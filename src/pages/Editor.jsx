@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import {
-    Save, Wand2, Download, ChevronLeft, ChevronRight, Send,
-    Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
-    Subscript, Superscript, List, ListOrdered, Undo, Redo,
-    FileDown, FileText, ZoomIn, ZoomOut, Maximize, Trash2, RotateCcw
-} from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
+import EditorToolbar from '../components/EditorToolbar';
+import VariablesSidebar from '../components/VariablesSidebar';
+import AiSidebar from '../components/AiSidebar';
 import './Editor.css';
 
 const Editor = () => {
@@ -14,7 +12,6 @@ const Editor = () => {
     const [prompt, setPrompt] = useState(location.state?.prompt || '');
     const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
     const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
-    const [showExportMenu, setShowExportMenu] = useState(false);
     const [activeTab, setActiveTab] = useState('ai');
     const [notes, setNotes] = useState('');
     const [zoomLevel, setZoomLevel] = useState(100);
@@ -23,26 +20,87 @@ const Editor = () => {
     const documentRef = useRef(null);
     const mainContainerRef = useRef(null);
 
-    const [placeholders, setPlaceholders] = useState([
-        { key: 'client_name', label: 'Client Name', value: '' },
-        { key: 'date', label: 'Date', value: new Date().toISOString().split('T')[0] },
-        { key: 'court_name', label: 'Court Name', value: '' },
-        { key: 'case_number', label: 'Case Number', value: '' },
-    ]);
+    const [placeholders, setPlaceholders] = useState([]);
     const [deletedPlaceholders, setDeletedPlaceholders] = useState([]);
 
     const [chatMessages, setChatMessages] = useState([
         { role: 'ai', content: 'Hello! I am your AI legal assistant. I can help you research case laws, draft clauses, or answer legal queries based on Indian Law.' }
     ]);
     const [chatInput, setChatInput] = useState('');
-    const [documentTitle, setDocumentTitle] = useState('Untitled Draft');
 
-    const [debugInfo, setDebugInfo] = useState('');
+    // Helper: Convert PDF fixed layout HTML to flowable content
+    const cleanPdfHtml = (htmlContent) => {
+        // If content doesn't look like our PDF output (no absolute positioning or specific classes), return as-is
+        if (!htmlContent.includes('content-element') && !htmlContent.includes('absolute')) {
+            return htmlContent;
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const elements = Array.from(doc.querySelectorAll('.content-element, .text-span, span[style*="absolute"]'));
+
+        if (elements.length === 0) return htmlContent;
+
+        // Group by approximate Y (top) position to form lines
+        const rows = new Map();
+        const TOLERANCE = 5; // px
+
+        elements.forEach(el => {
+            let top = parseFloat(el.style.top || '0');
+            // Find existing row within tolerance
+            let rowKey = Array.from(rows.keys()).find(k => Math.abs(parseFloat(k) - top) < TOLERANCE);
+
+            if (!rowKey) {
+                rowKey = top.toString();
+                rows.set(rowKey, []);
+            }
+            rows.get(rowKey).push(el);
+        });
+
+        // Sort rows by Y position
+        const sortedRowKeys = Array.from(rows.keys()).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+        // Build new HTML
+        let cleanHtml = '';
+
+        sortedRowKeys.forEach(key => {
+            const rowElements = rows.get(key);
+            // Sort elements in row by X (left) position
+            rowElements.sort((a, b) => {
+                const leftA = parseFloat(a.style.left || '0');
+                const leftB = parseFloat(b.style.left || '0');
+                return leftA - leftB;
+            });
+
+            // Create a paragraph for this line
+            cleanHtml += '<p>';
+
+            rowElements.forEach(el => {
+                // Extract style metadata we want to preserve
+                const styles = el.style;
+                const relevantStyles = [];
+
+                if (styles.fontWeight && styles.fontWeight !== 'normal') relevantStyles.push(`font-weight:${styles.fontWeight}`);
+                if (styles.fontStyle && styles.fontStyle !== 'normal') relevantStyles.push(`font-style:${styles.fontStyle}`);
+                if (styles.textDecoration && styles.textDecoration !== 'none') relevantStyles.push(`text-decoration:${styles.textDecoration}`);
+                // if (styles.color && styles.color !== 'rgb(0, 0, 0)' && styles.color !== '#000000') relevantStyles.push(`color:${styles.color}`);
+                // if (styles.fontSize) relevantStyles.push(`font-size:${styles.fontSize}`);
+
+                const styleString = relevantStyles.length > 0 ? `style="${relevantStyles.join(';')}"` : '';
+                cleanHtml += `<span ${styleString}>${el.innerHTML} </span>`;
+            });
+
+            cleanHtml += '</p>';
+        });
+
+        return cleanHtml;
+    };
 
     // Handle uploaded content and details - enhanced variable detection
     useEffect(() => {
         if (location.state?.htmlContent) {
-            let content = location.state.htmlContent;
+            // Clean content first
+            let content = cleanPdfHtml(location.state.htmlContent);
             const detectedPlaceholders = [];
 
             // Helper to add placeholder if not exists
@@ -66,21 +124,20 @@ const Editor = () => {
                 return cleanKey;
             };
 
-            // Broad Pattern: Text followed by dots/underscores, ignoring HTML tags and entities
-            const broadPattern = /([A-Za-z][A-Za-z0-9\s\/\-\(\):]*?)(?:<[^>]+>|&nbsp;|\s)*([._\u2026]{3,})/g;
+            // Regex Pattern: Text inside square brackets, e.g., [Name] or [Client Name]
+            const bracketPattern = /\[([^\]]+)\]/g;
 
-            content = content.replace(broadPattern, (match, label, dots) => {
-                // Clean up label for key generation
-                const cleanLabel = label.replace(/<[^>]+>|&nbsp;/g, ' ').trim().replace(/[:\s]+$/, '');
+            content = content.replace(bracketPattern, (match, label) => {
+                // Label is the text inside tags. Clean it up for the key.
+                const cleanLabel = label.trim();
 
-                if (cleanLabel.length < 2 || cleanLabel.toLowerCase() === 'sign') return match;
+                // Ignore very short or effectively empty brackets
+                if (cleanLabel.length < 1) return match;
 
                 const key = addPlaceholder(cleanLabel, cleanLabel);
 
-                // Replace ONLY the dots with the variable span, keeping the original label part of the match
-                // We reconstruct the match but replace the dots part
-                // ADDED SPACE HERE
-                return match.replace(dots, ` <span class="variable" data-key="${key}" data-original-dots="${dots}" contenteditable="false" style="font-weight: ${variablesBold ? 'bold' : 'normal'}">{${key}}</span>`);
+                // Wrap in variable span but display normally with brackets
+                return `<span class="variable" data-key="${key}" data-original-content="${label}" contenteditable="false">[${cleanLabel}]</span>`;
             });
 
             // Update document content
@@ -120,7 +177,27 @@ const Editor = () => {
         placeholders.forEach(p => {
             const elements = documentRef.current.querySelectorAll(`.variable[data-key="${p.key}"]`);
             elements.forEach(el => {
-                el.innerText = p.value || `{${p.key}}`;
+                // If value exists, show value (without brackets?), or user wants [value]?
+                // User said: "remove that they should look like a normal text on the editor placed between [] square brackets"
+                // AND "The text displayed over the boxex in the left panel should be the the text inside the placeholder"
+
+                // If the user inputs a value, usually we replace the placeholder [Name] with "John Doe". 
+                // BUT the instructions say: "look like a normal text... placed between [] square brackets".
+                // This implies even the VALUE might be shown in brackets? 
+                // OR likely, the placeholder STATE is [Name], and when filled, it becomes the value.
+
+                // Let's assume standard behavior: [Name] -> Value.
+                // UNLESS the user implies the *unfilled* state is [Name] (which we did above).
+
+                if (p.value) {
+                    el.innerText = p.value;
+                    // Optional: remove brackets when filled? Or keep them? 
+                    // Standard doc automation removes brackets.
+                    // If user wants brackets around value: `[${p.value}]`
+                } else {
+                    // Empty state -> show label in brackets
+                    el.innerText = `[${p.label}]`;
+                }
             });
         });
     }, [placeholders]);
@@ -137,16 +214,14 @@ const Editor = () => {
         setDeletedPlaceholders(prev => [...prev, placeholder]);
         setPlaceholders(prev => prev.filter(p => p.key !== key));
 
-        // Update DOM - change to "deleted" state
+        // Update DOM - change to "deleted" state (just text)
         if (documentRef.current) {
             const elements = documentRef.current.querySelectorAll(`.variable[data-key="${key}"]`);
             elements.forEach(el => {
                 el.classList.remove('variable');
                 el.classList.add('variable-deleted');
-                el.innerText = el.dataset.originalDots || '.........';
-                el.style.fontWeight = 'normal';
-                el.style.backgroundColor = 'transparent';
-                el.style.color = 'inherit';
+                // Revert to original content or current text?
+                // contentEditable true to allow manual edit
                 el.contentEditable = 'true';
             });
         }
@@ -166,11 +241,7 @@ const Editor = () => {
             elements.forEach(el => {
                 el.classList.remove('variable-deleted');
                 el.classList.add('variable');
-                el.innerText = placeholder.value || `{${key}}`;
-                el.style.fontWeight = variablesBold ? 'bold' : 'normal';
                 el.contentEditable = 'false';
-                el.style.backgroundColor = '';
-                el.style.color = '';
             });
         }
     };
@@ -217,7 +288,6 @@ const Editor = () => {
         };
 
         html2pdf().set(opt).from(clone).save();
-        setShowExportMenu(false);
     };
 
     const handleExportWord = () => {
@@ -259,7 +329,6 @@ const Editor = () => {
         fileDownload.download = 'legal_draft.doc';
         fileDownload.click();
         document.body.removeChild(fileDownload);
-        setShowExportMenu(false);
     };
 
     const handleZoomIn = () => {
@@ -279,59 +348,6 @@ const Editor = () => {
             setZoomLevel(Math.min(Math.max(newZoom - 5, 50), 150));
         }
     };
-
-    // Pinch-to-zoom handler (trackpad pinch or Ctrl+scroll) - zoom towards cursor
-    useEffect(() => {
-        const mainEl = mainContainerRef.current;
-        if (!mainEl) return;
-
-        const handleWheel = (e) => {
-            if (e.ctrlKey) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                // 4% zoom step
-                const delta = e.deltaY > 0 ? -4 : 4;
-                const newZoomLevel = Math.round(Math.min(200, Math.max(50, zoomLevel + delta)));
-
-                if (newZoomLevel !== zoomLevel) {
-                    // Get mouse position relative to viewport within container
-                    const rect = mainEl.getBoundingClientRect();
-                    const mouseXInContainer = e.clientX - rect.left;
-                    const mouseYInContainer = e.clientY - rect.top;
-
-                    // Current scroll and zoom
-                    const scrollLeft = mainEl.scrollLeft;
-                    const scrollTop = mainEl.scrollTop;
-                    const oldZoom = zoomLevel / 100;
-                    const newZoom = newZoomLevel / 100;
-
-                    // Point in document coordinates (before zoom)
-                    const pointX = (scrollLeft + mouseXInContainer) / oldZoom;
-                    const pointY = (scrollTop + mouseYInContainer) / oldZoom;
-
-                    // New scroll to keep that point under cursor
-                    const newScrollLeft = pointX * newZoom - mouseXInContainer;
-                    const newScrollTop = pointY * newZoom - mouseYInContainer;
-
-                    // Update zoom first
-                    setZoomLevel(newZoomLevel);
-
-                    // Then adjust scroll in next frame
-                    requestAnimationFrame(() => {
-                        mainEl.scrollTo({
-                            left: Math.max(0, newScrollLeft),
-                            top: Math.max(0, newScrollTop),
-                            behavior: 'instant'
-                        });
-                    });
-                }
-            }
-        };
-
-        mainEl.addEventListener('wheel', handleWheel, { passive: false });
-        return () => mainEl.removeEventListener('wheel', handleWheel);
-    }, [zoomLevel]);
 
     // Pagination constants (A4 at 96 DPI)
     const PAGE_HEIGHT = 1056;
@@ -522,157 +538,24 @@ const Editor = () => {
 
     return (
         <div className="editor-container">
-            {/* Toolbar */}
-            <div className="editor-toolbar glass-panel">
-                <div className="toolbar-group">
-                    <select className="font-select" onChange={(e) => execCommand('fontName', e.target.value)}>
-                        <option value="Inter">Inter</option>
-                        <option value="Times New Roman">Times New Roman</option>
-                        <option value="Roboto">Roboto</option>
-                        <option value="Open Sans">Open Sans</option>
-                        <option value="Lato">Lato</option>
-                        <option value="Georgia">Georgia</option>
-                    </select>
-                    <select className="size-select" onChange={(e) => execCommand('fontSize', e.target.value)}>
-                        <option value="3">12px</option>
-                        <option value="4">14px</option>
-                        <option value="5">18px</option>
-                        <option value="6">24px</option>
-                        <option value="7">30px</option>
-                    </select>
-                </div>
-                <div className="toolbar-divider"></div>
-                <div className="toolbar-group">
-                    <button className="tool-btn" onClick={() => execCommand('undo')} title="Undo"><Undo size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('redo')} title="Redo"><Redo size={18} /></button>
-                </div>
-                <div className="toolbar-divider"></div>
-                <div className="toolbar-group">
-                    <button className="tool-btn" onClick={() => execCommand('bold')} title="Bold"><Bold size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('italic')} title="Italic"><Italic size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('underline')} title="Underline"><Underline size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('subscript')} title="Subscript"><Subscript size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('superscript')} title="Superscript"><Superscript size={18} /></button>
-                </div>
-                <div className="toolbar-divider"></div>
-                <div className="toolbar-group">
-                    <button className="tool-btn" onClick={() => execCommand('justifyLeft')} title="Align Left"><AlignLeft size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('justifyCenter')} title="Align Center"><AlignCenter size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('justifyRight')} title="Align Right"><AlignRight size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
-                    <button className="tool-btn" onClick={() => execCommand('insertOrderedList')} title="Numbered List"><ListOrdered size={18} /></button>
-                </div>
-                <div className="spacer"></div>
-                <div className="toolbar-actions">
-                    <button className="btn btn-primary btn-sm">
-                        <Wand2 size={16} style={{ marginRight: 8 }} />
-                        Modify Draft
-                    </button>
-                    <button className="btn btn-ghost btn-sm">
-                        <Save size={16} style={{ marginRight: 8 }} />
-                        Save
-                    </button>
-                    <div style={{ position: 'relative' }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setShowExportMenu(!showExportMenu)}>
-                            <Download size={16} />
-                        </button>
-                        {showExportMenu && (
-                            <div className="export-menu glass-panel">
-                                <button onClick={handleExportPDF}>
-                                    <FileDown size={16} /> Export as PDF
-                                </button>
-                                <button onClick={handleExportWord}>
-                                    <FileText size={16} /> Export as Word
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <EditorToolbar
+                execCommand={execCommand}
+                onExportPDF={handleExportPDF}
+                onExportWord={handleExportWord}
+            />
 
             <div className="editor-layout">
-                {/* Left Sidebar: Placeholders */}
-                <div className={`editor-sidebar left glass-panel ${!leftSidebarOpen ? 'collapsed' : ''}`}>
-                    <div className="sidebar-title">
-                        {leftSidebarOpen && <h3>Variables</h3>}
-                        <button className="toggle-btn" onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}>
-                            {leftSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                    </div>
-                    {leftSidebarOpen && (
-                        <>
-                            <div className="sidebar-header-content">
-                                <span
-                                    className="badge"
-                                    style={{
-                                        backgroundColor: placeholders.filter(p => !p.value).length === 0 ? '#10b981' : undefined,
-                                        color: placeholders.filter(p => !p.value).length === 0 ? 'white' : undefined
-                                    }}
-                                >
-                                    {placeholders.filter(p => !p.value).length === 0
-                                        ? 'All filled'
-                                        : `${placeholders.filter(p => !p.value).length} missing`
-                                    }
-                                </span>
-                                <label style={{ display: 'flex', alignItems: 'center', fontSize: '12px', cursor: 'pointer', marginLeft: 'auto', color: '#666' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={variablesBold}
-                                        onChange={(e) => setVariablesBold(e.target.checked)}
-                                        style={{ marginRight: '5px' }}
-                                    />
-                                    Bold Variables
-                                </label>
-                            </div>
-                            <div className="placeholders-list">
-                                {placeholders.map(p => (
-                                    <div key={p.key} className="placeholder-item">
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                            <label style={{ marginBottom: 0 }}>{p.label}</label>
-                                            <button
-                                                onClick={() => handleRemovePlaceholder(p.key)}
-                                                className="btn-ghost"
-                                                title="Remove variable"
-                                                style={{ padding: '2px', height: 'auto', color: '#999' }}
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={p.value}
-                                            onChange={(e) => handlePlaceholderChange(p.key, e.target.value)}
-                                            placeholder={`Enter ${p.label}`}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-
-                            {deletedPlaceholders.length > 0 && (
-                                <div className="deleted-section" style={{ marginTop: '20px', borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: '10px' }}>
-                                    <h4 style={{ fontSize: '12px', color: '#999', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Deleted Variables
-                                    </h4>
-                                    {deletedPlaceholders.map(p => (
-                                        <div key={p.key} className="placeholder-item deleted" style={{ opacity: 0.7 }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <label style={{ textDecoration: 'line-through', color: '#999', marginBottom: 0 }}>{p.label}</label>
-                                                <button
-                                                    onClick={() => handleRestorePlaceholder(p.key)}
-                                                    className="btn-ghost"
-                                                    title="Restore variable"
-                                                    style={{ padding: '2px', height: 'auto', color: '#4caf50' }}
-                                                >
-                                                    <RotateCcw size={12} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                <VariablesSidebar
+                    isOpen={leftSidebarOpen}
+                    toggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
+                    placeholders={placeholders}
+                    deletedPlaceholders={deletedPlaceholders}
+                    variablesBold={variablesBold}
+                    setVariablesBold={setVariablesBold}
+                    onPlaceholderChange={handlePlaceholderChange}
+                    onRemovePlaceholder={handleRemovePlaceholder}
+                    onRestorePlaceholder={handleRestorePlaceholder}
+                />
 
                 {/* Center: Document */}
                 <div className="editor-main" ref={mainContainerRef}>
@@ -700,28 +583,7 @@ const Editor = () => {
                                     ref={documentRef}
                                 >
                                     {!location.state?.htmlContent && !location.state?.isEmpty && (
-                                        <>
-                                            <p><strong>LEGAL NOTICE</strong></p>
-                                            <p><strong>Ref No:</strong> <span className="variable" data-key="case_number" contentEditable="false">{placeholders.find(p => p.key === 'case_number')?.value || '{case_number}'}</span></p>
-                                            <p><strong>Date:</strong> <span className="variable" data-key="date" contentEditable="false">{placeholders.find(p => p.key === 'date')?.value || '{date}'}</span></p>
-                                            <p></p>
-                                            <p><strong>To,</strong></p>
-                                            <p>The Hon'ble Judge,</p>
-                                            <p><span className="variable" data-key="court_name" contentEditable="false">{placeholders.find(p => p.key === 'court_name')?.value || '{court_name}'}</span></p>
-                                            <p></p>
-                                            <p><strong>Subject:</strong> Petition regarding {prompt || 'the mentioned matter'}</p>
-                                            <p></p>
-                                            <p>Sir/Madam,</p>
-                                            <p>On behalf of my client, <strong><span className="variable" data-key="client_name" contentEditable="false">{placeholders.find(p => p.key === 'client_name')?.value || '{client_name}'}</span></strong>, I hereby submit the following facts:</p>
-                                            <p>1. That the petitioner is a law-abiding citizen of India.</p>
-                                            <p>2. That the petitioner is aggrieved by the circumstances detailed herein: {prompt}</p>
-                                            <p>3. That the petitioner seeks justice from this Hon'ble Court.</p>
-                                            <p></p>
-                                            <p>It is therefore prayed that this Hon'ble Court may be pleased to issue appropriate orders.</p>
-                                            <p></p>
-                                            <p>Sincerely,</p>
-                                            <p>Advocate Signature</p>
-                                        </>
+                                        <p><br /></p>
                                     )}
                                     {location.state?.isEmpty && (
                                         <p><br /></p>
@@ -748,72 +610,18 @@ const Editor = () => {
                     </div>
                 </div>
 
-                {/* Right Sidebar: AI Chat & Notes */}
-                <div className={`editor-sidebar right glass-panel ${!rightSidebarOpen ? 'collapsed' : ''}`}>
-                    <div className="chat-header">
-                        {rightSidebarOpen && (
-                            <>
-                                <div
-                                    className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('ai')}
-                                >
-                                    AI Research
-                                </div>
-                                <div
-                                    className={`tab ${activeTab === 'notes' ? 'active' : ''}`}
-                                    onClick={() => setActiveTab('notes')}
-                                >
-                                    Notes
-                                </div>
-                            </>
-                        )}
-                        <button className="toggle-btn" onClick={() => setRightSidebarOpen(!rightSidebarOpen)}>
-                            {rightSidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                        </button>
-                    </div>
-
-                    {rightSidebarOpen && (
-                        <>
-                            {activeTab === 'ai' ? (
-                                <>
-                                    <div className="chat-messages">
-                                        {chatMessages.map((msg, idx) => (
-                                            <div key={idx} className={`message ${msg.role}`}>
-                                                <div className="message-bubble">
-                                                    {msg.content}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="chat-input-area">
-                                        <div className="input-wrapper">
-                                            <input
-                                                type="text"
-                                                placeholder="Ask AI legal assistant..."
-                                                value={chatInput}
-                                                onChange={(e) => setChatInput(e.target.value)}
-                                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                                            />
-                                            <button className="send-btn" onClick={handleSendMessage}>
-                                                <Send size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="notes-area">
-                                    <textarea
-                                        placeholder="Type your research notes here..."
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                        className="notes-input"
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                <AiSidebar
+                    isOpen={rightSidebarOpen}
+                    toggle={() => setRightSidebarOpen(!rightSidebarOpen)}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    chatMessages={chatMessages}
+                    chatInput={chatInput}
+                    setChatInput={setChatInput}
+                    handleSendMessage={handleSendMessage}
+                    notes={notes}
+                    setNotes={setNotes}
+                />
             </div>
         </div >
     );

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, PenTool, Lock, Eye, EyeOff, FileText, Loader2, Check, ZoomIn, ZoomOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import './DraftingModal.css';
 
 const DraftingModal = ({ onClose }) => {
@@ -9,9 +10,14 @@ const DraftingModal = ({ onClose }) => {
     const [selectedFormat, setSelectedFormat] = useState(null);
     const [previewingFormat, setPreviewingFormat] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [previewZoom, setPreviewZoom] = useState(100);
     const previewRef = useRef(null);
+    const fileInputRef = useRef(null);
     const navigate = useNavigate();
+
+    // Backend converter URL
+    const CONVERTER_API_URL = "http://127.0.0.1:8000";
 
     // Zoom handlers
     const handleZoomIn = () => {
@@ -174,8 +180,83 @@ Date: ___________`
     const handleOptionSelect = (option) => {
         if (option === 'type') {
             setStep(2);
-        } else {
-            alert("Upload feature coming soon!");
+        } else if (option === 'upload') {
+            fileInputRef.current?.click();
+        }
+    };
+
+
+
+    const handleFileUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Exact extension logic from reference
+        const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+
+        // Exact allowed extensions from reference
+        const allowedExts = [".html", ".htm", ".pdf", ".rtf", ".doc", ".docx", ".txt"];
+
+        if (!allowedExts.includes(ext)) {
+            toast.error("Unsupported file type");
+            return;
+        }
+
+        // For HTML files, read directly as text
+        if (ext === ".html" || ext === ".htm") {
+            try {
+                const text = await file.text();
+                // Navigate immediately for HTML
+                navigate('/editor', {
+                    state: {
+                        htmlContent: text,
+                        uploadDetails: `Uploaded file: ${file.name}`,
+                        isEmpty: false
+                    }
+                });
+            } catch (error) {
+                toast.error("Failed to read HTML file");
+                console.error(error);
+            }
+            return;
+        }
+
+        // For all other supported files, use the converter backend
+        try {
+            setIsUploading(true);
+            toast.loading("Loading...");
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await fetch(`${CONVERTER_API_URL}/convert`, {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Conversion failed: ${response.statusText}`);
+            }
+
+            const htmlContent = await response.text();
+
+            toast.dismiss();
+            toast.success("File converted successfully!");
+
+            navigate('/editor', {
+                state: {
+                    htmlContent: htmlContent,
+                    uploadDetails: `Uploaded file: ${file.name}`,
+                    isEmpty: false
+                }
+            });
+
+        } catch (error) {
+            toast.dismiss();
+            toast.error("Failed to convert file. Make sure the converter service is running.");
+            console.error("Conversion error:", error);
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -218,7 +299,13 @@ Date: ___________`
                     <X size={20} />
                 </button>
 
-                {step === 1 ? (
+                {isUploading ? (
+                    <div className="step-content fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+                        <Loader2 size={48} className="spinner" style={{ marginBottom: '16px', color: '#4f46e5' }} />
+                        <h2 className="modal-title">Processing your file...</h2>
+                        <p className="modal-subtitle">Converting document to editable format</p>
+                    </div>
+                ) : step === 1 ? (
                     <div className="step-content fade-in">
                         <h2 className="modal-title">Start drafting by</h2>
                         <div className="options-grid">
@@ -231,6 +318,14 @@ Date: ___________`
                                     <p>Upload existing documents to use as reference for your draft</p>
                                 </div>
                             </button>
+                            {/* Hidden file input */}
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                accept=".html,.htm,.pdf,.doc,.docx,.rtf,.txt"
+                                onChange={handleFileUpload}
+                            />
 
                             <button className="option-card" onClick={() => handleOptionSelect('type')}>
                                 <div className="icon-box type">
@@ -294,8 +389,8 @@ Date: ___________`
                         {isLoading ? (
                             <div className="loading-state">
                                 <Loader2 size={48} className="spinner" />
-                                <h3>Generating your draft...</h3>
-                                <p>Our AI is preparing your {selectedFormat?.name} based on your prompt.</p>
+                                <h3 style={{ marginTop: '16px', fontSize: '1.2rem', fontWeight: 600 }}>Generating your draft...</h3>
+                                <p style={{ color: '#666', marginTop: '8px' }}>Our AI is preparing your {selectedFormat?.name} based on your prompt.</p>
                             </div>
                         ) : (
                             <>

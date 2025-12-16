@@ -12,9 +12,12 @@ const Placeholder = ({ title }) => (
   </div>
 );
 
+import { Toaster } from 'sonner';
+
 function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-center" richColors />
       <Routes>
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
