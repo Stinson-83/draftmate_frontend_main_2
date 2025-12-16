@@ -64,20 +64,19 @@ const MainLayout = () => {
       </aside>
 
       <main className="main-content">
-        {!isActive('/editor') && (
-          <header className="top-bar">
-            <div className="user-welcome">
-              <h1>Hi, Aaryan!</h1>
-              <p className="date">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-            </div>
-            <div className="brand-badge glass-panel">
-              <FileText size={16} className="brand-icon" />
-              <span>Law Jurist</span>
-            </div>
-          </header>
-        )}
-
         <div className="content-area">
+          {isActive('/') && (
+            <header className="top-bar">
+              <div className="user-welcome">
+                <h1>Hi, Aaryan!</h1>
+                <p className="date">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+              </div>
+              <div className="brand-badge glass-panel">
+                <FileText size={16} className="brand-icon" />
+                <span>Law Jurist</span>
+              </div>
+            </header>
+          )}
           <Outlet />
         </div>
       </main>

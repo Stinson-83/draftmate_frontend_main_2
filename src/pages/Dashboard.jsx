@@ -117,6 +117,7 @@ const Dashboard = () => {
                         icon={Scale}
                         title="AI Legal Research"
                         description="Do accurate legal research by talking to our AI."
+                        onClick={() => navigate('/research')}
                     />
                     <ActionCard
                         icon={FileText}

@@ -4,6 +4,8 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 
+import ResearchChat from './pages/ResearchChat';
+
 // Placeholder for other routes
 const Placeholder = ({ title }) => (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -23,7 +25,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="editor" element={<Editor />} />
           <Route path="drafts" element={<Placeholder title="My Drafts" />} />
-          <Route path="research" element={<Placeholder title="Legal Research" />} />
+          <Route path="research" element={<ResearchChat />} />
           <Route path="chat" element={<Placeholder title="AI Chat" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
