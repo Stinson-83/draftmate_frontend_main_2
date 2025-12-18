@@ -154,27 +154,62 @@ def score_match(row, user_query):
 
 def get_best_template(user_query):
     print("=== get_best_template called with:", user_query)
-    parsed = safe_normalize_query(user_query)   # keep your safe_normalize_query wrapper
-    print("DEBUG parsed:", parsed)
-    terms = parsed.get("search_terms", []) or []
-    language = parsed.get("language", "en")
     
-    # Generate Query Embedding
+    # 1. GENERATE EMBEDDING (Required for both paths)
     query_embedding = None
     try:
+        # Lower latency by encoding immediately
         query_embedding = model.encode(user_query).tolist()
     except Exception as e:
         print(f"Embedding failed: {e}")
 
-    # Use Hybrid Search from sql.py
-    candidates = search_documents(terms, query_embedding=query_embedding, raw_query=user_query, language=language)
-    if not candidates:
+    # 2. FAST PATH SEARCH (Direct search on raw user query)
+    print("DEBUG: Running Fast-Path Search...")
+    candidates = search_documents([], query_embedding=query_embedding, raw_query=user_query)
+    
+    def process_candidates(cand_list, query):
+        if not cand_list: return []
+        # Score candidates. Use DB score as weight.
+        scored = []
+        for r in cand_list:
+            # combine db score (0-1) with text similarity
+            db_score = float(r.get("score", 0))
+            text_sim = score_match(r, query)
+            # Favor db_score (especially vector) but fuzzy match helps tie-break
+            final_s = (db_score * 0.7) + (text_sim * 0.3)
+            scored.append((final_s, r))
+        scored.sort(reverse=True, key=lambda x: x[0])
+        return scored
+
+    scored = process_candidates(candidates, user_query)
+    
+    # Check if Fast-Path is "Good Enough" (Score > 0.6)
+    if scored and scored[0][0] > 0.6:
+        print(f"DEBUG: Fast-Path SUCCESS (Score: {scored[0][0]:.3f})")
+    else:
+        # 3. SLOW PATH (Gemini Normalization)
+        print("DEBUG: Fast-Path weak or empty. Calling Gemini...")
+        parsed = safe_normalize_query(user_query)
+        terms = parsed.get("search_terms", []) or []
+        
+        # Second pass with expanded terms
+        more_candidates = search_documents(terms, query_embedding=query_embedding, raw_query=user_query)
+        
+        # Merge results
+        seen = {c['doc_id'] for c in candidates}
+        for mc in more_candidates:
+            if mc['doc_id'] not in seen:
+                candidates.append(mc)
+        
+        scored = process_candidates(candidates, user_query)
+
+    if not scored:
         print("DEBUG: No candidates found -> returning None")
         return None, []
-    scored = [(score_match(r, user_query), r) for r in candidates]
-    scored.sort(reverse=True, key=lambda x: x[0])
+
     best_score, best_doc = scored[0]
     print("DEBUG: Best score:", best_score, "Best title:", best_doc["title"])
+    
     result = {
         "title": best_doc["title"],
         "doc_id": str(best_doc["doc_id"]),
