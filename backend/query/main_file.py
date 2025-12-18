@@ -1,6 +1,12 @@
 from QueryParsing import normalize_query
 from scoring import score_match 
 from sql import search_documents
+from sentence_transformers import SentenceTransformer
+
+# Load Model
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
+model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
 import re
 from difflib import SequenceMatcher
@@ -152,8 +158,16 @@ def get_best_template(user_query):
     print("DEBUG parsed:", parsed)
     terms = parsed.get("search_terms", []) or []
     language = parsed.get("language", "en")
-    # Expand multi-word terms already handled in search_documents_permissive
-    candidates = search_documents_permissive(terms, language)
+    
+    # Generate Query Embedding
+    query_embedding = None
+    try:
+        query_embedding = model.encode(user_query).tolist()
+    except Exception as e:
+        print(f"Embedding failed: {e}")
+
+    # Use Hybrid Search from sql.py
+    candidates = search_documents(terms, query_embedding=query_embedding, raw_query=user_query, language=language)
     if not candidates:
         print("DEBUG: No candidates found -> returning None")
         return None, []
