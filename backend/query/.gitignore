@@ -19,3 +19,4 @@ scraped_data_with_s3.json
 .vscode/
 *.swp
 *.swo
+env/

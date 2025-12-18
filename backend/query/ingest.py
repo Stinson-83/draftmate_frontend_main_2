@@ -21,6 +21,13 @@ from tqdm import tqdm
 import boto3
 import psycopg2
 from psycopg2.extras import execute_values
+from sentence_transformers import SentenceTransformer
+
+# Load Model (Global) - efficiently loaded only once
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
+model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+
 
 load_dotenv()
 
@@ -178,7 +185,7 @@ def upsert_documents(records):
         INSERT INTO documents (
             doc_id, title, canonical_title, doc_type, source_url, download_url,
             original_filename, file_extension, file_size_kb, language,
-            scrape_timestamp, s3_path, snippet, tags, created_at, updated_at
+            scrape_timestamp, s3_path, snippet, tags, embedding, created_at, updated_at
         ) VALUES %s
         ON CONFLICT (doc_id) DO UPDATE SET
             title = EXCLUDED.title,
@@ -194,6 +201,9 @@ def upsert_documents(records):
             s3_path = EXCLUDED.s3_path,
             snippet = EXCLUDED.snippet,
             tags = EXCLUDED.tags,
+            snippet = EXCLUDED.snippet,
+            tags = EXCLUDED.tags,
+            embedding = EXCLUDED.embedding,
             updated_at = now();
         """
         values = []
@@ -205,6 +215,10 @@ def upsert_documents(records):
                 tags_arr = [t.strip() for t in tags.split(",") if t.strip()]
             else:
                 tags_arr = None
+
+            # Generate Embedding
+            text_to_embed = f"{r.get('title') or ''} {r.get('snippet') or ''}".strip()
+            embedding = model.encode(text_to_embed).tolist() if text_to_embed else None
 
             values.append((
                 r.get("doc_id"),
@@ -221,6 +235,7 @@ def upsert_documents(records):
                 r.get("s3_path"),
                 r.get("snippet"),
                 tags_arr,
+                embedding,
                 r.get("created_at") or datetime.utcnow(),
                 r.get("updated_at") or datetime.utcnow()
             ))
