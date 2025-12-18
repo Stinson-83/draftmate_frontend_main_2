@@ -5,7 +5,7 @@ import {
     Subscript, Superscript, List, ListOrdered, FileDown, FileText
 } from 'lucide-react';
 
-const EditorToolbar = ({ execCommand, onExportPDF, onExportWord }) => {
+const EditorToolbar = ({ execCommand, onExportPDF, onExportWord, onSave }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
@@ -54,7 +54,7 @@ const EditorToolbar = ({ execCommand, onExportPDF, onExportWord }) => {
                     <Wand2 size={16} style={{ marginRight: 8 }} />
                     Modify Draft
                 </button>
-                <button className="btn btn-ghost btn-sm">
+                <button className="btn btn-ghost btn-sm" onClick={onSave}>
                     <Save size={16} style={{ marginRight: 8 }} />
                     Save
                 </button>

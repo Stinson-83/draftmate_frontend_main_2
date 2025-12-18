@@ -314,6 +314,19 @@
     margin-top: 0;
 }
 
+/* Force transparent background on text elements to prevent unwanted highlighting */
+.editor-root p,
+.editor-root span,
+.editor-root div,
+.editor-root h1,
+.editor-root h2,
+.editor-root h3,
+.editor-root h4,
+.editor-root h5,
+.editor-root h6 {
+    background-color: transparent !important;
+}
+
 .document-page h1,
 .editor-root h1 {
     text-align: center;

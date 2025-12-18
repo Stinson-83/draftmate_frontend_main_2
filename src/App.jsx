@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
+import MyDrafts from './pages/MyDrafts';
 
 import ResearchChat from './pages/ResearchChat';
 
@@ -24,7 +25,7 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="editor" element={<Editor />} />
-          <Route path="drafts" element={<Placeholder title="My Drafts" />} />
+          <Route path="drafts" element={<MyDrafts />} />
           <Route path="research" element={<ResearchChat />} />
           <Route path="chat" element={<Placeholder title="AI Chat" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
