@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { PenTool, FilePlus, Search, Upload, MessageSquare, FileText, Scale, BookOpen } from 'lucide-react';
+import { PenTool, FilePlus, Search, Upload, MessageSquare, FileText, Scale, BookOpen, Calculator } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './Dashboard.css';
 import DraftingModal from '../components/DraftingModal';
 import UploadModal from '../components/UploadModal';
+import CourtFeeModal from '../components/CourtFeeModal';
 import axios from 'axios';
 
 const Dashboard = () => {
     const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isCourtFeeModalOpen, setIsCourtFeeModalOpen] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState('');
     const [htmlContent, setHtmlContent] = useState('');
     const fileInputRef = React.useRef(null);
@@ -90,9 +92,10 @@ const Dashboard = () => {
                         onClick={() => navigate('/editor', { state: { isEmpty: true } })}
                     />
                     <ActionCard
-                        icon={Search}
+                        icon={FileText}
                         title="Review Your Draft"
-                        description="Upload your draft and let AI improve grammar and check errors."
+                        description="Review you previously created drafts."
+                        onClick={() => navigate('/drafts')}
                     />
                     <ActionCard
                         icon={Upload}
@@ -120,9 +123,10 @@ const Dashboard = () => {
                         onClick={() => navigate('/research')}
                     />
                     <ActionCard
-                        icon={FileText}
-                        title="Legal Memo"
-                        description="Prepare comprehensive Legal Memo with citations."
+                        icon={Calculator}
+                        title="Court Fee Calculator"
+                        description="Calculate Ad-Valorem Court Fees for your jurisdiction."
+                        onClick={() => setIsCourtFeeModalOpen(true)}
                     />
                     <ActionCard
                         icon={MessageSquare}
@@ -138,6 +142,7 @@ const Dashboard = () => {
             </section>
 
             {isModalOpen && <DraftingModal onClose={() => setIsModalOpen(false)} />}
+            {isCourtFeeModalOpen && <CourtFeeModal onClose={() => setIsCourtFeeModalOpen(false)} />}
 
             <UploadModal
                 isOpen={isUploadModalOpen}

@@ -18,9 +18,13 @@ const Editor = () => {
     const [zoomLevel, setZoomLevel] = useState(100);
     const [variablesBold, setVariablesBold] = useState(true);
 
-    // Save Modal State
-    const [showSaveModal, setShowSaveModal] = useState(false);
-    const [draftNameInput, setDraftNameInput] = useState('');
+    // Draft Name State
+    const [draftName, setDraftName] = useState(() => {
+        // Priority: Location state (from upload/open) -> Default
+        return location.state?.uploadDetails?.replace('Draft: ', '') ||
+            location.state?.name ||
+            'Untitled Draft';
+    });
 
     const documentRef = useRef(null);
     const mainContainerRef = useRef(null);
@@ -265,6 +269,7 @@ const Editor = () => {
     };
 
     const handleExportPDF = () => {
+        handleSave();
         const element = documentRef.current;
         // Clone the element to remove contentEditable and ensure clean styles
         const clone = element.cloneNode(true);
@@ -296,6 +301,7 @@ const Editor = () => {
     };
 
     const handleExportWord = () => {
+        handleSave();
         // Clone and clean up for Word export
         const clone = documentRef.current.cloneNode(true);
         const variables = clone.querySelectorAll('.variable');
@@ -534,15 +540,6 @@ const Editor = () => {
     }, [paginateAll]);
 
     const handleSave = () => {
-        // Pre-fill with current name or client name or default
-        const currentName = location.state?.uploadDetails?.replace('Draft: ', '') ||
-            placeholders.find(p => p.key === 'client_name')?.value ||
-            'Untitled Draft';
-        setDraftNameInput(currentName);
-        setShowSaveModal(true);
-    };
-
-    const confirmSave = () => {
         if (!documentRef.current) return;
 
         const content = documentRef.current.innerHTML;
@@ -551,19 +548,19 @@ const Editor = () => {
 
         const draftData = {
             id: draftId,
-            name: draftNameInput || 'Untitled Draft',
+            name: draftName || 'Untitled Draft',
             content: content,
             placeholders: placeholders,
             lastModified: new Date().toISOString()
         };
 
         const existingDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+        // Remove old version if exists
         const otherDrafts = existingDrafts.filter(d => d.id !== draftId);
         const updatedDrafts = [...otherDrafts, draftData];
 
         localStorage.setItem('my_drafts', JSON.stringify(updatedDrafts));
         toast.success('Draft saved successfully!');
-        setShowSaveModal(false);
     };
 
     // Auto-fit when sidebars change
@@ -581,6 +578,8 @@ const Editor = () => {
                 onExportPDF={handleExportPDF}
                 onExportWord={handleExportWord}
                 onSave={handleSave}
+                draftName={draftName}
+                setDraftName={setDraftName}
             />
 
             <div className="editor-layout">
@@ -662,83 +661,7 @@ const Editor = () => {
                     setNotes={setNotes}
                 />
 
-                {/* Save Draft Modal */}
-                {showSaveModal && (
-                    <div style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 1000,
-                        backdropFilter: 'blur(4px)'
-                    }}>
-                        <div style={{
-                            background: 'white',
-                            padding: '24px',
-                            borderRadius: '12px',
-                            width: '400px',
-                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                        }}>
-                            <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', fontWeight: 600 }}>Save Draft</h3>
 
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: '#475569' }}>
-                                    Draft Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={draftNameInput}
-                                    onChange={(e) => setDraftNameInput(e.target.value)}
-                                    placeholder="Enter draft name..."
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px',
-                                        borderRadius: '6px',
-                                        border: '1px solid #e2e8f0',
-                                        fontSize: '1rem',
-                                        outline: 'none'
-                                    }}
-                                    autoFocus
-                                />
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                <button
-                                    onClick={() => setShowSaveModal(false)}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '6px',
-                                        border: '1px solid #e2e8f0',
-                                        background: 'white',
-                                        cursor: 'pointer',
-                                        fontWeight: 500
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={confirmSave}
-                                    style={{
-                                        padding: '8px 16px',
-                                        borderRadius: '6px',
-                                        border: 'none',
-                                        background: '#2563eb',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontWeight: 500
-                                    }}
-                                >
-                                    Save Draft
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div >
     );

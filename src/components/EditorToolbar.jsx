@@ -5,7 +5,7 @@ import {
     Subscript, Superscript, List, ListOrdered, FileDown, FileText
 } from 'lucide-react';
 
-const EditorToolbar = ({ execCommand, onExportPDF, onExportWord, onSave }) => {
+const EditorToolbar = ({ execCommand, onExportPDF, onExportWord, onSave, draftName, setDraftName }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
@@ -47,6 +47,35 @@ const EditorToolbar = ({ execCommand, onExportPDF, onExportWord, onSave }) => {
                 <button className="tool-btn" onClick={() => execCommand('justifyRight')} title="Align Right"><AlignRight size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('insertOrderedList')} title="Numbered List"><ListOrdered size={18} /></button>
+            </div>
+            <div className="toolbar-divider"></div>
+            <div className="toolbar-group" style={{ flex: 1, padding: '0 16px' }}>
+                <input
+                    type="text"
+                    value={draftName || ''}
+                    onChange={(e) => setDraftName && setDraftName(e.target.value)}
+                    placeholder="Untitled Draft"
+                    className="draft-name-input"
+                    style={{
+                        width: '100%',
+                        padding: '6px 12px',
+                        border: '1px solid transparent',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: '#1e293b',
+                        background: 'transparent',
+                        transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => {
+                        e.target.style.background = '#f1f5f9';
+                        e.target.style.borderColor = '#cbd5e1';
+                    }}
+                    onBlur={(e) => {
+                        e.target.style.background = 'transparent';
+                        e.target.style.borderColor = 'transparent';
+                    }}
+                />
             </div>
             <div className="spacer"></div>
             <div className="toolbar-actions">

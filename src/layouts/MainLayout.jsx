@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, FileText, Search, MessageSquare, Settings, LogOut, Sun, Moon } from 'lucide-react';
+import { Home, FileText, Scale, MessageSquare, Settings, LogOut, Sun, Moon } from 'lucide-react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import './MainLayout.css';
 
@@ -40,7 +40,7 @@ const MainLayout = () => {
             <span className="tooltip">My Drafts</span>
           </Link>
           <Link to="/research" className={`nav-item ${isActive('/research') ? 'active' : ''}`}>
-            <Search size={20} />
+            <Scale size={20} />
             <span className="tooltip">Research</span>
           </Link>
           <Link to="/chat" className={`nav-item ${isActive('/chat') ? 'active' : ''}`}>

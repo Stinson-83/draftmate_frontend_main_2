@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import './DraftingModal.css';
 
 const DraftingModal = ({ onClose }) => {
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(2);
     const [prompt, setPrompt] = useState('');
     const [selectedFormat, setSelectedFormat] = useState(null);
     const [previewingFormat, setPreviewingFormat] = useState(null);
@@ -18,6 +18,9 @@ const DraftingModal = ({ onClose }) => {
 
     // Backend converter URL
     const CONVERTER_API_URL = "http://127.0.0.1:8000";
+
+    // State for formats
+    const [formats, setFormats] = useState([]);
 
     // Zoom handlers
     const handleZoomIn = () => {
@@ -49,133 +52,6 @@ const DraftingModal = ({ onClose }) => {
         };
     }, [previewingFormat]);
 
-    // Mock data for top 3 formats - will be replaced with backend data later
-    const mockFormats = [
-        {
-            id: 1,
-            name: 'Affidavit',
-            description: 'A written statement confirmed by oath or affirmation, used as evidence in court.',
-            preview: `AFFIDAVIT
-
-I, [Full Name], aged about [Age] years,
-S/o, D/o, W/o [Father's/Husband's Name],
-R/o [Complete Address],
-
-do hereby solemnly affirm and state as follows:
-
-1. That I am the deponent herein and am fully conversant with the facts of this case.
-
-2. That [state the relevant facts].
-
-3. That [additional facts as required].
-
-4. That the contents of this affidavit are true to my knowledge and belief and nothing material has been concealed therefrom.
-
-VERIFICATION:
-
-I, the above-named deponent, do hereby verify that the contents of this affidavit are true and correct to my knowledge and belief, and nothing material has been concealed therefrom.
-
-Verified at [Place] on this [Day] day of [Month], [Year].
-
-DEPONENT
-
-Identified by me:
-
-[Advocate Name]
-Advocate`
-        },
-        {
-            id: 2,
-            name: 'Legal Notice',
-            description: 'Formal communication to assert legal rights or demand action.',
-            preview: `LEGAL NOTICE
-
-Date: [DD/MM/YYYY]
-
-To,
-[Recipient Full Name]
-[Designation, if any]
-[Complete Address]
-[City, State - PIN Code]
-
-Subject: Legal Notice for [Brief Subject Matter]
-
-Ref: [Reference Number, if any]
-
-Sir/Madam,
-
-Under instructions from and on behalf of my client, [Client Name], I hereby serve upon you the following Legal Notice:
-
-1. That my client is [brief description of client].
-
-2. That [state the facts giving rise to the dispute].
-
-3. That despite repeated requests, you have failed to [specific grievance].
-
-4. That your actions/inactions constitute a violation of [relevant law/agreement].
-
-You are hereby called upon to [specific demand] within [number] days from the receipt of this notice, failing which my client shall be constrained to initiate appropriate legal proceedings against you, civil and/or criminal, at your risk, cost and consequences.
-
-Please treat this notice as final.
-
-Yours faithfully,
-
-[Advocate Name]
-Advocate
-[Bar Council Enrollment No.]
-[Office Address]
-[Contact Details]`
-        },
-        {
-            id: 3,
-            name: 'Petition',
-            description: 'A formal written request submitted to a court or authority.',
-            preview: `IN THE COURT OF [Court Name]
-[City/District]
-
-Petition No. _____ of 20__
-
-IN THE MATTER OF:
-
-[Petitioner Name]
-S/o, D/o, W/o [Parent/Spouse Name]
-R/o [Full Address]
-... PETITIONER
-
-VERSUS
-
-[Respondent Name]
-[Designation/Relationship]
-[Address]
-... RESPONDENT
-
-HUMBLE PETITION UNDER [Relevant Section/Act]
-
-Most Respectfully Showeth:
-
-1. That the Petitioner is a law-abiding citizen of India.
-
-2. That the facts and circumstances of the case are as follows:
-   [Detailed facts of the matter]
-
-3. That the Petitioner has a valid cause of action.
-
-PRAYER:
-
-It is therefore most respectfully prayed that this Hon'ble Court may be pleased to:
-
-a) Grant the relief as prayed for;
-b) Pass any other order deemed fit.
-
-AND FOR THIS ACT OF KINDNESS, THE PETITIONER SHALL EVER PRAY.
-
-Petitioner
-Through Counsel
-
-Place: ___________
-Date: ___________`
-        },
-    ];
 
     const handleOptionSelect = (option) => {
         if (option === 'type') {
@@ -260,20 +136,100 @@ Date: ___________`
         }
     };
 
-    const handleSubmit = () => {
-        // Move to format selection step instead of navigating directly
-        setStep(3);
+    const handleSubmit = async () => {
+        if (!prompt.trim()) {
+            toast.error("Please enter details about what you want to draft");
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            // Move to step 3 immediately so user sees loading state there if preferred, 
+            // OR keep a loading toast here. 
+            // Current design calls for a loading spinner in step 3... 
+            // BUT existing code showed step 3 -> loading.
+            // Let's set step 3 and reuse the loading state there.
+            setStep(3);
+
+            const response = await fetch(`${CONVERTER_API_URL}/search`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_query: prompt })
+            });
+
+            if (!response.ok) throw new Error('Search failed');
+
+            const result = await response.json();
+
+            // Format best match
+            const bestMatch = {
+                id: result.doc_id,
+                name: result.title,
+                description: 'Best Match found based on your requirements.',
+                s3_path: result.s3_path,
+                preview: null // Lazy load
+            };
+
+            // Format alternatives (take top 2)
+            const alternatives = (result.alternatives || []).slice(0, 2).map((alt, index) => ({
+                id: alt.doc_id || `alt-${index}`,
+                name: alt.title,
+                description: 'Alternative format that might suit your needs.',
+                s3_path: alt.s3_path,
+                preview: null
+            }));
+
+            setFormats([bestMatch, ...alternatives]);
+
+        } catch (error) {
+            console.error("Search error:", error);
+            toast.error("Failed to find formats. Please try again.");
+            // Fallback to empty or handle gracefully? 
+            // For now, staying on step 3 but empty formats might be bad.
+            // Maybe go back? or show retry?
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleFormatSelect = (format) => {
         setSelectedFormat(format);
     };
 
-    const handlePreviewToggle = (formatId) => {
+    const handlePreviewToggle = async (formatId) => {
         if (previewingFormat === formatId) {
             setPreviewingFormat(null);
-        } else {
-            setPreviewingFormat(formatId);
+            return;
+        }
+
+        const formatToPreview = formats.find(f => f.id === formatId);
+        if (!formatToPreview) return;
+
+        setPreviewingFormat(formatId);
+
+        // Fetch preview content if not already loaded
+        if (!formatToPreview.preview && formatToPreview.s3_path) {
+            try {
+                // Show a loading indicator in the preview area? 
+                // For now we just wait for the fetch.
+                const response = await fetch(`${CONVERTER_API_URL}/download-template-html`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ s3_path: formatToPreview.s3_path })
+                });
+
+                if (response.ok) {
+                    const htmlText = await response.text();
+
+                    // Update state with new preview content
+                    setFormats(prev => prev.map(f =>
+                        f.id === formatId ? { ...f, preview: htmlText } : f
+                    ));
+                }
+            } catch (error) {
+                console.error("Preview fetch error:", error);
+                toast.error("Failed to load preview.");
+            }
         }
     };
 
@@ -286,7 +242,24 @@ Date: ___________`
             navigate('/editor', {
                 state: {
                     prompt,
-                    selectedFormat: selectedFormat.name
+                    selectedFormat: selectedFormat.name,
+                    // If we have the HTML content already (from preview), we could pass it?
+                    // But typically generation is a separate process.
+                    // For now, sticking to current flow.
+                }
+            });
+        }, 1500);
+    };
+
+    const handleGenerateViaAI = () => {
+        setIsLoading(true);
+        // Simulate AI draft generation delay
+        setTimeout(() => {
+            navigate('/editor', {
+                state: {
+                    prompt,
+                    selectedFormat: 'Check/Cheque Bounce Notice', // Default fallback or generic type
+                    customGeneration: true
                 }
             });
         }, 1500);
@@ -347,11 +320,11 @@ Date: ___________`
                             <h2 className="modal-title">Please tell us more about what you want to draft</h2>
                         </div>
 
-                        <p className="modal-subtitle">Do include which legal document you want to draft and the facts of the case</p>
+                        <p className="modal-subtitle">Include important details and facts of the case to get accurate format for the Draft</p>
 
                         <div className="input-area">
                             <textarea
-                                placeholder="e.g. My client has been charged with Section 6 POCSO and rape charges..."
+                                placeholder="e.g. My client wants to file a petition for divorce"
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
                                 rows={6}
@@ -359,14 +332,15 @@ Date: ___________`
                         </div>
 
                         <div className="modal-controls">
-                            <div className="control-group">
+                            {/* can be used to give language options */}
+                            {/* <div className="control-group">
                                 <label>Draft in</label>
                                 <select className="select-input">
                                     <option>English</option>
                                     <option>Hindi</option>
                                     <option>Spanish</option>
                                 </select>
-                            </div>
+                            </div> */}
 
                             <div className="premium-feature">
                                 <input type="checkbox" disabled />
@@ -390,7 +364,7 @@ Date: ___________`
                             <div className="loading-state">
                                 <Loader2 size={48} className="spinner" />
                                 <h3 style={{ marginTop: '16px', fontSize: '1.2rem', fontWeight: 600 }}>Generating your draft...</h3>
-                                <p style={{ color: '#666', marginTop: '8px' }}>Our AI is preparing your {selectedFormat?.name} based on your prompt.</p>
+                                <p style={{ color: '#666', marginTop: '8px' }}>Our AI is preparing your {selectedFormat?.name || 'custom draft'} based on your prompt.</p>
                             </div>
                         ) : (
                             <>
@@ -401,11 +375,11 @@ Date: ___________`
                                     <h2 className="modal-title">Choose a format for your draft</h2>
                                 </div>
 
-                                <p className="modal-subtitle">Based on your prompt, here are the best matching formats:</p>
+                                <p className="modal-subtitle">Here are the best matching formats according to your draft:</p>
 
                                 <div className="format-selection-layout">
                                     <div className="formats-grid">
-                                        {mockFormats.map((format) => (
+                                        {formats.map((format) => (
                                             <button
                                                 key={format.id}
                                                 className={`format-card ${selectedFormat?.id === format.id ? 'selected' : ''}`}
@@ -466,7 +440,13 @@ Date: ___________`
                                                     }}
                                                 >
                                                     <div className="a4-page" style={{ transform: `scale(${previewZoom / 100})` }}>
-                                                        <pre>{mockFormats.find(f => f.id === previewingFormat)?.preview}</pre>
+                                                        {formats.find(f => f.id === previewingFormat)?.preview ? (
+                                                            <div dangerouslySetInnerHTML={{ __html: formats.find(f => f.id === previewingFormat).preview }} />
+                                                        ) : (
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                                                <Loader2 className="spinner" size={32} style={{ color: '#4f46e5' }} />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -474,15 +454,26 @@ Date: ___________`
                                     )}
                                 </div>
 
-                                <div className="modal-actions">
+                                <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
                                     <button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button>
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={handleContinue}
-                                        disabled={!selectedFormat}
-                                    >
-                                        Continue
-                                    </button>
+
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button
+                                            className="btn btn-ghost"
+                                            onClick={handleGenerateViaAI}
+                                            style={{ border: '1px solid #e2e8f0' }}
+                                        >
+                                            Generate via AI
+                                        </button>
+
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={handleContinue}
+                                            disabled={!selectedFormat}
+                                        >
+                                            Continue
+                                        </button>
+                                    </div>
                                 </div>
                             </>
                         )}
