@@ -1,5 +1,5 @@
-Endpoint: lawdb.cfge8ai08o3t.ap-south-1.rds.amazonaws.com
+Endpoint: privet-lawdb.cfge8ai08o3t.ap-south-1.rds.amazonaws.com
 Port: 5432
 Username: lawuser
 Password: Siddchick2506
-Database: lawdb
+Database: privet-lawdb
