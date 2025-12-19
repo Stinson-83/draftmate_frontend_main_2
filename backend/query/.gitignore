@@ -20,3 +20,4 @@ scraped_data_with_s3.json
 *.swp
 *.swo
 env/
+bash.exe.stackdump

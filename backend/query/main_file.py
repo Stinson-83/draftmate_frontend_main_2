@@ -3,30 +3,21 @@ from scoring import score_match
 from sql import search_documents
 from sentence_transformers import SentenceTransformer
 
+import os
+import re
+from difflib import SequenceMatcher
+from urllib.parse import urlparse
+from dotenv import load_dotenv
+import boto3
+
+load_dotenv()
+
 # Load Model
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
 model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
-import re
-from difflib import SequenceMatcher
-import psycopg2.extras
-
-import os
-import psycopg2
-from dotenv import load_dotenv
-
-# Load .env variables
-load_dotenv()
-
-# Create the global database connection
-POSTGRES_DSN = os.getenv("POSTGRES_DSN")
-conn = psycopg2.connect(POSTGRES_DSN)
-
-import boto3
-from urllib.parse import urlparse
-
-# Create S3 client (uses same AWS creds from .env)
+# Create S3 client
 s3_client = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
