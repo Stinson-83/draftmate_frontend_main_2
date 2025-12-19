@@ -15,7 +15,18 @@ load_dotenv()
 from QueryParsing import normalize_query
 from main_file import get_best_template, download_from_s3
 
-app = FastAPI(title="Legal Query Service")
+from contextlib import asynccontextmanager
+import sql
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start tunnel and connection pool
+    sql.start_tunnel_and_pool()
+    yield
+    # Shutdown: Stop tunnel and connection pool
+    sql.stop_tunnel_and_pool()
+
+app = FastAPI(title="Legal Query Service", lifespan=lifespan)
 
 # CORS middleware- allows the front end to communictae to backend
 #- here any frontend has access to our backend services
