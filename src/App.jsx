@@ -7,6 +7,8 @@ import MyDrafts from './pages/MyDrafts';
 
 import ResearchChat from './pages/ResearchChat';
 
+import Settings from './pages/Settings';
+
 // Placeholder for other routes
 const Placeholder = ({ title }) => (
   <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
@@ -25,6 +27,7 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="editor" element={<Editor />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="drafts" element={<MyDrafts />} />
           <Route path="research" element={<ResearchChat />} />
           <Route path="chat" element={<Placeholder title="AI Chat" />} />

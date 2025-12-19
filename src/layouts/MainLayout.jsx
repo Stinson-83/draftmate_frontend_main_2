@@ -54,9 +54,9 @@ const MainLayout = () => {
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             <span className="tooltip">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
-          <button className="nav-item">
+          <Link to="/settings" className={`nav-item ${isActive('/settings') ? 'active' : ''}`}>
             <Settings size={20} />
-          </button>
+          </Link>
           <button className="nav-item">
             <LogOut size={20} />
           </button>

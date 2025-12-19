@@ -18,6 +18,21 @@ const Editor = () => {
     const [zoomLevel, setZoomLevel] = useState(100);
     const [variablesBold, setVariablesBold] = useState(true);
 
+    // Settings State
+    const [editorSettings, setEditorSettings] = useState({ headerText: '', footerText: '', headerAlignment: 'center' });
+
+    // Load settings on mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('user_settings');
+            if (saved) {
+                setEditorSettings(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error('Failed to load settings', e);
+        }
+    }, []);
+
     // Draft Name State
     const [draftName, setDraftName] = useState(() => {
         // Priority: Location state (from upload/open) -> Default
@@ -186,25 +201,9 @@ const Editor = () => {
         placeholders.forEach(p => {
             const elements = documentRef.current.querySelectorAll(`.variable[data-key="${p.key}"]`);
             elements.forEach(el => {
-                // If value exists, show value (without brackets?), or user wants [value]?
-                // User said: "remove that they should look like a normal text on the editor placed between [] square brackets"
-                // AND "The text displayed over the boxex in the left panel should be the the text inside the placeholder"
-
-                // If the user inputs a value, usually we replace the placeholder [Name] with "John Doe". 
-                // BUT the instructions say: "look like a normal text... placed between [] square brackets".
-                // This implies even the VALUE might be shown in brackets? 
-                // OR likely, the placeholder STATE is [Name], and when filled, it becomes the value.
-
-                // Let's assume standard behavior: [Name] -> Value.
-                // UNLESS the user implies the *unfilled* state is [Name] (which we did above).
-
                 if (p.value) {
                     el.innerText = p.value;
-                    // Optional: remove brackets when filled? Or keep them? 
-                    // Standard doc automation removes brackets.
-                    // If user wants brackets around value: `[${p.value}]`
                 } else {
-                    // Empty state -> show label in brackets
                     el.innerText = `[${p.label}]`;
                 }
             });
@@ -219,18 +218,14 @@ const Editor = () => {
         const placeholder = placeholders.find(p => p.key === key);
         if (!placeholder) return;
 
-        // Move to deleted
         setDeletedPlaceholders(prev => [...prev, placeholder]);
         setPlaceholders(prev => prev.filter(p => p.key !== key));
 
-        // Update DOM - change to "deleted" state (just text)
         if (documentRef.current) {
             const elements = documentRef.current.querySelectorAll(`.variable[data-key="${key}"]`);
             elements.forEach(el => {
                 el.classList.remove('variable');
                 el.classList.add('variable-deleted');
-                // Revert to original content or current text?
-                // contentEditable true to allow manual edit
                 el.contentEditable = 'true';
             });
         }
@@ -240,11 +235,9 @@ const Editor = () => {
         const placeholder = deletedPlaceholders.find(p => p.key === key);
         if (!placeholder) return;
 
-        // Move back to active
         setPlaceholders(prev => [...prev, placeholder]);
         setDeletedPlaceholders(prev => prev.filter(p => p.key !== key));
 
-        // Update DOM - restore "variable" state
         if (documentRef.current) {
             const elements = documentRef.current.querySelectorAll(`.variable-deleted[data-key="${key}"]`);
             elements.forEach(el => {
@@ -271,13 +264,11 @@ const Editor = () => {
     const handleExportPDF = () => {
         handleSave();
         const element = documentRef.current;
-        // Clone the element to remove contentEditable and ensure clean styles
         const clone = element.cloneNode(true);
         clone.removeAttribute('contentEditable');
         clone.style.boxShadow = 'none';
         clone.style.margin = '0';
 
-        // Clean up variables for export (remove highlights)
         const variables = clone.querySelectorAll('.variable');
         variables.forEach(v => {
             v.style.backgroundColor = 'transparent';
@@ -302,7 +293,6 @@ const Editor = () => {
 
     const handleExportWord = () => {
         handleSave();
-        // Clone and clean up for Word export
         const clone = documentRef.current.cloneNode(true);
         const variables = clone.querySelectorAll('.variable');
         variables.forEach(v => {
@@ -353,7 +343,6 @@ const Editor = () => {
     const handleFitWidth = () => {
         if (mainContainerRef.current) {
             const containerWidth = mainContainerRef.current.clientWidth;
-            // A4 width in px (approx) + padding
             const documentWidth = 816 + 100;
             const newZoom = Math.floor((containerWidth / documentWidth) * 100);
             setZoomLevel(Math.min(Math.max(newZoom - 5, 50), 150));
@@ -362,20 +351,14 @@ const Editor = () => {
 
     // Pagination constants (A4 at 96 DPI)
     const PAGE_HEIGHT = 1056;
-    const PAGE_PADDING = 72; // Matches CSS padding (3/4 inch)
-    const MAX_CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 912px available content area
+    const PAGE_PADDING = 72;
+    const MAX_CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2;
 
-    // Ref to track pages container
     const pagesContainerRef = useRef(null);
-
-    // State for page count (for zoom-wrapper sizing)
     const [pageCount, setPageCount] = useState(1);
-
-    // State for document stats
     const [wordCount, setWordCount] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Helper: ensure editor-root exists in page
     const initEmptyEditor = (pageEl) => {
         let ed = pageEl.querySelector('.editor-root');
         if (!ed) {
@@ -394,7 +377,6 @@ const Editor = () => {
         return ed;
     };
 
-    // Helper: create or get next page
     const ensureNextPage = (currentPage) => {
         let next = currentPage.nextElementSibling;
         if (!next || !next.classList.contains('document-page')) {
@@ -406,21 +388,48 @@ const Editor = () => {
         return next;
     };
 
-    // Pagination function - exactly like DocumentPreview.tsx
+    // Helper: Render footer on specific page
+    const updateFooters = useCallback(() => {
+        const container = pagesContainerRef.current;
+        if (!container) return;
+
+        const pages = Array.from(container.querySelectorAll('.document-page'));
+        const footerText = editorSettings.footerText;
+
+        pages.forEach((page, index) => {
+            const isLast = index === pages.length - 1;
+            let footer = page.querySelector('.page-footer');
+
+            if (isLast && footerText) {
+                if (!footer) {
+                    footer = document.createElement('div');
+                    footer.className = 'page-footer';
+                    page.appendChild(footer);
+                }
+                if (footer.innerHTML !== footerText) {
+                    footer.innerHTML = footerText;
+                }
+            } else {
+                if (footer) {
+                    footer.remove();
+                }
+            }
+        });
+    }, [editorSettings.footerText]);
+
     const paginateAll = useCallback(() => {
         const container = pagesContainerRef.current;
         if (!container) return;
 
         let safety = 0;
         let changed = true;
-        let movedToNextPage = null; // Track if content was moved to next page
+        let movedToNextPage = null;
 
         while (changed && safety < 20) {
             changed = false;
             safety++;
             const pages = Array.from(container.querySelectorAll('.document-page'));
 
-            // Forward pass: push overflow to next page
             for (let i = 0; i < pages.length; i++) {
                 const pageEl = pages[i];
                 const editor = initEmptyEditor(pageEl);
@@ -429,7 +438,6 @@ const Editor = () => {
                     const next = ensureNextPage(pageEl);
                     const nextEditor = initEmptyEditor(next);
 
-                    // Check if cursor is in the element being moved
                     const selection = window.getSelection();
                     const movingEl = editor.lastChild;
                     const cursorInMovingEl = selection && selection.rangeCount > 0 &&
@@ -438,14 +446,12 @@ const Editor = () => {
                     nextEditor.insertBefore(movingEl, nextEditor.firstChild);
                     changed = true;
 
-                    // Mark that we need to move cursor to next page
                     if (cursorInMovingEl) {
                         movedToNextPage = nextEditor;
                     }
                 }
             }
 
-            // Backward pass: pull content up if there's room
             for (let i = pages.length - 2; i >= 0; i--) {
                 const pageEl = pages[i];
                 const nextEl = pages[i + 1];
@@ -457,7 +463,6 @@ const Editor = () => {
                     changed = true;
                 }
 
-                // Remove empty trailing page
                 if (i === pages.length - 2 && !nextEditor.firstChild) {
                     nextEl.remove();
                     changed = true;
@@ -465,12 +470,10 @@ const Editor = () => {
             }
         }
 
-        // If content was moved to next page, place cursor there
         if (movedToNextPage && movedToNextPage.firstChild) {
             const selection = window.getSelection();
             const range = document.createRange();
 
-            // Place cursor at end of first element in new page
             const firstEl = movedToNextPage.firstChild;
             if (firstEl.nodeType === Node.TEXT_NODE) {
                 range.setStart(firstEl, firstEl.textContent.length);
@@ -484,28 +487,23 @@ const Editor = () => {
             selection.removeAllRanges();
             selection.addRange(range);
 
-            // Scroll the new page into view
             movedToNextPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        // Update page count for zoom-wrapper
         const finalCount = container.querySelectorAll('.document-page').length;
         if (finalCount !== pageCount) {
             setPageCount(finalCount);
         }
 
-        // Update word count
         const allText = container.textContent || '';
         const words = allText.trim().split(/\s+/).filter(w => w.length > 0).length;
         setWordCount(words);
 
-        // Move cursor to next page if content was pushed there
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             const cursorNode = range.startContainer;
 
-            // Find which page the cursor is in now
             const pages = Array.from(container.querySelectorAll('.document-page'));
             for (let i = 0; i < pages.length; i++) {
                 if (pages[i].contains(cursorNode)) {
@@ -514,11 +512,11 @@ const Editor = () => {
                 }
             }
         }
-    }, [pageCount]);
 
+        updateFooters();
 
+    }, [pageCount, updateFooters]);
 
-    // Listen for content changes
     useEffect(() => {
         const container = pagesContainerRef.current;
         if (!container) return;
@@ -529,7 +527,6 @@ const Editor = () => {
         container.addEventListener('paste', schedule, true);
         container.addEventListener('keyup', schedule, true);
 
-        // Initial pagination
         setTimeout(paginateAll, 100);
 
         return () => {
@@ -543,7 +540,6 @@ const Editor = () => {
         if (!documentRef.current) return;
 
         const content = documentRef.current.innerHTML;
-        // Keep ID if editing existing draft, else new ID
         const draftId = location.state?.id || Date.now().toString();
 
         const draftData = {
@@ -555,7 +551,6 @@ const Editor = () => {
         };
 
         const existingDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
-        // Remove old version if exists
         const otherDrafts = existingDrafts.filter(d => d.id !== draftId);
         const updatedDrafts = [...otherDrafts, draftData];
 
@@ -563,7 +558,6 @@ const Editor = () => {
         toast.success('Draft saved successfully!');
     };
 
-    // Auto-fit when sidebars change
     useEffect(() => {
         const timer = setTimeout(() => {
             handleFitWidth();
@@ -595,7 +589,6 @@ const Editor = () => {
                     onRestorePlaceholder={handleRestorePlaceholder}
                 />
 
-                {/* Center: Document */}
                 <div className="editor-main" ref={mainContainerRef}>
                     <div
                         className="zoom-wrapper"
@@ -612,8 +605,13 @@ const Editor = () => {
                                 transformOrigin: 'top left',
                             }}
                         >
-                            {/* First page with content */}
                             <div className="document-page">
+                                {/* Header: Only on First Page */}
+                                <div
+                                    className="page-header"
+                                    dangerouslySetInnerHTML={{ __html: editorSettings.headerText || '' }}
+                                />
+
                                 <div
                                     className="editor-root"
                                     contentEditable
@@ -627,12 +625,12 @@ const Editor = () => {
                                         <p><br /></p>
                                     )}
                                 </div>
+                                {/* Footer handled by updateFooters logic */}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Zoom Controls and Stats - Fixed at bottom right */}
                 <div className="zoom-controls-container">
                     <div className="document-stats">
                         <span>Page {currentPage} of {pageCount}</span>
@@ -660,10 +658,8 @@ const Editor = () => {
                     notes={notes}
                     setNotes={setNotes}
                 />
-
-
             </div>
-        </div >
+        </div>
     );
 };
 
