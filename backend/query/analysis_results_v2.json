@@ -1,0 +1,82 @@
+[
+  {
+    "query": "Rental agreement",
+    "type": "simple",
+    "path": "FAST",
+    "latency_ms": 869.4938000007824,
+    "top_match": "Agreement",
+    "score": 0.585
+  },
+  {
+    "query": "Loan acknowledgement",
+    "type": "simple",
+    "path": "FAST",
+    "latency_ms": 753.5452999982226,
+    "top_match": "Acknowledgement",
+    "score": 0.64
+  },
+  {
+    "query": "Employment contract",
+    "type": "simple",
+    "path": "FAST",
+    "latency_ms": 1576.9465999983368,
+    "top_match": "Agreement",
+    "score": 0.459
+  },
+  {
+    "query": "Non-disclosure agreement",
+    "type": "simple",
+    "path": "FAST",
+    "latency_ms": 890.6229999993229,
+    "top_match": "Agreement",
+    "score": 0.532
+  },
+  {
+    "query": "Partnership deed",
+    "type": "simple",
+    "path": "FAST",
+    "latency_ms": 855.907400000433,
+    "top_match": "Miscellaneous deeds",
+    "score": 0.717
+  },
+  {
+    "query": "Agreement for repayment of friendly loan with interest and security",
+    "type": "complex",
+    "path": "FAST",
+    "latency_ms": 965.2118999983941,
+    "top_match": "Company",
+    "score": 0.546
+  },
+  {
+    "query": "Lease deed for commercial property with lock-in period and escalation clause",
+    "type": "complex",
+    "path": "SLOW",
+    "latency_ms": 4302.160600000207,
+    "top_match": "Lease Financing",
+    "score": 0.405
+  },
+  {
+    "query": "Consultancy agreement for IT services with intellectual property rights",
+    "type": "complex",
+    "path": "SLOW",
+    "latency_ms": 6557.488399997965,
+    "top_match": "Agreement",
+    "score": 0.388
+  },
+  {
+    "query": "Sale deed for residential flat including car parking and common areas",
+    "type": "complex",
+    "path": "SLOW",
+    "latency_ms": 5139.436800000112,
+    "top_match": "Sale",
+    "score": 0.419
+  },
+  {
+    "query": "Franchise agreement for retail outlet with territorial exclusivity",
+    "type": "complex",
+    "path": "FAST",
+    "latency_ms": 1825.3292000008514,
+    "top_match": "Franchisee",
+    "score": 0.759
+  }
+]
