@@ -15,7 +15,7 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                 editorRef.current.innerHTML = value;
             }
         }
-    }, []); // Run once on mount mostly
+    }, [value]);
 
     const exec = (command, val = null) => {
         document.execCommand(command, false, val);

@@ -5,7 +5,18 @@ import {
     Subscript, Superscript, List, ListOrdered, FileDown, FileText
 } from 'lucide-react';
 
-const EditorToolbar = ({ execCommand, onExportPDF, onExportWord, onSave, draftName, setDraftName }) => {
+const EditorToolbar = ({
+    execCommand,
+    onExportPDF,
+    onExportWord,
+    onSave,
+    draftName,
+    setDraftName,
+    showHeader,
+    setShowHeader,
+    showFooter,
+    setShowFooter
+}) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
 
     return (
@@ -49,6 +60,28 @@ const EditorToolbar = ({ execCommand, onExportPDF, onExportWord, onSave, draftNa
                 <button className="tool-btn" onClick={() => execCommand('insertOrderedList')} title="Numbered List"><ListOrdered size={18} /></button>
             </div>
             <div className="toolbar-divider"></div>
+
+            {/* Header/Footer Toggles */}
+            <div className="toolbar-group">
+                <button
+                    className={`tool-btn ${showHeader ? 'active' : ''}`}
+                    onClick={() => setShowHeader(!showHeader)}
+                    title="Toggle Header"
+                    style={{ color: showHeader ? 'var(--primary)' : 'inherit', background: showHeader ? '#f1f5f9' : 'transparent' }}
+                >
+                    Header
+                </button>
+                <button
+                    className={`tool-btn ${showFooter ? 'active' : ''}`}
+                    onClick={() => setShowFooter(!showFooter)}
+                    title="Toggle Footer"
+                    style={{ color: showFooter ? 'var(--primary)' : 'inherit', background: showFooter ? '#f1f5f9' : 'transparent' }}
+                >
+                    Footer
+                </button>
+            </div>
+            <div className="toolbar-divider"></div>
+
             <div className="toolbar-group" style={{ flex: 1, padding: '0 16px' }}>
                 <input
                     type="text"

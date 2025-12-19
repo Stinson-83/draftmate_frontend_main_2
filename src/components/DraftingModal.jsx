@@ -251,18 +251,54 @@ const DraftingModal = ({ onClose }) => {
         }, 1500);
     };
 
-    const handleGenerateViaAI = () => {
+    // Drafter API URL
+    const DRAFTER_API_URL = "http://127.0.0.1:8001";
+
+    const handleGenerateViaAI = async () => {
+        if (!prompt.trim()) {
+            toast.error("Please enter details about what you want to draft");
+            return;
+        }
+
         setIsLoading(true);
-        // Simulate AI draft generation delay
-        setTimeout(() => {
+        try {
+            const response = await fetch(`${DRAFTER_API_URL}/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    case_context: prompt,
+                    document_type: selectedFormat?.name || "Legal Document",
+                    // legal_documents: ... (if we had specific reference docs selected, could pass them here)
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Generation failed');
+            }
+
+            const data = await response.json();
+
+            // Assume data.draft contains the generated HTML/text
             navigate('/editor', {
                 state: {
-                    prompt,
-                    selectedFormat: 'Check/Cheque Bounce Notice', // Default fallback or generic type
-                    customGeneration: true
+                    htmlContent: data.draft, // The API returns markdown/text, Editor might expect HTML. 
+                    // If the Editor expects raw HTML, we might need to convert MD to HTML or ensure API returns what's expected.
+                    // Based on legal_draft.py it returns text. If Editor handles text/html indiscriminately or uses a markdown viewer, great.
+                    // Looking at previous step 41, it passes `htmlContent`.
+                    uploadDetails: `AI Generated Draft: ${selectedFormat?.name || 'Custom'}`,
+                    isEmpty: false,
+                    prompt: prompt
                 }
             });
-        }, 1500);
+            toast.success("Draft generated successfully!");
+
+        } catch (error) {
+            console.error("AI Generation error:", error);
+            toast.error(`Failed to generate draft: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (

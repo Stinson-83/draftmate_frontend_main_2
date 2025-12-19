@@ -287,6 +287,10 @@
     /* Critical: hide overflow so content moves to next page */
     background: white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+
+    /* Flex layout for Header/Editor/Footer */
+    display: flex;
+    flex-direction: column;
 }
 
 /* Editor root inside each page */
@@ -298,8 +302,9 @@
     overflow-wrap: anywhere;
     width: 100%;
     max-width: 100%;
-    min-height: 100%;
-    /* Min height to allow clicking anywhere to edit */
+    /* Flex grow to fill space */
+    flex: 1;
+    min-height: 0;
     font-size: 12pt;
     color: black;
 }
@@ -535,31 +540,57 @@
 
 /* Header and Footer Styles */
 .page-header {
-    position: absolute;
-    top: 30px;
-    /* Inside 72px padding */
-    left: 72px;
-    right: 72px;
+    position: relative;
+    margin-bottom: 2rem;
     font-size: 14px;
     color: #333;
-    pointer-events: none;
-    /* Let clicks pass through to editor unless inputs needed */
-    white-space: pre-wrap;
+    pointer-events: auto;
+    white-space: normal;
     z-index: 10;
+    flex-shrink: 0;
+    min-height: 24px;
+    outline: none;
+    cursor: text;
+}
+
+.page-header:empty::before {
+    content: 'Header (Click to edit)';
+    color: #94a3b8;
+    font-style: italic;
+    pointer-events: none;
+}
+
+.page-header p {
+    margin: 0;
+    line-height: 1.2;
 }
 
 .page-footer {
-    position: absolute;
-    bottom: 30px;
-    /* Inside 72px padding */
-    left: 72px;
-    right: 72px;
-    text-align: center;
+    position: relative;
+    margin-top: auto;
+    /* Negative margin to push it lower into the padding area */
+    margin-bottom: -40px;
     font-size: 12px;
     color: #666;
     border-top: 1px solid #eee;
     padding-top: 8px;
-    pointer-events: none;
-    white-space: pre-wrap;
+    pointer-events: auto;
+    white-space: normal;
     z-index: 10;
+    flex-shrink: 0;
+    min-height: 24px;
+    outline: none;
+    cursor: text;
+}
+
+.page-footer:empty::before {
+    content: 'Footer (Click to edit)';
+    color: #94a3b8;
+    font-style: italic;
+    pointer-events: none;
+}
+
+.page-footer p {
+    margin: 0;
+    line-height: normal;
 }

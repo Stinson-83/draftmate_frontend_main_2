@@ -18,6 +18,10 @@ const Editor = () => {
     const [zoomLevel, setZoomLevel] = useState(100);
     const [variablesBold, setVariablesBold] = useState(true);
 
+    // Header/Footer Toggle State
+    const [showHeader, setShowHeader] = useState(true);
+    const [showFooter, setShowFooter] = useState(false);
+
     // Settings State
     const [editorSettings, setEditorSettings] = useState({ headerText: '', footerText: '', headerAlignment: 'center' });
 
@@ -359,6 +363,63 @@ const Editor = () => {
     const [wordCount, setWordCount] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
 
+    // Updated updateFooters to handle "Last Page Only" logic based on showFooter toggle
+    const updateFooters = useCallback(() => {
+        const container = pagesContainerRef.current;
+        if (!container) return;
+
+        const pages = Array.from(container.querySelectorAll('.document-page'));
+        const footerText = editorSettings.footerText || '';
+
+        pages.forEach((page, index) => {
+            const isLast = index === pages.length - 1;
+            let footer = page.querySelector('.page-footer');
+
+            // Only show footer on the VERY LAST page if showFooter is true
+            if (isLast && showFooter) {
+                if (!footer) {
+                    footer = document.createElement('div');
+                    footer.className = 'page-footer';
+                    footer.contentEditable = 'true';
+                    footer.spellcheck = false;
+
+                    // Add save listener
+                    footer.addEventListener('blur', (e) => {
+                        const newText = e.target.innerHTML;
+                        setEditorSettings(prev => {
+                            const updated = { ...prev, footerText: newText };
+                            localStorage.setItem('user_settings', JSON.stringify(updated));
+                            return updated;
+                        });
+                        toast.success('Footer saved');
+                    });
+
+                    // Append to page content flow
+                    page.appendChild(footer);
+                }
+
+                // Only update innerHTML if it's strictly different (avoid cursor jumps)
+                // or if it's empty to allow placeholder to show
+                if (footer.innerHTML !== footerText) {
+                    // check if user is currently editing it
+                    if (document.activeElement !== footer) {
+                        footer.innerHTML = footerText;
+                    }
+                }
+                footer.style.display = 'block';
+            } else {
+                if (footer) {
+                    footer.remove();
+                }
+            }
+        });
+    }, [editorSettings.footerText, showFooter]);
+
+    // Trigger footer updates when relevant state changes
+    useEffect(() => {
+        updateFooters();
+    }, [pageCount, showFooter, updateFooters]);
+
     const initEmptyEditor = (pageEl) => {
         let ed = pageEl.querySelector('.editor-root');
         if (!ed) {
@@ -388,34 +449,7 @@ const Editor = () => {
         return next;
     };
 
-    // Helper: Render footer on specific page
-    const updateFooters = useCallback(() => {
-        const container = pagesContainerRef.current;
-        if (!container) return;
 
-        const pages = Array.from(container.querySelectorAll('.document-page'));
-        const footerText = editorSettings.footerText;
-
-        pages.forEach((page, index) => {
-            const isLast = index === pages.length - 1;
-            let footer = page.querySelector('.page-footer');
-
-            if (isLast && footerText) {
-                if (!footer) {
-                    footer = document.createElement('div');
-                    footer.className = 'page-footer';
-                    page.appendChild(footer);
-                }
-                if (footer.innerHTML !== footerText) {
-                    footer.innerHTML = footerText;
-                }
-            } else {
-                if (footer) {
-                    footer.remove();
-                }
-            }
-        });
-    }, [editorSettings.footerText]);
 
     const paginateAll = useCallback(() => {
         const container = pagesContainerRef.current;
@@ -499,7 +533,6 @@ const Editor = () => {
         const words = allText.trim().split(/\s+/).filter(w => w.length > 0).length;
         setWordCount(words);
 
-        const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             const cursorNode = range.startContainer;
@@ -513,9 +546,7 @@ const Editor = () => {
             }
         }
 
-        updateFooters();
-
-    }, [pageCount, updateFooters]);
+    }, [pageCount]);
 
     useEffect(() => {
         const container = pagesContainerRef.current;
@@ -574,6 +605,10 @@ const Editor = () => {
                 onSave={handleSave}
                 draftName={draftName}
                 setDraftName={setDraftName}
+                showHeader={showHeader}
+                setShowHeader={setShowHeader}
+                showFooter={showFooter}
+                setShowFooter={setShowFooter}
             />
 
             <div className="editor-layout">
@@ -606,11 +641,25 @@ const Editor = () => {
                             }}
                         >
                             <div className="document-page">
-                                {/* Header: Only on First Page */}
-                                <div
-                                    className="page-header"
-                                    dangerouslySetInnerHTML={{ __html: editorSettings.headerText || '' }}
-                                />
+                                {/* Header: First Page Only, controlled by toggle */}
+                                {showHeader && (
+                                    <div
+                                        className="page-header"
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        spellCheck={false}
+                                        onBlur={(e) => {
+                                            const newText = e.target.innerHTML;
+                                            setEditorSettings(prev => {
+                                                const updated = { ...prev, headerText: newText };
+                                                localStorage.setItem('user_settings', JSON.stringify(updated));
+                                                return updated;
+                                            });
+                                            toast.success('Header saved');
+                                        }}
+                                        dangerouslySetInnerHTML={{ __html: editorSettings.headerText || '' }}
+                                    />
+                                )}
 
                                 <div
                                     className="editor-root"
@@ -625,7 +674,7 @@ const Editor = () => {
                                         <p><br /></p>
                                     )}
                                 </div>
-                                {/* Footer handled by updateFooters logic */}
+                                {/* Footer handled by updateFooters logic (Last Page Only) */}
                             </div>
                         </div>
                     </div>
