@@ -8,3 +8,4 @@ ddgs
 firecrawl
 lxml_html_clean
 lxml>=6
+beautifulsoup4

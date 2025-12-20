@@ -8,7 +8,7 @@ import os
 # Ensure we can import from the current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from bot import enhance_content, enhance_clause
+from bot import enhance_content, enhance_clause, create_placeholders
 
 app = FastAPI()
 
@@ -28,6 +28,9 @@ class EnhanceContentRequest(BaseModel):
 class EnhanceClauseRequest(BaseModel):
     selected_text: str
     case_context: str
+
+class CreatePlaceholdersRequest(BaseModel):
+    html_content: str
 
 @app.post("/enhance_content")
 async def enhance_content_endpoint(request: EnhanceContentRequest):
@@ -80,6 +83,20 @@ async def enhance_clause_endpoint(request: EnhanceClauseRequest):
     except Exception as e:
         print(f"Error processing request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/create_placeholders")
+async def create_placeholders_endpoint(request: CreatePlaceholdersRequest):
+    try:
+        print("Received create placeholders request...")
+        
+        processed_html = create_placeholders(request.html_content)
+        
+        return {"processed_html": processed_html}
+
+    except Exception as e:
+        print(f"Error processing placeholder request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8002)

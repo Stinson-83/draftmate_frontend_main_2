@@ -115,12 +115,15 @@ def enhance_content(selected_text: str, user_context: str) -> str:
             model_name=LLM_MODEL,
             system_instruction=system_instruction
         )
+        
+        print(f"DEBUG: Calling enhance_content with context: {user_context}")
+        print(f"DEBUG: Input text length: {len(selected_text)}")
 
         response = model.generate_content(
             contents=[contents],
             generation_config={
-                "temperature": 0.3, # Slightly higher for creative flow but still low for precision
-                "max_output_tokens": 2048 # Increased token limit for full documents
+                "temperature": 0.3, 
+                "max_output_tokens": 8192 # Max for Flash to ensure full document return
             },
             safety_settings={
                 types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
@@ -130,12 +133,122 @@ def enhance_content(selected_text: str, user_context: str) -> str:
             }
         )
         try:
-            return response.text.strip()
+            res_text = response.text.strip()
+            print(f"DEBUG: Enhance Response (First 500 chars): {res_text[:500]}")
+            return res_text
         except ValueError:
+             print("DEBUG: Enhance blocked by safety filters.")
              return "Unable to enhance content due to safety filters."
 
     except Exception as e:
         return f"Error: {e}"
+
+def create_placeholders(html_content: str) -> str:
+    """
+    Parses HTML, finds content spans, and uses LLM to replace specific entity details with [Placeholders].
+    """
+    if not GEMINI_API_KEY:
+        return html_content # Mock mode: return as is or implement simple regex mock
+
+    try:
+        from bs4 import BeautifulSoup
+        # User requested strictly preserving style/attributes. 'lxml' is robust for this.
+        soup = BeautifulSoup(html_content, 'lxml')
+        
+        # Target spans based on user description and common PDF-to-HTML output
+        # Targeting 'content-element', 'text-span', or spans with absolute positioning
+        spans = soup.find_all('span', class_=lambda x: x and ('content-element' in x or 'text-span' in x))
+        
+        print(f"DEBUG: Found {len(spans)} spans with class filter.")
+
+        if not spans:
+             # Fallback: try finding any span with styles (generic) if class not found
+            spans = [s for s in soup.find_all('span') if s.get('style') and 'absolute' in s.get('style', '')]
+            print(f"DEBUG: Found {len(spans)} spans with style fallback.")
+
+        if not spans:
+            print("DEBUG: No spans found. Returning original HTML.")
+            return html_content
+
+        # Extract text to send to LLM
+        texts = [s.get_text() for s in spans]
+        print(f"DEBUG: Sample extracted text: {texts[:5]}")
+        
+        # We can't send infinite text, so we might need to batch if huge, 
+        # but for typical docs, sending a list of strings is efficient.
+        # We format it as a numbered list to keep track.
+        
+        input_text_block = "\n".join([f"ID_{i}: {text}" for i, text in enumerate(texts)])
+
+        system_instruction = """
+        You are a Legal Document Formatter. 
+        Task: Identify specific variable details in the provided text segments. These can be:
+        1. Specific entity values (Names, Dates, Locations, Amounts).
+        2. Visual placeholders like long underscores (_______) or dots (.........) representing missing info.
+
+        Replace them with standard UPPERCASE placeholders in square brackets.
+        
+        Example 1 (Values): 
+        Input: "This Agreement is made on 12th January 2024 between John Doe and Jane Smith."
+        Output: "This Agreement is made on [DATE] between [PARTY 1 NAME] and [PARTY 2 NAME]."
+
+        Example 2 (Blanks):
+        Input: "I pay a sum of Rs........................./- to Mr.........................."
+        Output: "I pay a sum of Rs [AMOUNT] /- to Mr [NAME]"
+
+        STRICT RULES:
+        1. ONLY change the specific entity values or blank lines to placeholders. Leave all legal boilerplate, grammar, and structure EXACTLY as is.
+        2. Use placeholders like: [DATE], [NAME], [AMOUNT], [ADDRESS], [COMPANY NAME].
+        3. Return the output in the EXACT format: "ID_{i}: {processed_text}"
+        4. Do not merge lines. Maintain 1-to-1 mapping.
+        """
+
+        model = genai.GenerativeModel(
+            model_name=LLM_MODEL,
+            system_instruction=system_instruction
+        )
+
+        response = model.generate_content(
+            contents=[input_text_block],
+            generation_config={"temperature": 0.1},
+            safety_settings={
+                types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
+                types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
+                types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
+                types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
+            }
+        )
+        
+        try:
+            result_text = response.text.strip()
+            print(f"DEBUG: LLM Response (First 200 chars): {result_text[:200]}")
+            # Parse results
+            param_map = {}
+            for line in result_text.split('\n'):
+                if line.startswith("ID_") and ":" in line:
+                    parts = line.split(":", 1)
+                    idx_str = parts[0].replace("ID_", "").strip()
+                    content = parts[1].strip()
+                    if idx_str.isdigit():
+                        param_map[int(idx_str)] = content
+            
+            # Update HTML
+            for i, span in enumerate(spans):
+                if i in param_map:
+                    # Only update if the LLM returned a valid mapping, otherwise keep original
+                    span.string = param_map[i]
+            
+            return str(soup)
+
+        except ValueError:
+            print("DEBUG: ValueError processing LLM response (possibly blocked).")
+            return html_content # Fail safe
+
+    except Exception as e:
+        print(f"Error in create_placeholders: {e}")
+        import traceback
+        traceback.print_exc()
+        return html_content
 
 # def get_legal_context_from_web(case_context: str) -> str:
 #     prompt="""

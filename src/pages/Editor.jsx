@@ -142,63 +142,91 @@ const Editor = () => {
 
     // Handle uploaded content and details - enhanced variable detection
     useEffect(() => {
-        if (location.state?.htmlContent) {
-            // Clean content first
-            let content = cleanPdfHtml(location.state.htmlContent);
-            const detectedPlaceholders = [];
+        const processContent = async () => {
+            if (location.state?.htmlContent) {
+                let initialHtml = location.state.htmlContent;
 
-            // Helper to add placeholder if not exists
-            const addPlaceholder = (key, label) => {
-                // Use last few words for the key if label is long
-                let keyBase = key;
-                const words = key.split(/\s+/);
-                if (words.length > 5) {
-                    keyBase = words.slice(-5).join(' ');
-                }
-
-                const cleanKey = keyBase.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-
-                if (cleanKey && cleanKey.length > 1 && !detectedPlaceholders.find(p => p.key === cleanKey)) {
-                    detectedPlaceholders.push({
-                        key: cleanKey,
-                        label: label.trim(), // Keep full label for the sidebar
-                        value: ''
+                // Call API to generate placeholders automatically
+                try {
+                    const res = await fetch('http://localhost:8002/create_placeholders', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ html_content: initialHtml })
                     });
+
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.processed_html) {
+                            initialHtml = data.processed_html;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Placeholder generation failed", e);
                 }
-                return cleanKey;
-            };
 
-            // Regex Pattern: Text inside square brackets, e.g., [Name] or [Client Name]
-            const bracketPattern = /\[([^\]]+)\]/g;
+                // Clean content first
+                let content = cleanPdfHtml(initialHtml);
+                const detectedPlaceholders = [];
 
-            content = content.replace(bracketPattern, (match, label) => {
-                // Label is the text inside tags. Clean it up for the key.
-                const cleanLabel = label.trim();
+                // Helper to add placeholder if not exists
+                const addPlaceholder = (key, label) => {
+                    // Use last few words for the key if label is long
+                    let keyBase = key;
+                    const words = key.split(/\s+/);
+                    if (words.length > 5) {
+                        keyBase = words.slice(-5).join(' ');
+                    }
 
-                // Ignore very short or effectively empty brackets
-                if (cleanLabel.length < 1) return match;
+                    const cleanKey = keyBase.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-                const key = addPlaceholder(cleanLabel, cleanLabel);
+                    if (cleanKey && cleanKey.length > 1 && !detectedPlaceholders.find(p => p.key === cleanKey)) {
+                        detectedPlaceholders.push({
+                            key: cleanKey,
+                            label: label.trim(), // Keep full label for the sidebar
+                            value: ''
+                        });
+                    }
+                    return cleanKey;
+                };
 
-                // Wrap in variable span but display normally with brackets
-                return `<span class="variable" data-key="${key}" data-original-content="${label}" contenteditable="false">[${cleanLabel}]</span>`;
-            });
+                // Regex Pattern: Text inside square brackets, e.g., [Name] or [Client Name]
+                const bracketPattern = /\[([^\]]+)\]/g;
 
-            // Update document content
-            setTimeout(() => {
-                if (documentRef.current) {
-                    documentRef.current.innerHTML = content;
+                content = content.replace(bracketPattern, (match, label) => {
+                    // Label is the text inside tags. Clean it up for the key.
+                    const cleanLabel = label.trim();
+
+                    // Ignore very short or effectively empty brackets
+                    if (cleanLabel.length < 1) return match;
+
+                    const key = addPlaceholder(cleanLabel, cleanLabel);
+
+                    // Wrap in variable span but display normally with brackets
+                    return `<span class="variable" data-key="${key}" data-original-content="${label}" contenteditable="false">[${cleanLabel}]</span>`;
+                });
+
+                // Update document content
+                setTimeout(() => {
+                    if (documentRef.current) {
+                        documentRef.current.innerHTML = content;
+                        setTimeout(paginateAll, 100);
+                    }
+                }, 100);
+
+                // Update placeholders - replace defaults with detected ones
+                if (detectedPlaceholders.length > 0) {
+                    setPlaceholders(detectedPlaceholders);
                 }
-            }, 100);
-
-            // Update placeholders - replace defaults with detected ones
-            if (detectedPlaceholders.length > 0) {
-                setPlaceholders(detectedPlaceholders);
+            } else if (location.state?.isEmpty) {
+                setPlaceholders([]);
             }
-        } else if (location.state?.isEmpty) {
-            setPlaceholders([]);
-        }
+        };
 
+        processContent();
+
+    }, [location.state]);
+
+    useEffect(() => {
         if (location.state?.uploadDetails) {
             setNotes(prev => prev + (prev ? '\n\n' : '') + `Upload Details:\n${location.state.uploadDetails}`);
             setActiveTab('notes');
