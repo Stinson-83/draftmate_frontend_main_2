@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-dotenv
+google-generativeai
+trafilatura
+tavily
+ddgs
+firecrawl
+lxml_html_clean
+lxml>=6

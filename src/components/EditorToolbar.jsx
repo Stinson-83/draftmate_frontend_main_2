@@ -15,7 +15,8 @@ const EditorToolbar = ({
     showHeader,
     setShowHeader,
     showFooter,
-    setShowFooter
+    setShowFooter,
+    onModify
 }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -82,7 +83,7 @@ const EditorToolbar = ({
             </div>
             <div className="toolbar-divider"></div>
 
-            <div className="toolbar-group" style={{ flex: 1, padding: '0 16px' }}>
+            <div className="toolbar-group" style={{ flex: 2, padding: '0 16px', minWidth: '300px' }}>
                 <input
                     type="text"
                     value={draftName || ''}
@@ -112,7 +113,7 @@ const EditorToolbar = ({
             </div>
             <div className="spacer"></div>
             <div className="toolbar-actions">
-                <button className="btn btn-primary btn-sm">
+                <button className="btn btn-primary btn-sm" onClick={onModify}>
                     <Wand2 size={16} style={{ marginRight: 8 }} />
                     Modify Draft
                 </button>

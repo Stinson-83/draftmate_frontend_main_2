@@ -6,6 +6,8 @@ import html2pdf from 'html2pdf.js';
 import EditorToolbar from '../components/EditorToolbar';
 import VariablesSidebar from '../components/VariablesSidebar';
 import AiSidebar from '../components/AiSidebar';
+import FloatingToolbar from '../components/FloatingToolbar';
+import ModifyDraftModal from '../components/ModifyDraftModal';
 import './Editor.css';
 
 const Editor = () => {
@@ -22,20 +24,34 @@ const Editor = () => {
     const [showHeader, setShowHeader] = useState(true);
     const [showFooter, setShowFooter] = useState(false);
 
+    const [isHeaderEditing, setIsHeaderEditing] = useState(false);
+
+    // Floating Toolbar State
+    const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
+    const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+
+    // Modify Draft Modal State
+    const [showModifyModal, setShowModifyModal] = useState(false);
+
     // Settings State
     const [editorSettings, setEditorSettings] = useState({ headerText: '', footerText: '', headerAlignment: 'center' });
 
     // Load settings on mount
     useEffect(() => {
         try {
-            const saved = localStorage.getItem('user_settings');
-            if (saved) {
-                setEditorSettings(JSON.parse(saved));
+            // Priority: Draft settings (if editing existing) -> Global settings -> Defaults
+            if (location.state?.settings) {
+                setEditorSettings(location.state.settings);
+            } else {
+                const saved = localStorage.getItem('user_settings');
+                if (saved) {
+                    setEditorSettings(JSON.parse(saved));
+                }
             }
         } catch (e) {
             console.error('Failed to load settings', e);
         }
-    }, []);
+    }, [location.state]);
 
     // Draft Name State
     const [draftName, setDraftName] = useState(() => {
@@ -356,7 +372,7 @@ const Editor = () => {
     // Pagination constants (A4 at 96 DPI)
     const PAGE_HEIGHT = 1056;
     const PAGE_PADDING = 72;
-    const MAX_CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2;
+
 
     const pagesContainerRef = useRef(null);
     const [pageCount, setPageCount] = useState(1);
@@ -380,18 +396,24 @@ const Editor = () => {
                 if (!footer) {
                     footer = document.createElement('div');
                     footer.className = 'page-footer';
-                    footer.contentEditable = 'true';
+                    footer.contentEditable = 'false'; // Locked by default
                     footer.spellcheck = false;
+
+                    // Double click to edit
+                    footer.addEventListener('dblclick', function () {
+                        this.contentEditable = 'true';
+                        this.focus();
+                    });
 
                     // Add save listener
                     footer.addEventListener('blur', (e) => {
+                        e.target.contentEditable = 'false'; // Lock on blur
                         const newText = e.target.innerHTML;
                         setEditorSettings(prev => {
                             const updated = { ...prev, footerText: newText };
-                            localStorage.setItem('user_settings', JSON.stringify(updated));
+                            // localStorage.setItem('user_settings', JSON.stringify(updated)); // Decoupled
                             return updated;
                         });
-                        toast.success('Footer saved');
                     });
 
                     // Append to page content flow
@@ -464,11 +486,14 @@ const Editor = () => {
             safety++;
             const pages = Array.from(container.querySelectorAll('.document-page'));
 
+            // 1. Forward Pass: Push overflow to next page
             for (let i = 0; i < pages.length; i++) {
                 const pageEl = pages[i];
                 const editor = initEmptyEditor(pageEl);
 
-                while (editor.scrollHeight > MAX_CONTENT_HEIGHT && editor.lastChild) {
+                // Check overflow against ACTUAL available height (flex container height)
+                // Use a small tolerance (1px) to avoid rounding jitter
+                while (editor.scrollHeight > editor.clientHeight + 1 && editor.lastChild) {
                     const next = ensureNextPage(pageEl);
                     const nextEditor = initEmptyEditor(next);
 
@@ -486,17 +511,30 @@ const Editor = () => {
                 }
             }
 
+            // 2. Backward Pass: Pull content back if space permits
             for (let i = pages.length - 2; i >= 0; i--) {
                 const pageEl = pages[i];
                 const nextEl = pages[i + 1];
                 const editor = initEmptyEditor(pageEl);
                 const nextEditor = initEmptyEditor(nextEl);
 
-                while (editor.scrollHeight < MAX_CONTENT_HEIGHT && nextEditor.firstChild) {
-                    editor.appendChild(nextEditor.firstChild);
-                    changed = true;
+                // Try to pull nodes one by one
+                while (nextEditor.firstChild) {
+                    const node = nextEditor.firstChild;
+                    editor.appendChild(node);
+
+                    // Check validation: Did we overflow?
+                    if (editor.scrollHeight > editor.clientHeight + 1) {
+                        // Yes, we overflowed. Revert!
+                        nextEditor.insertBefore(node, nextEditor.firstChild);
+                        break;
+                    } else {
+                        // Success, we kept it.
+                        changed = true;
+                    }
                 }
 
+                // If next page is empty, remove it
                 if (i === pages.length - 2 && !nextEditor.firstChild) {
                     nextEl.remove();
                     changed = true;
@@ -567,6 +605,13 @@ const Editor = () => {
         };
     }, [paginateAll]);
 
+    // Trigger pagination when layout changes (Header/Footer toggle)
+    useEffect(() => {
+        setTimeout(() => {
+            paginateAll();
+        }, 50);
+    }, [showHeader, showFooter, paginateAll]);
+
     const handleSave = () => {
         if (!documentRef.current) return;
 
@@ -578,6 +623,7 @@ const Editor = () => {
             name: draftName || 'Untitled Draft',
             content: content,
             placeholders: placeholders,
+            settings: editorSettings,
             lastModified: new Date().toISOString()
         };
 
@@ -596,8 +642,183 @@ const Editor = () => {
         return () => clearTimeout(timer);
     }, [leftSidebarOpen, rightSidebarOpen]);
 
+
+    // Handle Selection for Floating Toolbar
+    useEffect(() => {
+        const handleSelectionChange = () => {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+
+                // Only show if selection is within the editor main area (roughly)
+                if (mainContainerRef.current && mainContainerRef.current.contains(selection.anchorNode.parentElement || selection.anchorNode)) {
+                    setToolbarPosition({
+                        x: rect.left + rect.width / 2,
+                        y: rect.top - 10 // Position slightly above
+                    });
+                    setShowFloatingToolbar(true);
+                } else {
+                    setShowFloatingToolbar(false);
+                }
+            } else {
+                setShowFloatingToolbar(false);
+            }
+        };
+
+        const handleMouseUp = () => {
+            // Slight delay to let selection settle
+            setTimeout(handleSelectionChange, 10);
+        };
+
+        const handleKeyUp = (e) => {
+            // Update on shift+arrow selection
+            if (e.shiftKey) {
+                setTimeout(handleSelectionChange, 10);
+            }
+        };
+
+        // Hide toolbar when scrolling
+        const handleScroll = () => {
+            if (showFloatingToolbar) setShowFloatingToolbar(false);
+        };
+
+        document.addEventListener('mouseup', handleMouseUp);
+        document.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('scroll', handleScroll, true);
+
+        return () => {
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('scroll', handleScroll, true);
+        };
+    }, [showFloatingToolbar]);
+
+    const handleEnhance = async () => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+        const range = selection.getRangeAt(0);
+        const selectedText = selection.toString();
+
+        // 1. Get Context (approx 50 chars before and after)
+        // We clone the range and expand it
+        const PreRange = range.cloneRange();
+        PreRange.setStart(mainContainerRef.current, 0); // Start from beginning of editor
+        PreRange.setEnd(range.startContainer, range.startOffset);
+        const preText = PreRange.toString().slice(-50); // Last 50 chars
+
+        const PostRange = range.cloneRange();
+        PostRange.setStart(range.endContainer, range.endOffset);
+        PostRange.setEndAfter(mainContainerRef.current.lastChild || mainContainerRef.current);
+        const postText = PostRange.toString().slice(0, 50); // First 50 chars
+
+        const context = `${preText} ... [TARGET] ... ${postText}`;
+
+        console.log("Enhance Context:", context);
+
+        const promise = fetch('http://localhost:8002/enhance_clause', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                selected_text: selectedText,
+                case_context: context // Sending surrounding text as context per user request
+            })
+        }).then(async (res) => {
+            if (!res.ok) throw new Error('Enhancement failed');
+            const data = await res.json();
+            return data.enhanced_text;
+        });
+
+        toast.promise(promise, {
+            loading: 'Enhancing text with AI...',
+            success: (enhancedText) => {
+                // Replace text
+                // Check if selection is still valid and same
+                // For simplicity, we assume user hasn't moved cursor too much, or we just execute replace
+                // Ideally, we might want to restore range, but execCommand works on current selection. 
+                // Since this is async, user might have clicked away. 
+                // A safer way is to save the range before fetch, but if DOM changes, range is invalid.
+                // We will try to re-select or just insert if possible, but execCommand 'insertText' is robust enough for active selection.
+                // However, prolonged async calls are risky with selections. 
+                // Let's assume user waits.
+
+                document.execCommand('insertText', false, enhancedText);
+                return 'Text enhanced successfully!';
+            },
+            error: 'Failed to enhance text.'
+        });
+    };
+
+    const handleModifyDraft = async (context) => {
+        if (!pagesContainerRef.current) return;
+
+        // 1. Gather content from ALL pages
+        // documentRef only points to the first page's editor, but we might have multiple pages.
+        const allEditors = Array.from(pagesContainerRef.current.querySelectorAll('.editor-root'));
+        const fullContent = allEditors.map(ed => ed.innerHTML).join('');
+
+        if (!fullContent.trim()) {
+            toast.error("Document is empty.");
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:8002/enhance_content', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    selected_text: fullContent,
+                    user_context: context
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                if (res.status === 429) {
+                    toast.error('API Quota Exceeded. Please try again later.');
+                } else {
+                    toast.error(errorData.detail || 'Failed to modify draft.');
+                }
+                return;
+            }
+
+            const data = await res.json();
+
+            // 2. Update Content
+            // Strategy: Put everything in the first page, remove other pages, and let pagination flow
+            if (documentRef.current) {
+                // Clear other pages first to prevent duplication
+                const pages = Array.from(pagesContainerRef.current.querySelectorAll('.document-page'));
+                for (let i = 1; i < pages.length; i++) {
+                    pages[i].remove();
+                }
+
+                // Update first page
+                documentRef.current.innerHTML = data.enhanced_text;
+
+                // Trigger pagination
+                // Reset page count to 1 temporarily so React knows? 
+                // Actually paginateAll calculates final count.
+                setPageCount(1);
+                setTimeout(paginateAll, 100);
+            }
+            toast.success('Draft modified successfully!');
+            setShowModifyModal(false);
+
+        } catch (error) {
+            console.error(error);
+            toast.error('An error occurred while modifying the draft.');
+        }
+    };
+
     return (
         <div className="editor-container">
+            <ModifyDraftModal
+                isOpen={showModifyModal}
+                onClose={() => setShowModifyModal(false)}
+                onConfirm={handleModifyDraft}
+            />
             <EditorToolbar
                 execCommand={execCommand}
                 onExportPDF={handleExportPDF}
@@ -609,6 +830,7 @@ const Editor = () => {
                 setShowHeader={setShowHeader}
                 showFooter={showFooter}
                 setShowFooter={setShowFooter}
+                onModify={() => setShowModifyModal(true)}
             />
 
             <div className="editor-layout">
@@ -645,17 +867,18 @@ const Editor = () => {
                                 {showHeader && (
                                     <div
                                         className="page-header"
-                                        contentEditable
+                                        contentEditable={isHeaderEditing}
                                         suppressContentEditableWarning
                                         spellCheck={false}
+                                        onDoubleClick={() => setIsHeaderEditing(true)}
                                         onBlur={(e) => {
+                                            setIsHeaderEditing(false);
                                             const newText = e.target.innerHTML;
                                             setEditorSettings(prev => {
                                                 const updated = { ...prev, headerText: newText };
-                                                localStorage.setItem('user_settings', JSON.stringify(updated));
+                                                // localStorage.setItem('user_settings', JSON.stringify(updated)); // Decoupled
                                                 return updated;
                                             });
-                                            toast.success('Header saved');
                                         }}
                                         dangerouslySetInnerHTML={{ __html: editorSettings.headerText || '' }}
                                     />
@@ -708,6 +931,13 @@ const Editor = () => {
                     setNotes={setNotes}
                 />
             </div>
+
+            <FloatingToolbar
+                visible={showFloatingToolbar}
+                position={toolbarPosition}
+                onFormat={execCommand}
+                onEnhance={handleEnhance}
+            />
         </div>
     );
 };
