@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
+import PDFEditor from './pages/PDFEditor';
 import MyDrafts from './pages/MyDrafts';
 
 import ResearchChat from './pages/ResearchChat';
@@ -27,6 +28,7 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="editor" element={<Editor />} />
+          <Route path="pdf-editor" element={<PDFEditor />} />
           <Route path="settings" element={<Settings />} />
           <Route path="drafts" element={<MyDrafts />} />
           <Route path="research" element={<ResearchChat />} />

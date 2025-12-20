@@ -1,0 +1,10 @@
+streamlit
+pypdf
+pdf2docx
+docx2pdf
+reportlab
+fastapi
+python-multipart
+uvicorn
+pymupdf
+python-docx

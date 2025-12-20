@@ -135,8 +135,9 @@ const Dashboard = () => {
                     />
                     <ActionCard
                         icon={BookOpen}
-                        title="Generate Arguments"
-                        description="Tell AI about the case and generate arguments."
+                        title="PDF Toolkit"
+                        description="Merge PDFs, Rearrange pages and Convert to DOCX format."
+                        onClick={() => navigate('/pdf-editor')}
                     />
                 </div>
             </section>

@@ -83,7 +83,7 @@ const EditorToolbar = ({
             </div>
             <div className="toolbar-divider"></div>
 
-            <div className="toolbar-group" style={{ flex: 2, padding: '0 16px', minWidth: '300px' }}>
+            <div className="toolbar-group" style={{ flex: 2, padding: '0 16px', minWidth: '150px' }}>
                 <input
                     type="text"
                     value={draftName || ''}

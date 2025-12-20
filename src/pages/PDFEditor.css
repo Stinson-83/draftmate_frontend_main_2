@@ -1,0 +1,397 @@
+.pdf-editor-container {
+    display: flex;
+    height: 100vh;
+    background-color: var(--background);
+    color: var(--text-main);
+    overflow: hidden;
+}
+
+/* Sidebar Tool Navigation (Leftmost) */
+.tool-sidebar {
+    width: 60px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 1rem;
+    gap: 1rem;
+    z-index: 10;
+}
+
+.tool-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.tool-icon-btn:hover {
+    background: var(--surface-hover);
+    color: var(--primary);
+}
+
+.tool-icon-btn.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
+}
+
+/* Builder Layout */
+.builder-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Thumbnails Sidebar (Left) */
+.thumbnails-sidebar {
+    width: 240px;
+    background: var(--surface);
+    /* Was hardcoded rgba */
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 1rem;
+    gap: 0.5rem;
+}
+
+.thumbnail-card {
+    position: relative;
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 0.5rem;
+    cursor: grab;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid transparent;
+    /* default border */
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.thumbnail-card:active {
+    cursor: grabbing;
+}
+
+.thumbnail-card.selected {
+    border-color: var(--primary);
+    background: var(--accent-light);
+}
+
+.thumbnail-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+.thumbnail-image-container {
+    position: relative;
+    width: 100%;
+    height: 140px;
+    background: var(--surface-hover);
+    /* Contrast against card */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.thumbnail-image-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.page-number {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.file-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Actions Overlay on Thumbnail */
+.thumb-actions {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.thumbnail-card:hover .thumb-actions {
+    opacity: 1;
+}
+
+.action-mini-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.action-mini-btn:hover {
+    background: #ef4444;
+}
+
+/* Main Preview Area */
+.main-preview-area {
+    flex: 1;
+    background: #e2e8f0;
+    /* Default neutral grey background for canvas */
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.preview-toolbar-top {
+    height: 60px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+}
+
+/* Main Preview scrollable area */
+.preview-canvas {
+    flex: 1;
+    display: block;
+    /* changed from flex center to block for scrolling flow */
+    overflow-y: auto;
+    background: #e5e7eb;
+    padding: 2rem;
+    scroll-behavior: smooth;
+}
+
+.pages-flow-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    /* Gap between A4 pages */
+    padding-bottom: 4rem;
+}
+
+.page-view-wrapper {
+    position: relative;
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+
+.page-view-wrapper.focused .big-preview-img {
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.5), 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.page-view-number {
+    position: absolute;
+    top: -1.5rem;
+    left: 0;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* The "Paper" Look */
+.big-preview-img {
+    /* Fixed width for A4 feel, responsive */
+    width: 600px;
+    max-width: 90%;
+    height: auto;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    background: white;
+    display: block;
+}
+
+/* Download Button Theme Match */
+.btn-process {
+    background: var(--primary);
+    color: white;
+    padding: 0.5rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.btn-process:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.btn-process:disabled {
+    background: var(--secondary);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Split Mode Dividers */
+.split-gap {
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.split-gap:hover,
+.split-gap.active {
+    opacity: 1;
+}
+
+.scissor-line {
+    width: 90%;
+    height: 2px;
+    background: #ef4444;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.scissor-icon {
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    padding: 4px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Native DnD Drop Indicators */
+.drop-indicator-top {
+    border-top: 3px solid var(--primary);
+}
+
+.drop-indicator-bottom {
+    border-bottom: 3px solid var(--primary);
+}
+
+/* File Name Input */
+.filename-input {
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    padding: 0.5rem;
+    border-radius: 6px;
+    color: var(--text-main);
+    width: 200px;
+}
+
+.filename-input:focus {
+    outline: none;
+}
+
+/* Watermark Toolbar */
+.watermark-toolbar {
+    background: white;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.tool-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.tool-input-text {
+    border: 1px solid var(--border);
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    width: 200px;
+}
+
+.tool-slider {
+    width: 120px;
+    accent-color: var(--primary);
+}
+
+.tool-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+}
+
+/* Simple Mode Uploader */
+.pdf-uploader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: 3rem;
+    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.05);
+    /* Slight tint */
+    cursor: pointer;
+}
+
+.pdf-uploader:hover {
+    border-color: var(--primary);
+    background: var(--surface-hover);
+}
+
+.upload-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    color: var(--primary);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
