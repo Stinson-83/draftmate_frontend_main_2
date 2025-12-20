@@ -45,7 +45,7 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                 cursor: 'pointer',
                 padding: '4px',
                 borderRadius: '4px',
-                color: '#64748b',
+                color: 'var(--text-secondary)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -57,9 +57,9 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
 
     return (
         <div className="mini-editor" style={{
-            border: '1px solid #e2e8f0',
+            border: '1px solid var(--border)',
             borderRadius: '6px',
-            background: 'white',
+            background: 'var(--surface)',
             overflow: 'hidden',
             ...style
         }}>
@@ -68,14 +68,14 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                 display: 'flex',
                 gap: '4px',
                 padding: '8px',
-                borderBottom: '1px solid #e2e8f0',
-                background: '#f8fafc'
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--surface-hover)'
             }}>
                 <Btn icon={Bold} cmd="bold" title="Bold" />
                 <Btn icon={Italic} cmd="italic" title="Italic" />
                 <Btn icon={Underline} cmd="underline" title="Underline" />
 
-                <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
+                <div style={{ width: '1px', background: 'var(--border)', margin: '0 4px' }} />
 
                 {/* Font Family Selector */}
                 <select
@@ -83,9 +83,9 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                     style={{
                         padding: '4px',
                         borderRadius: '4px',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid var(--border)',
                         fontSize: '12px',
-                        color: '#64748b',
+                        color: 'var(--text-secondary)',
                         background: 'transparent',
                         outline: 'none',
                         cursor: 'pointer'
@@ -105,9 +105,9 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                     style={{
                         padding: '4px',
                         borderRadius: '4px',
-                        border: '1px solid #e2e8f0',
+                        border: '1px solid var(--border)',
                         fontSize: '12px',
-                        color: '#64748b',
+                        color: 'var(--text-secondary)',
                         background: 'transparent',
                         outline: 'none',
                         cursor: 'pointer'
@@ -120,13 +120,13 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                     <option value="7">Extra Large</option>
                 </select>
 
-                <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
+                <div style={{ width: '1px', background: 'var(--border)', margin: '0 4px' }} />
 
                 <Btn icon={AlignLeft} cmd="justifyLeft" title="Align Left" />
                 <Btn icon={AlignCenter} cmd="justifyCenter" title="Align Center" />
                 <Btn icon={AlignRight} cmd="justifyRight" title="Align Right" />
 
-                <div style={{ width: '1px', background: '#e2e8f0', margin: '0 4px' }} />
+                <div style={{ width: '1px', background: 'var(--border)', margin: '0 4px' }} />
 
                 <Btn icon={List} cmd="insertUnorderedList" title="Bullet List" />
                 <Btn icon={ListOrdered} cmd="insertOrderedList" title="Numbered List" />
@@ -154,7 +154,7 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
                     position: 'absolute',
                     pointerEvents: 'none',
                     padding: '12px',
-                    color: '#94a3b8',
+                    color: 'var(--text-secondary)',
                     fontSize: '14px',
                     display: 'none'
                 }}>

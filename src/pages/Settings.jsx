@@ -41,7 +41,7 @@ const Settings = () => {
                 <h1>Document Settings</h1>
             </div>
 
-            <div className="settings-section glass-panel" style={{ padding: '2rem', borderRadius: '12px', background: 'white', border: '1px solid #eee' }}>
+            <div className="settings-section glass-panel" style={{ padding: '2rem', borderRadius: '12px' }}>
                 <h2 style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>Letterhead & Footer</h2>
 
                 <div className="form-group" style={{ marginBottom: '2rem' }}>
@@ -70,16 +70,12 @@ const Settings = () => {
 
                 <button
                     onClick={handleSave}
+                    className="btn btn-primary"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        background: '#000',
-                        color: 'white',
                         padding: '0.8rem 1.5rem',
-                        borderRadius: '6px',
-                        border: 'none',
-                        cursor: 'pointer',
                         fontSize: '1rem'
                     }}
                 >
