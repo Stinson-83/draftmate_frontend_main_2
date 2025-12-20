@@ -223,8 +223,8 @@
 /* The "Paper" Look */
 .big-preview-img {
     /* Fixed width for A4 feel, responsive */
-    width: 600px;
-    max-width: 90%;
+    width: 800px;
+    max-width: 95%;
     height: auto;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;

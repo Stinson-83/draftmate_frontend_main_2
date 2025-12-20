@@ -12,7 +12,8 @@ import {
     Check,
     Download,
     Minimize2,
-    Stamp // for watermark
+    Stamp, // for watermark
+    Layers // for merge
 } from 'lucide-react';
 import './PDFEditor.css';
 
@@ -26,7 +27,7 @@ const MODES = {
 };
 
 const TOOLS = [
-    { id: 'merge', name: 'Merge & Organize', icon: Settings, desc: 'Combine multiple PDFs, reorder, and rotate pages.', mode: MODES.BUILDER },
+    { id: 'merge', name: 'Merge & Organize', icon: Layers, desc: 'Combine multiple PDFs, reorder, and rotate pages.', mode: MODES.BUILDER },
     { id: 'split', name: 'Split PDF', icon: Scissors, desc: 'Separate one page or a whole set for easy conversion.', mode: MODES.SPLITTER },
     { id: 'compress', name: 'Compress PDF', icon: Minimize2, desc: 'Reduce file size while optimizing for maximal quality.', mode: MODES.SIMPLE },
     { id: 'pdf-to-word', name: 'PDF to Word', icon: FileText, desc: 'Convert your PDF to editable Word documents.', mode: MODES.SIMPLE },
@@ -47,6 +48,7 @@ const PDFEditor = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [outputName, setOutputName] = useState("document");
     const [compressLevel, setCompressLevel] = useState("medium");
+    const [zoomLevel, setZoomLevel] = useState(1.0); // 1.0 = 100%
 
     // Watermark State
     const [watermarkText, setWatermarkText] = useState('CONFIDENTIAL');
@@ -451,6 +453,27 @@ const PDFEditor = () => {
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                {/* Zoom Controls */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem' }}>
+                                    <button
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))}
+                                        title="Zoom Out"
+                                    >
+                                        -
+                                    </button>
+                                    <span style={{ fontSize: '0.8rem', minWidth: '3rem', textAlign: 'center' }}>
+                                        {Math.round(zoomLevel * 100)}%
+                                    </span>
+                                    <button
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={() => setZoomLevel(prev => Math.min(2.0, prev + 0.1))}
+                                        title="Zoom In"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+
                                 {activeMode === MODES.BUILDER && (
                                     <>
                                         <button className="btn btn-ghost btn-icon" onClick={() => rotatePage(-90)} title="Rotate Left">
@@ -518,15 +541,18 @@ const PDFEditor = () => {
                                     {pages.map((page, idx) => (
                                         <div
                                             key={page.id}
-                                            id={`page - view - ${idx} `}
-                                            className={`page - view - wrapper ${selectedPageIndex === idx ? 'focused' : ''} `}
+                                            id={`page-view-${idx}`}
+                                            className={`page-view-wrapper ${selectedPageIndex === idx ? 'focused' : ''}`}
                                             onClick={() => setSelectedPageIndex(idx)}
                                         >
                                             <img
                                                 className="big-preview-img"
                                                 src={page.imageSrc}
-                                                style={{ transform: `rotate(${page.rotation}deg)` }}
-                                                alt={`Page ${idx + 1} `}
+                                                style={{
+                                                    transform: `rotate(${page.rotation}deg)`,
+                                                    width: `${800 * zoomLevel}px` // Dynamic Width
+                                                }}
+                                                alt={`Page ${idx + 1}`}
                                             />
                                         </div>
                                     ))}

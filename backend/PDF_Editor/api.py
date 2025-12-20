@@ -288,16 +288,21 @@ async def rotate_pdf_endpoint(file: UploadFile, angle: int = Form(...), pages: s
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/preview")
-async def preview_pdf_endpoint(file: UploadFile):
-    """Returns list of base64 images for first few pages"""
+async def preview_pdf_endpoint(file: UploadFile, limit: int = Form(default=5)):
+    """Returns list of base64 images. Use limit=0 for all pages."""
     try:
         content = await file.read()
         doc = fitz.open(stream=content, filetype="pdf")
         
         images = []
-        for i in range(min(5, len(doc))):
+        max_pages = len(doc)
+        if limit > 0:
+            max_pages = min(limit, max_pages)
+
+        for i in range(max_pages):
             page = doc[i]
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+            # Matrix(2.0, 2.0) = Roughly 144 DPI (Double resolution)
+            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
             img_data = pix.tobytes("png")
             b64_img = base64.b64encode(img_data).decode('utf-8')
             images.append(f"data:image/png;base64,{b64_img}")
