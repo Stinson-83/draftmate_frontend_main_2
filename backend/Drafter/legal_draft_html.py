@@ -1,11 +1,10 @@
-import os
 import google.generativeai as genai
 from typing import Optional
 from dotenv import load_dotenv
 load_dotenv()
 
 # System prompt for legal drafting with plain HTML output
-LEGAL_DRAFT_SYSTEM_PROMPT = """
+LEGAL_DRAFT_PLAIN_HTML_SYSTEM_PROMPT = """
 You are an expert legal drafting assistant with extensive knowledge of legal terminology, 
 document structures, and professional legal writing conventions. Your task is to create 
 comprehensive, professionally formatted legal drafts based on the provided case context 
@@ -91,70 +90,102 @@ insert a placeholder in the following exact format:
 3. Define terms on first use
 4. Avoid redundancy while maintaining legal completeness
 5. Include all material facts
+6. State legal provisions with section numbers
+7. Maintain consistency in terminology throughout
+
 ## CRITICAL HTML OUTPUT FORMAT:
 
-You MUST output strictly plain HTML structure using <p> and <span> tags. Follow these rules EXACTLY:
+You MUST output ONLY plain text wrapped in span elements with line breaks. Follow these rules EXACTLY:
 
-1. **STRUCTURE**:
-   - Every distinct line or paragraph MUST be wrapped in a `<p>` tag.
-   - Inside the `<p>` tag, wrap the text content in a `<span>` tag.
-   - Example: `<p><span>This is a paragraph of text.</span></p>`
+1. **NO FORMATTING ALLOWED**: Do NOT use any of the following:
+   - NO <strong> or <b> tags (no bold)
+   - NO <em> or <i> tags (no italics)
+   - NO <u> tags (no underline)
+   - NO <mark> tags (no highlighting)
+   - NO CSS styling for bold, italic, colors, backgrounds
+   - NO class names that imply formatting
 
-2. **NO SPECIAL CLASSES**: 
-   - Do NOT use classes like "content-element" or "text-span".
-   - Do NOT use "absolute" positioning or style attributes.
-   - Keep the HTML clean and semantic.
+2. **MANDATORY WRAPPER**: Every piece of text content MUST be wrapped in exactly this tag:
+   <span class="content-element text-span">your text content here</span>
 
-3. **FORMATTING**:
-   - NO bold, italics, or other styling tags.
-   - Use <br> only if strictly necessary within a paragraph, but prefer closing and opening new `<p>` tags for new lines.
+3. **LINE BREAKS - REQUIRED**: You MUST use the <br> tag after EVERY span element for line breaks.
+   The <br> tag is the ONLY additional HTML tag allowed. Place it AFTER the closing </span> tag.
 
-4. **EMPTY LINES**:
-   - For vertical spacing, use an empty paragraph: `<p><br></p>` or `<p><span>&nbsp;</span></p>`
+4. **OUTPUT FORMAT**: Output span elements followed by <br> tags. Example:
 
-5. **PLACEHOLDERS**:
-   - Keep the `_(description)_` placeholders as plain text inside the spans.
+<span class="content-element text-span">LEGAL NOTICE</span><br>
+<span class="content-element text-span"></span><br>
+<span class="content-element text-span">REF. NO.: _(Reference Number)_</span><br>
+<span class="content-element text-span">DATE: 20th December 2024</span><br>
+<span class="content-element text-span"></span><br>
+<span class="content-element text-span">To,</span><br>
+<span class="content-element text-span">The Managing Director,</span><br>
+<span class="content-element text-span">ABC Company Private Limited,</span><br>
 
-## OUTPUT EXAMPLE:
+5. **EMPTY LINES**: For blank lines/spacing, use: <span class="content-element text-span"></span><br>
 
-<p><span>LEGAL NOTICE</span></p>
-<p><span>&nbsp;</span></p>
-<p><span>REF. NO.: _(Reference Number)_</span></p>
-<p><span>DATE: 20th December 2024</span></p>
-<p><span>&nbsp;</span></p>
-<p><span>To,</span></p>
-<p><span>The Managing Director,</span></p>
-...
+6. **ALLOWED TAGS ONLY**: 
+   - <span class="content-element text-span">...</span> - for wrapping ALL text content
+   - <br> - for line breaks (MUST appear after every </span>)
+   
+   NO other HTML tags are allowed (!DOCTYPE, html, head, body, style, div, p, etc.)
 
 ## OUTPUT:
 
-Provide the complete legal draft as valid HTML following the strict structure above. output ONLY the HTML.
+Provide the complete legal draft with each line wrapped in the span tag as specified above.
+Do not add any explanatory notes or comments - output ONLY the span-wrapped content lines.
 """
 
-api_key= os.getenv("GOOGLE_API_KEY")
+DEFAULT_API_KEY = ""
 
-def generate_legal_draft(
+
+def generate_legal_draft_plain_html(
     case_context: str,
     legal_documents: Optional[str] = None,
-    document_type: Optional[str] = None
+    document_type: Optional[str] = None,
+    api_key: Optional[str] = DEFAULT_API_KEY
 ) -> str:
+    """
+    Generate a legal draft as plain HTML with content in text-span elements.
     
+    Args:
+        case_context: Detailed description of the case including parties, facts,
+                     dates, amounts, and all relevant information.
+        legal_documents: Optional reference legal documents or templates to guide
+                        the drafting process.
+        document_type: Optional type of document to generate (e.g., "Legal Notice",
+                      "Petition", "Contract", "Affidavit").
+        api_key: Google API key for Gemini. If not provided, uses DEFAULT_API_KEY
+                or GOOGLE_API_KEY environment variable.
+    
+    Returns:
+        HTML content as a string with all text wrapped in span elements.
+    
+    Raises:
+        ValueError: If no API key is available.
+        Exception: If the API call fails or returns an empty response.
+    """
     # Configure API key - Priority: parameter > DEFAULT_API_KEY > environment variable
     if api_key:
         genai.configure(api_key=api_key)
+    elif DEFAULT_API_KEY:
+        genai.configure(api_key=DEFAULT_API_KEY)
     else:
         import os
         if os.environ.get("GOOGLE_API_KEY"):
             genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
         else:
             raise ValueError(
-                "No API key provided. Please set GOOGLE_API_KEY environment variable"
+                "No API key provided. Please either:\n"
+                "1. Set DEFAULT_API_KEY at the top of legal_draft_plain_html_generator.py\n"
+                "2. Pass api_key parameter to the function\n"
+                "3. Set GOOGLE_API_KEY environment variable"
             )
     
-    # Initialize the Gemini model (using gemini-1.5-flash)
+    # Initialize the Gemini model
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash",
-        system_instruction=LEGAL_DRAFT_SYSTEM_PROMPT
+        system_instruction=LEGAL_DRAFT_PLAIN_HTML_SYSTEM_PROMPT
     )
     
     # Construct the user prompt
@@ -184,7 +215,11 @@ def generate_legal_draft(
         "generate a complete, professionally formatted legal draft. "
         "Remember to use placeholders _(description of missing info)_ for any "
         "information that is not provided in the case context. "
-        "Output ONLY the HTML content (<p><span>...</span></p>)."
+        "Output ONLY span elements with class=\"content-element text-span\" followed by <br> tags. "
+        "IMPORTANT: Use <br> tag after EVERY </span> for line breaks. "
+        "NO bold, NO italics, NO highlighting, NO other formatting. "
+        "Each line of content in its own span element followed by <br>. "
+        "Start output with the first span element immediately."
     )
     
     # Combine all parts
@@ -217,57 +252,91 @@ def generate_legal_draft(
         raise Exception(f"Failed to generate legal draft: {str(e)}")
 
 
-# Convenience function for specific document types
-def generate_legal_notice(
+def save_legal_draft_plain_html(
     case_context: str,
-    reference_docs: Optional[str] = None,
+    output_path: str,
+    legal_documents: Optional[str] = None,
+    document_type: Optional[str] = None,
+    api_key: Optional[str] = None
 ) -> str:
-    """Generate a Legal Notice document."""
-    return generate_legal_draft(
+    """
+    Generate and save a legal draft as a plain HTML file.
+    
+    Args:
+        case_context: Detailed description of the case.
+        output_path: Path where the HTML file will be saved.
+        legal_documents: Optional reference legal documents.
+        document_type: Optional type of document to generate.
+        api_key: Google API key for Gemini.
+    
+    Returns:
+        The path to the saved HTML file.
+    """
+    html_content = generate_legal_draft_plain_html(
         case_context=case_context,
-        legal_documents=reference_docs,
-        document_type="Legal Notice"
+        legal_documents=legal_documents,
+        document_type=document_type,
+        api_key=api_key
     )
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    return output_path
 
 
-def generate_petition(
+# Convenience functions for specific document types
+def generate_legal_notice_plain_html(
     case_context: str,
     reference_docs: Optional[str] = None,
     api_key: Optional[str] = None
 ) -> str:
-    """Generate a Court Petition document."""
-    return generate_legal_draft(
+    """Generate a Legal Notice document as plain HTML."""
+    return generate_legal_draft_plain_html(
         case_context=case_context,
         legal_documents=reference_docs,
-        document_type="Petition"
+        document_type="Legal Notice",
+        api_key=api_key
     )
 
 
-def generate_contract(
+def generate_petition_plain_html(
     case_context: str,
     reference_docs: Optional[str] = None,
     api_key: Optional[str] = None
 ) -> str:
-    """Generate a Contract/Agreement document."""
-    return generate_legal_draft(
+    """Generate a Court Petition document as plain HTML."""
+    return generate_legal_draft_plain_html(
         case_context=case_context,
         legal_documents=reference_docs,
-        document_type="Contract/Agreement"
+        document_type="Petition",
+        api_key=api_key
     )
 
 
-def generate_affidavit(
+def generate_contract_plain_html(
     case_context: str,
     reference_docs: Optional[str] = None,
     api_key: Optional[str] = None
 ) -> str:
-    """Generate an Affidavit document."""
-    return generate_legal_draft(
+    """Generate a Contract/Agreement document as plain HTML."""
+    return generate_legal_draft_plain_html(
         case_context=case_context,
         legal_documents=reference_docs,
-        document_type="Affidavit"
+        document_type="Contract/Agreement",
+        api_key=api_key
     )
 
-if __name__ == "__main__":
-    t=generate_petition(case_context="My client wants to file a divorce petition")
-    print(t)
+
+def generate_affidavit_plain_html(
+    case_context: str,
+    reference_docs: Optional[str] = None,
+    api_key: Optional[str] = None
+) -> str:
+    """Generate an Affidavit document as plain HTML."""
+    return generate_legal_draft_plain_html(
+        case_context=case_context,
+        legal_documents=reference_docs,
+        document_type="Affidavit",
+        api_key=api_key
+    )
