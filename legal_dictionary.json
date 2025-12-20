@@ -1,0 +1,1470 @@
+[
+  {
+    "Word": "*a fortiori*",
+    "Meaning": "from stronger"
+  },
+  {
+    "Word": "*a mensa et thoro*",
+    "Meaning": "from table and bed"
+  },
+  {
+    "Word": "*a posteriori*",
+    "Meaning": "from later"
+  },
+  {
+    "Word": "*a priori*",
+    "Meaning": "from earlier"
+  },
+  {
+    "Word": "*a quo*",
+    "Meaning": "from which"
+  },
+  {
+    "Word": "*ab extra*",
+    "Meaning": "from outside"
+  },
+  {
+    "Word": "*ab initio*",
+    "Meaning": "from the beginning"
+  },
+  {
+    "Word": "*absque hoc*",
+    "Meaning": "without this"
+  },
+  {
+    "Word": "*Actio non datur non damnificato*",
+    "Meaning": "An action is not given to one who is not injured."
+  },
+  {
+    "Word": "*Actus legis nemini facit injurium*",
+    "Meaning": "The act of law injures no one."
+  },
+  {
+    "Word": "*Actus non facit reum, nisi mens sit rea*",
+    "Meaning": "No act is punishable that is not the result of a guilty mind."
+  },
+  {
+    "Word": "*actus reus*",
+    "Meaning": "guilty act"
+  },
+  {
+    "Word": "*ad coelum*",
+    "Meaning": "to the sky"
+  },
+  {
+    "Word": "*ad colligenda bona*",
+    "Meaning": "to collect the goods"
+  },
+  {
+    "Word": "*ad hoc*",
+    "Meaning": "for this"
+  },
+  {
+    "Word": "*ad hominem*",
+    "Meaning": "at the person"
+  },
+  {
+    "Word": "*ad idem*",
+    "Meaning": "to the same thing"
+  },
+  {
+    "Word": "*ad infinitum*",
+    "Meaning": "to infinity"
+  },
+  {
+    "Word": "*ad litem*",
+    "Meaning": "for the case"
+  },
+  {
+    "Word": "*ad quod damnum*",
+    "Meaning": "according to the harm"
+  },
+  {
+    "Word": "*ad valorem*",
+    "Meaning": "according to value"
+  },
+  {
+    "Word": "adjournment *sine die*",
+    "Meaning": "adjournment without a day"
+  },
+  {
+    "Word": "*affidavit*",
+    "Meaning": "he has sworn"
+  },
+  {
+    "Word": "*allocatur*",
+    "Meaning": "it is allowed"
+  },
+  {
+    "Word": "*alter ego*",
+    "Meaning": "another I"
+  },
+  {
+    "Word": "*Alteri stipulari nemo potest*",
+    "Meaning": "No-one can alter on their own a contract"
+  },
+  {
+    "Word": "*amicus curiae*",
+    "Meaning": "friend of the court"
+  },
+  {
+    "Word": "*animus contrahendi*",
+    "Meaning": "contractual intent"
+  },
+  {
+    "Word": "*animus manendi*",
+    "Meaning": "intention to remain"
+  },
+  {
+    "Word": "*animus nocendi*",
+    "Meaning": "intention to harm"
+  },
+  {
+    "Word": "*animus possidendi*",
+    "Meaning": "intention to possess"
+  },
+  {
+    "Word": "*animus revertendi*",
+    "Meaning": "intention to return"
+  },
+  {
+    "Word": "*animus testandi*",
+    "Meaning": "testamentary intent"
+  },
+  {
+    "Word": "*ante*",
+    "Meaning": "before"
+  },
+  {
+    "Word": "(in) *arguendo*",
+    "Meaning": "for the sake of argument"
+  },
+  {
+    "Word": "*bona fide*",
+    "Meaning": "in good faith"
+  },
+  {
+    "Word": "*bona vacantia*",
+    "Meaning": "ownerless goods"
+  },
+  {
+    "Word": "*cadit quaestio*",
+    "Meaning": "the question falls"
+  },
+  {
+    "Word": "*casus belli*",
+    "Meaning": "case of war"
+  },
+  {
+    "Word": "*caveat*",
+    "Meaning": "May he beware"
+  },
+  {
+    "Word": "*caveat emptor*",
+    "Meaning": "Let the buyer beware"
+  },
+  {
+    "Word": "*certiorari*",
+    "Meaning": "to be apprised"
+  },
+  {
+    "Word": "*cessante ratione legis cessat ipsa lex*",
+    "Meaning": "when the reason for a law ceases, so does the law itself"
+  },
+  {
+    "Word": "*ceteris paribus*",
+    "Meaning": "with other things the same"
+  },
+  {
+    "Word": "*compos mentis*",
+    "Meaning": "having command of mind"
+  },
+  {
+    "Word": "*condicio sine qua non*",
+    "Meaning": "A condition without which it could not be"
+  },
+  {
+    "Word": "*consensus ad idem*",
+    "Meaning": "agreement to the same"
+  },
+  {
+    "Word": "*contra*",
+    "Meaning": "against"
+  },
+  {
+    "Word": "*contra legem*",
+    "Meaning": "against the law"
+  },
+  {
+    "Word": "*contradictio in adjecto*",
+    "Meaning": "contradiction in adjective"
+  },
+  {
+    "Word": "*contra proferentem*",
+    "Meaning": "against the one bringing forth"
+  },
+  {
+    "Word": "*coram non judice*",
+    "Meaning": "before one who is not a judge"
+  },
+  {
+    "Word": "*corpus delicti*",
+    "Meaning": "body of the crime"
+  },
+  {
+    "Word": "*corpus juris*",
+    "Meaning": "body of law"
+  },
+  {
+    "Word": "*corpus juris civilis*",
+    "Meaning": "body of civil law"
+  },
+  {
+    "Word": "*corpus juris gentium*",
+    "Meaning": "body of the law of nations"
+  },
+  {
+    "Word": "*corpus juris secundum*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*crimen falsi*",
+    "Meaning": "crime of falsifying"
+  },
+  {
+    "Word": "*cui bono*",
+    "Meaning": "as a benefit to whom?"
+  },
+  {
+    "Word": "*curia advisari vult*",
+    "Meaning": "the court wishes to consider"
+  },
+  {
+    "Word": "*de bonis asportatis*",
+    "Meaning": "carrying goods away"
+  },
+  {
+    "Word": "*debellatio*",
+    "Meaning": "warring down"
+  },
+  {
+    "Word": "*de bonis non administratis*",
+    "Meaning": "of goods not administered"
+  },
+  {
+    "Word": "*de die in diem*",
+    "Meaning": "from day to day"
+  },
+  {
+    "Word": "*de facto*",
+    "Meaning": "in fact"
+  },
+  {
+    "Word": "*de futuro*",
+    "Meaning": "concerning the future"
+  },
+  {
+    "Word": "*de integro*",
+    "Meaning": "concerning the whole"
+  },
+  {
+    "Word": "*de jure*",
+    "Meaning": "according to law"
+  },
+  {
+    "Word": "*de lege ferenda*",
+    "Meaning": "of the law as it should be"
+  },
+  {
+    "Word": "*de lege lata*",
+    "Meaning": "of the law as it is"
+  },
+  {
+    "Word": "*de minimis*",
+    "Meaning": "about the smallest things"
+  },
+  {
+    "Word": "*de minimis non curat lex*",
+    "Meaning": "the law is not concerned with minimal things"
+  },
+  {
+    "Word": "*de novo*",
+    "Meaning": "anew"
+  },
+  {
+    "Word": "*deorum injuriae diis curae*",
+    "Meaning": "The gods take care of injuries to the gods"
+  },
+  {
+    "Word": "*dictum*",
+    "Meaning": "(thing) said"
+  },
+  {
+    "Word": "*doli incapax*",
+    "Meaning": "incapable of guilt"
+  },
+  {
+    "Word": "*dolus bonus*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*dolus malus*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*dolus specialis*",
+    "Meaning": "Specific deceit"
+  },
+  {
+    "Word": "*domitae naturae*",
+    "Meaning": "tame by nature"
+  },
+  {
+    "Word": "*donatio mortis causa*",
+    "Meaning": "deathbed gift"
+  },
+  {
+    "Word": "*dramatis personae*",
+    "Meaning": "persons of the drama"
+  },
+  {
+    "Word": "*duces tecum*",
+    "Meaning": "bring with you"
+  },
+  {
+    "Word": "*ejusdem generis*",
+    "Meaning": "of the same class"
+  },
+  {
+    "Word": "*eo nomine*",
+    "Meaning": "by that name"
+  },
+  {
+    "Word": "*erga omnes*",
+    "Meaning": "towards all"
+  },
+  {
+    "Word": "*ergo*",
+    "Meaning": "therefore"
+  },
+  {
+    "Word": "*erratum*",
+    "Meaning": "having been made in error"
+  },
+  {
+    "Word": "*et al.*",
+    "Meaning": "and others"
+  },
+  {
+    "Word": "*et cetera*",
+    "Meaning": "and other things"
+  },
+  {
+    "Word": "*et seq.*",
+    "Meaning": "and the following things"
+  },
+  {
+    "Word": "*et uxor*",
+    "Meaning": "and wife"
+  },
+  {
+    "Word": "*et vir*",
+    "Meaning": "and husband"
+  },
+  {
+    "Word": "*ex aequo et bono*",
+    "Meaning": "of equity and [the] good"
+  },
+  {
+    "Word": "*ex ante*",
+    "Meaning": "of before"
+  },
+  {
+    "Word": "*ex cathedra*",
+    "Meaning": "from the chair"
+  },
+  {
+    "Word": "*ex concessis*",
+    "Meaning": "from what has been conceded already"
+  },
+  {
+    "Word": "*ex delicto*",
+    "Meaning": "from a transgression"
+  },
+  {
+    "Word": "*ex demissione*",
+    "Meaning": "from a transgression"
+  },
+  {
+    "Word": "*Ex dolo malo non oritur actio*",
+    "Meaning": "No action arises from harm"
+  },
+  {
+    "Word": "*ex facie*",
+    "Meaning": "on the face"
+  },
+  {
+    "Word": "*ex fida bona*",
+    "Meaning": "good business norms"
+  },
+  {
+    "Word": "*ex gratia*",
+    "Meaning": "by favor"
+  },
+  {
+    "Word": "*ex officio*",
+    "Meaning": "from the office"
+  },
+  {
+    "Word": "*ex parte*",
+    "Meaning": "from [for] one party"
+  },
+  {
+    "Word": "*ex post*",
+    "Meaning": "from after"
+  },
+  {
+    "Word": "*ex post facto*",
+    "Meaning": "from a thing done afterward"
+  },
+  {
+    "Word": "*ex post facto law*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*ex proprio motu*",
+    "Meaning": "by [one's] own motion"
+  },
+  {
+    "Word": "*ex rel*",
+    "Meaning": "[arising] out of the narration [of the relator]"
+  },
+  {
+    "Word": "*ex tempore*",
+    "Meaning": "At the time"
+  },
+  {
+    "Word": "*exempli gratia*",
+    "Meaning": "for the sake of example"
+  },
+  {
+    "Word": "*ex tunc*",
+    "Meaning": "from then"
+  },
+  {
+    "Word": "*Ex turpi causa non oritur actio*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*ex nunc*",
+    "Meaning": "from now on"
+  },
+  {
+    "Word": "*extant*",
+    "Meaning": "existing"
+  },
+  {
+    "Word": "*facio ut facias*",
+    "Meaning": "I do, that you may do"
+  },
+  {
+    "Word": "*factum*",
+    "Meaning": "deed"
+  },
+  {
+    "Word": "*favor contractus*",
+    "Meaning": "favor of the contract"
+  },
+  {
+    "Word": "*felo de se*",
+    "Meaning": "felon of himself"
+  },
+  {
+    "Word": "*ferae naturae*",
+    "Meaning": "wild animals by nature"
+  },
+  {
+    "Word": "*fiat*",
+    "Meaning": "Let it be done."
+  },
+  {
+    "Word": "*fieri facias*",
+    "Meaning": "May you cause to be done."
+  },
+  {
+    "Word": "*fortis attachiamentum, validior praesumptionem*",
+    "Meaning": "strong attachment, the stronger presumption"
+  },
+  {
+    "Word": "*forum non conveniens*",
+    "Meaning": "disagreeable forum"
+  },
+  {
+    "Word": "*fumus boni iuris*",
+    "Meaning": "smoke of a good right"
+  },
+  {
+    "Word": "*functus officio*",
+    "Meaning": "having performed his office"
+  },
+  {
+    "Word": "*gravamen*",
+    "Meaning": "things weighing down"
+  },
+  {
+    "Word": "guardian *ad litem*",
+    "Meaning": "guardian for the case"
+  },
+  {
+    "Word": "*habeas corpus*",
+    "Meaning": "May you have the body."
+  },
+  {
+    "Word": "*hostis humani generis*",
+    "Meaning": "enemy of the human race"
+  },
+  {
+    "Word": "*imprimatur*",
+    "Meaning": "Let it be printed."
+  },
+  {
+    "Word": "*in absentia*",
+    "Meaning": "in absence"
+  },
+  {
+    "Word": "*in articulo mortis*",
+    "Meaning": "at the moment of death"
+  },
+  {
+    "Word": "*in camera*",
+    "Meaning": "in the chamber"
+  },
+  {
+    "Word": "*in curia*",
+    "Meaning": "in court"
+  },
+  {
+    "Word": "*in esse*",
+    "Meaning": "in existence"
+  },
+  {
+    "Word": "*in extenso*",
+    "Meaning": "in the extended"
+  },
+  {
+    "Word": "*in extremis*",
+    "Meaning": "in the extreme"
+  },
+  {
+    "Word": "*in flagrante delicto*",
+    "Meaning": "in blazing offense"
+  },
+  {
+    "Word": "*in forma pauperis*",
+    "Meaning": "in the manner of a pauper"
+  },
+  {
+    "Word": "*in futuro*",
+    "Meaning": "in the future"
+  },
+  {
+    "Word": "*in haec verba*",
+    "Meaning": "in these words"
+  },
+  {
+    "Word": "*in limine*",
+    "Meaning": "at the threshold"
+  },
+  {
+    "Word": "*in loco parentis*",
+    "Meaning": "in the place of a parent"
+  },
+  {
+    "Word": "*in mitius*",
+    "Meaning": "in the milder"
+  },
+  {
+    "Word": "*in omnibus*",
+    "Meaning": "in all"
+  },
+  {
+    "Word": "*in pari delicto*",
+    "Meaning": "in equal offense"
+  },
+  {
+    "Word": "*in pari materia*",
+    "Meaning": "in the same matter"
+  },
+  {
+    "Word": "*in personam*",
+    "Meaning": "in person"
+  },
+  {
+    "Word": "*in pleno*",
+    "Meaning": "in full"
+  },
+  {
+    "Word": "*in propria persona*",
+    "Meaning": "in one's own person"
+  },
+  {
+    "Word": "*in re*",
+    "Meaning": "in the matter [of]"
+  },
+  {
+    "Word": "*in rem*",
+    "Meaning": "about a thing"
+  },
+  {
+    "Word": "*in situ*",
+    "Meaning": "in position"
+  },
+  {
+    "Word": "*in terrorem*",
+    "Meaning": "in order to frighten"
+  },
+  {
+    "Word": "*in terrorem* clause",
+    "Meaning": "clause \"in order to frighten"
+  },
+  {
+    "Word": "*in toto*",
+    "Meaning": "in total"
+  },
+  {
+    "Word": "*indicia*",
+    "Meaning": "indications"
+  },
+  {
+    "Word": "*infra*",
+    "Meaning": "below or under"
+  },
+  {
+    "Word": "*iniuria sine damno*",
+    "Meaning": "injury without financial or property loss"
+  },
+  {
+    "Word": "*innuendo*",
+    "Meaning": "by nodding"
+  },
+  {
+    "Word": "*inter alia*",
+    "Meaning": "among others"
+  },
+  {
+    "Word": "*inter rusticos*",
+    "Meaning": "among rustics"
+  },
+  {
+    "Word": "*inter se*",
+    "Meaning": "amongst themselves"
+  },
+  {
+    "Word": "*inter vivos*",
+    "Meaning": "between the living"
+  },
+  {
+    "Word": "*intra*",
+    "Meaning": "within"
+  },
+  {
+    "Word": "*intra fauces terrae*",
+    "Meaning": "within the jaws of the land"
+  },
+  {
+    "Word": "*intra legem*",
+    "Meaning": "within the law"
+  },
+  {
+    "Word": "*intra vires*",
+    "Meaning": "within the powers"
+  },
+  {
+    "Word": "*ipse dixit*",
+    "Meaning": "He himself said it."
+  },
+  {
+    "Word": "*ipsissima verba*",
+    "Meaning": "the very words"
+  },
+  {
+    "Word": "*ipso facto*",
+    "Meaning": "by the fact itself"
+  },
+  {
+    "Word": "*ipso jure*",
+    "Meaning": "the law itself"
+  },
+  {
+    "Word": "*ius*",
+    "Meaning": "law"
+  },
+  {
+    "Word": "*ius civile vigilantibus scriptum est*",
+    "Meaning": "civil law is written for the vigilant"
+  },
+  {
+    "Word": "*jurat*",
+    "Meaning": "(He) swears"
+  },
+  {
+    "Word": "*juris privati*",
+    "Meaning": "of private right"
+  },
+  {
+    "Word": "*jus*",
+    "Meaning": "law, right"
+  },
+  {
+    "Word": "*jus accrescendi*",
+    "Meaning": "right of survivorship"
+  },
+  {
+    "Word": "*jus ad bellum*",
+    "Meaning": "laws to war"
+  },
+  {
+    "Word": "*jus civile*",
+    "Meaning": "civil law"
+  },
+  {
+    "Word": "*jus cogens*",
+    "Meaning": "compelling law"
+  },
+  {
+    "Word": "*jus gentium*",
+    "Meaning": "law of nations"
+  },
+  {
+    "Word": "*jus in bello*",
+    "Meaning": "law in war"
+  },
+  {
+    "Word": "*jus inter gentes*",
+    "Meaning": "law between the peoples"
+  },
+  {
+    "Word": "*jus legationis*",
+    "Meaning": "right of legation"
+  },
+  {
+    "Word": "*jus naturale*",
+    "Meaning": "natural law"
+  },
+  {
+    "Word": "*jus primae noctis*",
+    "Meaning": "right of the first night"
+  },
+  {
+    "Word": "*jus sanguinis*",
+    "Meaning": "right of blood"
+  },
+  {
+    "Word": "*jus soli*",
+    "Meaning": "right of soil"
+  },
+  {
+    "Word": "*jus tertii*",
+    "Meaning": "law of the third"
+  },
+  {
+    "Word": "*Jus tractatuum*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*lacuna*",
+    "Meaning": "void, gap"
+  },
+  {
+    "Word": "*lex communis*",
+    "Meaning": "common law"
+  },
+  {
+    "Word": "*lex fori*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*lex lata*",
+    "Meaning": "the carried law"
+  },
+  {
+    "Word": "*lex loci*",
+    "Meaning": "the law of the place"
+  },
+  {
+    "Word": "*lex scripta*",
+    "Meaning": "written law"
+  },
+  {
+    "Word": "*liberum veto*",
+    "Meaning": "free *veto*"
+  },
+  {
+    "Word": "*lingua franca*",
+    "Meaning": "the Frankish language"
+  },
+  {
+    "Word": "*lis alibi pendens*",
+    "Meaning": "lawsuit elsewhere pending"
+  },
+  {
+    "Word": "*lis pendens*",
+    "Meaning": "suit pending"
+  },
+  {
+    "Word": "*locus*",
+    "Meaning": "place"
+  },
+  {
+    "Word": "*locus delicti*",
+    "Meaning": "place of the crime"
+  },
+  {
+    "Word": "*locus in quo*",
+    "Meaning": "the place in which"
+  },
+  {
+    "Word": "*locus poenitentiae*",
+    "Meaning": "place of repentance"
+  },
+  {
+    "Word": "*locus standi*",
+    "Meaning": "place of standing"
+  },
+  {
+    "Word": "*mala fide*",
+    "Meaning": "(in) bad faith"
+  },
+  {
+    "Word": "*malum in se*",
+    "Meaning": "wrong in itself"
+  },
+  {
+    "Word": "*malum prohibitum*",
+    "Meaning": "prohibited wrong"
+  },
+  {
+    "Word": "*mandamus*",
+    "Meaning": "we command"
+  },
+  {
+    "Word": "*mare clausum*",
+    "Meaning": "closed sea"
+  },
+  {
+    "Word": "*mare liberum*",
+    "Meaning": "open sea"
+  },
+  {
+    "Word": "*mea culpa*",
+    "Meaning": "through my fault"
+  },
+  {
+    "Word": "*mens rea*",
+    "Meaning": "guilty mind"
+  },
+  {
+    "Word": "*modus operandi*",
+    "Meaning": "manner of operation"
+  },
+  {
+    "Word": "*mortis causa*",
+    "Meaning": "in contemplation of death"
+  },
+  {
+    "Word": "*mos pro lege*",
+    "Meaning": "custom for law"
+  },
+  {
+    "Word": "*motion in limine*",
+    "Meaning": "motion at the start"
+  },
+  {
+    "Word": "*mutatis mutandis*",
+    "Meaning": "having changed [the things that] needed to be changed"
+  },
+  {
+    "Word": "*ne exeat*",
+    "Meaning": "let him not exit [the republic]"
+  },
+  {
+    "Word": "*Nemo dat quod non habet*",
+    "Meaning": "Nobody can give what he has not"
+  },
+  {
+    "Word": "*Nemo debet bis vexari* (*pro una et eadem causa*)",
+    "Meaning": "No-one should be tried twice (for one and the same charge)"
+  },
+  {
+    "Word": "*Nemo iudex in causa sua*",
+    "Meaning": "No-one should be a judge in his own case."
+  },
+  {
+    "Word": "*Nemo potest dare quod suum non est*",
+    "Meaning": "No one can give what he possesses not"
+  },
+  {
+    "Word": "*Nemo potest esse tenens et dominus*",
+    "Meaning": "No one can at the same time be a tenant and a landlord"
+  },
+  {
+    "Word": "*Nemo potest mutare consilium suum in alterius iniuriam*",
+    "Meaning": "Nobody can change his own purpose to another's injury"
+  },
+  {
+    "Word": "*Nemo potest nisi quod de jure potest*",
+    "Meaning": "A person can do only things, which s/he can do lawfully."
+  },
+  {
+    "Word": "*Nemo potest praecise cogi ad factum*",
+    "Meaning": "Nobody can be forced to a specific act"
+  },
+  {
+    "Word": "*Nemo potest venire contra factum proprium*",
+    "Meaning": "No-one can act in a way contrary to his own prior actions."
+  },
+  {
+    "Word": "*Nemo potest facere per alium quod per se non potest*",
+    "Meaning": "No one can do through another what he cannot do himself."
+  },
+  {
+    "Word": "*nihil dicit*",
+    "Meaning": "He says nothing."
+  },
+  {
+    "Word": "*nisi*",
+    "Meaning": "unless"
+  },
+  {
+    "Word": "*nisi prius*",
+    "Meaning": "unless first"
+  },
+  {
+    "Word": "*nolle prosequi*",
+    "Meaning": "not to prosecute"
+  },
+  {
+    "Word": "*nolo contendere*",
+    "Meaning": "I do not wish to argue"
+  },
+  {
+    "Word": "*non adimpleti contractus*",
+    "Meaning": "of a non-completed contract"
+  },
+  {
+    "Word": "*non compos mentis*",
+    "Meaning": "not in possession of [one's] mind"
+  },
+  {
+    "Word": "*non constat*",
+    "Meaning": "It is not certain."
+  },
+  {
+    "Word": "*non est factum*",
+    "Meaning": "It is not [my] deed."
+  },
+  {
+    "Word": "*non est inventus*",
+    "Meaning": "He was not found."
+  },
+  {
+    "Word": "*non liquet*",
+    "Meaning": "It is not clear."
+  },
+  {
+    "Word": "*non obstante verdicto*",
+    "Meaning": "notwithstanding the verdict"
+  },
+  {
+    "Word": "*novus actus interveniens*",
+    "Meaning": "a new action coming between"
+  },
+  {
+    "Word": "*noscitur a sociis*",
+    "Meaning": "It is known by the company it keeps."
+  },
+  {
+    "Word": "*nota bene*",
+    "Meaning": "note well"
+  },
+  {
+    "Word": "*Nullum crimen sine lege*",
+    "Meaning": "No-one can face punishment except for an act that was criminalized before \nhe performed the act"
+  },
+  {
+    "Word": "*Nulla poena sine culpa*",
+    "Meaning": "no punishment without fault"
+  },
+  {
+    "Word": "*nudum pactum*",
+    "Meaning": "naked promise"
+  },
+  {
+    "Word": "*nulla bona*",
+    "Meaning": "no goods"
+  },
+  {
+    "Word": "*nunc pro tunc*",
+    "Meaning": "now for then"
+  },
+  {
+    "Word": "*obiter dictum*",
+    "Meaning": "a thing said in passing"
+  },
+  {
+    "Word": "*omnia praesumuntur rite essa acta*",
+    "Meaning": "Everything is presumed right about this act"
+  },
+  {
+    "Word": "*onus probandi*",
+    "Meaning": ""
+  },
+  {
+    "Word": "*ore tenus*",
+    "Meaning": "(evidence) presented orally"
+  },
+  {
+    "Word": "*pace*",
+    "Meaning": "with peace"
+  },
+  {
+    "Word": "*par delictum*",
+    "Meaning": "equal fault"
+  },
+  {
+    "Word": "*parens patriae*",
+    "Meaning": "parent of the nation"
+  },
+  {
+    "Word": "*pari passu*",
+    "Meaning": "on equal footing"
+  },
+  {
+    "Word": "*partus sequitur ventrem*",
+    "Meaning": "Offspring follows the belly"
+  },
+  {
+    "Word": "*pendente lite*",
+    "Meaning": "while the litigation is pending"
+  },
+  {
+    "Word": "*per capita*",
+    "Meaning": "by head"
+  },
+  {
+    "Word": "*per contra*",
+    "Meaning": "by that against"
+  },
+  {
+    "Word": "*per curiam*",
+    "Meaning": "through the court"
+  },
+  {
+    "Word": "*per incuriam*",
+    "Meaning": "by their neglect"
+  },
+  {
+    "Word": "*per minas*",
+    "Meaning": "through threats"
+  },
+  {
+    "Word": "*per proxima amici*",
+    "Meaning": "by or through the next friend"
+  },
+  {
+    "Word": "*per quod*",
+    "Meaning": "by which"
+  },
+  {
+    "Word": "*per se*",
+    "Meaning": "by itself"
+  },
+  {
+    "Word": "*per stirpes*",
+    "Meaning": "by branch"
+  },
+  {
+    "Word": "*periculum in mora*",
+    "Meaning": "danger in delay"
+  },
+  {
+    "Word": "*persona non grata*",
+    "Meaning": "unwelcome person"
+  },
+  {
+    "Word": "*posse comitatus*",
+    "Meaning": "power of the county"
+  },
+  {
+    "Word": "*post hoc ergo propter hoc*",
+    "Meaning": "after this, therefore because of this"
+  },
+  {
+    "Word": "*post mortem*",
+    "Meaning": "after death"
+  },
+  {
+    "Word": "*post mortem auctoris*",
+    "Meaning": "after the author's death"
+  },
+  {
+    "Word": "*postliminium*",
+    "Meaning": "return from the other"
+  },
+  {
+    "Word": "*praetor peregrinus*",
+    "Meaning": "magistrate of foreigners"
+  },
+  {
+    "Word": "*prima facie*",
+    "Meaning": "at first face"
+  },
+  {
+    "Word": "*pro bono*",
+    "Meaning": "for good"
+  },
+  {
+    "Word": "*pro bono publico*",
+    "Meaning": "for the public good"
+  },
+  {
+    "Word": "*pro forma*",
+    "Meaning": "as a matter of form"
+  },
+  {
+    "Word": "*pro hac vice*",
+    "Meaning": "for this turn"
+  },
+  {
+    "Word": "*pro per*",
+    "Meaning": "abbreviation of *propria persona*, meaning \"one's own person"
+  },
+  {
+    "Word": "*pro rata*",
+    "Meaning": "from the rate"
+  },
+  {
+    "Word": "*pro se*",
+    "Meaning": "for himself"
+  },
+  {
+    "Word": "*pro tanto*",
+    "Meaning": "for so much"
+  },
+  {
+    "Word": "*pro tem*",
+    "Meaning": "abbreviation of *pro tempore*, meaning \"for the time being"
+  },
+  {
+    "Word": "*pro tempore*",
+    "Meaning": "for the time being"
+  },
+  {
+    "Word": "*propria persona*",
+    "Meaning": "proper person"
+  },
+  {
+    "Word": "*qua*",
+    "Meaning": "which; as"
+  },
+  {
+    "Word": "*quae ipso usu consumuntur*",
+    "Meaning": "Consumed by the use itself"
+  },
+  {
+    "Word": "*quaeritur*",
+    "Meaning": "It is sought."
+  },
+  {
+    "Word": "*quaere*",
+    "Meaning": "query"
+  },
+  {
+    "Word": "*quantum*",
+    "Meaning": "how much"
+  },
+  {
+    "Word": "*quantum meruit*",
+    "Meaning": "as much as it deserves; as much as she or he has earned[10]"
+  },
+  {
+    "Word": "*quantum valebant*",
+    "Meaning": "as much as they were worth"
+  },
+  {
+    "Word": "*quasi*",
+    "Meaning": "as if"
+  },
+  {
+    "Word": "*qui tam*",
+    "Meaning": "abbreviation of *qui tam pro domino rege quam pro se ipso in hac parte \nsequitur*, meaning \"who pursues in this action as much for the king as \nhimself\"."
+  },
+  {
+    "Word": "*quid pro quo*",
+    "Meaning": "this for that"
+  },
+  {
+    "Word": "*quo ante*",
+    "Meaning": "as before"
+  },
+  {
+    "Word": "*quo warranto*",
+    "Meaning": "by what warrant"
+  },
+  {
+    "Word": "*quoad hoc*",
+    "Meaning": "as to this"
+  },
+  {
+    "Word": "*R*",
+    "Meaning": "Rex or Regina"
+  },
+  {
+    "Word": "*ratio decidendi*",
+    "Meaning": "reason for the decision"
+  },
+  {
+    "Word": "*ratio scripta*",
+    "Meaning": "written reason"
+  },
+  {
+    "Word": "*rationae soli*",
+    "Meaning": "by reason of the soil"
+  },
+  {
+    "Word": "*rebus sic stantibus*",
+    "Meaning": "things thus standing"
+  },
+  {
+    "Word": "*reddendo singula singulis*",
+    "Meaning": "referring solely to the last"
+  },
+  {
+    "Word": "*res*",
+    "Meaning": "thing, matter, issue, affair"
+  },
+  {
+    "Word": "*res communis*",
+    "Meaning": "common to all"
+  },
+  {
+    "Word": "*res derelictae*",
+    "Meaning": "abandoned goods"
+  },
+  {
+    "Word": "*res ipsa loquitur*",
+    "Meaning": "the thing speaks for itself"
+  },
+  {
+    "Word": "*res gestae*",
+    "Meaning": "a thing done"
+  },
+  {
+    "Word": "*res judicata*",
+    "Meaning": "a matter judged"
+  },
+  {
+    "Word": "*res nova*",
+    "Meaning": "a new thing"
+  },
+  {
+    "Word": "*res nullius*",
+    "Meaning": "nobody's thing"
+  },
+  {
+    "Word": "*res publica*",
+    "Meaning": "public affair"
+  },
+  {
+    "Word": "*respondeat superior*",
+    "Meaning": "Let the master answer."
+  },
+  {
+    "Word": "*scandalum magnatum*",
+    "Meaning": "scandal of the magnates"
+  },
+  {
+    "Word": "*scienter*",
+    "Meaning": "knowingly"
+  },
+  {
+    "Word": "*scire facias*",
+    "Meaning": "Let them know."
+  },
+  {
+    "Word": "*scire feci*",
+    "Meaning": "I have made known."
+  },
+  {
+    "Word": "*secundum formam statuti*",
+    "Meaning": "According to the form of the statute."
+  },
+  {
+    "Word": "*se defendendo*",
+    "Meaning": "self-defence"
+  },
+  {
+    "Word": "*seriatim*",
+    "Meaning": "in series"
+  },
+  {
+    "Word": "*sine die*",
+    "Meaning": "without day"
+  },
+  {
+    "Word": "*sine qua non*",
+    "Meaning": "without which, nothing"
+  },
+  {
+    "Word": "*situs*",
+    "Meaning": "the place"
+  },
+  {
+    "Word": "*stare decisis*",
+    "Meaning": "to stand by [things] decided"
+  },
+  {
+    "Word": "*status quo*\n*status quo ante*\n*statu quo*",
+    "Meaning": "the state in which"
+  },
+  {
+    "Word": "*stratum*",
+    "Meaning": "a covering, from neuter past participle of sternere, to spread"
+  },
+  {
+    "Word": "*sua sponte*",
+    "Meaning": "of its own accord"
+  },
+  {
+    "Word": "*sub judice*",
+    "Meaning": "under the judge"
+  },
+  {
+    "Word": "*sub modo*",
+    "Meaning": "subject to modification"
+  },
+  {
+    "Word": "*sub nomine*",
+    "Meaning": "under the name"
+  },
+  {
+    "Word": "*sub silentio*",
+    "Meaning": "under silence"
+  },
+  {
+    "Word": "*subpoena*",
+    "Meaning": "under penalty"
+  },
+  {
+    "Word": "*subpoena ad testificandum*",
+    "Meaning": "under penalty to be witnessed"
+  },
+  {
+    "Word": "*subpoena duces tecum*",
+    "Meaning": "bring with you under penalty"
+  },
+  {
+    "Word": "*suggestio falsi*",
+    "Meaning": "false suggestion"
+  },
+  {
+    "Word": "*sui generis*",
+    "Meaning": "of its own kind/genus"
+  },
+  {
+    "Word": "*sui juris*",
+    "Meaning": "of his own right"
+  },
+  {
+    "Word": "*suo motu*",
+    "Meaning": "of its own motion"
+  },
+  {
+    "Word": "*supersedeas*",
+    "Meaning": "refrain from"
+  },
+  {
+    "Word": "*suppressio veri*",
+    "Meaning": "suppression of the truth"
+  },
+  {
+    "Word": "*supra*",
+    "Meaning": "above"
+  },
+  {
+    "Word": "*terra nullius*",
+    "Meaning": "no one's land"
+  },
+  {
+    "Word": "*trial de novo*",
+    "Meaning": "trial anew"
+  },
+  {
+    "Word": "*trinoda necessitas*",
+    "Meaning": "three-knotted need"
+  },
+  {
+    "Word": "*uberrima fides*",
+    "Meaning": "most abundant faith"
+  },
+  {
+    "Word": "*ubi eadem ratio, ibi idem jus*",
+    "Meaning": "where there is the same reason there is the same law;[14] like reason doth \nmake like law.[15]"
+  },
+  {
+    "Word": "*ubi jus ibi remedium*",
+    "Meaning": "wherever a right exists there is also a remedy"
+  },
+  {
+    "Word": "*ultra vires*",
+    "Meaning": "beyond the powers"
+  },
+  {
+    "Word": "*universitas personarum*",
+    "Meaning": "totality of people"
+  },
+  {
+    "Word": "*universitas rerum*",
+    "Meaning": "totality of things"
+  },
+  {
+    "Word": "*uno flatu*",
+    "Meaning": "in one breath"
+  },
+  {
+    "Word": "*uti possidetis*",
+    "Meaning": "as you possess"
+  },
+  {
+    "Word": "*uxor*",
+    "Meaning": "wife"
+  },
+  {
+    "Word": "*vel non*",
+    "Meaning": "or not"
+  },
+  {
+    "Word": "*veto*",
+    "Meaning": "forbid"
+  },
+  {
+    "Word": "*vice versa*",
+    "Meaning": "the other way around"
+  },
+  {
+    "Word": "*vide*",
+    "Meaning": "see"
+  },
+  {
+    "Word": "*videlicet*",
+    "Meaning": "contraction of *videre licet*, meaning \"it is permitted to see"
+  },
+  {
+    "Word": "*viz.*",
+    "Meaning": "abbreviation of videlicet"
+  },
+  {
+    "Word": "*vigilantibus non dormientibus iura subveniunt*",
+    "Meaning": "The laws benefit those who are vigilant rather than those who sleep."
+  }
+]
