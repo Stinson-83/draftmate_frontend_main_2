@@ -15,7 +15,6 @@ services:
       - enhance_bot
       - pdf_editor
       - converter
-      - converter
       - query
 
   db:
@@ -93,7 +92,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET=${S3_BUCKET}
-      - POSTGRES_DSN=${POSTGRES_DSN}
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
       - POSTGRES_HOST=db
     depends_on:
       db:
@@ -113,7 +112,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=${POSTGRES_PORT}
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
       - GOOGLE_SERP_API_KEY=${GOOGLE_SERP_API_KEY}

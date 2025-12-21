@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Optional
 import trafilatura
 from tavily import TavilyClient
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -90,7 +90,7 @@ class WebSearchTool:
                 text = trafilatura.extract(downloaded, favor_precision=True)
                 if text:
                     return f"\n\n{text}\n\n"
-        except:
+        except Exception as e:
             logger.error(f"Trafilatura failed for {url}: {e}")
             pass
         
