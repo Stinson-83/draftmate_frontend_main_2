@@ -53,4 +53,4 @@ def generate_draft_endpoint(request: DraftRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run("Drafter:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=True)

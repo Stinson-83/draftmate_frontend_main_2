@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:8004';
+import { API_CONFIG } from './endpoints';
+
+const API_BASE_URL = API_CONFIG.LEX_BOT.BASE_URL;
 
 export const api = {
     /**

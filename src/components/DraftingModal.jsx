@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, PenTool, Lock, Eye, EyeOff, FileText, Loader2, Check, ZoomIn, ZoomOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { API_CONFIG } from '../services/endpoints';
 import './DraftingModal.css';
 
 const DraftingModal = ({ onClose }) => {
@@ -17,7 +18,7 @@ const DraftingModal = ({ onClose }) => {
     const navigate = useNavigate();
 
     // Backend converter URL
-    const CONVERTER_API_URL = "http://127.0.0.1:8000";
+    const CONVERTER_API_URL = API_CONFIG.CONVERTER.BASE_URL;
 
     // State for formats
     const [formats, setFormats] = useState([]);
@@ -252,7 +253,7 @@ const DraftingModal = ({ onClose }) => {
     };
 
     // Drafter API URL
-    const DRAFTER_API_URL = "http://127.0.0.1:8001";
+    const DRAFTER_API_URL = API_CONFIG.DRAFTER.BASE_URL;
 
     const handleGenerateViaAI = async () => {
         if (!prompt.trim()) {

@@ -8,6 +8,7 @@ import VariablesSidebar from '../components/VariablesSidebar';
 import AiSidebar from '../components/AiSidebar';
 import FloatingToolbar from '../components/FloatingToolbar';
 import ModifyDraftModal from '../components/ModifyDraftModal';
+import { API_CONFIG } from '../services/endpoints';
 import './Editor.css';
 
 const Editor = () => {
@@ -148,7 +149,7 @@ const Editor = () => {
 
                 // Call API to generate placeholders automatically
                 try {
-                    const res = await fetch('http://localhost:8002/create_placeholders', {
+                    const res = await fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/create_placeholders`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ html_content: initialHtml })
@@ -745,7 +746,7 @@ const Editor = () => {
 
         console.log("Enhance Context:", context);
 
-        const promise = fetch('http://localhost:8002/enhance_clause', {
+        const promise = fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_clause`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -792,7 +793,7 @@ const Editor = () => {
         }
 
         try {
-            const res = await fetch('http://localhost:8002/enhance_content', {
+            const res = await fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_content`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

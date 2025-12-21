@@ -6,6 +6,7 @@ import DraftingModal from '../components/DraftingModal';
 import UploadModal from '../components/UploadModal';
 import CourtFeeModal from '../components/CourtFeeModal';
 import axios from 'axios';
+import { API_CONFIG } from '../services/endpoints';
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ const Dashboard = () => {
 
         try {
             // Show loading state if needed, for now just blocking
-            const response = await axios.post('http://localhost:8000/convert', formData, {
+            const response = await axios.post(API_CONFIG.CONVERTER.CONVERT, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

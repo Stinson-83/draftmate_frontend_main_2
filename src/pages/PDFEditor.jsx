@@ -16,8 +16,9 @@ import {
     Layers // for merge
 } from 'lucide-react';
 import './PDFEditor.css';
+import { API_CONFIG } from '../services/endpoints';
 
-const API_URL = "http://localhost:8003";
+const API_URL = API_CONFIG.PDF_EDITOR_API.BASE_URL;
 
 // Tool Modes
 const MODES = {

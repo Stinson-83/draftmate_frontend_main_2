@@ -8,7 +8,7 @@ from typing import Tuple
 load_dotenv()
 AWS_ACCESS_KEY_ID= os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY= os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION= os.getenv("AWS_DEFAULT_REGION")
+AWS_REGION= os.getenv("AWS_REGION")
 
 s3 = boto3.client(
     "s3",
@@ -28,7 +28,7 @@ def upload_to_s3(local_path: str, s3_key: str) -> Tuple[str, str]:
     """
     Uploads a local HTML file to S3 and returns its S3 URL.
     """
-    bucket_name="user-upload-s3-bucket"
+    bucket_name=os.getenv("S3_BUCKET_NAME")
     try:
         s3.upload_file(
             Filename=local_path,
