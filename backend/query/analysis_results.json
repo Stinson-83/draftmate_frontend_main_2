@@ -3,80 +3,350 @@
     "query": "Rental agreement",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 3221.995699997933,
+    "latency_ms": 1365.2384000015445,
     "top_match": "Agreement",
-    "score": 0.771
+    "score": 0.771,
+    "alternatives": [
+      {
+        "title": "Agreement",
+        "score": 0.703,
+        "s3_path": "s3://drafterai/docs/6457f221-b1f2-4ce7-a378-991eb54dd277/LETTER-OF-APPOINTMENT-OF-AN-OFFICER.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.702,
+        "s3_path": "s3://drafterai/docs/08e29629-70f7-4df8-9b73-5218082eeb40/AGREEMENT-FOR-REFERENCE-TO-TWO-ARBITRATORS.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.701,
+        "s3_path": "s3://drafterai/docs/0a6a5072-dd85-4da0-8bf1-15140c8f8580/UNDERWRITING-AGREEMENT-FOR-SHARES.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.701,
+        "s3_path": "s3://drafterai/docs/4102c93e-8938-454f-8a87-aa7930475199/agreement-between-a-newspaper-publisher-and-an-advertising-agency.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.701,
+        "s3_path": "s3://drafterai/docs/f8fbe4ea-237f-45dd-aa9c-09d1a4b27f46/AGREEMENT-FOR-SALE-FOR-PURCHASE-OF-A-PLOT-FOR-CONSTRUCTING-FLATS.html"
+      }
+    ]
   },
   {
     "query": "Loan acknowledgement",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1839.6723000005295,
+    "latency_ms": 1226.7953999980818,
     "top_match": "Acknowledgement",
-    "score": 0.946
+    "score": 0.946,
+    "alternatives": [
+      {
+        "title": "Acknowledgement",
+        "score": 0.941,
+        "s3_path": "s3://drafterai/docs/d329451b-a832-4542-aa59-0ca1d1304e6f/Form-5.html"
+      },
+      {
+        "title": "Acknowledgement",
+        "score": 0.939,
+        "s3_path": "s3://drafterai/docs/2f6e2d26-906e-4c17-a4a5-c297277fe33a/Form-3.html"
+      },
+      {
+        "title": "Acknowledgement",
+        "score": 0.933,
+        "s3_path": "s3://drafterai/docs/77f9250d-5e21-4468-9d5a-e3e79ef5c5c6/Form-2.html"
+      },
+      {
+        "title": "Acknowledgement",
+        "score": 0.931,
+        "s3_path": "s3://drafterai/docs/baf25173-bdfb-4b61-a65a-1bbb140d914d/Form-9.html"
+      },
+      {
+        "title": "Acknowledgement",
+        "score": 0.858,
+        "s3_path": "s3://drafterai/docs/55194713-0f52-4286-8b6e-9921075e2547/Form-1.html"
+      }
+    ]
   },
   {
     "query": "Employment contract",
     "type": "simple",
-    "path": "SLOW",
-    "latency_ms": 8267.805999999837,
+    "path": "FAST",
+    "latency_ms": 1072.6264999830164,
     "top_match": "Agreement",
-    "score": 0.459
+    "score": 0.459,
+    "alternatives": [
+      {
+        "title": "Agreement",
+        "score": 0.439,
+        "s3_path": "s3://drafterai/docs/a98eb650-e200-4336-b81d-c9d69e6f0ccd/FORMOF3.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.436,
+        "s3_path": "s3://drafterai/docs/2398d260-327c-4af2-bb4a-4c1a050f90f3/HIRE-PURCHASE-AGREEMENT-FOR-A-T.V.-SET.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.433,
+        "s3_path": "s3://drafterai/docs/edebd3e6-fc00-4a38-8c44-142dbf182fd2/AGREEMENT-FOR-COMPROMISE-BETWEEN-THE-EMPLOYER-AND-WORKMAN-FOR-PAYMENT-OF-COMPENSATION.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.431,
+        "s3_path": "s3://drafterai/docs/d05e0139-cb4d-44d1-955d-9a88685c7865/FORM-OF-AGREEMENT-BETWEEN-THE-EMPLOYER-AND-WORKMAN-REGARDING-COMPENSATION-FOR-PERMANENT-DISABLEMENT.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.431,
+        "s3_path": "s3://drafterai/docs/58c8b94f-93ee-4d13-bd5f-0cc50d3f6a7a/FORM-OF-AGREEMENT-BETWEEN-THE-EMPLOYER-AND-WORKMAN-REGARDING-COMPENSATION-FOR-PERMANENT-DISABLEMENT-form-L.html"
+      }
+    ]
   },
   {
     "query": "Non-disclosure agreement",
     "type": "simple",
-    "path": "SLOW",
-    "latency_ms": 6015.569899998809,
+    "path": "FAST",
+    "latency_ms": 1437.9805999924429,
     "top_match": "Agreement",
-    "score": 0.547
+    "score": 0.547,
+    "alternatives": [
+      {
+        "title": "Agreement",
+        "score": 0.532,
+        "s3_path": "s3://drafterai/docs/dca2d9d9-e7c9-4068-b72a-23b28e128864/AGREEMENT-TO-REFER-DISPUTE-TO-ONE-ARBITRATOR-SHORT-FORM.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.494,
+        "s3_path": "s3://drafterai/docs/0ac7dfed-7d13-4be3-a922-636de2389189/LETTER-BY-AN-UNDERWRITER-TO-THE-COMPANY-FOR-UNDERWRITING-SHARES.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.493,
+        "s3_path": "s3://drafterai/docs/7ca738d0-d806-451c-b396-2fb0825bf437/Agreement-for-Sale-of-Immovable-Property.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.49,
+        "s3_path": "s3://drafterai/docs/bfe70295-2a01-468a-8d07-23f0b3656b3e/FORM-OF-NOTICE-BY-COMMISSIONER-COMMUNICATING-REFUSAL-FOR-REGISTRATION-OF-AGREEMENT-BETWEEN.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.486,
+        "s3_path": "s3://drafterai/docs/73c9a230-1e8c-4324-ae61-ca93b99f6cbb/LETTER-OF-ACCEPTANCE-BY-THE-COMPANY-TO-AN-UNDERWRITER.html"
+      }
+    ]
   },
   {
     "query": "Partnership deed",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1127.3541999980807,
+    "latency_ms": 1465.0907999894116,
     "top_match": "Miscellaneous deeds",
-    "score": 0.717
+    "score": 0.717,
+    "alternatives": [
+      {
+        "title": "Miscellaneous deeds",
+        "score": 0.626,
+        "s3_path": "s3://drafterai/docs/0a11ab1e-38ca-4923-92b3-038a7ef5fa87/DEED-OF-INDEMNITY-BY-THE-PARTNER-RETAINING-ASSETS-AND-LIABILITIES-TO-A-PARTNER-ON-THE-DISSOLUTION-OF-THE-PARTNERSHIP-FIRM-1.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.619,
+        "s3_path": "s3://drafterai/docs/2d617131-972b-4786-882e-5b3ddabbe01c/AGREEMENT-MODIFYING-THE-PARTNERSHIP-DEED.html"
+      },
+      {
+        "title": "Miscellaneous deeds",
+        "score": 0.609,
+        "s3_path": "s3://drafterai/docs/30c13bd2-962e-4ea9-9ba5-8cf69309ce6e/Deed-of-Transfer-whereby-the-Partnership-Firm-is-Transferring-the-Unit-in-the-Society-to-the-Retiring-Partner.html"
+      },
+      {
+        "title": "Miscellaneous deeds",
+        "score": 0.606,
+        "s3_path": "s3://drafterai/docs/3da29770-80b0-44ce-a94d-5be5f84ba4fe/Deed-of-Partnership-for-Admitting-a-New-Partner.html"
+      },
+      {
+        "title": "Miscellaneous deeds",
+        "score": 0.594,
+        "s3_path": "s3://drafterai/docs/eb0f4dea-bf2a-4650-8e71-503674a71f95/DEED-OF-DISSOLUTION-WHERE-ONE-PARTNER-TAKES-OVER-ASSETS-AND-LIABILITIES-OF-THE-BUSINESS.html"
+      }
+    ]
   },
   {
     "query": "Agreement for repayment of friendly loan with interest and security",
     "type": "complex",
-    "path": "SLOW",
-    "latency_ms": 8261.097900001914,
+    "path": "FAST",
+    "latency_ms": 1267.3282999894582,
     "top_match": "Company",
-    "score": 0.546
+    "score": 0.546,
+    "alternatives": [
+      {
+        "title": "Mortgage, Pledge , Hypothecation and Security Document",
+        "score": 0.523,
+        "s3_path": "s3://drafterai/docs/b9588ac9-fe34-40e7-91f8-8d3809ef8337/REVIVAL-LETTER-TO-BE-OBTAINED-FROM-BORROWER-BEFORE-EXPIRY-OF-LIMITATION-PERIOD.html"
+      },
+      {
+        "title": "Mortgage, Pledge , Hypothecation and Security Document",
+        "score": 0.444,
+        "s3_path": "s3://drafterai/docs/8dee6731-700b-4f9e-a80b-367679a7b7e3/SIMPLE-MORTGAGE-DEED-IN-THE-FORM-OF-A-DEED-POLL.html"
+      },
+      {
+        "title": "Banking",
+        "score": 0.435,
+        "s3_path": "s3://drafterai/docs/01ad5218-d503-4d38-acf4-0c90713683a3/DEMAND-PROMISSORY-NOTE-FOR-JOINT-BORROWERS.html"
+      },
+      {
+        "title": "Bond",
+        "score": 0.432,
+        "s3_path": "s3://drafterai/docs/2971bdbe-018c-4b69-812c-3de17b2cfa5e/LOAN-BOND-WITH-SURETY-AND-HYPOTHECATEION-OF-PROPERTY.html"
+      },
+      {
+        "title": "Guarantee",
+        "score": 0.431,
+        "s3_path": "s3://drafterai/docs/0eb80c1f-0bfc-411d-b758-b228d42a1d84/BANK-GUARANTEE-GIVEN-TO-GOVERNMENT-OR-CORPORATION-FOR-ADVANCE-PAYMENT-TO-BE-MADE-TO-A-CONTRACTOR.html"
+      }
+    ]
   },
   {
     "query": "Lease deed for commercial property with lock-in period and maintenance clauses",
     "type": "complex",
     "path": "SLOW",
-    "latency_ms": 5273.9588000004005,
+    "latency_ms": 4733.365199994296,
     "top_match": "Lease Financing",
-    "score": 0.41
+    "score": 0.41,
+    "alternatives": [
+      {
+        "title": "Agreement",
+        "score": 0.394,
+        "s3_path": "s3://drafterai/docs/0805b7a6-d40b-4063-99f3-b3eaa1ded168/AGREEMENT-FOR-SALE-OF-FREEHOLD-PROPERTY.html"
+      },
+      {
+        "title": "Lease Financing",
+        "score": 0.387,
+        "s3_path": "s3://drafterai/docs/1ca42379-cd77-4fdb-a214-9c4e46afd1a3/DEED-OF-RENEWAL-OF-LEASE.html"
+      },
+      {
+        "title": "Lease Financing",
+        "score": 0.377,
+        "s3_path": "s3://drafterai/docs/b934f64a-783b-4fcb-99db-2aaf121ada95/UNDER-LEASE.html"
+      },
+      {
+        "title": "Lease Financing",
+        "score": 0.376,
+        "s3_path": "s3://drafterai/docs/be80e637-026b-4e7b-8d23-0f19233b577a/SUPPLEMENTARY-DEED-ALTERING-TERMS-OF-THE-LEASE-DEED.html"
+      },
+      {
+        "title": "Lease Financing",
+        "score": 0.375,
+        "s3_path": "s3://drafterai/docs/843e663d-042b-4df3-a841-0a4b0fc2ed7a/LETTER-BY-THE-LESSEE-FOR-EXERCISE-OF-OPTION-TO-PURCHASE-THE-LEASED-EQUIPMENTS.html"
+      }
+    ]
   },
   {
     "query": "Consultancy agreement for IT services with intellectual property assignment",
     "type": "complex",
     "path": "SLOW",
-    "latency_ms": 5569.048199999088,
+    "latency_ms": 5339.372699992964,
     "top_match": "Agreement",
-    "score": 0.402
+    "score": 0.402,
+    "alternatives": [
+      {
+        "title": "Assignment",
+        "score": 0.376,
+        "s3_path": "s3://drafterai/docs/9ad5d481-f90b-4d7e-b6a7-167b1857ceea/ASSIGNMENT-OF-TRADEMARKS.html"
+      },
+      {
+        "title": "Assignment",
+        "score": 0.376,
+        "s3_path": "s3://drafterai/docs/f4ef63c4-478b-4ae5-ba43-b2357988b5bf/Assignment-of-Simple-Contract-Debts.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.374,
+        "s3_path": "s3://drafterai/docs/f4e85e75-e626-46a3-9c33-79baddcda755/Agreement-for-Providing-Permanent-Alternate-Accommodation-to-the-Tenant-on-Ownership-basis-in-lieu-of-Tenanted-Premises-by-a-Developer.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.37,
+        "s3_path": "s3://drafterai/docs/b71cb36c-6988-4862-9d29-f68f84863aed/AGREEMENT-BETWEEN-PUBLISHER-AND-AUTHOR-FOR-GRANT-OF-COPYRIGHT-ON-LUMP-SUM-CONSIDERATION.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.369,
+        "s3_path": "s3://drafterai/docs/60e853ec-cf0d-4ec7-878d-377878d81376/Agreement-of-Project-Management.html"
+      }
+    ]
   },
   {
     "query": "Sale deed for residential flat including car parking and undivided share of land",
     "type": "complex",
-    "path": "SLOW (FALLBACK)",
-    "latency_ms": 4900.462300000072,
+    "path": "SLOW",
+    "latency_ms": 4984.07770000631,
     "top_match": "Sale",
-    "score": 0.423
+    "score": 0.423,
+    "alternatives": [
+      {
+        "title": "Sale",
+        "score": 0.42,
+        "s3_path": "s3://drafterai/docs/129af118-947d-4e6b-9708-416031d9c859/FORM-OF-DECLARATION-BY-THE-SOLE-OWNER-OR-OWNERS-OF-THE-LAND-FOR-SUBMITTING-THE-LAND-AND-BUILDINGS-UNDER-MAHARASHTRA-APARTMENT-OWNERSHIP-ACT-1970.html"
+      },
+      {
+        "title": "Income Tax",
+        "score": 0.409,
+        "s3_path": "s3://drafterai/docs/eb390cb8-6722-4228-a87b-6a4a81faab0f/FORM-O-1.html"
+      },
+      {
+        "title": "Miscellaneous deeds",
+        "score": 0.406,
+        "s3_path": "s3://drafterai/docs/a5ebe69d-38cd-4762-aba5-af7b43965a34/DEED-OF-CONVEYANCE-OF-A-PROPERTY-EXCLUSIVE-OF-A-FLAT.html"
+      },
+      {
+        "title": "Civil Pleading",
+        "score": 0.403,
+        "s3_path": "s3://drafterai/docs/3b1e057f-8ac9-49b1-b94b-d72314722b2c/BREACH-OF-AGREEMENT-TO-PURCHASE-LAND.html"
+      },
+      {
+        "title": "Miscellaneous deeds",
+        "score": 0.401,
+        "s3_path": "s3://drafterai/docs/fca0eaa1-4cea-4f18-9eec-543852649d4e/DEED-OF-PARTITION-BETWEEN-TWO-TENANTS-IN-COMMON.html"
+      }
+    ]
   },
   {
     "query": "Franchise agreement for retail outlet with territorial exclusivity and royalty terms",
     "type": "complex",
-    "path": "SLOW",
-    "latency_ms": 10637.7891000011,
+    "path": "FAST",
+    "latency_ms": 2117.4447999801487,
     "top_match": "Agreement",
-    "score": 0.452
+    "score": 0.452,
+    "alternatives": [
+      {
+        "title": "Franchisee",
+        "score": 0.447,
+        "s3_path": "s3://drafterai/docs/aefbc7da-fefd-4b88-992f-366be2891cd5/AGREEMENT-BETWEEN-A-FRANCHISER-AND-FRANCHISEE-GRANTING-FRANCHISE-RIGHTS-WITH-RIGHT-TO-APPOINT-SUBFRANCHISEES-IN-THE-TERRITORY-ALLOTTED.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.442,
+        "s3_path": "s3://drafterai/docs/d987eab4-b125-4041-8982-81ab3c93138d/Franchise-Agreement.html"
+      },
+      {
+        "title": "Franchisee",
+        "score": 0.436,
+        "s3_path": "s3://drafterai/docs/a709f072-6f36-4643-b4e6-3da79e7d2eb4/AGREEMENT-BETWEEN-A-FRANCHISEE-AND-SUB-FRANCHISEE-GRANTING-FRANCHISE-RIGHTS-FOR-A-TERRITORY.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.428,
+        "s3_path": "s3://drafterai/docs/f4e85e75-e626-46a3-9c33-79baddcda755/Agreement-for-Providing-Permanent-Alternate-Accommodation-to-the-Tenant-on-Ownership-basis-in-lieu-of-Tenanted-Premises-by-a-Developer.html"
+      },
+      {
+        "title": "Agreement",
+        "score": 0.418,
+        "s3_path": "s3://drafterai/docs/b7ec5bf9-fa58-42ce-bf7e-b70856846426/AGREEMENT-FOR-SALE-OF-MORTGAGED-HOUSE.html"
+      }
+    ]
   }
 ]
