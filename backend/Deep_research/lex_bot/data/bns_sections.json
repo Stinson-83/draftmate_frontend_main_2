@@ -1,0 +1,121 @@
+{
+    "103": {
+        "title": "Punishment for murder",
+        "description": "Whoever commits murder shall be punished with death or imprisonment for life, and shall also be liable to fine.",
+        "offense": "Murder",
+        "punishment": "Death or Imprisonment for Life + Fine",
+        "ipc_equivalent": "302"
+    },
+    "101": {
+        "title": "Murder",
+        "description": "Definition of murder (formerly Section 300 IPC). Key distinctions between culpable homicide and murder maintained.",
+        "offense": "Murder (Definition)",
+        "punishment": "NA",
+        "ipc_equivalent": "300"
+    },
+    "105": {
+        "title": "Punishment for culpable homicide not amounting to murder",
+        "description": "Punishment for culpable homicide not amounting to murder.",
+        "offense": "Culpable homicide not amounting to murder",
+        "punishment": "Life or up to 10 years + Fine",
+        "ipc_equivalent": "304"
+    },
+    "106": {
+        "title": "Causing death by negligence",
+        "description": "Causing death by doing any rash or negligent act not amounting to culpable homicide.",
+        "offense": "Death by negligence",
+        "punishment": "Up to 5 years (up from 2 in IPC 304A) + Fine",
+        "ipc_equivalent": "304A"
+    },
+    "63": {
+        "title": "Punishment for rape",
+        "description": "Punishment for rape.",
+        "offense": "Rape",
+        "punishment": "Min 10 years, up to Life + Fine",
+        "ipc_equivalent": "376"
+    },
+    "64": {
+        "title": "Punishment for rape",
+        "description": "Stringent punishment capability for rape cases.",
+        "offense": "Rape",
+        "punishment": "Rigorous imprisonment",
+        "ipc_equivalent": "376"
+    },
+    "69": {
+        "title": "Sexual intercourse by employing deceitful means",
+        "description": "Includes promise to marry false identity etc. New specific provision.",
+        "offense": "Deceitful sexual intercourse",
+        "punishment": "Up to 10 years + Fine",
+        "ipc_equivalent": "NA (New)"
+    },
+    "303": {
+        "title": "Theft",
+        "description": "Definition and punishment for theft combined.",
+        "offense": "Theft",
+        "punishment": "Up to 3 years or Fine or Both",
+        "ipc_equivalent": "378, 379"
+    },
+    "308": {
+        "title": "Extortion",
+        "description": "Definition and punishment for extortion.",
+        "offense": "Extortion",
+        "punishment": "Up to 3 years or Fine or Both",
+        "ipc_equivalent": "383, 384"
+    },
+    "309": {
+        "title": "Robbery",
+        "description": "Definition and punishment for robbery.",
+        "offense": "Robbery",
+        "punishment": "Up to 10 years (14 if on highway at night) + Fine",
+        "ipc_equivalent": "390, 392"
+    },
+    "310": {
+        "title": "Dacoity",
+        "description": "Definition and punishment for dacoity.",
+        "offense": "Dacoity",
+        "punishment": "Life or up to 10 years + Fine",
+        "ipc_equivalent": "391, 395"
+    },
+    "316": {
+        "title": "Criminal breach of trust",
+        "description": "Definition and punishment for criminal breach of trust.",
+        "offense": "Criminal breach of trust",
+        "punishment": "Up to 5 years (up from 3 in IPC 406) + Fine",
+        "ipc_equivalent": "405, 406"
+    },
+    "318": {
+        "title": "Cheating",
+        "description": "Definition and punishment for cheating.",
+        "offense": "Cheating",
+        "punishment": "Up to 3 years (simple) or 7 years (inducing delivery) + Fine",
+        "ipc_equivalent": "415, 417, 420"
+    },
+    "111": {
+        "title": "Organised crime",
+        "description": "New offense defining and punishing organized crime, syndicates, etc.",
+        "offense": "Organised crime",
+        "punishment": "Death or Life (if death caused) / Min 5 years (others)",
+        "ipc_equivalent": "MCOCA (Special Act)"
+    },
+    "113": {
+        "title": "Terrorist act",
+        "description": "New offense defining and punishing terrorist acts within general penal code.",
+        "offense": "Terrorist act",
+        "punishment": "Death or Life + Fine",
+        "ipc_equivalent": "UAPA (Special Act)"
+    },
+    "356": {
+        "title": "Defamation",
+        "description": "Defamation definition and punishment.",
+        "offense": "Defamation",
+        "punishment": "Simple Imprisonment up to 2 years or Fine or Both (Community Service added)",
+        "ipc_equivalent": "499, 500"
+    },
+    "351": {
+        "title": "Criminal intimidation",
+        "description": "Criminal intimidation definition and punishment.",
+        "offense": "Criminal intimidation",
+        "punishment": "Up to 2 years or Fine or Both",
+        "ipc_equivalent": "503, 506"
+    }
+}

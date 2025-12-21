@@ -1,0 +1,345 @@
+{
+    "299": {
+        "title": "Culpable homicide",
+        "description": "Whoever causes death by doing an act with the intention of causing death, or with the intention of causing such bodily injury as is likely to cause death, or with the knowledge that he is likely by such act to cause death, commits the offence of culpable homicide.",
+        "offense": "Culpable homicide",
+        "punishment": "Life imprisonment or up to 10 years, and fine",
+        "bns_equivalent": "100"
+    },
+    "300": {
+        "title": "Murder",
+        "description": "Culpable homicide is murder if the act by which the death is caused is done with the intention of causing death, or if it is done with the intention of causing such bodily injury as the offender knows to be likely to cause the death of the person to whom the harm is caused, or if it is done with the intention of causing bodily injury to any person and the bodily injury intended to be inflicted is sufficient in the ordinary course of nature to cause death, or if the person committing the act knows that it is so imminently dangerous that it must, in all probability, cause death or such bodily injury as is likely to cause death, and commits such act without any excuse for incurring the risk of causing death or such injury as aforesaid.",
+        "offense": "Murder",
+        "punishment": "Death or imprisonment for life, and fine",
+        "bns_equivalent": "101"
+    },
+    "302": {
+        "title": "Punishment for murder",
+        "description": "Whoever commits murder shall be punished with death, or imprisonment for life, and shall also be liable to fine.",
+        "offense": "Murder",
+        "punishment": "Death or Imprisonment for Life + Fine",
+        "bns_equivalent": "103"
+    },
+    "304": {
+        "title": "Punishment for culpable homicide not amounting to murder",
+        "description": "Whoever commits culpable homicide not amounting to murder shall be punished with imprisonment for life, or imprisonment of either description for a term which may extend to ten years, and shall also be liable to fine, if the act by which the death is caused is done with the intention of causing death, or of causing such bodily injury as is likely to cause death, or with imprisonment of either description for a term which may extend to ten years, or with fine, or with both, if the act is done with the knowledge that it is likely to cause death, but without any intention to cause death, or to cause such bodily injury as is likely to cause death.",
+        "offense": "Culpable homicide not amounting to murder",
+        "punishment": "Life or up to 10 years + Fine",
+        "bns_equivalent": "105"
+    },
+    "304A": {
+        "title": "Causing death by negligence",
+        "description": "Whoever causes the death of any person by doing any rash or negligent act not amounting to culpable homicide, shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both.",
+        "offense": "Causing death by negligence",
+        "punishment": "Up to 2 years or Fine or Both",
+        "bns_equivalent": "106"
+    },
+    "304B": {
+        "title": "Dowry death",
+        "description": "Where the death of a woman is caused by any burns or bodily injury or occurs otherwise than under normal circumstances within seven years of her marriage and it is shown that soon before her death she was subjected to cruelty or harassment by her husband or any relative of her husband for, or in connection with, any demand for dowry, such death shall be called 'dowry death', and such husband or relative shall be deemed to have caused her death.",
+        "offense": "Dowry death",
+        "punishment": "Minimum 7 years, up to Life Imprisonment",
+        "bns_equivalent": "80"
+    },
+    "307": {
+        "title": "Attempt to murder",
+        "description": "Whoever does any act with such intention or knowledge, and under such circumstances that, if he by that act caused death, he would be guilty of murder, shall be punished with imprisonment of either description for a term which may extend to ten years, and shall also be liable to fine; and if hurt is caused to any person by such act, the offender shall be liable either to imprisonment for life, or to such punishment as is hereinbefore mentioned.",
+        "offense": "Attempt to murder",
+        "punishment": "Up to 10 years + Fine (Life if hurt caused)",
+        "bns_equivalent": "109"
+    },
+    "308": {
+        "title": "Attempt to commit culpable homicide",
+        "description": "Whoever does any act with such intention or knowledge and under such circumstances that, if he by that act caused death, he would be guilty of culpable homicide not amounting to murder, shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both; and, if hurt is caused to any person by such act, shall be punished with imprisonment of either description for a term which may extend to seven years, or with fine, or with both.",
+        "offense": "Attempt to commit culpable homicide",
+        "punishment": "Up to 3 years or Fine or Both (Up to 7 years if hurt caused)",
+        "bns_equivalent": "110"
+    },
+    "309": {
+        "title": "Attempt to commit suicide",
+        "description": "Whoever attempts to commit suicide and does any act towards the commission of such offence, shall be punished with simple imprisonment for a term which may extend to one year or with fine, or with both.",
+        "offense": "Attempt to commit suicide",
+        "punishment": "Simple Imprisonment up to 1 year or Fine or Both",
+        "bns_equivalent": "NA"
+    },
+    "319": {
+        "title": "Hurt",
+        "description": "Whoever causes bodily pain, disease or infirmity to any person is said to cause hurt.",
+        "offense": "Hurt (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "115"
+    },
+    "320": {
+        "title": "Grievous hurt",
+        "description": "The following kinds of hurt only are designated as 'grievous': First.—Emasculation. Second.—Permanent privation of the sight of either eye. Third.—Permanent privation of the hearing of either ear. Fourth.—Privation of any member or joint. Fifth.—Destruction or permanent impairing of the powers of any member or joint. Sixth.—Permanent disfiguration of the head or face. Seventh.—Fracture or dislocation of a bone or tooth. Eighth.—Any hurt which endangers life or which causes the sufferer to be during the space of twenty days in severe bodily pain, or unable to follow his ordinary pursuits.",
+        "offense": "Grievous hurt (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "116"
+    },
+    "323": {
+        "title": "Punishment for voluntarily causing hurt",
+        "description": "Whoever, except in the case provided for by section 334, voluntarily causes hurt, shall be punished with imprisonment of either description for a term which may extend to one year, or with fine which may extend to one thousand rupees, or with both.",
+        "offense": "Voluntarily causing hurt",
+        "punishment": "Up to 1 year or Fine up to 1000 or Both",
+        "bns_equivalent": "115(2)"
+    },
+    "324": {
+        "title": "Voluntarily causing hurt by dangerous weapons or means",
+        "description": "Whoever, except in the case provided for by section 334, voluntarily causes hurt by means of any instrument for shooting, stabbing or cutting, or any instrument which, used as weapon of offence, is likely to cause death, or by means of fire or any heated substance, or by means of any poison or any corrosive substance, or by means of any explosive substance or by means of any substance which it is deleterious to the human body to inhale, to swallow, or to receive into the blood, or by means of any animal, shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both.",
+        "offense": "Voluntarily causing hurt by dangerous weapons",
+        "punishment": "Up to 3 years or Fine or Both",
+        "bns_equivalent": "118"
+    },
+    "325": {
+        "title": "Punishment for voluntarily causing grievous hurt",
+        "description": "Whoever, except in the case provided for by section 335, voluntarily causes grievous hurt, shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine.",
+        "offense": "Voluntarily causing grievous hurt",
+        "punishment": "Up to 7 years + Fine",
+        "bns_equivalent": "118(2)"
+    },
+    "326": {
+        "title": "Voluntarily causing grievous hurt by dangerous weapons or means",
+        "description": "Whoever, except in the case provided for by section 335, voluntarily causes grievous hurt by means of any instrument for shooting, stabbing or cutting, or any instrument which, used as a weapon of offence, is likely to cause death, or by means of fire or any heated substance, or by means of any poison or any corrosive substance, or by means of any explosive substance, or by means of any substance which it is deleterious to the human body to inhale, to swallow, or to receive into the blood, or by means of any animal, shall be punished with imprisonment for life, or with imprisonment of either description for a term which may extend to ten years, and shall also be liable to fine.",
+        "offense": "Voluntarily causing grievous hurt by dangerous weapons",
+        "punishment": "Life or up to 10 years + Fine",
+        "bns_equivalent": "119"
+    },
+    "354": {
+        "title": "Assault or criminal force to woman with intent to outrage her modesty",
+        "description": "Whoever assaults or uses criminal force to any woman, intending to outrage or knowing it to be likely that he will thereby outrage her modesty, shall be punished with imprisonment of either description for a term which shall not be less than one year but which may extend to five years, and shall also be liable to fine.",
+        "offense": "Outraging modesty of women",
+        "punishment": "Min 1 year, up to 5 years + Fine",
+        "bns_equivalent": "74"
+    },
+    "354A": {
+        "title": "Sexual harassment",
+        "description": "A man committing any of the following acts: (i) physical contact and advances involving unwelcome and explicit sexual overtures; or (ii) a demand or request for sexual favours; or (iii) showing pornography against the will of a woman; or (iv) making sexually coloured remarks, shall be guilty of the offence of sexual harassment.",
+        "offense": "Sexual harassment",
+        "punishment": "Up to 3 years + Fine (for i, ii, iii) / Up to 1 year + Fine (for iv)",
+        "bns_equivalent": "75"
+    },
+    "354B": {
+        "title": "Assault or use of criminal force to woman with intent to disrobe",
+        "description": "Any man who assaults or uses criminal force to any woman or abets such act with the intention of disrobing or compelling her to be naked, shall be punished with imprisonment of either description for a term which shall not be less than three years but which may extend to seven years, and shall also be liable to fine.",
+        "offense": "Assault with intent to disrobe",
+        "punishment": "Min 3 years, up to 7 years + Fine",
+        "bns_equivalent": "76"
+    },
+    "354C": {
+        "title": "Voyeurism",
+        "description": "Any man who watches, or captures the image of a woman engaging in a private act in circumstances where she would usually have the expectation of not being observed either by the perpetrator or by any other person at the behest of the perpetrator or disseminates such image shall be punished. ",
+        "offense": "Voyeurism",
+        "punishment": "Min 1 year, up to 3 years + Fine (1st conviction); Min 3, up to 7 + Fine (2nd)",
+        "bns_equivalent": "77"
+    },
+    "354D": {
+        "title": "Stalking",
+        "description": "Any man who follows a woman and contacts, or attempts to contact such woman to foster personal interaction repeatedly despite a clear indication of disinterest by such woman; or monitors the use by a woman of the internet, email or any other form of electronic communication, commits the offence of stalking.",
+        "offense": "Stalking",
+        "punishment": "Up to 3 years + Fine (1st); Up to 5 years + Fine (2nd)",
+        "bns_equivalent": "78"
+    },
+    "363": {
+        "title": "Punishment for kidnapping",
+        "description": "Whoever kidnaps any person from India or from lawful guardianship, shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine.",
+        "offense": "Kidnapping",
+        "punishment": "Up to 7 years + Fine",
+        "bns_equivalent": "137"
+    },
+    "375": {
+        "title": "Rape",
+        "description": "A man is said to commit 'rape' if he acts in a manner specified in the section with a woman against her will, or without her consent, or with consent obtained by putting her in fear of death or hurt, etc.",
+        "offense": "Rape (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "63"
+    },
+    "376": {
+        "title": "Punishment for rape",
+        "description": "Whoever, except in the cases provided for in sub-section (2), commits rape, shall be punished with rigorous imprisonment of either description for a term which shall not be less than ten years, but which may extend to imprisonment for life, and shall also be liable to fine.",
+        "offense": "Rape",
+        "punishment": "Min 10 years, up to Life + Fine",
+        "bns_equivalent": "64"
+    },
+    "378": {
+        "title": "Theft",
+        "description": "Whoever, intending to take dishonestly any movable property out of the possession of any person without that person's consent, moves that property in order to such taking, is said to commit theft.",
+        "offense": "Theft (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "303"
+    },
+    "379": {
+        "title": "Punishment for theft",
+        "description": "Whoever commits theft shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both.",
+        "offense": "Theft",
+        "punishment": "Up to 3 years or Fine or Both",
+        "bns_equivalent": "303(2)"
+    },
+    "383": {
+        "title": "Extortion",
+        "description": "Whoever intentionally puts any person in fear of any injury to that person, or to any other, and thereby dishonestly induces the person so put in fear to deliver to any person any property or valuable security, or anything signed or sealed which may be converted into a valuable security, commits 'extortion'.",
+        "offense": "Extortion (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "308"
+    },
+    "384": {
+        "title": "Punishment for extortion",
+        "description": "Whoever commits extortion shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both.",
+        "offense": "Extortion",
+        "punishment": "Up to 3 years or Fine or Both",
+        "bns_equivalent": "308(2)"
+    },
+    "390": {
+        "title": "Robbery",
+        "description": "In all robbery there is either theft or extortion. Theft is 'robbery' if, in order to the committing of the theft, or in committing the theft, or in carrying away or attempting to carry away property obtained by the theft, the offender, for that end, voluntarily causes or attempts to cause to any person death or hurt or wrongful restraint, or fear of instant death or of instant hurt, or of instant wrongful restraint.",
+        "offense": "Robbery (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "309"
+    },
+    "392": {
+        "title": "Punishment for robbery",
+        "description": "Whoever commits robbery shall be punished with rigorous imprisonment for a term which may extend to ten years, and shall also be liable to fine; and, if the robbery be committed on the highway between sunset and sunrise, the imprisonment may be extended to fourteen years.",
+        "offense": "Robbery",
+        "punishment": "Up to 10 years (14 if on highway at night) + Fine",
+        "bns_equivalent": "309(4)"
+    },
+    "395": {
+        "title": "Punishment for dacoity",
+        "description": "Whoever commits dacoity shall be punished with imprisonment for life, or with rigorous imprisonment for a term which may extend to ten years, and shall also be liable to fine.",
+        "offense": "Dacoity",
+        "punishment": "Life or up to 10 years + Fine",
+        "bns_equivalent": "310(2)"
+    },
+    "403": {
+        "title": "Dishonest misappropriation of property",
+        "description": "Whoever dishonestly misappropriates or converts to his own use any movable property, shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both.",
+        "offense": "Dishonest misappropriation of property",
+        "punishment": "Up to 2 years or Fine or Both",
+        "bns_equivalent": "314"
+    },
+    "405": {
+        "title": "Criminal breach of trust",
+        "description": "Whoever, being in any manner entrusted with property, or with any dominion over property, dishonestly misappropriates or converts to his own use that property, or dishonestly uses or disposes of that property in violation of any direction of law prescribing the mode in which such trust is to be discharged, or of any legal contract, express or implied, which he has made touching the discharge of such trust, or wilfully suffers any other person so to do, commits 'criminal breach of trust'.",
+        "offense": "Criminal breach of trust (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "316"
+    },
+    "406": {
+        "title": "Punishment for criminal breach of trust",
+        "description": "Whoever commits criminal breach of trust shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both.",
+        "offense": "Criminal breach of trust",
+        "punishment": "Up to 3 years or Fine or Both",
+        "bns_equivalent": "316(2)"
+    },
+    "415": {
+        "title": "Cheating",
+        "description": "Whoever, by deceiving any person, fraudulently or dishonestly induces the person so deceived to deliver any property to any person, or to consent that any person shall retain any property, or intentionally induces the person so deceived to do or omit to do anything which he would not do or omit if he were not so deceived, and which act or omission causes or is likely to cause damage or harm to that person in body, mind, reputation or property, is said to 'cheat'.",
+        "offense": "Cheating (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "318"
+    },
+    "417": {
+        "title": "Punishment for cheating",
+        "description": "Whoever cheats shall be punished with imprisonment of either description for a term which may extend to one year, or with fine, or with both.",
+        "offense": "Cheating",
+        "punishment": "Up to 1 year or Fine or Both",
+        "bns_equivalent": "318(2)"
+    },
+    "420": {
+        "title": "Cheating and dishonestly inducing delivery of property",
+        "description": "Whoever cheats and thereby dishonestly induces the person deceived to deliver any property to any person, or to make, alter or destroy the whole or any part of a valuable security, or anything which is signed or sealed, and which is capable of being converted into a valuable security, shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine.",
+        "offense": "Cheating and dishonestly inducing delivery of property",
+        "punishment": "Up to 7 years + Fine",
+        "bns_equivalent": "318(4)"
+    },
+    "425": {
+        "title": "Mischief",
+        "description": "Whoever with intent to cause, or knowing that he is likely to cause, wrongful loss or damage to the public or to any person, causes the destruction of any property, or any such change in any property or in the situation thereof as destroys or diminishes its value or utility, or affects it injuriously, commits 'mischief'.",
+        "offense": "Mischief (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "324"
+    },
+    "426": {
+        "title": "Punishment for mischief",
+        "description": "Whoever commits mischief shall be punished with imprisonment of either description for a term which may extend to three months, or with fine, or with both.",
+        "offense": "Mischief",
+        "punishment": "Up to 3 months or Fine or Both",
+        "bns_equivalent": "324(2)"
+    },
+    "441": {
+        "title": "Criminal trespass",
+        "description": "Whoever enters into or upon property in the possession of another with intent to commit an offence or to intimidate, insult or annoy any person in possession of such property, or having lawfully entered into or upon such property, unlawfully remains there with intent thereby to intimidate, insult or annoy any such person, or with intent to commit an offence, is said to commit 'criminal trespass'.",
+        "offense": "Criminal trespass (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "329"
+    },
+    "447": {
+        "title": "Punishment for criminal trespass",
+        "description": "Whoever commits criminal trespass shall be punished with imprisonment of either description for a term which may extend to three months, or with fine which may extend to five hundred rupees, or with both.",
+        "offense": "Criminal trespass",
+        "punishment": "Up to 3 months or Fine up to 500 or Both",
+        "bns_equivalent": "329(3)"
+    },
+    "448": {
+        "title": "Punishment for house-trespass",
+        "description": "Whoever commits house-trespass shall be punished with imprisonment of either description for a term which may extend to one year, or with fine which may extend to one thousand rupees, or with both.",
+        "offense": "House-trespass",
+        "punishment": "Up to 1 year or Fine up to 1000 or Both",
+        "bns_equivalent": "329(4)"
+    },
+    "463": {
+        "title": "Forgery",
+        "description": "Whoever makes any false documents or false electronic record or part of a document or electronic record, with intent to cause damage or injury, to the public or to any person, or to support any claim or title, or to cause any person to part with property, or to enter into any express or implied contract, or with intent to commit fraud or that fraud may be committed, commits forgery.",
+        "offense": "Forgery (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "336"
+    },
+    "465": {
+        "title": "Punishment for forgery",
+        "description": "Whoever commits forgery shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both.",
+        "offense": "Forgery",
+        "punishment": "Up to 2 years or Fine or Both",
+        "bns_equivalent": "336(2)"
+    },
+    "499": {
+        "title": "Defamation",
+        "description": "Whoever, by words either spoken or intended to be read, or by signs or by visible representations, makes or publishes any imputation concerning any person intending to harm, or knowing or having reason to believe that such imputation will harm, the reputation of such person, is said, except in the cases hereinafter expected, to defame that person.",
+        "offense": "Defamation (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "356"
+    },
+    "500": {
+        "title": "Punishment for defamation",
+        "description": "Whoever defames another shall be punished with simple imprisonment for a term which may extend to two years, or with fine, or with both.",
+        "offense": "Defamation",
+        "punishment": "Simple Imprisonment up to 2 years or Fine or Both",
+        "bns_equivalent": "356(2)"
+    },
+    "503": {
+        "title": "Criminal intimidation",
+        "description": "Whoever threatens another with any injury to his person, reputation or property, or to the person or reputation of any one in whom that person is interested, with intent to cause alarm to that person, or to cause that person to do any act which he is not legally bound to do, or to omit to do any act which that person is legally entitled to do, as the means of avoiding the execution of such threat, commits criminal intimidation.",
+        "offense": "Criminal intimidation (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "351"
+    },
+    "506": {
+        "title": "Punishment for criminal intimidation",
+        "description": "Whoever commits the offence of criminal intimidation shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both; and if the threat be to cause death or grievous hurt, etc., shall be punished with imprisonment of either description for a term which may extend to seven years, or with fine, or with both.",
+        "offense": "Criminal intimidation",
+        "punishment": "Up to 2 years or Fine or Both (Up to 7 years if threat of death/grievous hurt)",
+        "bns_equivalent": "351(2), 351(3)"
+    },
+    "509": {
+        "title": "Word, gesture or act intended to insult the modesty of a woman",
+        "description": "Whoever, intending to insult the modesty of any woman, utters any word, makes any sound or gesture, or exhibits any object, intending that such word or sound shall be heard, or that such gesture or object shall be seen, by such woman, or intrudes upon the privacy of such woman, shall be punished with simple imprisonment for a term which may extend to three years, or with fine, or with both.",
+        "offense": "Insulting modesty of woman",
+        "punishment": "Simple Imprisonment up to 3 years + Fine",
+        "bns_equivalent": "79"
+    },
+    "511": {
+        "title": "Punishment for attempting to commit offences punishable with imprisonment for life or other imprisonment",
+        "description": "Whoever attempts to commit an offence punishable by this Code with imprisonment for life or imprisonment, or to cause such an offence to be committed, and in such attempt does any act towards the commission of the offence, shall, where no express provision is made by this Code for the punishment of such attempt, be punished with imprisonment of any description provided for the offence, for a term which may extend to one-half of the imprisonment for life or, as the case may be, one-half of the longest term of imprisonment provided for that offence, or with such fine as is provided for the offence, or with both.",
+        "offense": "Attempting to commit offenses",
+        "punishment": "Half the max term for the offense or Fine or Both",
+        "bns_equivalent": "62"
+    }
+}

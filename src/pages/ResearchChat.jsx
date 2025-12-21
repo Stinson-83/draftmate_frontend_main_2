@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { api } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Sparkles, User, Bot } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, User, Bot, Plus, X, FileText } from 'lucide-react';
 import lawJuristLogo from '../assets/law_jurist_logo.png';
 
 const ResearchChat = () => {
@@ -8,6 +9,10 @@ const ResearchChat = () => {
     const messagesEndRef = useRef(null);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [sessionId, setSessionId] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef(null);
     const [messages, setMessages] = useState([
         {
             id: 1,
@@ -21,38 +26,94 @@ const ResearchChat = () => {
     };
 
     useEffect(() => {
+        // Generate a simplified session ID or use a UUID library if available.
+        // Using crypto.randomUUID() which is supported in modern browsers.
+        const newSessionId = crypto.randomUUID();
+        setSessionId(newSessionId);
+    }, []);
+
+    useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    const handleSend = () => {
-        if (!input.trim()) return;
+    const handleSend = async () => {
+        if (!input.trim() && !selectedFile) return;
+
+        const currentInput = input; // Capture input before clearing
 
         const userMsg = {
             id: Date.now(),
             role: 'user',
-            content: input
+            content: currentInput,
+            file: selectedFile
         };
 
         setMessages(prev => [...prev, userMsg]);
         setInput('');
+        setSelectedFile(null);
         setIsTyping(true);
 
-        // Simulate AI response
-        setTimeout(() => {
+        // Real API Call
+        try {
+            const response = await api.chat(currentInput, sessionId);
+
             const aiMsg = {
                 id: Date.now() + 1,
                 role: 'ai',
-                content: "I am researching that for you. As this is a demo, I can tell you that in Indian Law, the principles of natural justice are paramount. (This is a placeholder response)"
+                content: response.answer,
+                complexity: response.complexity,
+                agents: response.agents_used
             };
             setMessages(prev => [...prev, aiMsg]);
+        } catch (error) {
+            console.error("Chat error:", error);
+            const errorMsg = {
+                id: Date.now() + 1,
+                role: 'ai',
+                content: "I apologize, but I encountered an error connecting to the server. Please ensure the backend is running."
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
+        }
     };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
+        }
+    };
+
+    const handleFileSelect = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Optimistically set selected file
+            setSelectedFile(file); // Keep the file object for preview
+
+            setIsUploading(true);
+            try {
+                await api.uploadFile(file, sessionId);
+                // toast.success("File context added!"); // Optional: Add toast notification
+            } catch (error) {
+                console.error("Upload error:", error);
+                alert("Failed to upload file to the knowledge base.");
+                setSelectedFile(null); // Revert selection on error
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            } finally {
+                setIsUploading(false);
+            }
+        }
+    };
+
+    const triggerFileSelect = () => {
+        fileInputRef.current.click();
+    };
+
+    const removeFile = () => {
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -92,6 +153,12 @@ const ResearchChat = () => {
                             </div>
                             <div className="message-bubble glass-panel">
                                 <p>{msg.content}</p>
+                                {msg.file && (
+                                    <div className="message-file-attachment">
+                                        <FileText size={16} />
+                                        <span>{msg.file.name}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -112,20 +179,50 @@ const ResearchChat = () => {
                 </div>
             </div>
 
-            {/* Input Area */}
             <div className="input-section glass-panel">
+                {selectedFile && (
+                    <div className="file-preview-container">
+                        <div className="file-preview">
+                            <FileText size={16} className="file-icon" />
+                            <span className="file-name">{selectedFile.name} {isUploading && "(Uploading...)"}</span>
+                            <button
+                                className="remove-file-btn"
+                                onClick={removeFile}
+                                disabled={isUploading}
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className="input-container">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        accept=".pdf,application/pdf"
+                        style={{ display: 'none' }}
+                    />
+                    <button
+                        className="attach-btn"
+                        onClick={triggerFileSelect}
+                        title="Upload PDF"
+                        disabled={isUploading}
+                    >
+                        <Plus size={20} />
+                    </button>
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Ask a legal question... (e.g., 'What are the latest Supreme Court judgments on Section 138 of NI Act?')"
                         rows={1}
+                        disabled={isUploading || isTyping}
                     />
                     <button
                         className="send-btn-main"
                         onClick={handleSend}
-                        disabled={!input.trim()}
+                        disabled={(!input.trim() && !selectedFile) || isUploading || isTyping}
                     >
                         <Send size={20} />
                     </button>
@@ -272,6 +369,17 @@ const ResearchChat = () => {
                     color: #334155;
                 }
 
+                .message-file-attachment {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 8px;
+                    background: rgba(255, 255, 255, 0.2);
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    font-size: 0.875rem;
+                }
+
                 .message-row.user .message-bubble {
                     background: #4f46e5;
                     color: white;
@@ -297,7 +405,7 @@ const ResearchChat = () => {
                     position: relative;
                     background: white;
                     border-radius: 24px;
-                    padding: 8px 8px 8px 24px; /* Room for button */
+                    padding: 8px 12px 8px 12px;
                     display: flex;
                     align-items: center;
                     border: 1px solid #e2e8f0;
@@ -315,7 +423,7 @@ const ResearchChat = () => {
                     border: none !important;
                     background: transparent !important;
                     font-size: 1rem;
-                    padding: 8px 0;
+                    padding: 8px 12px;
                     resize: none;
                     max-height: 120px;
                     outline: none !important;
@@ -347,6 +455,73 @@ const ResearchChat = () => {
                 .send-btn-main:disabled {
                     background: #cbd5e1;
                     cursor: not-allowed;
+                }
+
+                .attach-btn {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: transparent;
+                    color: #64748b;
+                    border: none;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    flex-shrink: 0;
+                }
+
+                .attach-btn:hover {
+                    background: #f1f5f9;
+                    color: #4f46e5;
+                }
+
+                .file-preview-container {
+                    max-width: 900px;
+                    margin: 0 auto 12px;
+                    animation: slideUp 0.2s ease-out;
+                }
+
+                @keyframes slideUp {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+
+                .file-preview {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: white;
+                    padding: 8px 12px;
+                    border-radius: 12px;
+                    font-size: 0.875rem;
+                    color: #334155;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+
+                .file-icon {
+                    color: #ef4444; /* PDF color usually red-ish */
+                }
+
+                .remove-file-btn {
+                    background: transparent;
+                    border: none;
+                    color: #94a3b8;
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s;
+                    margin-left: 4px;
+                }
+
+                .remove-file-btn:hover {
+                    background: #f1f5f9;
+                    color: #ef4444;
                 }
 
                 .disclaimer {

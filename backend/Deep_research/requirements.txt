@@ -1,0 +1,36 @@
+# Core Framework
+fastapi
+uvicorn
+python-dotenv
+pydantic
+python-multipart
+
+# LangChain / AI
+langchain
+langgraph
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-openai
+
+# Vector & Database
+sentence-transformers
+faiss-cpu
+sqlalchemy
+psycopg2-binary
+pgvector
+mem0ai
+numpy
+
+# Web Search & Scraping
+duckduckgo-search
+tavily-python
+trafilatura
+firecrawl-py
+beautifulsoup4
+requests
+
+# PDF Processing
+pymupdf
+pdf2image
+easyocr
