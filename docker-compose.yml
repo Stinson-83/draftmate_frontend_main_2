@@ -4,18 +4,13 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.frontend
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8004
+      - VITE_API_BASE_URL=http://localhost:8080
     depends_on:
-      - lex_bot
-      - drafter
-      - enhance_bot
-      - pdf_editor
-      - converter
-      - query
+      - backend
 
   db:
     image: ankane/pgvector:latest
@@ -33,77 +28,12 @@ services:
       timeout: 5s
       retries: 5
 
-  drafter:
+  backend:
     build:
-      context: ./backend/Drafter
+      context: .
       dockerfile: Dockerfile
     ports:
-      - "8003:8003"
-    environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-
-  enhance_bot:
-    build:
-      context: ./backend/Enhance_bot
-      dockerfile: Dockerfile
-    ports:
-      - "8002:8002"
-    environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - TAVILY_API_KEY=${TAVILY_API_KEY}
-      - FIRECRAWLER_API_KEY=${FIRECRAWLER_API_KEY}
-      - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS}
-      - PREFERRED_DOMAINS=${PREFERRED_DOMAINS}
-
-  pdf_editor:
-    build:
-      context: ./backend/PDF_Editor
-      dockerfile: Dockerfile
-    ports:
-      - "8005:8005"
-
-  converter:
-    build:
-      context: ./backend/converter
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - PSQL_PASSWD=${PSQL_PASSWD}
-      - POSTGRES_HOST=db
-    depends_on:
-      db:
-        condition: service_healthy
-
-  query:
-    build:
-      context: ./backend/query
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
-      - S3_BUCKET=${S3_BUCKET}
-      - POSTGRES_DSN=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
-      - POSTGRES_HOST=db
-    depends_on:
-      db:
-        condition: service_healthy
-
-  lex_bot:
-    build:
-      context: ./backend/Deep_research
-      dockerfile: Dockerfile
-    ports:
-      - "8004:8004"
+      - "8080:8080"
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -117,14 +47,21 @@ services:
       - SERPER_API_KEY=${SERPER_API_KEY}
       - GOOGLE_SERP_API_KEY=${GOOGLE_SERP_API_KEY}
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - FIRECRAWLER_API_KEY=${FIRECRAWLER_API_KEY}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - PSQL_PASSWD=${PSQL_PASSWD}
       - LLM_MODE=${LLM_MODE}
       - LLM_PROVIDER=${LLM_PROVIDER}
       - EMBED_MODEL=${EMBED_MODEL}
       - RERANK_MODEL=${RERANK_MODEL}
       - MEM0_ENABLED=${MEM0_ENABLED}
       - SESSION_CACHE_TTL=${SESSION_CACHE_TTL}
-      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - LANGSMITH_PROJECT=${LANGSMITH_PROJECT}
       - SCRAPE_DELAY=${SCRAPE_DELAY}
@@ -137,6 +74,11 @@ services:
       - CHAT_RETENTION_DAYS=${CHAT_RETENTION_DAYS}
       - MEM0_RETENTION_DAYS=${MEM0_RETENTION_DAYS}
       - TEST_MODE=${TEST_MODE}
+      - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS}
+      - PREFERRED_DOMAINS=${PREFERRED_DOMAINS}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
+      - INPUT_JSON=${INPUT_JSON}
+      - INTERACTIVE=${INTERACTIVE}
     depends_on:
       db:
         condition: service_healthy

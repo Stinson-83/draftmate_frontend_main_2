@@ -4,31 +4,33 @@
  * This file contains the API configuration for all backend microservices.
  * 
  * IMPORTANT: 
- * - Ports have been resolved to avoid conflicts.
- * - DRAFTER: 8003
- * - PDF_EDITOR_API: 8005
+ * - All services are now routed through a single Nginx Reverse Proxy.
+ * - Base URL is determined by VITE_API_BASE_URL env var.
+ * - Path prefixes map to specific services (e.g., /converter -> port 8000).
  */
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
 export const API_CONFIG = {
-    // Service: backend/converter
+    // Service: backend/converter (Port 8000)
     CONVERTER: {
-        BASE_URL: 'http://localhost:8000',
+        BASE_URL: `${BASE_URL}/converter`,
         ENDPOINTS: {
             CONVERT: '/convert', // POST
         }
     },
 
-    // Service: backend/Drafter
+    // Service: backend/Drafter (Port 8003)
     DRAFTER: {
-        BASE_URL: 'http://localhost:8003', // Resolved port
+        BASE_URL: `${BASE_URL}/drafter`,
         ENDPOINTS: {
             GENERATE: '/generate', // POST
         }
     },
 
-    // Service: backend/query
+    // Service: backend/query (Port 8001)
     QUERY: {
-        BASE_URL: 'http://localhost:8001',
+        BASE_URL: `${BASE_URL}/query`,
         ENDPOINTS: {
             HEALTH: '/', // GET
             DIAGNOSTICS: '/diag', // GET
@@ -38,9 +40,9 @@ export const API_CONFIG = {
         }
     },
 
-    // Service: backend/Enhance_bot
+    // Service: backend/Enhance_bot (Port 8002)
     ENHANCE_BOT: {
-        BASE_URL: 'http://localhost:8002',
+        BASE_URL: `${BASE_URL}/enhance`,
         ENDPOINTS: {
             ENHANCE_CONTENT: '/enhance_content', // POST
             ENHANCE_CLAUSE: '/enhance_clause', // POST
@@ -48,9 +50,9 @@ export const API_CONFIG = {
         }
     },
 
-    // Service: backend/Deep_research/lex_bot
+    // Service: backend/Deep_research/lex_bot (Port 8004)
     LEX_BOT: {
-        BASE_URL: 'http://localhost:8004',
+        BASE_URL: `${BASE_URL}/lexbot`,
         ENDPOINTS: {
             HEALTH: '/', // GET
             CONFIG_LLM: '/config/llm', // GET, POST
@@ -67,10 +69,9 @@ export const API_CONFIG = {
         }
     },
 
-    // Service: backend/PDF_Editor
-    // Note: This service is configured to run on port 8005
+    // Service: backend/PDF_Editor (Port 8005)
     PDF_EDITOR_API: {
-        BASE_URL: 'http://localhost:8005',
+        BASE_URL: `${BASE_URL}/pdf`,
         ENDPOINTS: {
             MERGE: '/merge', // POST
             SPLIT: '/split', // POST
