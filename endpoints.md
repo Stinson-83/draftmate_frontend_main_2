@@ -123,8 +123,8 @@ Handles legal template search and retrieval.
 ## Summary of Active Ports
 - **Frontend**: `http://localhost:5173`
 - **Converter**: `http://localhost:8000`
-- **Drafter**: `http://localhost:8001`
+- **Drafter**: `http://localhost:8003`
 - **Enhance Bot**: `http://localhost:8002`
-- **PDF Editor**: `http://localhost:8003`
+- **PDF Editor**: `http://localhost:8005`
 - **Deep Research**: `http://localhost:8004`
-- **Query Service**: `http://localhost:8005` 
+- **Query Service**: `http://localhost:8001` 

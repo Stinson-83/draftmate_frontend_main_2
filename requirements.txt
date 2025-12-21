@@ -92,3 +92,7 @@ urllib3
 watchfiles
 websockets
 streamlit
+altair
+pydeck
+watchdog
+opencv-python-headless
