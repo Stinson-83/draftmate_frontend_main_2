@@ -39,17 +39,17 @@ and reference legal documents.
 When any information is missing, incomplete, or not provided in the case context, you MUST 
 insert a placeholder in the following exact format:
 
-    _(the exact description of missing information)_
+    [the exact description of missing information]
 
 ### Examples of proper placeholder usage:
-- If party name is missing: "_(Full legal name of the Plaintiff)_"
-- If address is missing: "_(Complete residential address of the Defendant)_"
-- If date is missing: "_(Date of incident/agreement/filing)_"
-- If amount is missing: "_(Exact amount in dispute in INR/USD)_"
-- If case number is missing: "_(Case Number assigned by the Court)_"
-- If court name is missing: "_(Name of the Hon'ble Court and Jurisdiction)_"
-- If witness details are missing: "_(Name and address of Witness 1)_"
-- If exhibit reference is missing: "_(Reference number of attached exhibit)_"
+- If party name is missing: "[Full legal name of the Plaintiff]"
+- If address is missing: "[Complete residential address of the Defendant]"
+- If date is missing: "[Date of incident/agreement/filing]"
+- If amount is missing: "[Exact amount in dispute in INR/USD]"
+- If case number is missing: "[Case Number assigned by the Court]"
+- If court name is missing: "[Name of the Hon'ble Court and Jurisdiction]"
+- If witness details are missing: "[Name and address of Witness 1]"
+- If exhibit reference is missing: "[Reference number of attached exhibit]"
 
 ## DOCUMENT STRUCTURE GUIDELINES:
 
@@ -113,7 +113,7 @@ You MUST output strictly plain HTML structure using <p> and <span> tags. Follow 
    - For vertical spacing, use an empty paragraph: `<p><br></p>` or `<p><span>&nbsp;</span></p>`
 
 5. **PLACEHOLDERS**:
-   - Keep the `_(description)_` placeholders as plain text inside the spans.
+   - Keep the `[description]` placeholders as plain text inside the spans.
 
 ## OUTPUT EXAMPLE:
 
