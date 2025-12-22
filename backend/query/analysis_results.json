@@ -3,7 +3,7 @@
     "query": "Rental agreement",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1365.2384000015445,
+    "latency_ms": 1065.281999995932,
     "top_match": "Agreement",
     "score": 0.771,
     "alternatives": [
@@ -38,7 +38,7 @@
     "query": "Loan acknowledgement",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1226.7953999980818,
+    "latency_ms": 804.3146999989403,
     "top_match": "Acknowledgement",
     "score": 0.946,
     "alternatives": [
@@ -73,7 +73,7 @@
     "query": "Employment contract",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1072.6264999830164,
+    "latency_ms": 568.3873999951174,
     "top_match": "Agreement",
     "score": 0.459,
     "alternatives": [
@@ -108,7 +108,7 @@
     "query": "Non-disclosure agreement",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1437.9805999924429,
+    "latency_ms": 822.4978000071133,
     "top_match": "Agreement",
     "score": 0.547,
     "alternatives": [
@@ -143,7 +143,7 @@
     "query": "Partnership deed",
     "type": "simple",
     "path": "FAST",
-    "latency_ms": 1465.0907999894116,
+    "latency_ms": 1236.8237000046065,
     "top_match": "Miscellaneous deeds",
     "score": 0.717,
     "alternatives": [
@@ -178,7 +178,7 @@
     "query": "Agreement for repayment of friendly loan with interest and security",
     "type": "complex",
     "path": "FAST",
-    "latency_ms": 1267.3282999894582,
+    "latency_ms": 1028.7215999996988,
     "top_match": "Company",
     "score": 0.546,
     "alternatives": [
@@ -213,7 +213,7 @@
     "query": "Lease deed for commercial property with lock-in period and maintenance clauses",
     "type": "complex",
     "path": "SLOW",
-    "latency_ms": 4733.365199994296,
+    "latency_ms": 6128.918200003682,
     "top_match": "Lease Financing",
     "score": 0.41,
     "alternatives": [
@@ -248,7 +248,7 @@
     "query": "Consultancy agreement for IT services with intellectual property assignment",
     "type": "complex",
     "path": "SLOW",
-    "latency_ms": 5339.372699992964,
+    "latency_ms": 6342.323999997461,
     "top_match": "Agreement",
     "score": 0.402,
     "alternatives": [
@@ -283,7 +283,7 @@
     "query": "Sale deed for residential flat including car parking and undivided share of land",
     "type": "complex",
     "path": "SLOW",
-    "latency_ms": 4984.07770000631,
+    "latency_ms": 7259.553100011544,
     "top_match": "Sale",
     "score": 0.423,
     "alternatives": [
@@ -318,7 +318,7 @@
     "query": "Franchise agreement for retail outlet with territorial exclusivity and royalty terms",
     "type": "complex",
     "path": "FAST",
-    "latency_ms": 2117.4447999801487,
+    "latency_ms": 1175.4638999991585,
     "top_match": "Agreement",
     "score": 0.452,
     "alternatives": [

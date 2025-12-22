@@ -29,12 +29,13 @@ POSTGRES_DSN = os.getenv("POSTGRES_DSN")
 BASTION_IP = os.getenv("BASTION_IP")
 SSH_KEY_PATH = os.getenv("SSH_KEY_PATH")
 RDS_ENDPOINT = os.getenv("RDS_ENDPOINT", "privet-lawdb.cfge8ai08o3t.ap-south-1.rds.amazonaws.com")
+LOCAL_BIND_PORT = 5432
 
 # Global variables
 tunnel = None
 connection_pool = None
 
-def is_port_open(host='127.0.0.1', port=5432, timeout=1.0):
+def is_port_open(host='127.0.0.1', port=LOCAL_BIND_PORT, timeout=1.0):
     """Check if a port is open (manual tunnel running)."""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,7 +65,12 @@ def _get_tunneled_dsn():
         dsn = dsn.replace(RDS_ENDPOINT, "127.0.0.1")
     elif "amazonaws.com" in dsn:
         import re
-        dsn = re.sub(r'@[^:]+:5432', '@127.0.0.1:5432', dsn)
+        dsn = re.sub(r'@[^:]+', '@127.0.0.1', dsn)
+        
+    # Ensure port is updated to local bind port
+    if ":5432" in dsn:
+        dsn = dsn.replace(":5432", f":{LOCAL_BIND_PORT}")
+        
     return dsn
 
 def start_tunnel_and_pool():
@@ -72,7 +78,7 @@ def start_tunnel_and_pool():
     
     # 1. Check if manual tunnel is already running
     if is_port_open():
-        logger.info("Port 5432 is open. Using existing tunnel.")
+        logger.info(f"Port {LOCAL_BIND_PORT} is open. Using existing tunnel.")
         try:
             dsn = _get_tunneled_dsn()
             connection_pool = pool.ThreadedConnectionPool(1, 20, dsn)
@@ -91,7 +97,7 @@ def start_tunnel_and_pool():
                 ssh_username="ec2-user",
                 ssh_pkey=SSH_KEY_PATH,
                 remote_bind_address=(RDS_ENDPOINT, 5432),
-                local_bind_address=('127.0.0.1', 5432)
+                local_bind_address=('127.0.0.1', LOCAL_BIND_PORT)
             )
             tunnel.start()
             logger.info(f"Auto-tunnel active on port {tunnel.local_bind_port}")

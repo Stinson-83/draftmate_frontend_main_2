@@ -26,6 +26,10 @@ RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 # Copy all backend code
 COPY backend/ backend/
 
+# Fix SSH key permissions for Paramiko
+RUN chmod 600 /app/backend/query/secrets/bastion.key.pem
+
+
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 

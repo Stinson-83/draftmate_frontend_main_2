@@ -1,0 +1,27 @@
+--- INTERNAL DOCKER VERIFICATION (VERBOSE) ---
+Env SSH_KEY_PATH: ./secrets/bastion.key.pem
+Absolute Key Path: /app/secrets/bastion.key.pem
+ERROR: Key file NOT found at /app/secrets/bastion.key.pem
+CWD: /app
+Listing current dir: ['backend', 'requirements.txt']
+LOCAL_BIND_PORT: 5433
+Starting tunnel...
+INFO:sql:Port 5433 is open. Using existing tunnel.
+Port 5433 is open. Using existing tunnel.
+ERROR:sql:Pool creation failed: connection to server at "127.0.0.1", port 5433 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+Pool creation failed: connection to server at "127.0.0.1", port 5433 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+Tunnel start function returned.
+sql.tunnel is None after start call!
+Getting connection...
+WARNING:sql:Connection pool not initialized. Attempting direct connection.
+Connection pool not initialized. Attempting direct connection.
+Exception during connection: connection to server at "127.0.0.1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+--- END VERIFICATION ---

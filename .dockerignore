@@ -1,0 +1,23 @@
+# Docker Ignore File
+
+# Version Control
+.git
+.gitignore
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Python Artifacts (Exclude heavy venvs from copy)
+**/venv
+**/__pycache__
+*.pyc
+
+# Environment Variables
+.env
+.env.*
+
+# Docker artifacts
+docker-compose.yml
+Dockerfile
+Dockerfile.frontend

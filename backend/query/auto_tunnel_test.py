@@ -33,7 +33,8 @@ def test_tunnel():
             ssh_username=SSH_USER,
             ssh_pkey=SSH_KEY_PATH,
             remote_bind_address=(RDS_ENDPOINT, 5432),
-            local_bind_address=('127.0.0.1', 5432)
+            # local_bind_address=('127.0.0.1', 5432)  
+            local_bind_address=('127.0.0.1', 5432) # as my pql server was on port 5432
         )
         tunnel.start()
         print(f"[SUCCESS] Auto-tunnel SUCCESS! Port: {tunnel.local_bind_port}")
