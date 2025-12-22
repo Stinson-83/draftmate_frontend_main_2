@@ -55,6 +55,7 @@ const PDFEditor = () => {
     const [watermarkText, setWatermarkText] = useState('CONFIDENTIAL');
     const [watermarkOpacity, setWatermarkOpacity] = useState(0.3);
     const [watermarkRotation, setWatermarkRotation] = useState(45);
+    const [watermarkScale, setWatermarkScale] = useState(1.0);
 
     const fileInputRef = useRef(null);
     const dragItem = useRef(null);
@@ -241,6 +242,7 @@ const PDFEditor = () => {
                 formData.append('text', watermarkText);
                 formData.append('opacity', watermarkOpacity.toString());
                 formData.append('rotation', watermarkRotation.toString());
+                formData.append('scale', watermarkScale.toString());
 
             } else if (activeTool.mode === MODES.BUILDER) {
                 endpoint = '/assemble';
@@ -526,9 +528,19 @@ const PDFEditor = () => {
                                 <div className="tool-group">
                                     <label>Rotation ({watermarkRotation}°)</label>
                                     <input
-                                        type="range" min="0" max="360" step="45"
+                                        type="range" min="0" max="360" step="5"
                                         value={watermarkRotation}
                                         onChange={(e) => setWatermarkRotation(parseInt(e.target.value))}
+                                        className="tool-slider"
+                                    />
+                                </div>
+                                <div className="tool-divider"></div>
+                                <div className="tool-group">
+                                    <label>Scale ({watermarkScale}x)</label>
+                                    <input
+                                        type="range" min="0.1" max="3.0" step="0.1"
+                                        value={watermarkScale}
+                                        onChange={(e) => setWatermarkScale(parseFloat(e.target.value))}
                                         className="tool-slider"
                                     />
                                 </div>

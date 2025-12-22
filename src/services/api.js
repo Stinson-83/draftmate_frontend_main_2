@@ -21,7 +21,7 @@ export const api = {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Upload failed: ${response.status} ${errorText}`);
+            throw new Error(errorText || `Upload failed with status ${response.status}`);
         }
 
         return response.json();

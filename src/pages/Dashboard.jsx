@@ -129,11 +129,7 @@ const Dashboard = () => {
                         description="Calculate Ad-Valorem Court Fees for your jurisdiction."
                         onClick={() => setIsCourtFeeModalOpen(true)}
                     />
-                    <ActionCard
-                        icon={MessageSquare}
-                        title="Chat with PDF"
-                        description="Upload a PDF and ask questions about it."
-                    />
+
                     <ActionCard
                         icon={BookOpen}
                         title="PDF Toolkit"

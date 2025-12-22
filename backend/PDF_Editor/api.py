@@ -84,6 +84,19 @@ def split_pdf_logic(pdf_bytes, range_str):
     except Exception as e:
         raise Exception(f"Split error: {str(e)}")
 
+def validate_pdf(pdf_bytes):
+    """Validate if PDF is valid and not empty"""
+    try:
+        if len(pdf_bytes) < 100:  # Too small to be valid
+            return False
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if len(doc) == 0:
+            return False
+        doc.close()
+        return True
+    except:
+        return False
+
 def compress_pdf_logic(pdf_bytes, level="medium"):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -120,12 +133,23 @@ def compress_pdf_logic(pdf_bytes, level="medium"):
                     continue
                     
         output = io.BytesIO()
+        # Use less aggressive garbage collection to prevent corruption
         doc.save(
             output,
-            garbage=4,
+            garbage=3,
             deflate=True,
-            clean=True
+            clean=True,
+            deflate_images=True,
+            deflate_fonts=True
         )
+        doc.close()
+        
+        # Validate output
+        if not validate_pdf(output.getvalue()):
+            # If compression failed, return original
+            return io.BytesIO(pdf_bytes)
+            
+        output.seek(0)
         return output
     except Exception as e:
         raise Exception(f"Compress error: {str(e)}")
@@ -365,100 +389,65 @@ def assemble_pdf_logic(pdf_bytes_list, manifest):
     except Exception as e:
         raise Exception(f"Assembly error: {str(e)}")
 
-def watermark_pdf_logic(pdf_bytes, text, opacity=0.3, rotation=45, color=(0, 0, 0)):
+def watermark_pdf_logic(pdf_bytes, text, opacity=0.3, rotation=45, color=(0, 0, 0), scale=1.0):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        
+        # Font size base
+        font_size = 50
+        
         for page in doc:
-            # Calculate center
-            rect = page.rect
-            center = fitz.Point(rect.width / 2, rect.height / 2)
+            page_width = page.rect.width
+            page_height = page.rect.height
             
-            # Start a shape to draw semi-transparent text? 
-            # fitz.insert_text usually is solid. 
-            # For transparency, we might need a distinct text writer or use 'fill_opacity' in insert_text if supported in newer versions
-            # OR use shape.insert_text...
-            # The easiest way for simple watermark with rotation is insert_text with 'rotate' param (in newer fitz) 
-            # or creating a text box.
+            # Create a PIL image for the watermark
+            text_length = len(text)
+            # Base dimensions
+            img_width = int(text_length * font_size * 0.7 * scale)
+            img_height = int(font_size * 2 * scale)
             
-            # Simplified approach: Render text at center.
-            # PyMuPDF's insert_text doesn't always support easy transparency/rotation.
-            # Using 'insert_textbox' is better.
+            # Create transparent image
+            watermark_img = Image.new('RGBA', (img_width, img_height), (255, 255, 255, 0))
+            draw = ImageDraw.Draw(watermark_img)
             
-            # Note: PyMuPDF 1.18+ supports overlaying.
-            # Let's use the standard "insert_text" with render_mode if needed, 
-            # but transparency works best via shape or setting alpha.
+            # Try to use a font, fallback to default
+            try:
+                # Use Liberation Sans which we installed in Docker
+                font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", int(font_size * scale))
+            except:
+                try:
+                    # Fallback for local testing if not on Linux/Docker
+                    font = ImageFont.truetype("Arial.ttf", int(font_size * scale))
+                except:
+                    try:
+                        font = ImageFont.load_default()
+                    except:
+                        pass
             
-            # Standard "Watermark" function in fitz (doc.insert_pdf is for stamps).
-            # Let's try inserting text as a standard foreground overlay.
+            # Calculate text color with opacity
+            alpha = int(opacity * 255)
+            text_color = (128, 128, 128, alpha)  # Gray with alpha
             
-            # Correct approach for Watermark with Rotation & Opacity in PyMuPDF
-            # We use a text writer or insert_textbox with a Morph.
+            # Draw text
+            # If font is loaded, use it. If not, default might not support size.
+            # For simplicity in container, we try to draw.
+            draw.text((10, 10), text, fill=text_color, font=font)
             
-            # Simple approach: Use `insert_text` but `rotate` param might be `rotate` or part of `morph`.
-            # Standard "Stamp" approach is usually creating a PDF page or using `insert_textbox` with rotation.
+            # Rotate the image
+            watermark_img = watermark_img.rotate(rotation, expand=True)
             
-            # Let's try `insert_textbox`. It matches `rect` and `rotate`.
-            # To center it, we define a rect around the center.
+            # Save to bytes
+            img_byte_arr = io.BytesIO()
+            watermark_img.save(img_byte_arr, format='PNG')
+            img_bytes = img_byte_arr.getvalue()
             
-            # However, `insert_text` with `rotate` keyword was added in v1.19+. 
-            # If it fails, we might be on older version. 
-            # Safest is to use `TextWriter` or `Shape` or just standard `insert_text` with simple rotate if supported.
+            # Center position
+            x = (page_width - watermark_img.width) / 2
+            y = (page_height - watermark_img.height) / 2
             
-            # Let's assume v1.19+ is available (standard in recent installs).
-            # But `align` is not a valid kwarg for `insert_text` usually.
-            # `insert_text(point, text, ...)`
-            
-            # Let's use `insert_textbox` which handles alignment and rotation better.
-            
-            # 1. Define a large rect centered on page
-            r = fitz.Rect(0, 0, 500, 100)
-            # Center it
-            r.x0 = center.x - 250
-            r.x1 = center.x + 250
-            r.y0 = center.y - 50
-            r.y1 = center.y + 50
-            
-            # 2. Insert text
-            # Note: insert_textbox returns valid rect check?
-            # actually `page.insert_textbox` takes `rect`, `buffer`, `rotate`...
-            
-            # REVISED: direct `insert_text` with `morph`.
-            # morph = (p, matrix). 
-            # Only certain versions support `rotate`.
-            
-            # Let's try the most standard way: `page.insert_text` WITHOUT `align` or `fill_opacity` if suspect.
-            # But we want opacity.
-            # To get opacity, we might need `page.draw_rect` with text? No.
-            
-            # Valid robust code:
-            # Use `shape.insert_text` logic?
-            
-            # Let's try the simplest working solution:
-            # Use `page.insert_text` without advanced params first? No user wants rotation/opacity.
-            
-            # We will use `TextWriter`.
-            # tw = fitz.TextWriter(page.rect)
-            # tw.append(center, text, fontsize=60, font=fitz.Font("helv"))
-            # tw.write_text(page, opacity=opacity, rotate=rotation) ? No.
-            
-            # Let's go with `insert_text` but verify kwargs. `fill_opacity` is valid in recent versions.
-            # The error usually implies `align` is wrong for `insert_text` (it's for `insert_textbox`).
-            # Removing `align=1` and `rotate`.
-            # To rotate, we simply set the page rotation? No.
-            
-            # New Plan: use `insert_textbox` which supports `rotate`.
-            page.insert_textbox(
-                rect, # Use full page rect
-                text,
-                fontsize=60,
-                fontname="helv",
-                color=color,
-                fill_opacity=opacity,
-                rotate=rotation,
-                align=1 # Center aligned
-            )
-            # This is robust because `insert_textbox` is designed for layout.
-            # Let's assume standard usage. If rotation fails, we fallback.
+            # Insert image
+            img_rect = fitz.Rect(x, y, x + watermark_img.width, y + watermark_img.height)
+            page.insert_image(img_rect, stream=img_bytes, overlay=True)
             
         output = io.BytesIO(doc.tobytes())
         return output
@@ -483,11 +472,12 @@ async def watermark_pdf_endpoint(
     file: UploadFile, 
     text: str = Form(...), 
     opacity: float = Form(0.3),
-    rotation: int = Form(45)
+    rotation: int = Form(45),
+    scale: float = Form(1.0)
 ):
     try:
         content = await file.read()
-        result = watermark_pdf_logic(content, text, opacity, rotation)
+        result = watermark_pdf_logic(content, text, opacity, rotation, scale=scale)
         return StreamingResponse(
             result, 
             media_type="application/pdf",

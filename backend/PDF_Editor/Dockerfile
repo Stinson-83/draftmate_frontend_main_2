@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     python3-dev \
     poppler-utils \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Sparkles, User, Bot, Plus, X, FileText } from 'lucide-react';
 import lawJuristLogo from '../assets/law_jurist_logo.png';
@@ -88,16 +90,21 @@ const ResearchChat = () => {
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (file) {
+            if (!sessionId) {
+                toast.error("Session not initialized. Please try again.");
+                return;
+            }
+
             // Optimistically set selected file
             setSelectedFile(file); // Keep the file object for preview
 
             setIsUploading(true);
             try {
                 await api.uploadFile(file, sessionId);
-                // toast.success("File context added!"); // Optional: Add toast notification
+                toast.success("File uploaded successfully!");
             } catch (error) {
                 console.error("Upload error:", error);
-                alert("Failed to upload file to the knowledge base.");
+                toast.error(`Failed to upload file: ${error.message}`);
                 setSelectedFile(null); // Revert selection on error
                 if (fileInputRef.current) fileInputRef.current.value = '';
             } finally {
@@ -152,7 +159,9 @@ const ResearchChat = () => {
                                 )}
                             </div>
                             <div className="message-bubble glass-panel">
-                                <p>{msg.content}</p>
+                                <div className="markdown-content">
+                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                </div>
                                 {msg.file && (
                                     <div className="message-file-attachment">
                                         <FileText size={16} />
@@ -554,6 +563,68 @@ const ResearchChat = () => {
                 @keyframes bounce {
                     0%, 80%, 100% { transform: scale(0); }
                     40% { transform: scale(1); }
+                }
+
+                /* Markdown Styles */
+                .markdown-content {
+                    font-size: 1rem;
+                    line-height: 1.6;
+                    color: #334155;
+                }
+
+                .markdown-content p {
+                    margin-bottom: 12px;
+                }
+
+                .markdown-content p:last-child {
+                    margin-bottom: 0;
+                }
+
+                .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+                    font-weight: 600;
+                    color: #1e293b;
+                    margin-top: 16px;
+                    margin-bottom: 8px;
+                }
+
+                .markdown-content h1 { font-size: 1.4rem; }
+                .markdown-content h2 { font-size: 1.25rem; }
+                .markdown-content h3 { font-size: 1.1rem; }
+
+                .markdown-content ul, .markdown-content ol {
+                    margin-left: 20px;
+                    margin-bottom: 12px;
+                }
+
+                .markdown-content li {
+                    margin-bottom: 4px;
+                }
+
+                .markdown-content strong {
+                    font-weight: 600;
+                    color: #0f172a;
+                }
+
+                .markdown-content code {
+                    background: rgba(0,0,0,0.05);
+                    padding: 2px 4px;
+                    border-radius: 4px;
+                    font-family: monospace;
+                    font-size: 0.9em;
+                }
+
+                .message-row.user .markdown-content {
+                    color: white;
+                }
+                
+                .message-row.user .markdown-content strong {
+                    color: white;
+                }
+
+                .message-row.user .markdown-content h1, 
+                .message-row.user .markdown-content h2, 
+                .message-row.user .markdown-content h3 {
+                    color: white;
                 }
 
             `}</style>

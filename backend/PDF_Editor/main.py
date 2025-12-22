@@ -673,15 +673,22 @@ def compress_pdf_advanced(pdf_file, target_size_kb=None, compression_level="medi
                     continue
         
         output = io.BytesIO()
+        # Use less aggressive garbage collection to prevent corruption
         doc.save(
             output,
-            garbage=4,
+            garbage=3, 
             deflate=True,
             clean=True,
             deflate_images=True,
             deflate_fonts=True
         )
         doc.close()
+        
+        # Validate output
+        if not validate_pdf(output.getvalue()):
+            st.warning("Compression produced invalid file, returning original.")
+            pdf_file.seek(0)
+            return pdf_file
         
         output.seek(0)
         final_size_kb = len(output.getvalue()) / 1024
@@ -727,6 +734,20 @@ def compress_pdf_advanced(pdf_file, target_size_kb=None, compression_level="medi
     except Exception as e:
         st.error(f"Error compressing PDF: {str(e)}")
         return None
+
+
+def validate_pdf(pdf_bytes):
+    """Validate if PDF is valid and not empty"""
+    try:
+        if len(pdf_bytes) < 100:  # Too small to be valid
+            return False
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if len(doc) == 0:
+            return False
+        doc.close()
+        return True
+    except:
+        return False
 
 
 def pdf_to_word_pymupdf(pdf_file):
@@ -843,7 +864,7 @@ def word_to_pdf_improved(docx_file):
         return None
 
 
-def add_watermark_simple(pdf_file, watermark_text=None, watermark_image=None, opacity=0.3, position="center", font_size=50):
+def add_watermark_simple(pdf_file, watermark_text=None, watermark_image=None, opacity=0.3, position="center", font_size=50, angle=45, scale=1.0):
     """Add watermark to PDF - SIMPLIFIED VERSION THAT WORKS"""
     try:
         pdf_bytes = pdf_file.read()
@@ -883,7 +904,7 @@ def add_watermark_simple(pdf_file, watermark_text=None, watermark_image=None, op
                 draw.text((10, 10), watermark_text, fill=text_color, font=font)
                 
                 # Rotate the image
-                watermark_img = watermark_img.rotate(45, expand=True)
+                watermark_img = watermark_img.rotate(angle, expand=True)
                 
                 # Save to bytes
                 img_byte_arr = io.BytesIO()
@@ -914,8 +935,10 @@ def add_watermark_simple(pdf_file, watermark_text=None, watermark_image=None, op
                 
             elif watermark_image:
                 # Calculate position for image
-                img_width = 200
-                img_height = 200
+                base_width = 200
+                base_height = 200
+                img_width = int(base_width * scale)
+                img_height = int(base_height * scale)
                 
                 if position == "center":
                     x0, y0 = (page_width - img_width) / 2, (page_height - img_height) / 2
@@ -941,6 +964,15 @@ def add_watermark_simple(pdf_file, watermark_text=None, watermark_image=None, op
                 alpha = img.split()[3]
                 alpha = alpha.point(lambda p: int(p * opacity))
                 img.putalpha(alpha)
+                
+                # Resize image
+                img = img.resize((img_width, img_height), Image.Resampling.LANCZOS)
+                
+                # Rotate image
+                img = img.rotate(angle, expand=True)
+                
+                # Update dimensions after rotation
+                img_width, img_height = img.size
                 
                 # Save to bytes
                 img_byte_arr = io.BytesIO()
@@ -1394,6 +1426,9 @@ elif tool == "💧 Add Watermark":
                 help="Lower values = more transparent"
             )
             
+            angle = st.slider("Rotation Angle", -180, 180, 45, step=5)
+            scale = st.slider("Watermark Scale", 0.1, 3.0, 1.0, step=0.1)
+            
             position = st.selectbox(
                 "Position:",
                 ["center", "top-left", "top-right", "bottom-left", "bottom-right"]
@@ -1413,7 +1448,9 @@ elif tool == "💧 Add Watermark":
                         watermark_image=watermark_image if watermark_type == "Image" else None,
                         opacity=opacity,
                         position=position,
-                        font_size=font_size
+                        font_size=font_size,
+                        angle=angle,
+                        scale=scale
                     )
                     
                     if watermarked_pdf:
