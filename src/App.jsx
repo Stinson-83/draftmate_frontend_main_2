@@ -20,12 +20,25 @@ const Placeholder = ({ title }) => (
 
 import { Toaster } from 'sonner';
 
+import Onboarding from './pages/Onboarding';
+
 function App() {
+  // Check if user has onboarded (simple check)
+  const RequireAuth = ({ children }) => {
+    const profile = localStorage.getItem('user_profile');
+    if (!profile) {
+      return <Navigate to="/login" replace />;
+    }
+    return children;
+  };
+
   return (
     <BrowserRouter>
       <Toaster position="top-center" richColors />
       <Routes>
-        <Route path="/" element={<MainLayout />}>
+        <Route path="/login" element={<Onboarding />} />
+
+        <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
           <Route index element={<Dashboard />} />
           <Route path="editor" element={<Editor />} />
           <Route path="pdf-editor" element={<PDFEditor />} />
