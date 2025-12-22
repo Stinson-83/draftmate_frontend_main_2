@@ -312,29 +312,54 @@ const Editor = () => {
 
     const handleExportPDF = () => {
         handleSave();
-        const element = documentRef.current;
-        const clone = element.cloneNode(true);
-        clone.removeAttribute('contentEditable');
-        clone.style.boxShadow = 'none';
-        clone.style.margin = '0';
+        const element = pagesContainerRef.current;
+        if (!element) return;
 
-        const variables = clone.querySelectorAll('.variable');
-        variables.forEach(v => {
-            v.style.backgroundColor = 'transparent';
-            v.style.color = 'inherit';
-            v.style.border = 'none';
-            v.style.padding = '0';
-            v.style.borderRadius = '0';
-            v.removeAttribute('contenteditable');
-            v.removeAttribute('data-key');
+        // Clone the container to modify styles for PDF generation without affecting UI
+        const clone = element.cloneNode(true);
+
+        // Remove the transform scale from the clone so it renders at 100%
+        clone.style.transform = 'none';
+        clone.style.width = 'fit-content';
+        clone.style.height = 'auto';
+        clone.style.position = 'static';
+        clone.style.overflow = 'visible';
+
+        // Adjust the pages inside the clone
+        const pages = clone.querySelectorAll('.document-page');
+        pages.forEach(page => {
+            page.style.margin = '0';
+            page.style.boxShadow = 'none';
+            page.style.marginBottom = '0';
+            // Ensure variables look like normal text
+            const variables = page.querySelectorAll('.variable');
+            variables.forEach(v => {
+                v.style.backgroundColor = 'transparent';
+                v.style.color = 'inherit';
+                v.style.border = 'none';
+                v.style.padding = '0';
+                v.style.borderRadius = '0';
+                v.removeAttribute('contenteditable');
+                v.removeAttribute('data-key');
+            });
+
+            // Remove contentEditable from headers/footers/editors
+            const editables = page.querySelectorAll('[contenteditable]');
+            editables.forEach(el => el.removeAttribute('contenteditable'));
         });
 
         const opt = {
-            margin: [10, 10, 10, 10], // top, left, bottom, right
-            filename: 'legal_draft.pdf',
+            margin: 0,
+            filename: `${draftName || 'legal_draft'}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                logging: true,
+                windowWidth: 816,
+            },
+            jsPDF: { unit: 'pt', format: 'letter', orientation: 'portrait' }, // Letter matches 816x1056px approx
+            pagebreak: { mode: ['css', 'legacy'] }
         };
 
         html2pdf().set(opt).from(clone).save();
@@ -342,16 +367,41 @@ const Editor = () => {
 
     const handleExportWord = () => {
         handleSave();
-        const clone = documentRef.current.cloneNode(true);
-        const variables = clone.querySelectorAll('.variable');
-        variables.forEach(v => {
-            v.style.backgroundColor = 'transparent';
-            v.style.color = 'inherit';
-            v.style.border = 'none';
-            v.style.padding = '0';
-            v.style.borderRadius = '0';
-            v.removeAttribute('contenteditable');
-            v.removeAttribute('data-key');
+        const container = pagesContainerRef.current;
+        if (!container) return;
+
+        let fullContent = '';
+        const pages = Array.from(container.querySelectorAll('.document-page'));
+
+        pages.forEach((page, index) => {
+            // We try to capture header, content, and footer if possible, 
+            // but primarily the editor content is what matters for Word flow.
+            // For simplicity and robustness, we'll grab the editor content.
+            // If we want headers/footers in Word, we'd need to set them in the Word HTML styles (mso-header),
+            // which is complex. For now, let's just ensure ALL text content is exported.
+
+            const editor = page.querySelector('.editor-root');
+            if (editor) {
+                const clone = editor.cloneNode(true);
+
+                const variables = clone.querySelectorAll('.variable');
+                variables.forEach(v => {
+                    v.style.backgroundColor = 'transparent';
+                    v.style.color = 'inherit';
+                    v.style.border = 'none';
+                    v.style.padding = '0';
+                    v.style.borderRadius = '0';
+                    v.removeAttribute('contenteditable');
+                    v.removeAttribute('data-key');
+                });
+
+                fullContent += clone.innerHTML;
+
+                // Add page break
+                if (index < pages.length - 1) {
+                    fullContent += '<br style="page-break-after: always; clear: both;" />';
+                }
+            }
         });
 
         const header = `
@@ -360,7 +410,7 @@ const Editor = () => {
             xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
         <meta charset='utf-8'>
-        <title>Legal Draft</title>
+        <title>${draftName || 'Legal Draft'}</title>
         <style>
           body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
           p { margin-bottom: 1em; }
@@ -369,14 +419,13 @@ const Editor = () => {
       </head>
       <body>`;
         const footer = "</body></html>";
-        const content = clone.innerHTML;
-        const sourceHTML = header + content + footer;
+        const sourceHTML = header + fullContent + footer;
 
         const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
         const fileDownload = document.createElement("a");
         document.body.appendChild(fileDownload);
         fileDownload.href = source;
-        fileDownload.download = 'legal_draft.doc';
+        fileDownload.download = `${draftName || 'legal_draft'}.doc`;
         fileDownload.click();
         document.body.removeChild(fileDownload);
     };

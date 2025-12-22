@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Sparkles, User, Bot, Plus, X, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, User, Bot, Plus, X, FileText, PenTool } from 'lucide-react';
 import lawJuristLogo from '../assets/law_jurist_logo.png';
 
 const ResearchChat = () => {
@@ -149,7 +149,7 @@ const ResearchChat = () => {
             {/* Chat Area */}
             <div className="chat-viewport">
                 <div className="messages-list">
-                    {messages.map((msg) => (
+                    {messages.map((msg, index) => (
                         <div key={msg.id} className={`message-row ${msg.role}`}>
                             <div className="avatar">
                                 {msg.role === 'ai' ? (
@@ -162,6 +162,20 @@ const ResearchChat = () => {
                                 <div className="markdown-content">
                                     <ReactMarkdown>{msg.content}</ReactMarkdown>
                                 </div>
+                                {msg.role === 'ai' && index > 0 && messages[index - 1].role === 'user' && (
+                                    <button
+                                        className="draft-followup-btn"
+                                        onClick={() => navigate('/', {
+                                            state: {
+                                                openDrafting: true,
+                                                prompt: `Draft the legal document required for: ${messages[index - 1].content || (messages[index - 1].file ? `the uploaded document ${messages[index - 1].file.name}` : 'this query')}. Focus on drafting the actual legal papers.`
+                                            }
+                                        })}
+                                    >
+                                        <PenTool size={14} />
+                                        Draft a document related to this query
+                                    </button>
+                                )}
                                 {msg.file && (
                                     <div className="message-file-attachment">
                                         <FileText size={16} />
@@ -225,7 +239,7 @@ const ResearchChat = () => {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Ask a legal question... (e.g., 'What are the latest Supreme Court judgments on Section 138 of NI Act?')"
-                        rows={1}
+                        rows={2}
                         disabled={isUploading || isTyping}
                     />
                     <button
@@ -399,6 +413,27 @@ const ResearchChat = () => {
                 .message-row.ai .message-bubble {
                     background: white;
                     border-radius: 20px 20px 20px 4px;
+                }
+
+                .draft-followup-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 12px;
+                    padding: 8px 12px;
+                    background: #f1f5f9;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    color: #4f46e5;
+                    font-size: 0.875rem;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .draft-followup-btn:hover {
+                    background: #e0e7ff;
+                    border-color: #c7d2fe;
                 }
 
                 /* Input Section */

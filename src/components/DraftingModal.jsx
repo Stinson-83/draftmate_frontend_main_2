@@ -5,9 +5,9 @@ import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
 import './DraftingModal.css';
 
-const DraftingModal = ({ onClose }) => {
+const DraftingModal = ({ onClose, initialPrompt }) => {
     const [step, setStep] = useState(2);
-    const [prompt, setPrompt] = useState('');
+    const [prompt, setPrompt] = useState(initialPrompt || '');
     const [selectedFormat, setSelectedFormat] = useState(null);
     const [previewingFormat, setPreviewingFormat] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +19,7 @@ const DraftingModal = ({ onClose }) => {
 
     // Backend converter URL
     const CONVERTER_API_URL = API_CONFIG.CONVERTER.BASE_URL;
+    const QUERY_API_URL = API_CONFIG.QUERY.BASE_URL;
 
     // State for formats
     const [formats, setFormats] = useState([]);
@@ -152,7 +153,7 @@ const DraftingModal = ({ onClose }) => {
             // Let's set step 3 and reuse the loading state there.
             setStep(3);
 
-            const response = await fetch(`${CONVERTER_API_URL}/search`, {
+            const response = await fetch(`${QUERY_API_URL}/search`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_query: prompt })
@@ -213,7 +214,7 @@ const DraftingModal = ({ onClose }) => {
             try {
                 // Show a loading indicator in the preview area? 
                 // For now we just wait for the fetch.
-                const response = await fetch(`${CONVERTER_API_URL}/download-template-html`, {
+                const response = await fetch(`${QUERY_API_URL}/download-template-html`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ s3_path: formatToPreview.s3_path })

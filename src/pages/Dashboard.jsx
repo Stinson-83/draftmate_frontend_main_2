@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PenTool, FilePlus, Search, Upload, MessageSquare, FileText, Scale, BookOpen, Calculator } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './Dashboard.css';
 import DraftingModal from '../components/DraftingModal';
 import UploadModal from '../components/UploadModal';
@@ -10,14 +10,30 @@ import { API_CONFIG } from '../services/endpoints';
 
 const Dashboard = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isCourtFeeModalOpen, setIsCourtFeeModalOpen] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState('');
     const [htmlContent, setHtmlContent] = useState('');
+    const [initialDraftingPrompt, setInitialDraftingPrompt] = useState('');
     const fileInputRef = React.useRef(null);
 
+    useEffect(() => {
+        if (location.state?.openDrafting) {
+            setInitialDraftingPrompt(location.state.prompt || '');
+            setIsModalOpen(true);
+            // Clear state so it doesn't reopen on refresh? 
+            // React Router state persists on refresh usually, but clearing it might be good.
+            // But modifying history is side-effect. Let's just consume it.
+            // Actually, better to clear it to avoid reopening if they close and navigate back/forth?
+            // For now, just opening is enough.
+            window.history.replaceState({}, document.title)
+        }
+    }, [location]);
+
     const handleDraftingClick = () => {
+        setInitialDraftingPrompt('');
         setIsModalOpen(true);
     };
 
@@ -139,7 +155,7 @@ const Dashboard = () => {
                 </div>
             </section>
 
-            {isModalOpen && <DraftingModal onClose={() => setIsModalOpen(false)} />}
+            {isModalOpen && <DraftingModal onClose={() => setIsModalOpen(false)} initialPrompt={initialDraftingPrompt} />}
             {isCourtFeeModalOpen && <CourtFeeModal onClose={() => setIsCourtFeeModalOpen(false)} />}
 
             <UploadModal
