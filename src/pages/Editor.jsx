@@ -691,9 +691,12 @@ const Editor = () => {
     }, [showHeader, showFooter, paginateAll]);
 
     const handleSave = () => {
-        if (!documentRef.current) return;
+        if (!pagesContainerRef.current) return;
 
-        const content = documentRef.current.innerHTML;
+        // Gather content from ALL pages
+        const allEditors = Array.from(pagesContainerRef.current.querySelectorAll('.editor-root'));
+        const content = allEditors.map(ed => ed.innerHTML).join('');
+
         const draftId = location.state?.id || Date.now().toString();
 
         const draftData = {
