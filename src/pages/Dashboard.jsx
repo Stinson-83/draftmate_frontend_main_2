@@ -52,13 +52,17 @@ const Dashboard = () => {
 
         try {
             // Show loading state if needed, for now just blocking
-            const response = await axios.post(API_CONFIG.CONVERTER.CONVERT, formData, {
+            const url = `${API_CONFIG.CONVERTER.BASE_URL}${API_CONFIG.CONVERTER.ENDPOINTS.CONVERT}`;
+            const response = await axios.post(url, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
             });
 
             setHtmlContent(response.data);
+            // DEBUG: Show content length
+            // alert(`Uploaded content length: ${response.data?.length}`);
+            console.log('Uploaded content:', response.data);
             setIsUploadModalOpen(true);
         } catch (error) {
             console.error('Upload failed:', error);

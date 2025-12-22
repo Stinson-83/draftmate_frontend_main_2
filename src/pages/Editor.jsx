@@ -131,12 +131,22 @@ const Editor = () => {
                 // if (styles.color && styles.color !== 'rgb(0, 0, 0)' && styles.color !== '#000000') relevantStyles.push(`color:${styles.color}`);
                 // if (styles.fontSize) relevantStyles.push(`font-size:${styles.fontSize}`);
 
+                // FORCE BLACK COLOR to ensure visibility
+                relevantStyles.push('color: black');
+
                 const styleString = relevantStyles.length > 0 ? `style="${relevantStyles.join(';')}"` : '';
                 cleanHtml += `<span ${styleString}>${el.innerHTML} </span>`;
             });
 
             cleanHtml += '</p>';
         });
+
+        console.log("Cleaned HTML Preview (first 500 chars):", cleanHtml.substring(0, 500));
+
+        if (cleanHtml.length === 0) {
+            console.warn("cleanPdfHtml produced empty output from non-empty input!");
+            return htmlContent; // Fallback to original if cleaning failed
+        }
 
         return cleanHtml;
     };
@@ -146,6 +156,8 @@ const Editor = () => {
         const processContent = async () => {
             if (location.state?.htmlContent) {
                 let initialHtml = location.state.htmlContent;
+                console.log('Editor received content length:', initialHtml.length);
+                // toast.info(`Received content length: ${initialHtml.length}`);
 
                 // Call API to generate placeholders automatically
                 try {
