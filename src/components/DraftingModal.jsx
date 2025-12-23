@@ -235,22 +235,43 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
         }
     };
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (!selectedFormat) return;
 
         setIsLoading(true);
-        // Simulate AI draft generation delay
-        setTimeout(() => {
+        try {
+            let htmlContent = selectedFormat.preview;
+
+            // If preview not already loaded, fetch it now
+            if (!htmlContent && selectedFormat.s3_path) {
+                const response = await fetch(`${QUERY_API_URL}/download-template-html`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ s3_path: selectedFormat.s3_path })
+                });
+
+                if (response.ok) {
+                    htmlContent = await response.text();
+                } else {
+                    throw new Error("Failed to fetch template content");
+                }
+            }
+
             navigate('/editor', {
                 state: {
                     prompt,
                     selectedFormat: selectedFormat.name,
-                    // If we have the HTML content already (from preview), we could pass it?
-                    // But typically generation is a separate process.
-                    // For now, sticking to current flow.
+                    htmlContent: htmlContent,
+                    uploadDetails: `Selected Format: ${selectedFormat.name}`,
+                    isEmpty: false
                 }
             });
-        }, 1500);
+        } catch (error) {
+            console.error("Error preparing draft:", error);
+            toast.error("Failed to load the selected draft format.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // Drafter API URL

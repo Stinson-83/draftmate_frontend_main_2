@@ -82,73 +82,117 @@ const Editor = () => {
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, 'text/html');
-        const elements = Array.from(doc.querySelectorAll('.content-element, .text-span, span[style*="absolute"]'));
 
-        if (elements.length === 0) return htmlContent;
+        // Check for PDF pages
+        const pages = Array.from(doc.querySelectorAll('.pdf-page'));
 
-        // Group by approximate Y (top) position to form lines
-        const rows = new Map();
-        const TOLERANCE = 5; // px
+        // Helper to process a set of elements (either a full page or the whole doc)
+        const processElements = (elements) => {
+            if (elements.length === 0) return '';
 
-        elements.forEach(el => {
-            let top = parseFloat(el.style.top || '0');
-            // Find existing row within tolerance
-            let rowKey = Array.from(rows.keys()).find(k => Math.abs(parseFloat(k) - top) < TOLERANCE);
+            // Group by approximate Y (top) position to form lines
+            const rows = new Map();
+            const TOLERANCE = 5; // px
 
-            if (!rowKey) {
-                rowKey = top.toString();
-                rows.set(rowKey, []);
+            elements.forEach(el => {
+                let top = parseFloat(el.style.top || '0');
+                // Find existing row within tolerance
+                let rowKey = Array.from(rows.keys()).find(k => Math.abs(parseFloat(k) - top) < TOLERANCE);
+
+                if (!rowKey) {
+                    rowKey = top.toString();
+                    rows.set(rowKey, []);
+                }
+                rows.get(rowKey).push(el);
+            });
+
+            // Sort rows by Y position
+            const sortedRowKeys = Array.from(rows.keys()).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+            // Build new HTML
+            let cleanHtml = '';
+
+            sortedRowKeys.forEach(key => {
+                const rowElements = rows.get(key);
+                // Sort elements in row by X (left) position
+                rowElements.sort((a, b) => {
+                    const leftA = parseFloat(a.style.left || '0');
+                    const leftB = parseFloat(b.style.left || '0');
+                    return leftA - leftB;
+                });
+
+                // Create a paragraph for this line
+                cleanHtml += '<p>';
+
+                let previousRight = 0;
+
+                rowElements.forEach((el, index) => {
+                    // Extract style metadata we want to preserve
+                    const styles = el.style;
+                    const relevantStyles = [];
+
+                    if (styles.fontWeight && styles.fontWeight !== 'normal') relevantStyles.push(`font-weight:${styles.fontWeight}`);
+                    if (styles.fontStyle && styles.fontStyle !== 'normal') relevantStyles.push(`font-style:${styles.fontStyle}`);
+                    if (styles.textDecoration && styles.textDecoration !== 'none') relevantStyles.push(`text-decoration:${styles.textDecoration}`);
+                    // if (styles.color && styles.color !== 'rgb(0, 0, 0)' && styles.color !== '#000000') relevantStyles.push(`color:${styles.color}`);
+                    if (styles.fontSize) relevantStyles.push(`font-size:${styles.fontSize}`);
+                    // FORCE BLACK COLOR to ensure visibility
+                    relevantStyles.push('color: black');
+
+                    // Calculate Margin for visual spacing
+                    const left = parseFloat(styles.left || '0');
+                    const width = parseFloat(styles.width || '0');
+
+                    if (index > 0) {
+                        const gap = left - previousRight;
+                        // Only add margin if gap is significant (> 5px) to avoid jitter
+                        if (gap > 5) {
+                            relevantStyles.push(`margin-left:${Math.round(gap)}px`);
+                        } else {
+                            // Ensure at least a space if gap is small but positive
+                            relevantStyles.push(`margin-left: 4px`);
+                        }
+                    }
+
+                    // Update previousRight for next element
+                    // If width is missing (legacy docs), estimate based on text length (approx 7px per char for 12px font)
+                    const estimatedWidth = width > 0 ? width : (el.innerText.length * 7);
+                    previousRight = left + estimatedWidth;
+
+                    const styleString = relevantStyles.length > 0 ? `style="${relevantStyles.join(';')}"` : '';
+                    cleanHtml += `<span ${styleString}>${el.innerHTML}</span>`;
+                });
+
+                cleanHtml += '</p>';
+            });
+
+            return cleanHtml;
+        };
+
+        if (pages.length > 0) {
+            // Process each page separately
+            let fullHtml = '';
+            pages.forEach(page => {
+                const elements = Array.from(page.querySelectorAll('.content-element, .text-span, span[style*="absolute"]'));
+                fullHtml += processElements(elements);
+                // Add a page break or spacing if needed between pages, though <p>s usually suffice
+            });
+
+            console.log("Cleaned HTML Preview (Pages Mode, first 500 chars):", fullHtml.substring(0, 500));
+            return fullHtml || htmlContent; // Fallback if empty
+        } else {
+            // Fallback: Process entire document as one (legacy behavior)
+            const elements = Array.from(doc.querySelectorAll('.content-element, .text-span, span[style*="absolute"]'));
+            const result = processElements(elements);
+
+            console.log("Cleaned HTML Preview (Legacy Mode, first 500 chars):", result.substring(0, 500));
+
+            if (result.length === 0) {
+                console.warn("cleanPdfHtml produced empty output from non-empty input!");
+                return htmlContent; // Fallback to original if cleaning failed
             }
-            rows.get(rowKey).push(el);
-        });
-
-        // Sort rows by Y position
-        const sortedRowKeys = Array.from(rows.keys()).sort((a, b) => parseFloat(a) - parseFloat(b));
-
-        // Build new HTML
-        let cleanHtml = '';
-
-        sortedRowKeys.forEach(key => {
-            const rowElements = rows.get(key);
-            // Sort elements in row by X (left) position
-            rowElements.sort((a, b) => {
-                const leftA = parseFloat(a.style.left || '0');
-                const leftB = parseFloat(b.style.left || '0');
-                return leftA - leftB;
-            });
-
-            // Create a paragraph for this line
-            cleanHtml += '<p>';
-
-            rowElements.forEach(el => {
-                // Extract style metadata we want to preserve
-                const styles = el.style;
-                const relevantStyles = [];
-
-                if (styles.fontWeight && styles.fontWeight !== 'normal') relevantStyles.push(`font-weight:${styles.fontWeight}`);
-                if (styles.fontStyle && styles.fontStyle !== 'normal') relevantStyles.push(`font-style:${styles.fontStyle}`);
-                if (styles.textDecoration && styles.textDecoration !== 'none') relevantStyles.push(`text-decoration:${styles.textDecoration}`);
-                // if (styles.color && styles.color !== 'rgb(0, 0, 0)' && styles.color !== '#000000') relevantStyles.push(`color:${styles.color}`);
-                // if (styles.fontSize) relevantStyles.push(`font-size:${styles.fontSize}`);
-
-                // FORCE BLACK COLOR to ensure visibility
-                relevantStyles.push('color: black');
-
-                const styleString = relevantStyles.length > 0 ? `style="${relevantStyles.join(';')}"` : '';
-                cleanHtml += `<span ${styleString}>${el.innerHTML} </span>`;
-            });
-
-            cleanHtml += '</p>';
-        });
-
-        console.log("Cleaned HTML Preview (first 500 chars):", cleanHtml.substring(0, 500));
-
-        if (cleanHtml.length === 0) {
-            console.warn("cleanPdfHtml produced empty output from non-empty input!");
-            return htmlContent; // Fallback to original if cleaning failed
+            return result;
         }
-
-        return cleanHtml;
     };
 
     // Handle uploaded content and details - enhanced variable detection
@@ -221,6 +265,16 @@ const Editor = () => {
                 // Update document content
                 setTimeout(() => {
                     if (documentRef.current) {
+                        // FIX: Clear any existing extra pages to prevent duplication on re-render
+                        if (pagesContainerRef.current) {
+                            const pages = Array.from(pagesContainerRef.current.querySelectorAll('.document-page'));
+                            // Remove all pages after the first one
+                            for (let i = 1; i < pages.length; i++) {
+                                pages[i].remove();
+                            }
+                            setPageCount(1);
+                        }
+
                         documentRef.current.innerHTML = content;
                         setTimeout(paginateAll, 100);
                     }

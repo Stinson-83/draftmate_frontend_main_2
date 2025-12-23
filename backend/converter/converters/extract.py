@@ -112,6 +112,11 @@ def cvt_html(pdf_path, output_path=None):
                     x0_pt = span["origin"][0]
                     y0_pt = span["bbox"][1]
 
+                    # Calculate width
+                    x1_pt = span["bbox"][2]
+                    width_pt = x1_pt - x0_pt
+                    width_px = width_pt * PT_TO_PX
+
                     # Convert all values to pixels
                     font_size_px = font_size_pt * PT_TO_PX
                     x0_px = x0_pt * PT_TO_PX
@@ -125,14 +130,14 @@ def cvt_html(pdf_path, output_path=None):
                     
                     if text_decoration == "underline":
                         style = (
-                            f"left:{x0_px}px; top:{y0_px}px; "
+                            f"left:{x0_px}px; top:{y0_px}px; width:{width_px}px; "
                             f"font-family:'{font_name}'; font-size:{font_size_px}px; "
                             f"font-weight:{font_weight}; font-style:{font_style}; color:{css_color}; "
                             f"text-decoration: underline;"
     )
                     elif text_decoration == "none":
                         style = (
-                            f"left:{x0_px}px; top:{y0_px}px; "
+                            f"left:{x0_px}px; top:{y0_px}px; width:{width_px}px; "
                             f"font-family:'{font_name}'; font-size:{font_size_px}px; "
                             f"font-weight:{font_weight}; font-style:{font_style}; color:{css_color};"
                         )
