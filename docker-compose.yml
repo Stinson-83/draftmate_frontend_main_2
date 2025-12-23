@@ -79,9 +79,15 @@ services:
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
       - INPUT_JSON=${INPUT_JSON}
       - INTERACTIVE=${INTERACTIVE}
+      - SSH_KEY_PATH=/app/bastion.key.pem
+      - BASTION_IP=${BASTION_IP}
+      - SSH_USER=${SSH_USER}
+      - POSTGRES_DSN=${POSTGRES_DSN}
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./backend/query/secrets/bastion.key.pem:/app/bastion.key.pem
 
 volumes:
   postgres_data:
