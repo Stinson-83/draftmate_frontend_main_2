@@ -57,7 +57,12 @@ def _get_tunneled_dsn():
     dsn = POSTGRES_DSN
     if not dsn:
         return None
-        
+    
+    # ONLY rewrite if we are actually tunneling (i.e. BASTION_IP is set)
+    # If no bastion, we assume direct connection (VPC or localhost) and return DSN as-is.
+    if not BASTION_IP:
+        return dsn
+
     if "localhost" in dsn:
         dsn = dsn.replace("localhost", "127.0.0.1")
     
