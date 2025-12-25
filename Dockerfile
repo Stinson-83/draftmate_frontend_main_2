@@ -1,4 +1,14 @@
-# Use an official Python runtime as a parent image
+# Stage 1: Build Frontend
+FROM node:20-slim AS frontend-builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY index.html vite.config.js eslint.config.js ./
+COPY src/ src/
+COPY public/ public/
+RUN VITE_BASE_PATH=/ npm run build
+
+# Stage 2: Backend & Runtime
 FROM python:3.11-slim-bookworm
 
 # Set environment variables
@@ -26,16 +36,14 @@ RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 # Copy all backend code
 COPY backend/ backend/
 
-# Fix SSH key permissions for Paramiko
-# Fix SSH key permissions for Paramiko (Only if key exists)
-# RUN chmod 600 /app/backend/query/secrets/bastion.key.pem
-
-
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy Nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy Frontend Build Artifacts from Stage 1
+COPY --from=frontend-builder /app/dist /var/www/html
 
 # Create directory for uploads (used by lex_bot)
 RUN mkdir -p backend/Deep_research/lex_bot/data/uploads
