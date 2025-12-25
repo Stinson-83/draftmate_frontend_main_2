@@ -9,7 +9,8 @@
  * - Path prefixes map to specific services (e.g., /converter -> port 8000).
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = envBaseUrl !== undefined ? envBaseUrl : 'http://localhost:8080';
 
 export const API_CONFIG = {
     // Service: backend/converter (Port 8000)
