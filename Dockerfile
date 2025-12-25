@@ -6,7 +6,7 @@ RUN npm ci
 COPY index.html vite.config.js eslint.config.js ./
 COPY src/ src/
 COPY public/ public/
-RUN VITE_BASE_PATH=/ npm run build
+RUN VITE_BASE_PATH=/ VITE_API_BASE_URL="" npm run build
 
 # Stage 2: Backend & Runtime
 FROM python:3.11-slim-bookworm
