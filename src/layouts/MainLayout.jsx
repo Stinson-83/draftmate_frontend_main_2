@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Home, FileText, Scale, MessageSquare, Settings, LogOut } from 'lucide-react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import './MainLayout.css';
 
@@ -12,323 +11,141 @@ const MainLayout = () => {
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('theme');
-  }, []);
 
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const handleProfileUpdate = () => {
+      const saved = localStorage.getItem('user_profile');
+      if (saved) {
+        // Update local state is managed internally for now
+      }
+    };
+
+    window.addEventListener('user_profile_updated', handleProfileUpdate);
+    return () => window.removeEventListener('user_profile_updated', handleProfileUpdate);
+  }, []);
 
   // Initialize profile from storage or defaults
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('user_profile');
     if (saved) return JSON.parse(saved);
-    // Fallback for legacy simple name storage
-    const legacyName = localStorage.getItem('user_name');
     return {
-      name: legacyName || 'Aaryan',
-      role: '',
-      workplace: '',
-      image: null
+      name: "Attorney Davis",
+      email: "davis@lawjurist.com",
+      image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
     };
   });
 
-  const [tempProfile, setTempProfile] = useState(userProfile);
+  // Listen for updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      const saved = localStorage.getItem('user_profile');
+      if (saved) setUserProfile(JSON.parse(saved));
+    };
+    window.addEventListener('user_profile_updated', handleUpdate);
+    return () => window.removeEventListener('user_profile_updated', handleUpdate);
+  }, []);
 
+  const isCollapsed = ['/dashboard/editor', '/dashboard/research', '/dashboard/pdf-editor'].some(path => location.pathname.startsWith(path));
 
+  const NavItem = ({ to, icon, label }) => {
+    const active = isActive(to);
+    const baseClasses = "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group";
+    const activeClasses = "bg-primary/10 text-primary dark:text-blue-400";
+    const inactiveClasses = "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white";
+    const iconClass = active ? "icon-fill" : "";
+    const alignmentClasses = isCollapsed ? "justify-center px-0 w-8 h-8 mx-auto rounded-lg" : "";
 
-  const handleProfileClick = () => {
-    setTempProfile(userProfile);
-    setSettingsMenuOpen(false);
-    setIsProfileModalOpen(true);
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTempProfile(prev => ({ ...prev, image: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSaveProfile = () => {
-    if (tempProfile.name.trim()) {
-      setUserProfile(tempProfile);
-      localStorage.setItem('user_profile', JSON.stringify(tempProfile));
-      setIsProfileModalOpen(false);
-    }
+    return (
+      <Link to={to} className={`${baseClasses} ${active ? activeClasses : inactiveClasses} ${alignmentClasses}`} title={isCollapsed ? label : ''}>
+        <span className={`material-symbols-outlined ${iconClass} ${isCollapsed ? 'text-xl' : ''}`}>{icon}</span>
+        {!isCollapsed && <span className="text-sm font-medium">{label}</span>}
+      </Link>
+    );
   };
 
   return (
-    <div className="layout-container">
-      <aside className="sidebar glass-panel">
-        <div className="sidebar-header" style={{ justifyContent: userProfile.image ? 'center' : 'center' }}>
-          {userProfile.image ? (
-            <img
-              src={userProfile.image}
-              alt="Profile"
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2px solid var(--primary)'
-              }}
-            />
-          ) : (
-            <div className="logo-icon">⚖️</div>
-          )}
-        </div>
-
-        <nav className="sidebar-nav">
-          <Link to="/" className={`nav-item ${isActive('/') ? 'active' : ''}`}>
-            <Home size={20} />
-            <span className="tooltip">Home</span>
-          </Link>
-          <Link to="/drafts" className={`nav-item ${isActive('/drafts') ? 'active' : ''}`}>
-            <FileText size={20} />
-            <span className="tooltip">My Drafts</span>
-          </Link>
-          <Link to="/research" className={`nav-item ${isActive('/research') ? 'active' : ''}`}>
-            <Scale size={20} />
-            <span className="tooltip">Research</span>
-          </Link>
-          <Link to="/chat" className={`nav-item ${isActive('/chat') ? 'active' : ''}`}>
-            <MessageSquare size={20} />
-            <span className="tooltip">Chat</span>
-          </Link>
-        </nav>
-
-        <div className="sidebar-footer">
-
-
-          <div style={{ position: 'relative' }}>
-            <button
-              className={`nav-item ${isActive('/settings') ? 'active' : ''}`}
-              onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
-            >
-              <Settings size={20} />
-              <span className="tooltip">Settings</span>
-            </button>
-
-            {settingsMenuOpen && (
-              <div className="settings-menu glass-panel" style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: '100%',
-                marginLeft: '10px',
-                marginBottom: '-40px',
-                background: 'white',
-                borderRadius: '8px',
-                padding: '8px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                minWidth: '180px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                zIndex: 100
-              }}>
-                <button
-                  onClick={handleProfileClick}
-                  style={{
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: '#333'
-                  }}
-                  onMouseEnter={e => e.target.style.background = '#f1f5f9'}
-                  onMouseLeave={e => e.target.style.background = 'transparent'}
-                >
-                  Personal Profile
-                </button>
-                <Link
-                  to="/settings"
-                  onClick={() => setSettingsMenuOpen(false)}
-                  style={{
-                    padding: '8px 12px',
-                    textAlign: 'left',
-                    textDecoration: 'none',
-                    color: '#333',
-                    fontSize: '14px',
-                    borderRadius: '4px'
-                  }}
-                  onMouseEnter={e => e.target.style.background = '#f1f5f9'}
-                  onMouseLeave={e => e.target.style.background = 'transparent'}
-                >
-                  Document Settings
-                </Link>
+    <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display antialiased overflow-hidden h-screen flex w-full">
+      <aside className={`hidden md:flex flex-col ${isCollapsed ? 'w-12' : 'w-64'} bg-white dark:bg-[#151f2e] border-r border-slate-200 dark:border-slate-800 h-full flex-shrink-0 transition-all duration-300`}>
+        <div className={`p-6 flex flex-col h-full justify-between ${isCollapsed ? 'px-0 py-4 items-center' : ''}`}>
+          <div className="flex flex-col gap-8 w-full">
+            {/* Logo */}
+            <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center px-0' : ''}`}>
+              <div className={`bg-primary aspect-square rounded-lg flex items-center justify-center text-white shrink-0 transition-all ${isCollapsed ? 'size-8 rounded-lg' : 'size-8'}`}>
+                <span className={`material-symbols-outlined ${isCollapsed ? 'text-lg' : 'text-xl'}`}>gavel</span>
               </div>
-            )}
+              {!isCollapsed && <h1 className="text-slate-900 dark:text-white text-lg font-bold tracking-tight whitespace-nowrap">Law Jurist</h1>}
+            </div>
+
+            {/* Navigation */}
+            <nav className="flex flex-col gap-2 w-full">
+              <NavItem to="/dashboard/home" icon="dashboard" label="Dashboard" />
+              <NavItem to="/dashboard/tools" icon="handyman" label="Tools" />
+              <NavItem to="/dashboard/drafts" icon="article" label="My Drafts" />
+
+              <Link to="/dashboard/settings" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors ${isCollapsed ? 'justify-center px-0 w-8 h-8 mx-auto rounded-lg' : ''}`} title={isCollapsed ? "Settings" : ""}>
+                <span className={`material-symbols-outlined ${isCollapsed ? 'text-xl' : ''}`}>settings</span>
+                {!isCollapsed && <span className="text-sm font-medium">Settings</span>}
+              </Link>
+            </nav>
           </div>
 
-          <button className="nav-item">
-            <LogOut size={20} />
-          </button>
+          {/* Profile Footer */}
+          <div className={`mt-auto w-full ${!isCollapsed && 'border-t border-slate-200 dark:border-slate-800 pt-4'}`}>
+            <Link
+              to="/dashboard/settings"
+              className={`flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer group relative overflow-hidden ${isCollapsed ? 'justify-center w-10 h-10 mx-auto p-0' : ''}`}
+            >
+              <img
+                src={userProfile.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.name || 'User')}&background=0D8ABC&color=fff`}
+                alt="Profile"
+                className={`rounded-full shrink-0 object-cover ring-2 ring-white dark:ring-slate-700 ${isCollapsed ? 'size-8' : 'size-10'}`}
+                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.name || 'User')}&background=0D8ABC&color=fff`; }}
+              />
+
+              {!isCollapsed && (
+                <div className="flex flex-col min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
+                    {userProfile.name || 'Attorney Davis'}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {userProfile.email || 'View Profile'}
+                  </p>
+                </div>
+              )}
+
+              {!isCollapsed && (
+                <span className="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors text-[20px]">
+                  chevron_right
+                </span>
+              )}
+            </Link>
+          </div>
         </div>
       </aside>
 
-      <main className="main-content">
-        <div className="content-area">
-          {isActive('/') && (
-            <header className="top-bar">
-              <div className="user-welcome">
-                <h1>Hi, {userProfile.name}!</h1>
-                {(userProfile.role || userProfile.workplace) && (
-                  <p className="user-subtitle" style={{ fontSize: '0.9rem', color: '#666', marginTop: '4px' }}>
-                    {userProfile.role && <span>{userProfile.role}</span>}
-                    {userProfile.role && userProfile.workplace && <span> at </span>}
-                    {userProfile.workplace && <span>{userProfile.workplace}</span>}
-                  </p>
-                )}
-                <p className="date" style={{ marginTop: '4px' }}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-              </div>
-              <div className="brand-badge glass-panel">
-                <FileText size={16} className="brand-icon" />
-                <span>Law Jurist</span>
-              </div>
-            </header>
-          )}
-          <Outlet />
-        </div>
-      </main>
-
-      {/* Profile Modal */}
-      {isProfileModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            padding: '24px',
-            borderRadius: '12px',
-            width: '450px',
-            maxWidth: '90%',
-            maxHeight: '90vh',
-            overflowY: 'auto'
-          }}>
-            <h2 style={{ marginBottom: '20px', fontSize: '1.25rem', fontWeight: 600 }}>Personal Profile</h2>
-
-            {/* Profile Picture Upload */}
-            <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                background: '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                border: '2px solid #e2e8f0'
-              }}>
-                {tempProfile.image ? (
-                  <img src={tempProfile.image} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: '2rem' }}>👤</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <label className="btn btn-sm btn-ghost" style={{ cursor: 'pointer', border: '1px solid #e2e8f0', padding: '6px 12px', borderRadius: '6px' }}>
-                  Upload Picture
-                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                </label>
-                {tempProfile.image && (
-                  <button
-                    onClick={() => setTempProfile(prev => ({ ...prev, image: null }))}
-                    className="btn btn-sm"
-                    style={{
-                      cursor: 'pointer',
-                      border: '1px solid #fee2e2',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      color: '#ef4444',
-                      background: '#fef2f2'
-                    }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-
-            </div>
-
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', color: '#666' }}>Full Name</label>
-                <input
-                  type="text"
-                  value={tempProfile.name}
-                  onChange={(e) => setTempProfile(p => ({ ...p, name: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '1rem' }}
-                  placeholder="Your Name"
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', color: '#666' }}>Role / Designation</label>
-                <input
-                  type="text"
-                  value={tempProfile.role || ''}
-                  onChange={(e) => setTempProfile(p => ({ ...p, role: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '1rem' }}
-                  placeholder="e.g. Senior Associate"
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', color: '#666' }}>Current Workplace</label>
-                <input
-                  type="text"
-                  value={tempProfile.workplace || ''}
-                  onChange={(e) => setTempProfile(p => ({ ...p, workplace: e.target.value }))}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '1rem' }}
-                  placeholder="e.g. Mahesh Kumar & Co."
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                onClick={() => setIsProfileModalOpen(false)}
-                style={{
-                  padding: '8px 16px',
-                  background: 'transparent',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProfile}
-                style={{
-                  padding: '8px 16px',
-                  background: '#4f46e5',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}
-              >
-                Save Profile
-              </button>
-            </div>
+      <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative bg-background-light dark:bg-background-dark">
+        {/* Top Header */}
+        <header className="flex items-center justify-between px-6 py-4 bg-white dark:bg-[#151f2e] border-b border-slate-200 dark:border-slate-800 z-10">
+          <button className="md:hidden p-2 text-slate-600 dark:text-slate-300">
+            <span className="material-symbols-outlined">menu</span>
+          </button>
+          <div></div>
+          <div className="flex items-center gap-6">
+            {location.pathname === '/dashboard/home' && (
+              <>
+                <button className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                  <span className="material-symbols-outlined text-[22px]">notifications</span>
+                </button>
+                <button className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                  Help Center
+                </button>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        </header>
+
+        {/* Content Area */}
+        <Outlet />
+      </main>
     </div>
   );
 };

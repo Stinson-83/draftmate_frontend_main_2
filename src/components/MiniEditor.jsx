@@ -10,10 +10,10 @@ const MiniEditor = ({ value, onChange, placeholder, style }) => {
 
     // Initial value setup
     useEffect(() => {
-        if (editorRef.current && value && editorRef.current.innerHTML !== value) {
-            if (!editorRef.current.innerHTML.trim()) {
-                editorRef.current.innerHTML = value;
-            }
+        if (editorRef.current && value !== undefined && editorRef.current.innerHTML !== value) {
+            // Apply value from props if different from current content
+            // This allows resetting content (e.g. templates) but relies on correct onChange handling for typing
+            editorRef.current.innerHTML = value;
         }
     }, [value]);
 

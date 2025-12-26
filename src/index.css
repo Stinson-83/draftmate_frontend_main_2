@@ -125,12 +125,12 @@ button {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(67, 56, 202, 0.95));
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(29, 78, 216, 0.95));
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow:
-    0 4px 6px -1px rgba(79, 70, 229, 0.3),
-    0 2px 4px -1px rgba(79, 70, 229, 0.15),
+    0 4px 6px -1px rgba(37, 99, 235, 0.3),
+    0 2px 4px -1px rgba(37, 99, 235, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
     inset 0 -2px 5px rgba(0, 0, 0, 0.1);
   /* Inner depth */
@@ -156,11 +156,11 @@ button {
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 10px 15px -3px rgba(79, 70, 229, 0.4),
-    0 4px 6px -2px rgba(79, 70, 229, 0.2),
+    0 10px 15px -3px rgba(37, 99, 235, 0.4),
+    0 4px 6px -2px rgba(37, 99, 235, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     inset 0 -2px 5px rgba(0, 0, 0, 0.2);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 1), rgba(67, 56, 202, 1));
+  background: linear-gradient(135deg, rgba(37, 99, 235, 1), rgba(29, 78, 216, 1));
 }
 
 .btn-primary:hover::before {
