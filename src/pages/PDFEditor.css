@@ -4,6 +4,9 @@
     background-color: var(--background);
     color: var(--text-main);
     overflow: hidden;
+    /* Local Theme Override */
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
 }
 
 /* Sidebar Tool Navigation (Leftmost) */
@@ -37,9 +40,9 @@
 }
 
 .tool-icon-btn.active {
-    background: var(--primary);
+    background: #2563eb;
     color: white;
-    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4);
 }
 
 /* Builder Layout */
@@ -208,7 +211,7 @@
 }
 
 .page-view-wrapper.focused .big-preview-img {
-    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.5), 0 10px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.5), 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
 .page-view-number {
@@ -234,7 +237,7 @@
 
 /* Download Button Theme Match */
 .btn-process {
-    background: var(--primary);
+    background: #2563eb;
     color: white;
     padding: 0.5rem 1.5rem;
     border-radius: var(--radius-md);
@@ -247,9 +250,9 @@
 }
 
 .btn-process:hover {
-    background: var(--primary-hover);
+    background: #1d4ed8;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .btn-process:disabled {

@@ -46,8 +46,8 @@ const CourtFeeModal = ({ onClose }) => {
                 </button>
 
                 <div className="modal-header" style={{ marginBottom: '20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div className="icon-wrapper" style={{ margin: '0 0 12px 0', width: '48px', height: '48px', borderRadius: '12px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Calculator size={24} color="#4f46e5" />
+                    <div className="icon-wrapper" style={{ margin: '0 0 12px 0', width: '48px', height: '48px', borderRadius: '12px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Calculator size={24} color="#2563eb" />
                     </div>
                     <h2 style={{ fontSize: '20px', fontWeight: 'bold' }}>Court Fee Calculator</h2>
                     <p style={{ marginTop: '4px', color: '#64748b', fontSize: '14px', maxWidth: '90%' }}>
@@ -137,14 +137,14 @@ const CourtFeeModal = ({ onClose }) => {
                         <button
                             className="btn btn-primary"
                             onClick={handleCalculate}
-                            style={{ flex: 1, justifyContent: 'center', background: '#e11d48', border: 'none', padding: '12px', fontSize: '15px' }}
+                            style={{ flex: 1, justifyContent: 'center', background: '#2563eb', border: 'none', padding: '12px', fontSize: '15px' }}
                         >
                             Calculate
                         </button>
                         <button
                             className="btn btn-ghost"
                             onClick={handleReset}
-                            style={{ flex: 1, justifyContent: 'center', color: '#e11d48', border: '1px solid #e11d48', background: 'transparent', padding: '12px', fontSize: '15px' }}
+                            style={{ flex: 1, justifyContent: 'center', color: '#2563eb', border: '1px solid #2563eb', background: 'transparent', padding: '12px', fontSize: '15px' }}
                         >
                             Reset
                         </button>

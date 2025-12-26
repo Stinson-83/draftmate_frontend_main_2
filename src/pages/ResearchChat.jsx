@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Sparkles, User, Bot, Plus, X, FileText, PenTool } from 'lucide-react';
+// Using specific imports if needed, but switching to Material Symbols for UI icons
+// keeping logo just in case, though mostly using icons now
 import lawJuristLogo from '../assets/law_jurist_logo.png';
 
 const ResearchChat = () => {
@@ -19,7 +20,7 @@ const ResearchChat = () => {
         {
             id: 1,
             role: 'ai',
-            content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos. How can I assist you today?'
+            content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
         }
     ]);
 
@@ -28,8 +29,6 @@ const ResearchChat = () => {
     };
 
     useEffect(() => {
-        // Generate a simplified session ID or use a UUID library if available.
-        // Using crypto.randomUUID() which is supported in modern browsers.
         const newSessionId = crypto.randomUUID();
         setSessionId(newSessionId);
     }, []);
@@ -41,8 +40,7 @@ const ResearchChat = () => {
     const handleSend = async () => {
         if (!input.trim() && !selectedFile) return;
 
-        const currentInput = input; // Capture input before clearing
-
+        const currentInput = input;
         const userMsg = {
             id: Date.now(),
             role: 'user',
@@ -55,10 +53,8 @@ const ResearchChat = () => {
         setSelectedFile(null);
         setIsTyping(true);
 
-        // Real API Call
         try {
             const response = await api.chat(currentInput, sessionId);
-
             const aiMsg = {
                 id: Date.now() + 1,
                 role: 'ai',
@@ -94,10 +90,7 @@ const ResearchChat = () => {
                 toast.error("Session not initialized. Please try again.");
                 return;
             }
-
-            // Optimistically set selected file
-            setSelectedFile(file); // Keep the file object for preview
-
+            setSelectedFile(file);
             setIsUploading(true);
             try {
                 await api.uploadFile(file, sessionId);
@@ -105,7 +98,7 @@ const ResearchChat = () => {
             } catch (error) {
                 console.error("Upload error:", error);
                 toast.error(`Failed to upload file: ${error.message}`);
-                setSelectedFile(null); // Revert selection on error
+                setSelectedFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             } finally {
                 setIsUploading(false);
@@ -125,46 +118,84 @@ const ResearchChat = () => {
     };
 
     return (
-        <div className="research-chat-container">
+        <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
             {/* Header */}
-            <div className="chat-header-main glass-panel">
+            <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center shadow-sm z-10">
                 <button
-                    className="back-btn"
                     onClick={() => navigate('/')}
-                    title="Back to Dashboard"
+                    aria-label="Go back"
+                    className="mr-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
                 >
-                    <ArrowLeft size={20} />
+                    <span className="material-symbols-outlined text-2xl">arrow_back</span>
                 </button>
-                <div className="header-info">
-                    <div className="icon-badge">
-                        <Sparkles size={18} />
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
+                        <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
                     </div>
                     <div>
-                        <h1>AI Legal Research</h1>
-                        <p>Ask anything about Indian Law</p>
+                        <h1 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">AI Legal Research</h1>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Ask anything about Indian Law</p>
                     </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Chat Area */}
-            <div className="chat-viewport">
-                <div className="messages-list">
+            {/* Main Content */}
+            <main className="flex-1 overflow-y-auto relative flex flex-col bg-slate-50 dark:bg-slate-900">
+                {/* Dot Pattern Background */}
+                <div className="absolute inset-0 pointer-events-none opacity-50"
+                    style={{
+                        backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+                        backgroundSize: '24px 24px'
+                    }}
+                ></div>
+
+                <div className="relative z-0 flex-1 w-full max-w-4xl mx-auto px-4 py-8 flex flex-col gap-6">
+                    {/* Messages */}
                     {messages.map((msg, index) => (
-                        <div key={msg.id} className={`message-row ${msg.role}`}>
-                            <div className="avatar">
+                        <div key={msg.id} className={`flex gap-4 items-start ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in-up`}>
+                            {/* Avatar */}
+                            <div className={`flex-none w-10 h-10 rounded-full flex items-center justify-center shadow-sm overflow-hidden
+                                ${msg.role === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700' : 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800'}`}
+                            >
                                 {msg.role === 'ai' ? (
-                                    <img src={lawJuristLogo} alt="AI" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                    <span className="material-symbols-outlined text-blue-600 text-xl">gavel</span>
                                 ) : (
-                                    <User size={20} />
+                                    <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-xl">person</span>
                                 )}
                             </div>
-                            <div className="message-bubble glass-panel">
-                                <div className="markdown-content">
-                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+
+                            {/* Bubble */}
+                            <div className={`flex-1 max-w-[85%] p-6 rounded-2xl shadow-sm border leading-relaxed text-base
+                                ${msg.role === 'ai'
+                                    ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-tl-none text-slate-900 dark:text-slate-100'
+                                    : 'bg-blue-600 text-white border-blue-600 rounded-tr-none'
+                                }`}
+                            >
+                                <div className={`markdown-content ${msg.role === 'user' ? 'text-white' : ''}`}>
+                                    <ReactMarkdown
+                                        components={{
+                                            p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                                            // Ensure lists and other elements are styled correctly within markdown
+                                            ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-3" {...props} />,
+                                            ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-3" {...props} />,
+                                            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                            h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                                            h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                                            h3: ({ node, ...props }) => <h3 className="text-base font-bold mt-3 mb-1" {...props} />,
+                                            code: ({ node, inline, ...props }) => (
+                                                inline
+                                                    ? <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-sm font-mono" {...props} />
+                                                    : <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-sm font-mono my-3"><code {...props} /></pre>
+                                            ),
+                                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                                        }}
+                                    >
+                                        {msg.content}
+                                    </ReactMarkdown>
                                 </div>
                                 {msg.role === 'ai' && index > 0 && messages[index - 1].role === 'user' && (
                                     <button
-                                        className="draft-followup-btn"
+                                        className="mt-4 flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
                                         onClick={() => navigate('/', {
                                             state: {
                                                 openDrafting: true,
@@ -172,497 +203,118 @@ const ResearchChat = () => {
                                             }
                                         })}
                                     >
-                                        <PenTool size={14} />
+                                        <span className="material-symbols-outlined text-sm">edit_document</span>
                                         Draft a document related to this query
                                     </button>
                                 )}
                                 {msg.file && (
-                                    <div className="message-file-attachment">
-                                        <FileText size={16} />
-                                        <span>{msg.file.name}</span>
+                                    <div className="flex items-center gap-2 mt-2 bg-white/20 p-2 rounded-lg text-sm">
+                                        <span className="material-symbols-outlined text-sm">description</span>
+                                        {msg.file.name}
                                     </div>
                                 )}
                             </div>
                         </div>
                     ))}
 
+                    {/* Typing Indicator */}
                     {isTyping && (
-                        <div className="message-row ai">
-                            <div className="avatar">
-                                <img src={lawJuristLogo} alt="AI" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        <div className="flex gap-4 items-start animate-fade-in-up">
+                            <div className="flex-none w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm">
+                                <span className="material-symbols-outlined text-blue-600 text-xl">gavel</span>
                             </div>
-                            <div className="message-bubble glass-panel typing">
-                                <span className="dot"></span>
-                                <span className="dot"></span>
-                                <span className="dot"></span>
+                            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700">
+                                <div className="flex gap-1.5">
+                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                                </div>
                             </div>
                         </div>
                     )}
-                    <div ref={messagesEndRef} />
-                </div>
-            </div>
 
-            <div className="input-section glass-panel">
-                {selectedFile && (
-                    <div className="file-preview-container">
-                        <div className="file-preview">
-                            <FileText size={16} className="file-icon" />
-                            <span className="file-name">{selectedFile.name} {isUploading && "(Uploading...)"}</span>
+                    {/* Suggested Prompts (Only show when only welcome message exists) */}
+                    {messages.length === 1 && !isTyping && (
+                        <div className="mt-auto pb-4 grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in-up">
                             <button
-                                className="remove-file-btn"
-                                onClick={removeFile}
-                                disabled={isUploading}
+                                onClick={() => setInput("What are the latest Supreme Court judgments on Section 138 of NI Act?")}
+                                className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
                             >
-                                <X size={14} />
+                                <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Section 138 of NI Act</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">Latest Supreme Court judgments summary</div>
+                            </button>
+                            <button
+                                onClick={() => setInput("Draft a Legal Notice for breach of contract under Indian Contract Act")}
+                                className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
+                            >
+                                <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Draft a Legal Notice</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">For breach of contract under Indian Contract Act</div>
                             </button>
                         </div>
+                    )}
+
+                    <div ref={messagesEndRef} />
+                </div>
+            </main>
+
+            {/* Footer / Input */}
+            <footer className="flex-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 pb-6 pt-4 px-4 z-20">
+                <div className="max-w-4xl mx-auto w-full space-y-3">
+                    {/* File Preview */}
+                    {selectedFile && (
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 w-fit shadow-sm animate-slide-up">
+                            <span className="material-symbols-outlined text-red-500">picture_as_pdf</span>
+                            <span className="text-sm text-slate-700 dark:text-slate-200">{selectedFile.name}</span>
+                            <button onClick={removeFile} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                <span className="material-symbols-outlined text-base">close</span>
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="relative flex items-end gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-2">
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            accept=".pdf,application/pdf"
+                            className="hidden"
+                        />
+                        <button
+                            onClick={triggerFileSelect}
+                            className="flex-none p-3 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="Add attachment"
+                            disabled={isUploading}
+                        >
+                            <span className="material-symbols-outlined text-xl">add</span>
+                        </button>
+                        <textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Ask a legal question... (e.g., 'What are the latest Supreme Court judgments on Section 138 of NI Act?')"
+                            rows={1}
+                            className="flex-1 bg-transparent border-0 focus:ring-0 p-3 text-slate-900 dark:text-white placeholder-slate-400 resize-none max-h-48 overflow-y-auto outline-none shadow-none"
+                            style={{ minHeight: '48px' }}
+                            onInput={(e) => {
+                                e.target.style.height = 'auto';
+                                e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                        />
+                        <button
+                            onClick={handleSend}
+                            disabled={(!input.trim() && !selectedFile) || isUploading || isTyping}
+                            className="flex-none p-2 mb-1 mr-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                        >
+                            <span className="material-symbols-outlined text-xl group-hover:translate-x-0.5 transition-transform">send</span>
+                        </button>
                     </div>
-                )}
-                <div className="input-container">
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                        accept=".pdf,application/pdf"
-                        style={{ display: 'none' }}
-                    />
-                    <button
-                        className="attach-btn"
-                        onClick={triggerFileSelect}
-                        title="Upload PDF"
-                        disabled={isUploading}
-                    >
-                        <Plus size={20} />
-                    </button>
-                    <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Ask a legal question... (e.g., 'What are the latest Supreme Court judgments on Section 138 of NI Act?')"
-                        rows={2}
-                        disabled={isUploading || isTyping}
-                    />
-                    <button
-                        className="send-btn-main"
-                        onClick={handleSend}
-                        disabled={(!input.trim() && !selectedFile) || isUploading || isTyping}
-                    >
-                        <Send size={20} />
-                    </button>
+                    <div className="text-center">
+                        <p className="text-xs text-slate-400 dark:text-slate-500">
+                            AI can make mistakes. Please verify important information.
+                        </p>
+                    </div>
                 </div>
-                <div className="disclaimer">
-                    AI can make mistakes. Please verify important information.
-                </div>
-            </div>
-
-            {/* Styles for this page */}
-            <style>{`
-                .research-chat-container {
-                    height: 100vh;
-                    display: flex;
-                    flex-direction: column;
-                    background: #f8fafc; /* Light background */
-                    position: relative;
-                }
-
-                .glass-panel {
-                    background: rgba(255, 255, 255, 0.8);
-                    backdrop-filter: blur(12px);
-                    border: 1px solid rgba(255, 255, 255, 0.4);
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-                }
-
-                /* Header */
-                .chat-header-main {
-                    padding: 16px 24px;
-                    display: flex;
-                    align-items: center;
-                    gap: 16px;
-                    z-index: 10;
-                    border-bottom: 1px solid rgba(0,0,0,0.05);
-                }
-
-                .back-btn {
-                    padding: 8px;
-                    border-radius: 50%;
-                    border: none;
-                    background: transparent;
-                    color: #64748b;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .back-btn:hover {
-                    background: #e2e8f0;
-                    color: #0f172a;
-                }
-
-                .header-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-
-                .header-info .icon-badge {
-                    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-                    color: white;
-                    padding: 10px;
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .header-info h1 {
-                    font-size: 1.25rem;
-                    font-weight: 600;
-                    color: #0f172a;
-                    margin: 0;
-                }
-
-                .header-info p {
-                    font-size: 0.875rem;
-                    color: #64748b;
-                    margin: 0;
-                }
-
-                /* Chat Port */
-                .chat-viewport {
-                    flex: 1;
-                    overflow-y: auto;
-                    padding: 24px;
-                    display: flex;
-                    flex-direction: column;
-                    /* Background Pattern for premium feel */
-                    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-                    background-size: 24px 24px;
-                }
-
-                .messages-list {
-                    width: 100%;
-                    max-width: 900px;
-                    margin: 0 auto;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 24px;
-                    padding-bottom: 24px;
-                }
-
-                .message-row {
-                    display: flex;
-                    gap: 16px;
-                    max-width: 85%;
-                }
-
-                .message-row.user {
-                    align-self: flex-end;
-                    flex-direction: row-reverse;
-                }
-
-                .message-row.ai {
-                    align-self: flex-start;
-                }
-
-                .avatar {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                }
-
-                .message-row.ai .avatar {
-                    background: transparent;
-                    color: #4f46e5;
-                    overflow: hidden;
-                }
-
-                .message-row.user .avatar {
-                    background: #f0fdf4;
-                    color: #16a34a;
-                }
-
-                .message-bubble {
-                    padding: 16px 20px;
-                    border-radius: 20px;
-                    font-size: 1rem;
-                    line-height: 1.6;
-                    color: #334155;
-                }
-
-                .message-file-attachment {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-top: 8px;
-                    background: rgba(255, 255, 255, 0.2);
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    font-size: 0.875rem;
-                }
-
-                .message-row.user .message-bubble {
-                    background: #4f46e5;
-                    color: white;
-                    border-radius: 20px 20px 4px 20px;
-                    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
-                }
-
-                .message-row.ai .message-bubble {
-                    background: white;
-                    border-radius: 20px 20px 20px 4px;
-                }
-
-                .draft-followup-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-top: 12px;
-                    padding: 8px 12px;
-                    background: #f1f5f9;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    color: #4f46e5;
-                    font-size: 0.875rem;
-                    font-weight: 500;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-
-                .draft-followup-btn:hover {
-                    background: #e0e7ff;
-                    border-color: #c7d2fe;
-                }
-
-                /* Input Section */
-                .input-section {
-                    padding: 24px;
-                    border-top: 1px solid rgba(0,0,0,0.05);
-                    z-index: 10;
-                }
-
-                .input-container {
-                    max-width: 900px;
-                    margin: 0 auto;
-                    position: relative;
-                    background: white;
-                    border-radius: 24px;
-                    padding: 8px 12px 8px 12px;
-                    display: flex;
-                    align-items: center;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-                    transition: all 0.2s;
-                }
-
-                .input-container:focus-within {
-                    border-color: #4f46e5;
-                    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
-                }
-
-                .input-container textarea {
-                    flex: 1;
-                    border: none !important;
-                    background: transparent !important;
-                    font-size: 1rem;
-                    padding: 8px 12px;
-                    resize: none;
-                    max-height: 120px;
-                    outline: none !important;
-                    box-shadow: none !important;
-                    font-family: inherit;
-                    -webkit-appearance: none;
-                }
-
-                .send-btn-main {
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    background: #4f46e5;
-                    color: white;
-                    border: none;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    margin-left: 12px;
-                }
-
-                .send-btn-main:hover:not(:disabled) {
-                    transform: scale(1.05);
-                    background: #4338ca;
-                }
-
-                .send-btn-main:disabled {
-                    background: #cbd5e1;
-                    cursor: not-allowed;
-                }
-
-                .attach-btn {
-                    width: 40px;
-                    height: 40px;
-                    border-radius: 50%;
-                    background: transparent;
-                    color: #64748b;
-                    border: none;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    flex-shrink: 0;
-                }
-
-                .attach-btn:hover {
-                    background: #f1f5f9;
-                    color: #4f46e5;
-                }
-
-                .file-preview-container {
-                    max-width: 900px;
-                    margin: 0 auto 12px;
-                    animation: slideUp 0.2s ease-out;
-                }
-
-                @keyframes slideUp {
-                    from { opacity: 0; transform: translateY(10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-
-                .file-preview {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    background: white;
-                    padding: 8px 12px;
-                    border-radius: 12px;
-                    font-size: 0.875rem;
-                    color: #334155;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-                }
-
-                .file-icon {
-                    color: #ef4444; /* PDF color usually red-ish */
-                }
-
-                .remove-file-btn {
-                    background: transparent;
-                    border: none;
-                    color: #94a3b8;
-                    cursor: pointer;
-                    padding: 4px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s;
-                    margin-left: 4px;
-                }
-
-                .remove-file-btn:hover {
-                    background: #f1f5f9;
-                    color: #ef4444;
-                }
-
-                .disclaimer {
-                    text-align: center;
-                    font-size: 0.75rem;
-                    color: #94a3b8;
-                    margin-top: 12px;
-                }
-
-                /* Dots animation */
-                .typing {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    padding: 16px !important;
-                    width: fit-content;
-                }
-
-                .dot {
-                    width: 8px;
-                    height: 8px;
-                    background: #cbd5e1;
-                    border-radius: 50%;
-                    animation: bounce 1.4s infinite ease-in-out both;
-                }
-
-                .dot:nth-child(1) { animation-delay: -0.32s; }
-                .dot:nth-child(2) { animation-delay: -0.16s; }
-
-                @keyframes bounce {
-                    0%, 80%, 100% { transform: scale(0); }
-                    40% { transform: scale(1); }
-                }
-
-                /* Markdown Styles */
-                .markdown-content {
-                    font-size: 1rem;
-                    line-height: 1.6;
-                    color: #334155;
-                }
-
-                .markdown-content p {
-                    margin-bottom: 12px;
-                }
-
-                .markdown-content p:last-child {
-                    margin-bottom: 0;
-                }
-
-                .markdown-content h1, .markdown-content h2, .markdown-content h3 {
-                    font-weight: 600;
-                    color: #1e293b;
-                    margin-top: 16px;
-                    margin-bottom: 8px;
-                }
-
-                .markdown-content h1 { font-size: 1.4rem; }
-                .markdown-content h2 { font-size: 1.25rem; }
-                .markdown-content h3 { font-size: 1.1rem; }
-
-                .markdown-content ul, .markdown-content ol {
-                    margin-left: 20px;
-                    margin-bottom: 12px;
-                }
-
-                .markdown-content li {
-                    margin-bottom: 4px;
-                }
-
-                .markdown-content strong {
-                    font-weight: 600;
-                    color: #0f172a;
-                }
-
-                .markdown-content code {
-                    background: rgba(0,0,0,0.05);
-                    padding: 2px 4px;
-                    border-radius: 4px;
-                    font-family: monospace;
-                    font-size: 0.9em;
-                }
-
-                .message-row.user .markdown-content {
-                    color: white;
-                }
-                
-                .message-row.user .markdown-content strong {
-                    color: white;
-                }
-
-                .message-row.user .markdown-content h1, 
-                .message-row.user .markdown-content h2, 
-                .message-row.user .markdown-content h3 {
-                    color: white;
-                }
-
-            `}</style>
+            </footer>
         </div>
     );
 };

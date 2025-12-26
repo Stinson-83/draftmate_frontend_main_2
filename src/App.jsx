@@ -7,6 +7,7 @@ import PDFEditor from './pages/PDFEditor';
 import MyDrafts from './pages/MyDrafts';
 
 import ResearchChat from './pages/ResearchChat';
+import Tools from './pages/Tools';
 
 import Settings from './pages/Settings';
 
@@ -20,7 +21,10 @@ const Placeholder = ({ title }) => (
 
 import { Toaster } from 'sonner';
 
+import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
+
+import Landing from './pages/Landing';
 
 function App() {
   // Check if user has onboarded (simple check)
@@ -36,18 +40,28 @@ function App() {
     <BrowserRouter>
       <Toaster position="top-center" richColors />
       <Routes>
-        <Route path="/login" element={<Onboarding />} />
+        <Route path="/" element={<Landing />} />
 
-        <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>
-          <Route index element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+
+        <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
+
+        <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
+          <Route path="home" element={<Dashboard />} />
           <Route path="editor" element={<Editor />} />
           <Route path="pdf-editor" element={<PDFEditor />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="tools" element={<Tools />} />
           <Route path="drafts" element={<MyDrafts />} />
           <Route path="research" element={<ResearchChat />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="chat" element={<Placeholder title="AI Chat" />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch-all relative to dashboard */}
+          <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
         </Route>
+
+        {/* Global catch-all redirect to Landing */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

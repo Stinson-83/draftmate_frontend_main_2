@@ -572,7 +572,7 @@ const PDFEditor = () => {
                                 </div>
                             ) : (
                                 <div style={{ textAlign: 'center', color: '#666' }}>
-                                    <Upload size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+
                                     <h2>No pages selected</h2>
                                     <p>Select files from the sidebar to begin</p>
                                 </div>
@@ -585,7 +585,7 @@ const PDFEditor = () => {
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
                     <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '3rem', textAlign: 'center' }}>
                         <div style={{ marginBottom: '2rem' }}>
-                            <activeTool.icon size={48} style={{ color: '#818cf8' }} />
+                            <activeTool.icon size={48} style={{ color: '#3b82f6' }} />
                             <h1 style={{ marginTop: '1rem' }}>{activeTool.name}</h1>
                             <p style={{ color: 'var(--text-secondary)' }}>{activeTool.desc}</p>
                         </div>

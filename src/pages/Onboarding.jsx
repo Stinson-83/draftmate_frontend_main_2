@@ -1,373 +1,355 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    ChevronRight,
-    ChevronLeft,
-    User,
-    Briefcase,
-    Building2,
-    Search,
-    FileText,
-    FileSearch,
-    Sparkles,
-    Scale,
-    GraduationCap,
-    AlertCircle
-} from 'lucide-react';
-import './Onboarding.css'; // Keep for resets
-import JudgeCharacter from '../components/JudgeCharacter';
 
 const Onboarding = () => {
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
-    const [direction, setDirection] = useState(0);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [isJudgeAngry, setIsJudgeAngry] = useState(false);
-    const [shake, setShake] = useState(false);
-    const [errorMsg, setErrorMsg] = useState('');
-
     const [formData, setFormData] = useState({
-        name: '',
-        jobRole: '',
+        role: 'professional',
+        firstName: '',
+        lastName: '',
         workplace: '',
+        designation: '',
         usage: []
     });
 
-    useEffect(() => {
-        const handleMouseMove = (e) => {
-            setMousePos({ x: e.clientX, y: e.clientY });
-        };
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
-
-    const totalSteps = 4;
-
-    const handleNext = () => {
-        const error = validateStep();
-        if (error) {
-            triggerError(error);
-            return;
-        }
-
-        setDirection(1);
-        setErrorMsg('');
-        if (step === totalSteps) {
-            handleComplete();
-        } else {
-            setStep(prev => prev + 1);
-        }
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const triggerError = (msg) => {
-        setIsJudgeAngry(true);
-        setShake(true);
-        setErrorMsg(msg);
-        setTimeout(() => {
-            setIsJudgeAngry(false);
-            setShake(false);
-        }, 600);
+    const handleRoleSelect = (role) => {
+        setFormData(prev => ({ ...prev, role }));
+    };
+
+    const handleUsageToggle = (option) => {
+        setFormData(prev => {
+            const usage = prev.usage.includes(option)
+                ? prev.usage.filter(item => item !== option)
+                : [...prev.usage, option];
+            return { ...prev, usage };
+        });
+    };
+
+    const handleContinue = () => {
+        if (step < 3) {
+            setStep(step + 1);
+        } else {
+            // Finish onboarding - Save to localStorage for Dashboard/Settings
+            const userProfile = {
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                name: `${formData.firstName} ${formData.lastName}`.trim(),
+                role: formData.designation || (formData.role === 'professional' ? 'Legal Professional' : 'Law Student'),
+                workplace: formData.workplace,
+                usage: formData.usage,
+                email: 'user@example.com', // Mock email
+                image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
+            };
+            localStorage.setItem('user_profile', JSON.stringify(userProfile));
+            window.dispatchEvent(new Event('user_profile_updated')); // Notify other components
+            navigate('/dashboard/home');
+        }
     };
 
     const handleBack = () => {
-        setDirection(-1);
-        setStep(prev => prev - 1);
-        setErrorMsg('');
-        if (isJudgeAngry) setIsJudgeAngry(false);
-    };
-
-    const handleComplete = () => {
-        const profile = {
-            name: formData.name,
-            role: formData.jobRole,
-            workplace: formData.workplace,
-            usage: formData.usage.join(', '),
-            image: null
-        };
-        localStorage.setItem('user_profile', JSON.stringify(profile));
-        navigate('/');
-    };
-
-    const validateStep = () => {
-        switch (step) {
-            case 1:
-                return formData.name.trim().length > 0 ? null : "Please enter your name.";
-            case 2:
-                return formData.jobRole.trim().length > 0 ? null : "Please select your profession.";
-            case 3:
-                return formData.workplace.trim().length > 0 ? null : "Please enter your workplace.";
-            case 4:
-                return formData.usage.length > 0 ? null : "Please select at least one objective.";
-            default: return "Unknown error";
+        if (step > 1) {
+            setStep(step - 1);
+        } else {
+            navigate('/login');
         }
     };
 
-    const updateField = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
-        if (isJudgeAngry) setIsJudgeAngry(false);
-        if (errorMsg) setErrorMsg('');
-    };
-
-    const variants = {
-        enter: (direction) => ({
-            x: direction > 0 ? 20 : -20,
-            opacity: 0,
-        }),
-        center: {
-            zIndex: 1,
-            x: 0,
-            opacity: 1,
-        },
-        exit: (direction) => ({
-            zIndex: 0,
-            x: direction < 0 ? 20 : -20,
-            opacity: 0,
-        })
-    };
-
-    // INLINE STYLES TO FORCE DESIGN CHANGES
-    const pageStyle = {
-        minHeight: '100vh',
-        width: '100vw',
-        background: 'radial-gradient(at 0% 0%, #ec4899 0, transparent 50%), radial-gradient(at 100% 0%, #6366f1 0, transparent 50%), radial-gradient(at 100% 100%, #3b82f6 0, transparent 50%), #4338ca',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        fontFamily: "'Inter', sans-serif",
-        padding: '2rem',
-        position: 'relative'
-    };
-
-    const containerStyle = {
-        display: 'flex',
-        width: '100%',
-        maxWidth: '1100px',
-        height: '650px',
-        background: '#FFFFFF',
-        borderRadius: '32px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-        overflow: 'hidden'
-    };
+    const usageOptions = [
+        { id: 'drafting', icon: 'edit_document', label: 'Legal Drafting', desc: 'Contracts, notices, agreements' },
+        { id: 'research', icon: 'library_books', label: 'Legal Research', desc: 'Case laws, statutes, precedents' },
+        { id: 'analysis', icon: 'analytics', label: 'Document Analysis', desc: 'Review and summarize documents' },
+        { id: 'management', icon: 'folder_open', label: 'Case Management', desc: 'Organize files and clients' },
+        { id: 'compliance', icon: 'gavel', label: 'Compliance', desc: 'Regulatory checks and audits' }
+    ];
 
     return (
-        <div style={pageStyle}>
-            <motion.div
-                style={containerStyle}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
-            >
-
-                {/* LEFT SIDE: The Judge */}
-                <div className="judge-section" style={{ flex: 0.9, background: '#fff', position: 'relative', borderRight: '1px solid #f1f5f9' }}>
-                    <JudgeCharacter
-                        mousePos={mousePos}
-                        isAngry={isJudgeAngry}
-                    />
+        <div className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex h-screen overflow-hidden antialiased transition-colors duration-200">
+            {/* Left Panel: Branding & Context */}
+            <aside className="hidden lg:flex w-5/12 relative flex-col justify-between bg-slate-900 text-white overflow-hidden">
+                {/* Background Image with Overlay */}
+                <div className="absolute inset-0 z-0">
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 to-blue-600/80 z-10 mix-blend-multiply"></div>
+                    <div className="w-full h-full bg-cover bg-center opacity-40 mix-blend-overlay" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDb2CRzdwCjgYV-YgFxXs0c9EyHTaII2XLWdFig24IWoNTtUrvlJ8iEZPqC5MEdXQotRvXZMKk358BJ7g6_RtCV-mkRVf1MD66Jlup6o-zNdQihZj_YDV0uECvP3RgluhQS0B0Tm1gbsPn8GwOIM326M9bqBX4qz8V3lfzA37oq39Z_mSSxqk-MPck87U2WhNLevJgNN5GhwQ_d9BXDjzlRj350e1cxoasNQPKTW-Nf1R_jKxQqhE8q9oNM9oWvLpDwfdit3t3DBvc")' }}></div>
                 </div>
 
-                {/* RIGHT SIDE: Form - DIRECT LAYOUT NO CARDS */}
-                <div className="login-section" style={{ flex: 1.1, padding: '3rem 4rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#fff', position: 'relative' }}>
-
-                    {/* Decorative Top Line */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '6px', background: 'linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6)' }} />
-
-                    {/* Progress Bar */}
-                    <div className="progress-bar">
-                        <div
-                            className="progress-fill"
-                            style={{ width: `${(step / totalSteps) * 100}%` }}
-                        />
+                {/* Content */}
+                <div className="relative z-20 flex flex-col h-full justify-between p-12 lg:p-16">
+                    {/* Brand */}
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white border border-white/20">
+                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M13.8261 30.5736C16.7203 29.8826 20.2244 29.4783 24 29.4783C27.7756 29.4783 31.2797 29.8826 34.1739 30.5736C36.9144 31.2278 39.9967 32.7669 41.3563 33.8352L24.8486 7.36089C24.4571 6.73303 23.5429 6.73303 23.1514 7.36089L6.64374 33.8352C8.00331 32.7669 11.0856 31.2278 13.8261 30.5736Z"></path>
+                                <path clipRule="evenodd" d="M39.998 35.764C39.9944 35.7463 39.9875 35.7155 39.9748 35.6706C39.9436 35.5601 39.8949 35.4259 39.8346 35.2825C38.5103 34.2887 35.9788 33.0607 33.7095 32.5189C30.9875 31.8691 27.6413 31.4783 24 31.4783C20.3587 31.4783 17.0125 31.8691 14.2905 32.5189C12.0012 33.0654 9.44505 34.3104 8.18538 35.1832C8.02977 35.589 8.00004 35.7388 8.00004 35.7388C8.0104 36.0767 8.68485 36.6314 11.9291 38.2772C14.9242 39.319 19.1919 40 24 40C28.8081 40 33.0758 39.319 36.0709 38.2772C37.5778 37.7531 38.6545 37.1746 39.3151 36.6314C39.9006 36.1499 39.9857 35.8511 39.998 35.764ZM35.9868 29.004L24 9.77997L12.0131 29.004C12.4661 28.8609 12.9179 28.7342 13.3617 28.6282C16.4281 27.8961 20.0901 27.4783 24 27.4783C27.9099 27.4783 31.5719 27.8961 34.6383 28.6282C35.082 28.7342 35.5339 28.8609 35.9868 29.004Z" fillRule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <h1 className="text-2xl font-bold tracking-tight">Law Jurist</h1>
                     </div>
 
-                    <motion.div
-                        style={{ width: '100%', maxWidth: '450px', margin: '0 auto' }}
-                        animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
-                        transition={{ type: "spring", stiffness: 300, damping: 10 }}
-                    >
-                        <AnimatePresence initial={false} custom={direction} mode='wait'>
-                            {/* STEP 1: NAME */}
-                            {step === 1 && (
-                                <motion.div
-                                    key="step1"
-                                    custom={direction}
-                                    variants={variants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="step-title">Welcome to DraftMate</h2>
-                                    <p className="step-subtitle">Let's verify your identity for the record.</p>
-
-                                    <div className="field-group">
-                                        <User size={20} className="field-icon" />
-                                        <input
-                                            type="text"
-                                            className={`clean-input ${errorMsg ? 'input-error' : ''}`}
-                                            placeholder="Full Name"
-                                            value={formData.name}
-                                            onChange={e => updateField('name', e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleNext()}
-                                            autoFocus
-                                        />
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {/* STEP 2: ROLE */}
-                            {step === 2 && (
-                                <motion.div
-                                    key="step2"
-                                    custom={direction}
-                                    variants={variants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="step-title">Your Profession</h2>
-                                    <p className="step-subtitle">State your current occupation.</p>
-
-                                    <div className="options-list grid-2">
-                                        {[
-                                            { id: 'Lawyer', icon: Scale },
-                                            { id: 'Student', icon: GraduationCap },
-                                            { id: 'Paralegal', icon: FileText },
-                                            { id: 'Other', icon: User }
-                                        ].map(({ id, icon: Icon }) => (
-                                            <div
-                                                key={id}
-                                                className={`option-card ${formData.jobRole === id ? 'selected' : ''}`}
-                                                onClick={() => updateField('jobRole', id)}
-                                            >
-                                                <Icon size={24} className={formData.jobRole === id ? 'text-primary' : 'text-secondary'} />
-                                                <span className="option-label">{id}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {/* STEP 3: WORKPLACE */}
-                            {step === 3 && (
-                                <motion.div
-                                    key="step3"
-                                    custom={direction}
-                                    variants={variants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="step-title">Affiliation</h2>
-                                    <p className="step-subtitle">
-                                        {formData.jobRole === 'Student'
-                                            ? 'Name of your educational institution?'
-                                            : 'Name of your firm or organization?'}
-                                    </p>
-
-                                    <div className="field-group">
-                                        {formData.jobRole === 'Student' ? (
-                                            <Building2 size={20} className="field-icon" />
-                                        ) : (
-                                            <Briefcase size={20} className="field-icon" />
-                                        )}
-                                        <input
-                                            type="text"
-                                            className={`clean-input ${errorMsg ? 'input-error' : ''}`}
-                                            placeholder={formData.jobRole === 'Student' ? "University / College" : "Firm / Company Name"}
-                                            value={formData.workplace}
-                                            onChange={e => updateField('workplace', e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleNext()}
-                                            autoFocus
-                                        />
-                                    </div>
-                                </motion.div>
-                            )}
-
-                            {/* STEP 4: GOALS */}
-                            {step === 4 && (
-                                <motion.div
-                                    key="step4"
-                                    custom={direction}
-                                    variants={variants}
-                                    initial="enter"
-                                    animate="center"
-                                    exit="exit"
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <h2 className="step-title">Objectives</h2>
-                                    <p className="step-subtitle">Select your intended usage goals.</p>
-
-                                    <div className="options-list grid-2">
-                                        {[
-                                            { id: 'Legal Research', icon: Search },
-                                            { id: 'Drafting', icon: FileText },
-                                            { id: 'Draft Review', icon: FileSearch },
-                                            { id: 'Enhancing Drafts', icon: Sparkles }
-                                        ].map(({ id, icon: Icon }) => {
-                                            const isSelected = formData.usage.includes(id);
-                                            return (
-                                                <div
-                                                    key={id}
-                                                    className={`option-card ${isSelected ? 'selected' : ''}`}
-                                                    onClick={() => {
-                                                        const current = formData.usage;
-                                                        const next = current.includes(id)
-                                                            ? current.filter(i => i !== id)
-                                                            : [...current, id];
-                                                        updateField('usage', next);
-                                                    }}
-                                                >
-                                                    <Icon size={24} className={isSelected ? 'text-primary' : 'text-secondary'} />
-                                                    <span className="option-label">{id}</span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {errorMsg && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="error-message"
-                                style={{
-                                    color: '#EF4444',
-                                    marginTop: '1rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    fontSize: '0.9rem',
-                                    fontWeight: '500'
-                                }}
-                            >
-                                <AlertCircle size={16} />
-                                {errorMsg}
-                            </motion.div>
-                        )}
-
-                        <div className="nav-footer">
-                            <button
-                                className="back-btn"
-                                onClick={handleBack}
-                                style={{ visibility: step === 1 ? 'hidden' : 'visible' }}
-                            >
-                                <ChevronLeft size={16} /> Back
-                            </button>
-
-                            <button className="next-btn" onClick={handleNext}>
-                                {step === totalSteps ? 'Complete Profile' : 'Continue'} <ChevronRight size={16} />
-                            </button>
+                    {/* Quote */}
+                    <div className="max-w-md">
+                        <span className="material-symbols-outlined text-4xl text-blue-400/80 mb-4">format_quote</span>
+                        <p className="text-xl md:text-2xl font-medium leading-relaxed mb-6 text-slate-100">
+                            "Streamlining our practice management has never been easier. Law Jurist allows us to focus on what matters most—our clients."
+                        </p>
+                        <div className="flex items-center gap-4">
+                            <div
+                                className="w-12 h-12 rounded-full bg-slate-700 bg-cover bg-center border-2 border-blue-600"
+                                style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAJ1wh3__wbJ26Y-fW35aiho512Jc600fmj4966iQj3xpZ1OKGejXqiP4smdQpqRHOaibwb-E-7oIXaRK3gg3TRz9X6V4sOzbLpFnsYqIw_gEKZRjQDPEYxVOlVW8vQEMHi6Ho7IAF_7EA0Ocyi17fkyXgNRU2mHx6QBMnCVsJB2Sb-pFmAfA9Au5M0P37vbXq8ZGQf4_tyDrnHvnGkSeYmtwaZJHprvCNMgYKVFLm5-_-C1R8iLE4bKr9wYWH5qIbPIoq-WlumkXw")' }}
+                            ></div>
+                            <div>
+                                <p className="font-bold text-white">Sarah Jenkins</p>
+                                <p className="text-sm text-slate-400">Senior Partner, Jenkins & Co.</p>
+                            </div>
                         </div>
-                    </motion.div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="text-sm text-slate-400">
+                        © 2024 Law Jurist Inc.
+                    </div>
                 </div>
-            </motion.div>
+            </aside>
+
+            {/* Right Panel: Onboarding Form */}
+            <main className="flex-1 flex flex-col h-full overflow-y-auto relative">
+                {/* Top Navigation */}
+                <nav className="flex justify-end items-center px-8 py-6 w-full absolute top-0 z-10">
+                    <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                        Already have an account?
+                        <a href="#" className="text-blue-600 hover:text-blue-700 ml-1 transition-colors" onClick={(e) => { e.preventDefault(); navigate('/login'); }}>Sign in</a>
+                    </div>
+                </nav>
+
+                {/* Main Content Container */}
+                <div className="flex-1 flex flex-col justify-center w-full max-w-2xl mx-auto px-6 py-20 lg:px-12">
+                    {/* Progress Indicator */}
+                    <div className="mb-8">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Step {step} of 3</span>
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{Math.round((step / 3) * 100)}% Completed</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-300"
+                                style={{ width: `${(step / 3) * 100}%` }}
+                            ></div>
+                        </div>
+                    </div>
+
+                    {/* Page Header */}
+                    <div className="mb-10">
+                        <h2 className="text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-3">
+                            {step === 1 && "Welcome to Law Jurist"}
+                            {step === 2 && "Professional Details"}
+                            {step === 3 && "Tailor Your Experience"}
+                        </h2>
+                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed">
+                            {step === 1 && "Tell us a bit about yourself so we can tailor your experience."}
+                            {step === 2 && "Help us customize your workspace with your professional details."}
+                            {step === 3 && "What do you plan to use this website for? Select all that apply."}
+                        </p>
+                    </div>
+
+                    {/* Step 1: Basic Info */}
+                    {step === 1 && (
+                        <div className="flex flex-col gap-8 animate-fade-in-up">
+                            {/* Role Selection */}
+                            <div className="flex flex-col gap-3">
+                                <label className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">I am a...</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <label className="relative group cursor-pointer" onClick={() => handleRoleSelect('professional')}>
+                                        <input
+                                            type="radio"
+                                            name="role"
+                                            value="professional"
+                                            className="peer sr-only"
+                                            checked={formData.role === 'professional'}
+                                            onChange={() => { }}
+                                        />
+                                        <div className="p-5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 peer-checked:border-blue-600 peer-checked:bg-blue-600/5 dark:peer-checked:bg-blue-600/10 transition-all duration-200 h-full flex flex-col gap-4 shadow-sm hover:shadow-md">
+                                            <div className="flex justify-between items-start">
+                                                <div className="w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                    <span className="material-symbols-outlined text-2xl">gavel</span>
+                                                </div>
+                                                <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-white text-sm opacity-0 peer-checked:opacity-100 font-bold">check</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-base font-bold text-slate-900 dark:text-white mb-1">Working Professional</p>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">I practice law at a firm, agency, or independently.</p>
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    <label className="relative group cursor-pointer" onClick={() => handleRoleSelect('student')}>
+                                        <input
+                                            type="radio"
+                                            name="role"
+                                            value="student"
+                                            className="peer sr-only"
+                                            checked={formData.role === 'student'}
+                                            onChange={() => { }}
+                                        />
+                                        <div className="p-5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 peer-checked:border-blue-600 peer-checked:bg-blue-600/5 dark:peer-checked:bg-blue-600/10 transition-all duration-200 h-full flex flex-col gap-4 shadow-sm hover:shadow-md">
+                                            <div className="flex justify-between items-start">
+                                                <div className="w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                    <span className="material-symbols-outlined text-2xl">school</span>
+                                                </div>
+                                                <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
+                                                    <span className="material-symbols-outlined text-white text-sm opacity-0 peer-checked:opacity-100 font-bold">check</span>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-base font-bold text-slate-900 dark:text-white mb-1">Law Student</p>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">I am currently studying at a law school or university.</p>
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Text Inputs */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="firstName">First Name</label>
+                                    <input
+                                        className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 px-4 shadow-sm placeholder:text-slate-400 transition-colors"
+                                        id="firstName"
+                                        name="firstName"
+                                        value={formData.firstName}
+                                        onChange={handleChange}
+                                        placeholder="e.g. Jonathan"
+                                        type="text"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="lastName">Last Name</label>
+                                    <input
+                                        className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 px-4 shadow-sm placeholder:text-slate-400 transition-colors"
+                                        id="lastName"
+                                        name="lastName"
+                                        value={formData.lastName}
+                                        onChange={handleChange}
+                                        placeholder="e.g. Suits"
+                                        type="text"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Professional Details */}
+                    {step === 2 && (
+                        <div className="flex flex-col gap-8 animate-fade-in-up">
+                            <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="workplace">
+                                        {formData.role === 'student' ? 'University / Law School Name' : 'Firm / Organization Name'}
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">domain</span>
+                                        <input
+                                            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 pl-12 pr-4 shadow-sm placeholder:text-slate-400 transition-colors"
+                                            id="workplace"
+                                            name="workplace"
+                                            value={formData.workplace}
+                                            onChange={handleChange}
+                                            placeholder={formData.role === 'student' ? "e.g. Harvard Law School" : "e.g. Pearson Hardman"}
+                                            type="text"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="designation">
+                                        {formData.role === 'student' ? 'Year of Study' : 'Role / Designation'}
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">badge</span>
+                                        <input
+                                            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 pl-12 pr-4 shadow-sm placeholder:text-slate-400 transition-colors"
+                                            id="designation"
+                                            name="designation"
+                                            value={formData.designation}
+                                            onChange={handleChange}
+                                            placeholder={formData.role === 'student' ? "e.g. 2nd Year" : "e.g. Senior Associate"}
+                                            type="text"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 3: Usage Intent */}
+                    {step === 3 && (
+                        <div className="flex flex-col gap-4 animate-fade-in-up">
+                            <div className="grid grid-cols-1 gap-4">
+                                {usageOptions.map((option) => (
+                                    <label key={option.id} className="relative group cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="peer sr-only"
+                                            checked={formData.usage.includes(option.id)}
+                                            onChange={() => handleUsageToggle(option.id)}
+                                        />
+                                        <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 peer-checked:border-blue-600 peer-checked:bg-blue-600/5 dark:peer-checked:bg-blue-600/10 transition-all duration-200 shadow-sm hover:shadow-md">
+                                            <div className="flex-none size-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center">
+                                                <span className="material-symbols-outlined">{option.icon}</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="text-base font-bold text-slate-900 dark:text-white">{option.label}</h3>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">{option.desc}</p>
+                                            </div>
+                                            <div className="size-6 rounded-full border-2 border-slate-300 dark:border-slate-600 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-white text-sm opacity-0 peer-checked:opacity-100 font-bold">check</span>
+                                            </div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between pt-6 mt-8 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                            className="px-6 py-3 rounded-lg text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            type="button"
+                            onClick={handleBack}
+                        >
+                            Back
+                        </button>
+                        <button
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all"
+                            type="button"
+                            onClick={handleContinue}
+                        >
+                            <span>{step === 3 ? "Finish & Go to Dashboard" : "Continue"}</span>
+                            <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
+                        </button>
+                    </div>
+
+                    {/* Trust Signals */}
+                    <div className="flex justify-center gap-6 mt-4 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="material-symbols-outlined text-sm">lock</span>
+                            <span>256-bit Encryption</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="material-symbols-outlined text-sm">verified_user</span>
+                            <span>ISO 27001 Certified</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
     );
 };
