@@ -12,6 +12,7 @@ const ResearchChat = () => {
     const messagesEndRef = useRef(null);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [statusMessage, setStatusMessage] = useState(''); // Streaming status
     const [selectedFile, setSelectedFile] = useState(null);
     const [sessionId, setSessionId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
@@ -52,27 +53,69 @@ const ResearchChat = () => {
         setInput('');
         setSelectedFile(null);
         setIsTyping(true);
+        setStatusMessage('');
+
+        // Create placeholder for AI response
+        const aiMsgId = Date.now() + 1;
+        let aiContent = '';
+        let aiFollowups = [];
 
         try {
-            const response = await api.chat(currentInput, sessionId);
-            const aiMsg = {
-                id: Date.now() + 1,
-                role: 'ai',
-                content: response.answer,
-                complexity: response.complexity,
-                agents: response.agents_used
-            };
-            setMessages(prev => [...prev, aiMsg]);
+            await api.chatStream(currentInput, sessionId, {
+                onStatus: (message) => {
+                    setStatusMessage(message);
+                },
+                onAnswer: (content) => {
+                    aiContent = content;
+                    setStatusMessage('');
+                    // Add or update AI message
+                    setMessages(prev => {
+                        const existing = prev.find(m => m.id === aiMsgId);
+                        if (existing) {
+                            return prev.map(m => m.id === aiMsgId ? { ...m, content: aiContent } : m);
+                        } else {
+                            return [...prev, { id: aiMsgId, role: 'ai', content: aiContent }];
+                        }
+                    });
+                },
+                onFollowups: (questions) => {
+                    aiFollowups = questions;
+                    // Update message with followups
+                    setMessages(prev => prev.map(m =>
+                        m.id === aiMsgId ? { ...m, followups: aiFollowups } : m
+                    ));
+                },
+                onDone: (event) => {
+                    // Update with final metadata
+                    setMessages(prev => prev.map(m =>
+                        m.id === aiMsgId ? {
+                            ...m,
+                            complexity: event.complexity,
+                            agents: event.agents_used
+                        } : m
+                    ));
+                },
+                onError: (error) => {
+                    console.error("Stream error:", error);
+                    setMessages(prev => [...prev, {
+                        id: aiMsgId,
+                        role: 'ai',
+                        content: "I apologize, but I encountered an error. Please try again."
+                    }]);
+                }
+            });
         } catch (error) {
             console.error("Chat error:", error);
-            const errorMsg = {
-                id: Date.now() + 1,
-                role: 'ai',
-                content: "I apologize, but I encountered an error connecting to the server. Please ensure the backend is running."
-            };
-            setMessages(prev => [...prev, errorMsg]);
+            if (!aiContent) {
+                setMessages(prev => [...prev, {
+                    id: aiMsgId,
+                    role: 'ai',
+                    content: "I apologize, but I encountered an error connecting to the server. Please ensure the backend is running."
+                }]);
+            }
         } finally {
             setIsTyping(false);
+            setStatusMessage('');
         }
     };
 
@@ -194,18 +237,34 @@ const ResearchChat = () => {
                                     </ReactMarkdown>
                                 </div>
                                 {msg.role === 'ai' && index > 0 && messages[index - 1].role === 'user' && (
-                                    <button
-                                        className="mt-4 flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
-                                        onClick={() => navigate('/', {
-                                            state: {
-                                                openDrafting: true,
-                                                prompt: `Draft the legal document required for: ${messages[index - 1].content || (messages[index - 1].file ? `the uploaded document ${messages[index - 1].file.name}` : 'this query')}. Focus on drafting the actual legal papers.`
-                                            }
-                                        })}
-                                    >
-                                        <span className="material-symbols-outlined text-sm">edit_document</span>
-                                        Draft a document related to this query
-                                    </button>
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        <button
+                                            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
+                                            onClick={() => navigate('/', {
+                                                state: {
+                                                    openDrafting: true,
+                                                    prompt: `Draft the legal document required for: ${messages[index - 1].content || (messages[index - 1].file ? `the uploaded document ${messages[index - 1].file.name}` : 'this query')}. Focus on drafting the actual legal papers.`
+                                                }
+                                            })}
+                                        >
+                                            <span className="material-symbols-outlined text-sm">edit_document</span>
+                                            Draft
+                                        </button>
+                                    </div>
+                                )}
+                                {/* Follow-up Suggestions */}
+                                {msg.followups && msg.followups.length > 0 && (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {msg.followups.map((question, qIdx) => (
+                                            <button
+                                                key={qIdx}
+                                                onClick={() => setInput(question)}
+                                                className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                                            >
+                                                {question}
+                                            </button>
+                                        ))}
+                                    </div>
                                 )}
                                 {msg.file && (
                                     <div className="flex items-center gap-2 mt-2 bg-white/20 p-2 rounded-lg text-sm">
@@ -217,18 +276,25 @@ const ResearchChat = () => {
                         </div>
                     ))}
 
-                    {/* Typing Indicator */}
+                    {/* Typing Indicator with Status Message */}
                     {isTyping && (
                         <div className="flex gap-4 items-start animate-fade-in-up">
                             <div className="flex-none w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm">
                                 <span className="material-symbols-outlined text-blue-600 text-xl">gavel</span>
                             </div>
                             <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700">
-                                <div className="flex gap-1.5">
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
-                                </div>
+                                {statusMessage ? (
+                                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                        <span className="material-symbols-outlined animate-spin text-blue-500">progress_activity</span>
+                                        <span className="text-sm font-medium">{statusMessage}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-1.5">
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

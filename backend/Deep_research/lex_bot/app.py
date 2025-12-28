@@ -15,6 +15,8 @@ Endpoints:
 import os
 import uuid
 import time
+import json
+import asyncio
 import logging
 from typing import Optional, List
 from datetime import datetime
@@ -41,6 +43,7 @@ from lex_bot.memory import UserMemoryManager
 from lex_bot.memory.chat_store import ChatStore
 from lex_bot.config import MEM0_ENABLED
 from lex_bot.tools.session_cache import get_session_cache
+from lex_bot.core.observability import setup_langsmith
 
 # Logging setup
 logging.basicConfig(
@@ -57,6 +60,9 @@ chat_store = ChatStore()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 Lex Bot v2 starting up...")
+    
+    # Initialize LangSmith tracing (if API key is set)
+    setup_langsmith()
     
     # Check Database Connection
     from sqlalchemy import create_engine, text
@@ -188,6 +194,7 @@ class ChatResponse(BaseModel):
     chain_of_thought: Optional[str] = None  # For reasoning mode
     memory_used: bool = False
     processing_time_ms: int
+    suggested_followups: Optional[List[str]] = None  # Follow-up questions
 
 
 class SessionResponse(BaseModel):
@@ -302,6 +309,94 @@ async def chat_reasoning(request: ChatRequest):
     return await _process_chat(request, llm_mode="reasoning", include_cot=True)
 
 
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming chat with real-time status updates.
+    Uses Server-Sent Events (SSE) to push:
+    - status: Progress updates (Analyzing, Searching, Generating)
+    - answer: The complete answer when done
+    - followups: Suggested follow-up questions
+    - done: Final metadata (session_id, complexity, etc.)
+    """
+    async def event_generator():
+        session_id = request.session_id or str(uuid.uuid4())
+        start_time = time.time()
+        
+        try:
+            # Status: Analyzing
+            yield f"data: {json.dumps({'event': 'status', 'message': '🔍 Analyzing your query...'})}\n\n"
+            await asyncio.sleep(0.1)
+            
+            # Status: Searching
+            yield f"data: {json.dumps({'event': 'status', 'message': '📚 Searching legal databases...'})}\n\n"
+            
+            # Run the query (this is the heavy lifting)
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: run_query(
+                    query=request.query,
+                    user_id=request.user_id,
+                    session_id=session_id,
+                    llm_mode="fast",
+                    file_path=get_session_cache().get_file_path(session_id) if session_id else None
+                )
+            )
+            
+            # Status: Generating
+            yield f"data: {json.dumps({'event': 'status', 'message': '⚖️ Generating response...'})}\n\n"
+            await asyncio.sleep(0.1)
+            
+            answer = result.get("final_answer", "No answer generated.")
+            
+            # Send the answer
+            yield f"data: {json.dumps({'event': 'answer', 'content': answer})}\n\n"
+            
+            # Generate follow-ups
+            yield f"data: {json.dumps({'event': 'status', 'message': '💡 Generating suggestions...'})}\n\n"
+            suggested_followups = []
+            try:
+                from lex_bot.core.llm_factory import get_llm
+                followup_llm = get_llm(mode="fast")
+                followup_prompt = f"""Based on this legal query, suggest 3 brief follow-up questions.
+Query: {request.query}
+Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
+                followup_response = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: followup_llm.invoke(followup_prompt)
+                )
+                import re
+                json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
+                if json_match:
+                    suggested_followups = json.loads(json_match.group())[:3]
+            except Exception as e:
+                logger.warning(f"Follow-up generation failed: {e}")
+            
+            if suggested_followups:
+                yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
+            
+            # Store messages
+            if request.user_id:
+                chat_store.add_message(request.user_id, session_id, "user", request.query)
+                chat_store.add_message(request.user_id, session_id, "assistant", answer)
+            
+            # Done event with metadata
+            processing_time = int((time.time() - start_time) * 1000)
+            yield f"data: {json.dumps({'event': 'done', 'session_id': session_id, 'complexity': result.get('complexity'), 'agents_used': result.get('selected_agents'), 'processing_time_ms': processing_time})}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Streaming error: {e}", exc_info=True)
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 async def _process_chat(
     request: ChatRequest,
     llm_mode: str,
@@ -335,6 +430,25 @@ async def _process_chat(
         
         answer = result.get("final_answer", "No answer generated.")
         
+        # Generate follow-up suggestions
+        suggested_followups = None
+        try:
+            from lex_bot.core.llm_factory import get_llm
+            followup_llm = get_llm(mode="fast")
+            followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
+
+Query: {request.query}
+Answer: {answer[:800]}
+
+Return ONLY a JSON array of 3 short questions, e.g.: ["Question 1?", "Question 2?", "Question 3?"]"""
+            followup_response = followup_llm.invoke(followup_prompt)
+            import re
+            json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
+            if json_match:
+                suggested_followups = json.loads(json_match.group())[:3]
+        except Exception as e:
+            logger.warning(f"Follow-up generation failed: {e}")
+        
         # Store assistant response
         if request.user_id:
             chat_store.add_message(
@@ -357,7 +471,8 @@ async def _process_chat(
             agents_used=result.get("selected_agents"),
             chain_of_thought=result.get("reasoning_trace") if include_cot else None,
             memory_used=bool(result.get("memory_context")),
-            processing_time_ms=processing_time
+            processing_time_ms=processing_time,
+            suggested_followups=suggested_followups
         )
         
     except Exception as e:

@@ -302,8 +302,20 @@ class PenalCodeTool(PenalCodeLookup):
     pass
 
 
-# Convenience function
+# Singleton instance - loaded once, reused everywhere
+_penal_code_cache = None
+
+def get_penal_code_lookup() -> PenalCodeLookup:
+    """Get cached PenalCodeLookup instance (singleton pattern)."""
+    global _penal_code_cache
+    if _penal_code_cache is None:
+        _penal_code_cache = PenalCodeLookup()
+        logger.info("📚 Penal code data cached in memory")
+    return _penal_code_cache
+
+
+# Convenience function (now uses cache)
 def lookup_section(section: str, code: str = "ipc") -> Optional[Dict[str, Any]]:
     """Quick lookup of a penal code section."""
-    tool = PenalCodeLookup()
-    return tool.get_section(section, code=code)
+    return get_penal_code_lookup().get_section(section, code=code)
+
