@@ -28,6 +28,7 @@ class EnhanceContentRequest(BaseModel):
 class EnhanceClauseRequest(BaseModel):
     selected_text: str
     case_context: str
+    user_prompt: str = None
 
 class CreatePlaceholdersRequest(BaseModel):
     html_content: str
@@ -55,6 +56,8 @@ async def enhance_content_endpoint(request: EnhanceContentRequest):
     except HTTPException:
         raise
     except Exception as e:
+        with open("error.log", "a") as f:
+            f.write(f"Enhance Content Error: {str(e)}\n")
         print(f"Error processing request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -66,7 +69,8 @@ async def enhance_clause_endpoint(request: EnhanceClauseRequest):
         # Call the clause enhancement function
         enhanced_text = enhance_clause(
             request.selected_text, 
-            request.case_context
+            request.case_context,
+            request.user_prompt
         )
         
         # Check for errors from backend
@@ -81,6 +85,8 @@ async def enhance_clause_endpoint(request: EnhanceClauseRequest):
     except HTTPException:
         raise
     except Exception as e:
+        with open("error.log", "a") as f:
+            f.write(f"Enhance Clause Error: {str(e)}\n")
         print(f"Error processing request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 

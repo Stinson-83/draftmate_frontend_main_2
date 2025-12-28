@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import './MainLayout.css';
+import logo from '../assets/draftmate_logo.png';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -29,7 +30,7 @@ const MainLayout = () => {
     if (saved) return JSON.parse(saved);
     return {
       name: "Attorney Davis",
-      email: "davis@lawjurist.com",
+      email: "davis@draftmate.com",
       image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
     };
   });
@@ -69,10 +70,8 @@ const MainLayout = () => {
           <div className="flex flex-col gap-8 w-full">
             {/* Logo */}
             <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center px-0' : ''}`}>
-              <div className={`bg-primary aspect-square rounded-lg flex items-center justify-center text-white shrink-0 transition-all ${isCollapsed ? 'size-8 rounded-lg' : 'size-8'}`}>
-                <span className={`material-symbols-outlined ${isCollapsed ? 'text-lg' : 'text-xl'}`}>gavel</span>
-              </div>
-              {!isCollapsed && <h1 className="text-slate-900 dark:text-white text-lg font-bold tracking-tight whitespace-nowrap">Law Jurist</h1>}
+              <img src={logo} alt="DraftMate" className={`object-contain transition-all ${isCollapsed ? 'size-8' : 'size-8'}`} />
+              {!isCollapsed && <h1 className="text-slate-900 dark:text-white text-lg font-bold tracking-tight whitespace-nowrap">DraftMate</h1>}
             </div>
 
             {/* Navigation */}

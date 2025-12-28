@@ -790,9 +790,17 @@ const Editor = () => {
     }, [leftSidebarOpen, rightSidebarOpen]);
 
 
+    // Ref to store the valid range when toolbar is shown
+    const activeRangeRef = useRef(null);
+
     // Handle Selection for Floating Toolbar
     useEffect(() => {
         const handleSelectionChange = () => {
+            // If user is interacting with the toolbar (e.g. typing in input), don't hide it
+            if (document.activeElement && document.activeElement.closest('.floating-toolbar')) {
+                return;
+            }
+
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
                 const range = selection.getRangeAt(0);
@@ -805,11 +813,15 @@ const Editor = () => {
                         y: rect.top - 10 // Position slightly above
                     });
                     setShowFloatingToolbar(true);
+                    // Save the range!
+                    activeRangeRef.current = range.cloneRange();
                 } else {
                     setShowFloatingToolbar(false);
+                    activeRangeRef.current = null;
                 }
             } else {
                 setShowFloatingToolbar(false);
+                activeRangeRef.current = null;
             }
         };
 
@@ -826,7 +838,11 @@ const Editor = () => {
         };
 
         // Hide toolbar when scrolling
-        const handleScroll = () => {
+        const handleScroll = (e) => {
+            // If scroll comes from the toolbar itself (e.g. input scrolling), ignore it
+            if (e.target && e.target.closest && e.target.closest('.floating-toolbar')) {
+                return;
+            }
             if (showFloatingToolbar) setShowFloatingToolbar(false);
         };
 
@@ -841,12 +857,22 @@ const Editor = () => {
         };
     }, [showFloatingToolbar]);
 
-    const handleEnhance = async () => {
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+    const handleEnhance = async (userPrompt = '') => {
+        // Use stored range if available (prioritize logic) or fall back to current selection
+        let range = activeRangeRef.current;
+        let selectedText = '';
 
-        const range = selection.getRangeAt(0);
-        const selectedText = selection.toString();
+        if (!range) {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+                range = selection.getRangeAt(0);
+            }
+        }
+
+        if (!range) return;
+
+        selectedText = range.toString();
+        if (!selectedText) return; // Double check
 
         // 1. Get Context (approx 50 chars before and after)
         // We clone the range and expand it
@@ -863,13 +889,15 @@ const Editor = () => {
         const context = `${preText} ... [TARGET] ... ${postText}`;
 
         console.log("Enhance Context:", context);
+        console.log("User Prompt:", userPrompt);
 
         const promise = fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_clause`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 selected_text: selectedText,
-                case_context: context // Sending surrounding text as context per user request
+                case_context: context, // Sending surrounding text as context per user request
+                user_prompt: userPrompt
             })
         }).then(async (res) => {
             if (!res.ok) throw new Error('Enhancement failed');

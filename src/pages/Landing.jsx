@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import logo from '../assets/draftmate_logo.png';
 
 const Landing = () => {
     return (
@@ -7,8 +8,8 @@ const Landing = () => {
             {/* Header */}
             <header className="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#f0f2f4] bg-white/95 backdrop-blur-sm px-6 py-3 lg:px-40">
                 <div className="flex items-center gap-4 text-[#111318]">
-                    <div className="size-8 flex items-center justify-center text-primary">
-                        <span className="material-symbols-outlined text-3xl">gavel</span>
+                    <div className="size-8 flex items-center justify-center">
+                        <img src={logo} alt="DraftMate" className="w-full h-full object-contain" />
                     </div>
                     <h2 className="text-[#111318] text-xl font-bold leading-tight tracking-[-0.015em]">DraftMate</h2>
                 </div>
@@ -16,7 +17,7 @@ const Landing = () => {
                     <div className="flex items-center gap-9">
                         <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Features</a>
                         <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Blogs</a>
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Law Jurist</a>
+                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">About</a>
                         <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Pricing</a>
                         <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">How it Works</a>
                     </div>
@@ -232,7 +233,9 @@ const Landing = () => {
                     <div className="flex flex-col md:flex-row justify-between gap-8">
                         <div className="flex flex-col gap-4 max-w-xs">
                             <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-primary text-2xl">gavel</span>
+                                <div className="size-8">
+                                    <img src={logo} alt="DraftMate" className="w-full h-full object-contain" />
+                                </div>
                                 <h2 className="text-lg font-bold">DraftMate</h2>
                             </div>
                             <p className="text-gray-400 text-sm">Empowering Indian Advocates with next-gen AI tools for drafting and research.</p>

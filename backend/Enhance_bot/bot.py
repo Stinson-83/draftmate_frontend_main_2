@@ -19,7 +19,7 @@ try:
 except Exception as e:
     print(f"Warning: Client init failed ({e}). Using mock mode.")
 
-def enhance_clause(selected_text: str, case_context: str) -> str:
+def enhance_clause(selected_text: str, case_context: str, user_prompt: str = None) -> str:
     """
     Analyzes a legal clause and returns a revision suggestion or 'No significant suggestions'.
     """
@@ -31,12 +31,13 @@ def enhance_clause(selected_text: str, case_context: str) -> str:
 
     # 2. Construct Prompt
     system_instruction = f"""
-    You are an expert Senior Legal Editor. Your task is to ENHANCE the 'Input Clause' based on the provided Case Context..
+    You are an expert Senior Legal Editor. Your task is to ENHANCE the 'Input Clause' based on the provided Case Context and any User Instructions.
 
     INPUT DATA:
     1. Case Context: The facts and background of the case.
+    2. User Instructions: Specific directions from the user on how to enhance the text (e.g., "make it stricter", "shorten it", "enhance usinf latin law words").
 
-    Your Goal: Use the Case Context to find specific legal terminology, relevant sections, or standard phrasing. Rewrite the Input Clause to be more professional, legally precise, and impactful.
+    Your Goal: Use the Case Context and User Instructions to rewrite the Input Clause. It must be professional, legally precise, and impactful.
 
     STRICT OUTPUT RULES:
     1. Output ONLY the enhanced version of the text.
@@ -48,6 +49,7 @@ def enhance_clause(selected_text: str, case_context: str) -> str:
     contents = f"""
     Contexts:
     - Case_context: {case_context}
+    - User Instructions: {user_prompt if user_prompt else "None"}
     
     Input Clause: {selected_text}
     """
@@ -64,7 +66,7 @@ def enhance_clause(selected_text: str, case_context: str) -> str:
             contents=[contents],
             generation_config={
                 "temperature": 0.1,
-                "max_output_tokens": 512
+                "max_output_tokens": 512*4
             },
             safety_settings={
                 types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
@@ -83,6 +85,8 @@ def enhance_clause(selected_text: str, case_context: str) -> str:
             return "Unable to enhance text due to safety filters."
 
     except Exception as e:
+        with open("error.log", "a") as f:
+            f.write(f"Enhance Clause Error: {str(e)}\n")
         return f"Error: {e}"
 
 def enhance_content(selected_text: str, user_context: str) -> str:
@@ -141,6 +145,8 @@ def enhance_content(selected_text: str, user_context: str) -> str:
              return "Unable to enhance content due to safety filters."
 
     except Exception as e:
+        with open("error.log", "a") as f:
+            f.write(f"Enhance Content Error: {str(e)}\n")
         return f"Error: {e}"
 
 def create_placeholders(html_content: str) -> str:

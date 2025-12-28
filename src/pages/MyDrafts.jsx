@@ -23,7 +23,7 @@ const MyDrafts = () => {
     };
 
     const handleOpenDraft = (draft) => {
-        navigate('/editor', {
+        navigate('/dashboard/editor', {
             state: {
                 htmlContent: draft.content,
                 placeholders: draft.placeholders || [],

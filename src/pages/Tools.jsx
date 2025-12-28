@@ -56,12 +56,12 @@ const Tools = () => {
     };
 
     const handleUploadSubmit = ({ details, supportingDocs }) => {
-        navigate('/editor', {
+        navigate('/dashboard/editor', {
             state: { htmlContent, uploadDetails: details, supportingDocs }
         });
     };
 
-    const handleUploadSkip = () => navigate('/editor', { state: { htmlContent } });
+    const handleUploadSkip = () => navigate('/dashboard/editor', { state: { htmlContent } });
 
     // Reusable Card Component matching the new design
     const ToolCard = ({ icon, title, description, onClick, primary = false, children }) => (
@@ -159,13 +159,13 @@ const Tools = () => {
                                     icon="note_add"
                                     title="Empty Document"
                                     description="Start with an empty document without a prompt."
-                                    onClick={() => navigate('/editor', { state: { isEmpty: true } })}
+                                    onClick={() => navigate('/dashboard/editor', { state: { isEmpty: true } })}
                                 />
                                 <ToolCard
                                     icon="description"
                                     title="Review Your Draft"
                                     description="Review you previously created drafts."
-                                    onClick={() => navigate('/drafts')}
+                                    onClick={() => navigate('/dashboard/drafts')}
                                 />
                                 <ToolCard
                                     icon="upload_file"
@@ -192,7 +192,7 @@ const Tools = () => {
                                         icon="book"
                                         title="PDF Tool kit"
                                         description="Merge PDFs, Rearrange pages and Convert to DOCX format."
-                                        onClick={() => navigate('/pdf-editor')}
+                                        onClick={() => navigate('/dashboard/pdf-editor')}
                                     >
                                         <div className="flex flex-col gap-4 mt-4 opacity-50 group-hover:opacity-100 transition-opacity">
                                             <div className="flex justify-between items-center px-4">
@@ -222,7 +222,7 @@ const Tools = () => {
                                         icon="balance"
                                         title="AI Legal Research"
                                         description="Do accurate legal research by talking to our AI."
-                                        onClick={() => navigate('/research')}
+                                        onClick={() => navigate('/dashboard/research')}
                                     />
                                     <ToolCard
                                         icon="calculate"

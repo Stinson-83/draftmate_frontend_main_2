@@ -43,7 +43,8 @@ export const API_CONFIG = {
 
     // Service: backend/Enhance_bot (Port 8002)
     ENHANCE_BOT: {
-        BASE_URL: `${BASE_URL}/enhance`,
+        // Direct local address to avoid Nginx requirement for dev
+        BASE_URL: 'http://localhost:8002',
         ENDPOINTS: {
             ENHANCE_CONTENT: '/enhance_content', // POST
             ENHANCE_CLAUSE: '/enhance_clause', // POST

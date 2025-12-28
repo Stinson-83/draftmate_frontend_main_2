@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import logo from '../assets/draftmate_logo.png';
 
 const Onboarding = () => {
     const navigate = useNavigate();
@@ -83,19 +84,16 @@ const Onboarding = () => {
                     {/* Brand */}
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white border border-white/20">
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M13.8261 30.5736C16.7203 29.8826 20.2244 29.4783 24 29.4783C27.7756 29.4783 31.2797 29.8826 34.1739 30.5736C36.9144 31.2278 39.9967 32.7669 41.3563 33.8352L24.8486 7.36089C24.4571 6.73303 23.5429 6.73303 23.1514 7.36089L6.64374 33.8352C8.00331 32.7669 11.0856 31.2278 13.8261 30.5736Z"></path>
-                                <path clipRule="evenodd" d="M39.998 35.764C39.9944 35.7463 39.9875 35.7155 39.9748 35.6706C39.9436 35.5601 39.8949 35.4259 39.8346 35.2825C38.5103 34.2887 35.9788 33.0607 33.7095 32.5189C30.9875 31.8691 27.6413 31.4783 24 31.4783C20.3587 31.4783 17.0125 31.8691 14.2905 32.5189C12.0012 33.0654 9.44505 34.3104 8.18538 35.1832C8.02977 35.589 8.00004 35.7388 8.00004 35.7388C8.0104 36.0767 8.68485 36.6314 11.9291 38.2772C14.9242 39.319 19.1919 40 24 40C28.8081 40 33.0758 39.319 36.0709 38.2772C37.5778 37.7531 38.6545 37.1746 39.3151 36.6314C39.9006 36.1499 39.9857 35.8511 39.998 35.764ZM35.9868 29.004L24 9.77997L12.0131 29.004C12.4661 28.8609 12.9179 28.7342 13.3617 28.6282C16.4281 27.8961 20.0901 27.4783 24 27.4783C27.9099 27.4783 31.5719 27.8961 34.6383 28.6282C35.082 28.7342 35.5339 28.8609 35.9868 29.004Z" fillRule="evenodd"></path>
-                            </svg>
+                            <img src={logo} alt="DraftMate" className="w-full h-full object-contain p-1" />
                         </div>
-                        <h1 className="text-2xl font-bold tracking-tight">Law Jurist</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">DraftMate</h1>
                     </div>
 
                     {/* Quote */}
                     <div className="max-w-md">
                         <span className="material-symbols-outlined text-4xl text-blue-400/80 mb-4">format_quote</span>
                         <p className="text-xl md:text-2xl font-medium leading-relaxed mb-6 text-slate-100">
-                            "Streamlining our practice management has never been easier. Law Jurist allows us to focus on what matters most—our clients."
+                            "Streamlining our practice management has never been easier. DraftMate allows us to focus on what matters most—our clients."
                         </p>
                         <div className="flex items-center gap-4">
                             <div
@@ -111,7 +109,7 @@ const Onboarding = () => {
 
                     {/* Footer */}
                     <div className="text-sm text-slate-400">
-                        © 2024 Law Jurist Inc.
+                        © 2024 DraftMate Inc.
                     </div>
                 </div>
             </aside>
@@ -145,7 +143,7 @@ const Onboarding = () => {
                     {/* Page Header */}
                     <div className="mb-10">
                         <h2 className="text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-3">
-                            {step === 1 && "Welcome to Law Jurist"}
+                            {step === 1 && "Welcome to DraftMate"}
                             {step === 2 && "Professional Details"}
                             {step === 3 && "Tailor Your Experience"}
                         </h2>

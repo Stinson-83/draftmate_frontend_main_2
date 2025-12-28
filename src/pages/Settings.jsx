@@ -25,7 +25,7 @@ const PersonalSettings = () => {
                 lastName: parsed.lastName || nameParts.slice(1).join(' ') || '',
                 role: parsed.role || '',
                 workplace: parsed.workplace || '',
-                email: parsed.email || 'attorney@lawjurist.com',
+                email: parsed.email || 'attorney@draftmate.com',
                 bio: parsed.bio || '',
                 image: parsed.image || "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
             });
@@ -545,7 +545,7 @@ const DocumentSettings = () => {
             </div>
 
             <div className="mt-auto pt-10 text-center text-slate-400 text-xs">
-                <p>© 2024 Law Jurist Inc. All rights reserved.</p>
+                <p>© 2024 DraftMate Inc. All rights reserved.</p>
             </div>
 
             <SaveTemplateModal
