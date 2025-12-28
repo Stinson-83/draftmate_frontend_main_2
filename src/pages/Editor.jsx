@@ -908,15 +908,17 @@ const Editor = () => {
         toast.promise(promise, {
             loading: 'Enhancing text with AI...',
             success: (enhancedText) => {
-                // Replace text
-                // Check if selection is still valid and same
-                // For simplicity, we assume user hasn't moved cursor too much, or we just execute replace
-                // Ideally, we might want to restore range, but execCommand works on current selection. 
-                // Since this is async, user might have clicked away. 
-                // A safer way is to save the range before fetch, but if DOM changes, range is invalid.
-                // We will try to re-select or just insert if possible, but execCommand 'insertText' is robust enough for active selection.
-                // However, prolonged async calls are risky with selections. 
-                // Let's assume user waits.
+                // Check for no-op responses
+                if (!enhancedText || enhancedText === 'No significant suggestions') {
+                    return 'No suggestions available.';
+                }
+
+                // Restore selection to ensure insertText works
+                if (range) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
 
                 document.execCommand('insertText', false, enhancedText);
                 return 'Text enhanced successfully!';
