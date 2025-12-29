@@ -1,148 +1,57 @@
 """
-sql_v2.py - Improved version with robust SSH tunnel auto-detection.
-CHANGES:
-1. Skip auto-tunnel attempt if manual tunnel is already detected (port open)
-2. Use ec2-user as SSH username
-3. Simplified connection logic
+sql.py - Production-ready DB connection with pooling.
 """
-import paramiko
-# Monkey-patch paramiko.DSSKey for compatibility with sshtunnel + paramiko 3.0+
-if not hasattr(paramiko, "DSSKey"):
-    class MockDSSKey:
-        @classmethod
-        def from_private_key_file(cls, filename, password=None):
-            # This is never used for RSA keys, but sshtunnel imports it.
-            return None
-    paramiko.DSSKey = MockDSSKey
-
-from sshtunnel import SSHTunnelForwarder
 import psycopg2
 import psycopg2.extras
 from psycopg2 import pool
-import os
-import socket
-from dotenv import load_dotenv
-
-load_dotenv()
-
-POSTGRES_DSN = os.getenv("POSTGRES_DSN")
-BASTION_IP = os.getenv("BASTION_IP")
-SSH_KEY_PATH = os.getenv("SSH_KEY_PATH")
-RDS_ENDPOINT = os.getenv("RDS_ENDPOINT", "privet-lawdb.cfge8ai08o3t.ap-south-1.rds.amazonaws.com")
-LOCAL_BIND_PORT = 5432
-
-# Global variables
-tunnel = None
-connection_pool = None
-
-def is_port_open(host='127.0.0.1', port=LOCAL_BIND_PORT, timeout=1.0):
-    """Check if a port is open (manual tunnel running)."""
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
-    except:
-        return False
-
 import logging
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Replace RDS endpoint with localhost for tunneled connections
-def _get_tunneled_dsn():
-    dsn = POSTGRES_DSN
-    if not dsn:
-        return None
-    
-    # ONLY rewrite if we are actually tunneling (i.e. BASTION_IP is set)
-    # If no bastion, we assume direct connection (VPC or localhost) and return DSN as-is.
-    if not BASTION_IP:
-        return dsn
+# Global connection pool
+connection_pool = None
 
-    if "localhost" in dsn:
-        dsn = dsn.replace("localhost", "127.0.0.1")
-    
-    if RDS_ENDPOINT in dsn:
-        dsn = dsn.replace(RDS_ENDPOINT, "127.0.0.1")
-    elif "amazonaws.com" in dsn:
-        import re
-        dsn = re.sub(r'@[^:]+', '@127.0.0.1', dsn)
-        
-    # Ensure port is updated to local bind port
-    if ":5432" in dsn:
-        dsn = dsn.replace(":5432", f":{LOCAL_BIND_PORT}")
-        
-    return dsn
-
-def start_tunnel_and_pool():
-    global tunnel, connection_pool
-    
-    # 1. Check if manual tunnel is already running
-    if is_port_open():
-        logger.info(f"Port {LOCAL_BIND_PORT} is open. Using existing tunnel.")
-        try:
-            dsn = _get_tunneled_dsn()
-            connection_pool = pool.ThreadedConnectionPool(1, 20, dsn)
-            logger.info("Threaded connection pool created (Manual Tunnel)")
-            return
-        except Exception as e:
-            logger.error(f"Pool creation failed: {e}")
-            return
-
-    # 2. Start auto-tunnel only if port is NOT open
-    if BASTION_IP and SSH_KEY_PATH:
-        logger.info(f"Starting auto SSH tunnel via {BASTION_IP}...")
-        try:
-            tunnel = SSHTunnelForwarder(
-                (BASTION_IP, 22),
-                ssh_username="ec2-user",
-                ssh_pkey=SSH_KEY_PATH,
-                remote_bind_address=(RDS_ENDPOINT, 5432),
-                local_bind_address=('127.0.0.1', LOCAL_BIND_PORT)
-            )
-            tunnel.start()
-            logger.info(f"Auto-tunnel active on port {tunnel.local_bind_port}")
-        except Exception as e:
-            logger.error(f"Auto-tunnel failed: {e}")
-            return
-
-    # 3. Create connection pool
+def init_pool(dsn):
+    """Initialize the threaded connection pool."""
+    global connection_pool
     try:
-        dsn = _get_tunneled_dsn()
-        connection_pool = pool.ThreadedConnectionPool(1, 20, dsn)
-        logger.info("Threaded connection pool created")
+        connection_pool = pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=20,
+            dsn=dsn
+        )
+        logger.info("✅ Database connection pool initialized")
     except Exception as e:
-        logger.error(f"Error creating connection pool: {e}")
+        logger.error(f"❌ Failed to initialize connection pool: {e}")
+        raise e
 
-def stop_tunnel_and_pool():
-    global tunnel, connection_pool
+def close_pool():
+    """Close all connections in the pool."""
+    global connection_pool
     if connection_pool:
-        logger.info("Closing database connection pool...")
         connection_pool.closeall()
         connection_pool = None
-    
-    if tunnel:
-        logger.info("Stopping SSH tunnel...")
-        tunnel.stop()
-        tunnel = None
+        logger.info("Database connection pool closed")
 
 def get_db_connection():
+    """Get a connection from the pool."""
     if connection_pool:
         return connection_pool.getconn()
     else:
-        # Fallback if pool wasn't initialized
-        logger.warning("Connection pool not initialized. Attempting direct connection.")
-        return psycopg2.connect(POSTGRES_DSN)
+        raise RuntimeError("Connection pool not initialized. Call init_pool() first.")
 
 def release_db_connection(conn):
+    """Return a connection to the pool."""
     if connection_pool:
         connection_pool.putconn(conn)
     else:
-        conn.close()
+        # Fallback if pool was closed (shouldn't happen in normal flow)
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def search_documents(search_terms, query_embedding=None, raw_query=None, language="en"):
