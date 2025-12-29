@@ -60,7 +60,7 @@ export const api = {
      * @param {Object} callbacks - Event callbacks { onStatus, onAnswer, onFollowups, onDone, onError }
      */
     chatStream: async (query, sessionId, callbacks = {}) => {
-        const { onStatus, onAnswer, onFollowups, onDone, onError } = callbacks;
+        const { onStatus, onToken, onAnswer, onFollowups, onDone, onError } = callbacks;
 
         try {
             const response = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -98,7 +98,13 @@ export const api = {
 
                             switch (event.event) {
                                 case 'status':
-                                    onStatus?.(event.message);
+                                    onStatus?.(event.message, event.quote);
+                                    break;
+                                case 'token':
+                                    onToken?.(event.chunk, event.accumulated);
+                                    break;
+                                case 'answer_complete':
+                                    onAnswer?.(event.content);
                                     break;
                                 case 'answer':
                                     onAnswer?.(event.content);

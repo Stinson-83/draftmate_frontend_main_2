@@ -312,12 +312,13 @@ async def chat_reasoning(request: ChatRequest):
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """
-    Streaming chat with real-time status updates.
+    Streaming chat with token-by-token response.
     Uses Server-Sent Events (SSE) to push:
-    - status: Progress updates (Analyzing, Searching, Generating)
-    - answer: The complete answer when done
+    - status: Progress updates with legal terminology
+    - token: Answer chunks (typewriter effect)
+    - answer_complete: Full answer when done
     - followups: Suggested follow-up questions
-    - done: Final metadata (session_id, complexity, etc.)
+    - done: Final metadata
     """
     async def event_generator():
         session_id = request.session_id or str(uuid.uuid4())
@@ -325,11 +326,11 @@ async def chat_stream(request: ChatRequest):
         
         try:
             # Status: Analyzing
-            yield f"data: {json.dumps({'event': 'status', 'message': '🔍 Analyzing your query...'})}\n\n"
+            yield f"data: {json.dumps({'event': 'status', 'message': 'Examining the pleadings...'})}\n\n"
             await asyncio.sleep(0.1)
             
             # Status: Searching
-            yield f"data: {json.dumps({'event': 'status', 'message': '📚 Searching legal databases...'})}\n\n"
+            yield f"data: {json.dumps({'event': 'status', 'message': 'Researching precedents and statutes...'})}\n\n"
             
             # Run the query (this is the heavy lifting)
             result = await asyncio.get_event_loop().run_in_executor(
@@ -344,16 +345,27 @@ async def chat_stream(request: ChatRequest):
             )
             
             # Status: Generating
-            yield f"data: {json.dumps({'event': 'status', 'message': '⚖️ Generating response...'})}\n\n"
-            await asyncio.sleep(0.1)
+            yield f"data: {json.dumps({'event': 'status', 'message': 'Drafting the legal opinion...'})}\n\n"
+            await asyncio.sleep(0.05)
             
             answer = result.get("final_answer", "No answer generated.")
             
-            # Send the answer
-            yield f"data: {json.dumps({'event': 'answer', 'content': answer})}\n\n"
+            # Stream answer in chunks (typewriter effect)
+            words = answer.split(' ')
+            chunk_size = 5  # Send 5 words at a time
+            accumulated = ""
+            
+            for i in range(0, len(words), chunk_size):
+                chunk = ' '.join(words[i:i+chunk_size])
+                accumulated += chunk + ' '
+                yield f"data: {json.dumps({'event': 'token', 'chunk': chunk + ' ', 'accumulated': accumulated.strip()})}\n\n"
+                await asyncio.sleep(0.02)  # Small delay for visual effect
+            
+            # Signal answer complete
+            yield f"data: {json.dumps({'event': 'answer_complete', 'content': answer})}\n\n"
             
             # Generate follow-ups
-            yield f"data: {json.dumps({'event': 'status', 'message': '💡 Generating suggestions...'})}\n\n"
+            yield f"data: {json.dumps({'event': 'status', 'message': 'Preparing suggestions...'})}\n\n"
             suggested_followups = []
             try:
                 from lex_bot.core.llm_factory import get_llm

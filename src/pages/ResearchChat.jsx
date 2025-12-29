@@ -65,10 +65,23 @@ const ResearchChat = () => {
                 onStatus: (message) => {
                     setStatusMessage(message);
                 },
+                onToken: (chunk, accumulated) => {
+                    // Update message progressively with each token chunk
+                    setStatusMessage('');
+                    setMessages(prev => {
+                        const existing = prev.find(m => m.id === aiMsgId);
+                        if (existing) {
+                            return prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m);
+                        } else {
+                            return [...prev, { id: aiMsgId, role: 'ai', content: accumulated }];
+                        }
+                    });
+                    aiContent = accumulated;
+                },
                 onAnswer: (content) => {
                     aiContent = content;
                     setStatusMessage('');
-                    // Add or update AI message
+                    // Final update with complete message
                     setMessages(prev => {
                         const existing = prev.find(m => m.id === aiMsgId);
                         if (existing) {
