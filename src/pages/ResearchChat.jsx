@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 // Using specific imports if needed, but switching to Material Symbols for UI icons
 // keeping logo just in case, though mostly using icons now
-import lawJuristLogo from '../assets/law_jurist_logo.png';
+import lawJuristLogo from '../assets/draftmate_logo.png';
 
 const ResearchChat = () => {
     const navigate = useNavigate();
