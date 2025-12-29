@@ -61,8 +61,9 @@ conn = psycopg2.connect(POSTGRES_DSN)
 # ============================================================
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}")
-model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+CACHE_FOLDER = os.getenv("SENTENCE_TRANSFORMERS_HOME", "/app/models")
+print(f"Loading embedding model: {EMBEDDING_MODEL_NAME} from {CACHE_FOLDER}")
+model = SentenceTransformer(EMBEDDING_MODEL_NAME, cache_folder=CACHE_FOLDER)
 
 # ============================================================
 # Utils
