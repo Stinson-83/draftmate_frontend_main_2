@@ -72,8 +72,8 @@ class LegalStrategyAgent(BaseAgent):
     - Risk assessment
     """
     
-    def __init__(self, mode: str = "reasoning"):
-        """Initialize with reasoning mode for complex analysis."""
+    def __init__(self, mode: str = "fast"):
+        """Initialize with fast mode for cost efficiency."""
         super().__init__(mode=mode)
     
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:

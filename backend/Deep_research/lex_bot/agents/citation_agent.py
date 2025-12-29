@@ -57,8 +57,8 @@ class CitationAgent(BaseAgent):
     Citation Network Agent for tracing case precedents and statute usage.
     """
     
-    def __init__(self, mode: str = "reasoning"):
-        """Initialize with reasoning mode for analysis."""
+    def __init__(self, mode: str = "fast"):
+        """Initialize with fast mode for cost efficiency."""
         super().__init__(mode=mode)
         self.kanoon = IndianKanoonScraper()
         self.statute_lookup = PenalCodeLookup()
