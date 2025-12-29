@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-POSTGRES_DSN = os.getenv("POSTGRES_DSN", "postgresql://lawuser:Siddchick2506@127.0.0.1:5432/postgres")
+POSTGRES_DSN = os.getenv("POSTGRES_DSN")
+if not POSTGRES_DSN:
+    raise ValueError("POSTGRES_DSN environment variable is not set")
 chat_dsn = POSTGRES_DSN.replace("/postgres", "/lexbot_chat")
 
 print("=== Fixing Chat Database Schema ===\n")

@@ -10,7 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Connection to the default 'postgres' database (to create new DB)
-POSTGRES_DSN = os.getenv("POSTGRES_DSN", "postgresql://lawuser:Siddchick2506@127.0.0.1:5432/postgres")
+# Connection to the default 'postgres' database (to create new DB)
+POSTGRES_DSN = os.getenv("POSTGRES_DSN")
+if not POSTGRES_DSN:
+    raise ValueError("POSTGRES_DSN environment variable is not set")
 
 def create_database():
     """Create the lexbot_chat database if it doesn't exist."""
