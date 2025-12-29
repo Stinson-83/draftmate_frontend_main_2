@@ -17,6 +17,16 @@ const ResearchChat = () => {
     const [sessionId, setSessionId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
+    // Premium UX controls
+    const [reasoningMode, setReasoningMode] = useState(false);
+    const [selectedLLM, setSelectedLLM] = useState('gemini-2.5-flash');
+    const [showLLMDropdown, setShowLLMDropdown] = useState(false);
+    const llmModels = [
+        { id: 'gemini-2.5-flash', name: 'Gemini Flash', icon: '⚡' },
+        { id: 'gemini-2.5-pro', name: 'Gemini Pro', icon: '✨' },
+        { id: 'gpt-4o', name: 'GPT-4o', icon: '🚀' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', icon: '💨' },
+    ];
     const [messages, setMessages] = useState([
         {
             id: 1,
@@ -176,21 +186,72 @@ const ResearchChat = () => {
     return (
         <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
             {/* Header */}
-            <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center shadow-sm z-10">
-                <button
-                    onClick={() => navigate('/')}
-                    aria-label="Go back"
-                    className="mr-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
-                >
-                    <span className="material-symbols-outlined text-2xl">arrow_back</span>
-                </button>
+            <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between shadow-sm z-10">
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/')}
+                        aria-label="Go back"
+                        className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                    </button>
                     <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
                         <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
                     </div>
                     <div>
                         <h1 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">AI Legal Research</h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Ask anything about Indian Law</p>
+                    </div>
+                </div>
+
+                {/* Premium Controls */}
+                <div className="flex items-center gap-3">
+                    {/* Reasoning Toggle */}
+                    <button
+                        onClick={() => setReasoningMode(!reasoningMode)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${reasoningMode
+                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                            }`}
+                        title="Toggle reasoning mode for detailed analysis"
+                    >
+                        <span className="material-symbols-outlined text-base">psychology</span>
+                        <span>Reasoning</span>
+                    </button>
+
+                    {/* LLM Switcher */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowLLMDropdown(!showLLMDropdown)}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 transition-all text-sm font-medium"
+                        >
+                            <span>{llmModels.find(m => m.id === selectedLLM)?.icon}</span>
+                            <span>{llmModels.find(m => m.id === selectedLLM)?.name}</span>
+                            <span className="material-symbols-outlined text-sm">expand_more</span>
+                        </button>
+
+                        {showLLMDropdown && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-50">
+                                {llmModels.map((model) => (
+                                    <button
+                                        key={model.id}
+                                        onClick={() => {
+                                            setSelectedLLM(model.id);
+                                            setShowLLMDropdown(false);
+                                            toast.success(`Switched to ${model.name}`);
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${selectedLLM === model.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                                            }`}
+                                    >
+                                        <span className="text-lg">{model.icon}</span>
+                                        <span className="flex-1 font-medium">{model.name}</span>
+                                        {selectedLLM === model.id && (
+                                            <span className="material-symbols-outlined text-blue-600 text-sm">check</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -243,7 +304,23 @@ const ResearchChat = () => {
                                                     ? <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-sm font-mono" {...props} />
                                                     : <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-sm font-mono my-3"><code {...props} /></pre>
                                             ),
-                                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+                                            // Premium clickable citations with hover URL preview
+                                            a: ({ node, href, children, ...props }) => (
+                                                <a
+                                                    href={href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="group relative inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium underline decoration-blue-400 underline-offset-2 transition-all hover:decoration-blue-600"
+                                                    {...props}
+                                                >
+                                                    {children}
+                                                    <span className="material-symbols-outlined text-xs opacity-60 group-hover:opacity-100">open_in_new</span>
+                                                    <span className="absolute -bottom-8 left-0 max-w-xs bg-slate-900 text-white text-xs px-2 py-1 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis z-10">
+                                                        {href}
+                                                    </span>
+                                                </a>
+                                            )
                                         }}
                                     >
                                         {msg.content}

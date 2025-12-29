@@ -364,27 +364,28 @@ async def chat_stream(request: ChatRequest):
             # Signal answer complete
             yield f"data: {json.dumps({'event': 'answer_complete', 'content': answer})}\n\n"
             
-            # Generate follow-ups
-            yield f"data: {json.dumps({'event': 'status', 'message': 'Preparing suggestions...'})}\n\n"
-            suggested_followups = []
-            try:
-                from lex_bot.core.llm_factory import get_llm
-                followup_llm = get_llm(mode="fast")
-                followup_prompt = f"""Based on this legal query, suggest 3 brief follow-up questions.
-Query: {request.query}
-Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
-                followup_response = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: followup_llm.invoke(followup_prompt)
-                )
-                import re
-                json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
-                if json_match:
-                    suggested_followups = json.loads(json_match.group())[:3]
-            except Exception as e:
-                logger.warning(f"Follow-up generation failed: {e}")
             
-            if suggested_followups:
-                yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
+            # DISABLED: Follow-up generation (saves 1-2 seconds)
+            # yield f"data: {json.dumps({'event': 'status', 'message': 'Preparing suggestions...'})}\n\n"
+            # suggested_followups = []
+            # try:
+            #     from lex_bot.core.llm_factory import get_llm
+            #     followup_llm = get_llm(mode="fast")
+            #     followup_prompt = f"""Based on this legal query, suggest 3 brief follow-up questions.
+            # Query: {request.query}
+            # Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
+            #     followup_response = await asyncio.get_event_loop().run_in_executor(
+            #         None, lambda: followup_llm.invoke(followup_prompt)
+            #     )
+            #     import re
+            #     json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
+            #     if json_match:
+            #         suggested_followups = json.loads(json_match.group())[:3]
+            # except Exception as e:
+            #     logger.warning(f"Follow-up generation failed: {e}")
+            # 
+            # if suggested_followups:
+            #     yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
             
             # Store messages
             if request.user_id:
@@ -442,24 +443,25 @@ async def _process_chat(
         
         answer = result.get("final_answer", "No answer generated.")
         
-        # Generate follow-up suggestions
+        
+        # DISABLED: Follow-up generation (saves 1-2 seconds)
         suggested_followups = None
-        try:
-            from lex_bot.core.llm_factory import get_llm
-            followup_llm = get_llm(mode="fast")
-            followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
-
-Query: {request.query}
-Answer: {answer[:800]}
-
-Return ONLY a JSON array of 3 short questions, e.g.: ["Question 1?", "Question 2?", "Question 3?"]"""
-            followup_response = followup_llm.invoke(followup_prompt)
-            import re
-            json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
-            if json_match:
-                suggested_followups = json.loads(json_match.group())[:3]
-        except Exception as e:
-            logger.warning(f"Follow-up generation failed: {e}")
+        # try:
+        #     from lex_bot.core.llm_factory import get_llm
+        #     followup_llm = get_llm(mode="fast")
+        #     followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
+        # 
+        # Query: {request.query}
+        # Answer: {answer[:800]}
+        # 
+        # Return ONLY a JSON array of 3 short questions, e.g.: ["Question 1?", "Question 2?", "Question 3?"]"""
+        #     followup_response = followup_llm.invoke(followup_prompt)
+        #     import re
+        #     json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
+        #     if json_match:
+        #         suggested_followups = json.loads(json_match.group())[:3]
+        # except Exception as e:
+        #     logger.warning(f"Follow-up generation failed: {e}")
         
         # Store assistant response
         if request.user_id:
