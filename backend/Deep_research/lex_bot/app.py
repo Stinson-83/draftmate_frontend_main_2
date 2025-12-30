@@ -370,8 +370,11 @@ async def chat_stream(request: ChatRequest):
             try:
                 from lex_bot.core.llm_factory import get_llm
                 followup_llm = get_llm(mode="fast")
-                followup_prompt = f"""Based on this legal query, suggest 3 brief follow-up questions.
+                followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
+
 Query: {request.query}
+Answer: {answer[:500]}
+
 Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
                 followup_response = await asyncio.get_event_loop().run_in_executor(
                     None, lambda: followup_llm.invoke(followup_prompt)
@@ -450,7 +453,7 @@ async def _process_chat(
             followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
 
 Query: {request.query}
-Answer: {answer[:800]}
+Answer: {answer[:500]}
 
 Return ONLY a JSON array of 3 short questions, e.g.: ["Question 1?", "Question 2?", "Question 3?"]"""
             followup_response = followup_llm.invoke(followup_prompt)
