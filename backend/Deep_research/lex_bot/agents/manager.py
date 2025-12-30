@@ -5,7 +5,7 @@ from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from .base_agent import BaseAgent
 from ..tools.reranker import rerank_documents
 from ..core.router import ROUTER_PROMPT  # Use enhanced router prompt
-
+from ..core.llm_factory import get_llm  # For dynamic mode switching
 
 class ManagerAgent(BaseAgent):
     def classify_and_route(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -267,11 +267,17 @@ class ManagerAgent(BaseAgent):
         """
         Aggregates context and generates final answer.
         Supports both normal and reasoning (CoT) modes.
+        
+        Note: For reasoning mode, uses Gemini Pro or GPT-4o for deeper analysis.
         """
-        print("📝 Generating Final Response...")
+        llm_mode = state.get("llm_mode", "fast")
+        print(f"📝 Generating Final Response... (Mode: {llm_mode.upper()})")
+        
+        # Get the appropriate LLM based on mode (reasoning uses pro models)
+        llm = get_llm(mode=llm_mode)
+        
         law_ctx = state.get("law_context", [])
         case_ctx = state.get("case_context", [])
-        llm_mode = state.get("llm_mode", "fast")
         document_ctx = state.get("document_context", [])
         
         # Combine all candidates
@@ -361,7 +367,7 @@ class ManagerAgent(BaseAgent):
             - Be professional, precise, and legally sound.
             """)
         
-        chain = prompt | self.llm | StrOutputParser()
+        chain = prompt | llm | StrOutputParser()
         answer = chain.invoke({"context": context_str, "query": state["original_query"]})
         
         # For reasoning mode, extract the reasoning trace
