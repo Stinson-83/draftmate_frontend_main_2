@@ -4,6 +4,44 @@ const API_BASE_URL = API_CONFIG.LEX_BOT.BASE_URL;
 
 export const api = {
     /**
+     * Get current LLM configuration.
+     * @returns {Promise<Object>} - { current_model, available_models, modes }
+     */
+    getLLMConfig: async () => {
+        const response = await fetch(`${API_BASE_URL}/config/llm`, {
+            method: 'GET',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to get LLM config: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Set LLM model at runtime.
+     * @param {string} model - The model to switch to.
+     * @returns {Promise<Object>} - Updated configuration.
+     */
+    setLLMConfig: async (model) => {
+        const response = await fetch(`${API_BASE_URL}/config/llm`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ model }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to set LLM config: ${errorText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
      * Upload a PDF file to the backend.
      * @param {File} file - The file object to upload.
      * @param {string} sessionId - The current session ID.
@@ -31,10 +69,12 @@ export const api = {
      * Send a chat query to the backend (non-streaming).
      * @param {string} query - The user's question.
      * @param {string} sessionId - The current session ID.
+     * @param {boolean} reasoning - Whether to use reasoning mode.
      * @returns {Promise<Object>} - The JSON response containing the answer.
      */
-    chat: async (query, sessionId) => {
-        const response = await fetch(`${API_BASE_URL}/chat`, {
+    chat: async (query, sessionId, reasoning = false) => {
+        const endpoint = reasoning ? '/chat/reasoning' : '/chat';
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -131,3 +171,4 @@ export const api = {
         }
     }
 };
+

@@ -20,6 +20,8 @@ const Dashboard = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
 
     React.useEffect(() => {
+        document.title = 'Dashboard | DraftMate';
+
         const handleProfileUpdate = () => {
             const saved = localStorage.getItem('user_profile');
             if (saved) setUserProfile(JSON.parse(saved));

@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import logo from '../assets/draftmate_logo.png';
 
 const Landing = () => {
+    useEffect(() => {
+        document.title = 'DraftMate';
+    }, []);
+
     return (
         <div className="bg-slate-50 dark:bg-[#101622] text-[#111318] font-sans overflow-x-hidden">
             {/* Header */}

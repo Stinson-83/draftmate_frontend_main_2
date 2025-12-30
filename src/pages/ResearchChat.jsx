@@ -7,6 +7,14 @@ import { useNavigate } from 'react-router-dom';
 // keeping logo just in case, though mostly using icons now
 import lawJuristLogo from '../assets/draftmate_logo.png';
 
+// LLM options for dropdown
+const LLM_OPTIONS = [
+    { value: 'gemini-2.5-flash', label: 'Gemini Flash', description: 'Fast responses' },
+    { value: 'gemini-2.5-pro', label: 'Gemini Pro', description: 'Advanced reasoning' },
+    { value: 'gpt-4o', label: 'GPT-4o', description: 'OpenAI flagship' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast & efficient' },
+];
+
 const ResearchChat = () => {
     const navigate = useNavigate();
     const messagesEndRef = useRef(null);
@@ -17,6 +25,11 @@ const ResearchChat = () => {
     const [sessionId, setSessionId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
+
+    // Deep Think and LLM state
+    const [deepThinkEnabled, setDeepThinkEnabled] = useState(false);
+    const [selectedLLM, setSelectedLLM] = useState('gemini-2.5-flash');
+    const [isLLMDropdownOpen, setIsLLMDropdownOpen] = useState(false);
     const [messages, setMessages] = useState([
         {
             id: 1,
@@ -29,9 +42,27 @@ const ResearchChat = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    // Set page title
+    useEffect(() => {
+        document.title = 'AI Research | DraftMate';
+    }, []);
+
     useEffect(() => {
         const newSessionId = crypto.randomUUID();
         setSessionId(newSessionId);
+
+        // Fetch current LLM config on mount
+        const fetchLLMConfig = async () => {
+            try {
+                const config = await api.getLLMConfig();
+                if (config.current_model) {
+                    setSelectedLLM(config.current_model);
+                }
+            } catch (error) {
+                console.warn('Failed to fetch LLM config:', error);
+            }
+        };
+        fetchLLMConfig();
     }, []);
 
     useEffect(() => {
@@ -61,62 +92,76 @@ const ResearchChat = () => {
         let aiFollowups = [];
 
         try {
-            await api.chatStream(currentInput, sessionId, {
-                onStatus: (message) => {
-                    setStatusMessage(message);
-                },
-                onToken: (chunk, accumulated) => {
-                    // Update message progressively with each token chunk
-                    setStatusMessage('');
-                    setMessages(prev => {
-                        const existing = prev.find(m => m.id === aiMsgId);
-                        if (existing) {
-                            return prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m);
-                        } else {
-                            return [...prev, { id: aiMsgId, role: 'ai', content: accumulated }];
-                        }
-                    });
-                    aiContent = accumulated;
-                },
-                onAnswer: (content) => {
-                    aiContent = content;
-                    setStatusMessage('');
-                    // Final update with complete message
-                    setMessages(prev => {
-                        const existing = prev.find(m => m.id === aiMsgId);
-                        if (existing) {
-                            return prev.map(m => m.id === aiMsgId ? { ...m, content: aiContent } : m);
-                        } else {
-                            return [...prev, { id: aiMsgId, role: 'ai', content: aiContent }];
-                        }
-                    });
-                },
-                onFollowups: (questions) => {
-                    aiFollowups = questions;
-                    // Update message with followups
-                    setMessages(prev => prev.map(m =>
-                        m.id === aiMsgId ? { ...m, followups: aiFollowups } : m
-                    ));
-                },
-                onDone: (event) => {
-                    // Update with final metadata
-                    setMessages(prev => prev.map(m =>
-                        m.id === aiMsgId ? {
-                            ...m,
-                            complexity: event.complexity,
-                            agents: event.agents_used
-                        } : m
-                    ));
-                },
-                onError: (error) => {
-                    console.error("Stream error:", error);
-                    setMessages(prev => [...prev, {
-                        id: aiMsgId,
-                        role: 'ai',
-                        content: "I apologize, but I encountered an error. Please try again."
-                    }]);
-                }
-            });
+            if (deepThinkEnabled) {
+                // Deep Think mode: Use non-streaming /chat/reasoning for chain-of-thought
+                setStatusMessage('Deep thinking...');
+                const response = await api.chat(currentInput, sessionId, true);
+                aiContent = response.answer || response.content || '';
+                setMessages(prev => [...prev, {
+                    id: aiMsgId,
+                    role: 'ai',
+                    content: aiContent,
+                    isDeepThink: true
+                }]);
+            } else {
+                // Normal mode: Use streaming /chat/stream
+                await api.chatStream(currentInput, sessionId, {
+                    onStatus: (message) => {
+                        setStatusMessage(message);
+                    },
+                    onToken: (chunk, accumulated) => {
+                        // Update message progressively with each token chunk
+                        setStatusMessage('');
+                        setMessages(prev => {
+                            const existing = prev.find(m => m.id === aiMsgId);
+                            if (existing) {
+                                return prev.map(m => m.id === aiMsgId ? { ...m, content: accumulated } : m);
+                            } else {
+                                return [...prev, { id: aiMsgId, role: 'ai', content: accumulated }];
+                            }
+                        });
+                        aiContent = accumulated;
+                    },
+                    onAnswer: (content) => {
+                        aiContent = content;
+                        setStatusMessage('');
+                        // Final update with complete message
+                        setMessages(prev => {
+                            const existing = prev.find(m => m.id === aiMsgId);
+                            if (existing) {
+                                return prev.map(m => m.id === aiMsgId ? { ...m, content: aiContent } : m);
+                            } else {
+                                return [...prev, { id: aiMsgId, role: 'ai', content: aiContent }];
+                            }
+                        });
+                    },
+                    onFollowups: (questions) => {
+                        aiFollowups = questions;
+                        // Update message with followups
+                        setMessages(prev => prev.map(m =>
+                            m.id === aiMsgId ? { ...m, followups: aiFollowups } : m
+                        ));
+                    },
+                    onDone: (event) => {
+                        // Update with final metadata
+                        setMessages(prev => prev.map(m =>
+                            m.id === aiMsgId ? {
+                                ...m,
+                                complexity: event.complexity,
+                                agents: event.agents_used
+                            } : m
+                        ));
+                    },
+                    onError: (error) => {
+                        console.error("Stream error:", error);
+                        setMessages(prev => [...prev, {
+                            id: aiMsgId,
+                            role: 'ai',
+                            content: "I apologize, but I encountered an error. Please try again."
+                        }]);
+                    }
+                });
+            }
         } catch (error) {
             console.error("Chat error:", error);
             if (!aiContent) {
@@ -173,25 +218,82 @@ const ResearchChat = () => {
         }
     };
 
+    // Handle LLM change
+    const handleLLMChange = async (model) => {
+        setSelectedLLM(model);
+        setIsLLMDropdownOpen(false);
+        try {
+            await api.setLLMConfig(model);
+            toast.success(`Switched to ${LLM_OPTIONS.find(o => o.value === model)?.label || model}`);
+        } catch (error) {
+            console.error('Failed to switch LLM:', error);
+            toast.error('Failed to switch model');
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
             {/* Header */}
-            <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center shadow-sm z-10">
-                <button
-                    onClick={() => navigate('/')}
-                    aria-label="Go back"
-                    className="mr-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
-                >
-                    <span className="material-symbols-outlined text-2xl">arrow_back</span>
-                </button>
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-                        <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
+            <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between shadow-sm z-10">
+                <div className="flex items-center">
+                    <button
+                        onClick={() => navigate('/')}
+                        aria-label="Go back"
+                        className="mr-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
+                            <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">AI Legal Research</h1>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">Ask anything about Indian Law</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">AI Legal Research</h1>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Ask anything about Indian Law</p>
-                    </div>
+                </div>
+
+                {/* LLM Switcher Dropdown */}
+                <div className="relative">
+                    <button
+                        onClick={() => setIsLLMDropdownOpen(!isLLMDropdownOpen)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all shadow-sm hover:shadow-md group"
+                    >
+                        <span className="material-symbols-outlined text-lg text-blue-600 dark:text-blue-400">smart_toy</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {LLM_OPTIONS.find(o => o.value === selectedLLM)?.label || 'Select Model'}
+                        </span>
+                        <span className={`material-symbols-outlined text-sm text-slate-400 transition-transform duration-200 ${isLLMDropdownOpen ? 'rotate-180' : ''}`}>
+                            expand_more
+                        </span>
+                    </button>
+
+                    {isLLMDropdownOpen && (
+                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in-up">
+                            <div className="p-2">
+                                {LLM_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => handleLLMChange(option.value)}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${selectedLLM === option.value
+                                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                            : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                                            }`}
+                                    >
+                                        <span className={`material-symbols-outlined text-lg ${selectedLLM === option.value ? 'text-blue-600' : 'text-slate-400'
+                                            }`}>
+                                            {selectedLLM === option.value ? 'check_circle' : 'radio_button_unchecked'}
+                                        </span>
+                                        <div>
+                                            <div className="text-sm font-medium">{option.label}</div>
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">{option.description}</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -379,6 +481,26 @@ const ResearchChat = () => {
                                 e.target.style.height = e.target.scrollHeight + 'px';
                             }}
                         />
+                        {/* Deep Think Toggle Button */}
+                        <button
+                            onClick={() => setDeepThinkEnabled(!deepThinkEnabled)}
+                            className={`flex-none flex items-center gap-1.5 px-3 py-2 mb-1 rounded-full text-sm font-medium transition-all duration-300 ${deepThinkEnabled
+                                ? 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                                }`}
+                            title={deepThinkEnabled ? 'Deep Think enabled - Advanced reasoning mode' : 'Enable Deep Think for detailed analysis'}
+                        >
+                            <span className={`material-symbols-outlined text-base transition-all duration-300 ${deepThinkEnabled ? 'animate-pulse' : ''
+                                }`}>
+                                psychology
+                            </span>
+                            <span className="hidden sm:inline">Deep Think</span>
+                            {deepThinkEnabled && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                            )}
+                        </button>
+
+                        {/* Send Button */}
                         <button
                             onClick={handleSend}
                             disabled={(!input.trim() && !selectedFile) || isUploading || isTyping}
