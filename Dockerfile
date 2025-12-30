@@ -33,13 +33,6 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
-# Set model cache directory
-ENV SENTENCE_TRANSFORMERS_HOME=/app/models
-
-# Copy and run model download script
-COPY backend/download_model.py .
-RUN python download_model.py && rm download_model.py
-
 # Copy all backend code
 COPY backend/ backend/
 

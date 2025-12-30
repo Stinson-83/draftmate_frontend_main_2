@@ -3,55 +3,33 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
+from main_file import s3_client
 import os
-import traceback
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
-import boto3
-import psycopg2
-
-from contextlib import asynccontextmanager
+import traceback
+from parse_s3_uri import parse_s3_uri
+load_dotenv()
 
 from QueryParsing import normalize_query
 from main_file import get_best_template, download_from_s3
-from parse_s3_uri import parse_s3_uri
+
+from contextlib import asynccontextmanager
 import sql
-
-# ============================================================
-# ENV & AWS CLIENT (IAM ROLE BASED)
-# ============================================================
-
-load_dotenv()
-
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_BUCKET_REGION = os.getenv("S3_BUCKET_REGION", AWS_REGION)
-POSTGRES_DSN = os.getenv("POSTGRES_DSN")
-
-if not POSTGRES_DSN:
-    raise RuntimeError("POSTGRES_DSN is required")
-
-s3_client = boto3.client(
-    "s3",
-    region_name=S3_BUCKET_REGION
-)
-
-# ============================================================
-# FastAPI Lifecycle
-# ============================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Direct DB pool – NO SSH TUNNEL on App Runner
-    sql.init_pool(POSTGRES_DSN)
+    # Startup: Start tunnel and connection pool
+    sql.start_tunnel_and_pool()
     yield
-    sql.close_pool()
+    # Shutdown: Stop tunnel and connection pool
+    sql.stop_tunnel_and_pool()
 
 app = FastAPI(title="Legal Query Service", lifespan=lifespan)
 
-# ============================================================
-# CORS
-# ============================================================
-
+# CORS middleware- allows the front end to communictae to backend
+#- here any frontend has access to our backend services
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -60,10 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================================================
-# Models
-# ============================================================
-
+# Pydantic models
 class QueryRequest(BaseModel):
     user_query: str
     language: Optional[str] = "en"
@@ -75,117 +50,144 @@ class TemplateResult(BaseModel):
     s3_path: str
     alternatives: List[dict]
 
-class DownloadRequest(BaseModel):
-    s3_path: str
-
 class HealthResponse(BaseModel):
     ok: bool
     service: str
 
-# ============================================================
-# Health & Diagnostics
-# ============================================================
+# ==================== Health & Diagnostics ====================
 
 @app.get("/", response_model=HealthResponse)
 async def health():
+    """Health check endpoint."""
     return {"ok": True, "service": "legal-query"}
 
 @app.get("/diag")
 async def diagnostics():
+    """Diagnostics: check environment and database connectivity."""
     try:
-        # DB check
+        # Check .env loaded
+        google_key = os.getenv("GOOGLE_API_KEY")
+        postgres_dsn = os.getenv("POSTGRES_DSN")
+        aws_key = os.getenv("AWS_ACCESS_KEY_ID")
+        
+        # Try to connect to DB
+        db_status = "unknown"
         try:
-            conn = psycopg2.connect(POSTGRES_DSN)
+            import psycopg2
+            conn = psycopg2.connect(postgres_dsn)
             conn.close()
             db_status = "connected"
-        except Exception as e:
-            db_status = f"failed: {str(e)[:120]}"
-
-        # IAM role check (S3)
-        iam_ok = True
-        try:
-            s3_client.list_buckets()
-        except Exception:
-            iam_ok = False
-
+        except Exception as db_err:
+            db_status = f"failed: {str(db_err)[:100]}"
+        
         return {
             "ok": True,
+            "google_api_configured": bool(google_key),
+            "postgres_dsn_configured": bool(postgres_dsn),
+            "aws_configured": bool(aws_key),
             "postgres_status": db_status,
-            "iam_role_active": iam_ok,
-            "aws_region": AWS_REGION
+            "env_path": str(Path(__file__).parent / "queries" / "env")
         }
-
     except Exception as e:
         return {
             "ok": False,
             "error": str(e),
             "traceback": traceback.format_exc()
-        }
+       }
 
-# ============================================================
-# Core API
-# ============================================================
+# ==================== Main Query Endpoints ====================
 
 @app.post("/search", response_model=TemplateResult)
 async def search_template(request: QueryRequest):
+    """
+    Search for best matching legal template by user query.
+    
+    Uses Gemini LLM to normalize the query, searches PostgreSQL documents table,
+    scores matches, and returns the best match with alternatives.
+    
+    Args:
+        user_query: Natural language legal requirement (e.g., "I need acknowledgement letter for loan repayment")
+        language: Document language (default: "en")
+    
+    Returns:
+        TemplateResult: Best matching template with title, doc_id, score, s3_path, and alternatives
+    """
     try:
+        print(f"[search] query: {request.user_query} | lang: {request.language}")
+        
+        # Get best matching template
         result, scored = get_best_template(request.user_query)
-
+        
         if not result:
             raise HTTPException(status_code=404, detail="No matching templates found")
-
+        
         return TemplateResult(**result)
-
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Search error: {str(e)}"
-        )
+        print(f"[search] error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
-# ============================================================
-# Downloads
-# ============================================================
 
 @app.post("/download-template")
-async def download_template(request: DownloadRequest):
+async def download_template(request: BaseModel):
+    """
+    Download a template from S3 to local storage.
+    
+    Args:
+        s3_path: S3 URI (e.g., s3://bucket/docs/id/file.pdf)
+    
+    Returns:
+        Local file path where the template was downloaded
+    """
     try:
-        local_path = download_from_s3(request.s3_path)
-
+        s3_path = getattr(request, 's3_path', None) or request.dict().get('s3_path')
+        if not s3_path:
+            raise HTTPException(status_code=400, detail="s3_path required")
+        
+        print(f"[download-template] s3_path: {s3_path}")
+        local_path = download_from_s3(s3_path)
+        
         return {
             "ok": True,
-            "s3_path": request.s3_path,
+            "s3_path": s3_path,
             "local_path": local_path,
             "filename": Path(local_path).name
         }
-
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Download error: {str(e)}"
-        )
+        print(f"[download-template] error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
 
 @app.post("/download-template-html", response_class=HTMLResponse)
-async def download_template_html(request: DownloadRequest):
+async def download_template_html(payload: dict):
+    s3_path = payload.get("s3_path")
+    if not s3_path:
+        raise HTTPException(status_code=400, detail="s3_path required")
+
     try:
-        bucket, key = parse_s3_uri(request.s3_path)
+        bucket, key = parse_s3_uri(s3_path)
         obj = s3_client.get_object(Bucket=bucket, Key=key)
 
-        html_text = obj["Body"].read().decode("utf-8", errors="replace")
+        # Read the raw bytes
+        html_bytes = obj["Body"].read()
+
+        # Decode to UTF-8 text (HTML)
+        html_text = html_bytes.decode("utf-8", errors="replace")
+
+        # Return raw HTML to frontend
         return HTMLResponse(content=html_text)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
-# Global Error Handler
-# ============================================================
+# ==================== Error Handlers ====================
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
+    """Catch-all exception handler for unhandled errors."""
     return {
         "ok": False,
         "error": str(exc),
-        "traceback": traceback.format_exc()
+        "detail": traceback.format_exc()
     }
