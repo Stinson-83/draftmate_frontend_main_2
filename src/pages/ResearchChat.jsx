@@ -15,6 +15,80 @@ const LLM_OPTIONS = [
     { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast & efficient' },
 ];
 
+// Helper function to make [1], [2], etc. citations clickable
+const processCitations = (content, sources) => {
+    if (!sources || sources.length === 0) return content;
+
+    // Replace [1], [2], etc. with markdown links
+    let processed = content;
+    sources.forEach(source => {
+        const pattern = new RegExp(`\\[${source.index}\\]`, 'g');
+        const link = `[\\[${source.index}\\]](${source.url})`;
+        processed = processed.replace(pattern, link);
+    });
+
+    return processed;
+};
+
+// Citation Link with professional hover tooltip
+const CitationLink = ({ href, children, sources }) => {
+    // Find matching source for this citation
+    const citationMatch = children?.toString().match(/\[(\d+)\]/);
+    const citationIndex = citationMatch ? parseInt(citationMatch[1]) : null;
+    const source = sources?.find(s => s.index === citationIndex);
+
+    return (
+        <span className="relative inline-block group/citation">
+            <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold no-underline bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-all duration-200 border border-blue-200/50 dark:border-blue-700/50 hover:border-blue-300 dark:hover:border-blue-600"
+            >
+                {children}
+            </a>
+            {/* Tooltip */}
+            {source && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover/citation:opacity-100 group-hover/citation:visible transition-all duration-200 z-50 pointer-events-none group-hover/citation:pointer-events-auto">
+                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-3 min-w-[280px] max-w-[350px] backdrop-blur-sm">
+                        {/* Header with type badge */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                            <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${source.type === 'Case'
+                                ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                                : source.type === 'Law'
+                                    ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                }`}>
+                                {source.type || 'Source'}
+                            </span>
+                            <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{source.index}]</span>
+                        </div>
+                        {/* Title */}
+                        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug mb-1 line-clamp-2">
+                            {source.title}
+                        </h4>
+                        {/* Citation if available */}
+                        {source.citation && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-mono">
+                                {source.citation}
+                            </p>
+                        )}
+                        {/* Footer */}
+                        <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                            <span className="material-symbols-outlined text-xs">open_in_new</span>
+                            Click to view full source
+                        </div>
+                    </div>
+                    {/* Arrow */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px]">
+                        <div className="border-8 border-transparent border-t-white dark:border-t-slate-800"></div>
+                    </div>
+                </div>
+            )}
+        </span>
+    );
+};
+
 const ResearchChat = () => {
     const navigate = useNavigate();
     const messagesEndRef = useRef(null);
@@ -140,6 +214,12 @@ const ResearchChat = () => {
                         // Update message with followups
                         setMessages(prev => prev.map(m =>
                             m.id === aiMsgId ? { ...m, followups: aiFollowups } : m
+                        ));
+                    },
+                    onSources: (sources) => {
+                        // Store sources for clickable citations
+                        setMessages(prev => prev.map(m =>
+                            m.id === aiMsgId ? { ...m, sources: sources } : m
                         ));
                     },
                     onDone: (event) => {
@@ -345,10 +425,16 @@ const ResearchChat = () => {
                                                     ? <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-sm font-mono" {...props} />
                                                     : <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-sm font-mono my-3"><code {...props} /></pre>
                                             ),
-                                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />
+                                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+                                            // Style citation links with hover tooltip
+                                            a: ({ node, href, children, ...props }) => (
+                                                <CitationLink href={href} sources={msg.sources}>
+                                                    {children}
+                                                </CitationLink>
+                                            )
                                         }}
                                     >
-                                        {msg.content}
+                                        {processCitations(msg.content, msg.sources)}
                                     </ReactMarkdown>
                                 </div>
                                 {msg.role === 'ai' && index > 0 && messages[index - 1].role === 'user' && (
@@ -380,6 +466,31 @@ const ResearchChat = () => {
                                             </button>
                                         ))}
                                     </div>
+                                )}
+                                {/* Sources Reference */}
+                                {msg.sources && msg.sources.length > 0 && (
+                                    <details className="mt-4 group">
+                                        <summary className="cursor-pointer text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-sm">menu_book</span>
+                                            {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''} Referenced
+                                            <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
+                                        </summary>
+                                        <div className="mt-2 space-y-1 pl-1 border-l-2 border-blue-200 dark:border-blue-800">
+                                            {msg.sources.map((source, sIdx) => (
+                                                <a
+                                                    key={sIdx}
+                                                    href={source.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="block text-xs py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                                >
+                                                    <span className="font-medium text-blue-600 dark:text-blue-400">[{source.index}]</span>
+                                                    <span className="text-slate-600 dark:text-slate-300 ml-1">{source.title}</span>
+                                                    <span className="text-slate-400 dark:text-slate-500 ml-1 text-[10px]">({source.type})</span>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </details>
                                 )}
                                 {msg.file && (
                                     <div className="flex items-center gap-2 mt-2 bg-white/20 p-2 rounded-lg text-sm">

@@ -389,6 +389,26 @@ Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
             if suggested_followups:
                 yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
             
+            # Extract sources for clickable citations
+            sources = []
+            law_ctx = result.get("law_context", [])
+            case_ctx = result.get("case_context", [])
+            all_sources = law_ctx + case_ctx
+            
+            for i, doc in enumerate(all_sources[:15], 1):  # Limit to 15 sources
+                source = {
+                    "index": i,
+                    "title": doc.get("title", "Untitled"),
+                    "url": doc.get("url", ""),
+                    "type": doc.get("source", "Web"),
+                    "citation": doc.get("citation", "")
+                }
+                if source["url"]:  # Only include if URL exists
+                    sources.append(source)
+            
+            if sources:
+                yield f"data: {json.dumps({'event': 'sources', 'sources': sources})}\n\n"
+            
             # Store messages
             if request.user_id:
                 chat_store.add_message(request.user_id, session_id, "user", request.query)
