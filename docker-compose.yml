@@ -82,7 +82,7 @@ services:
       - SSH_KEY_PATH=/app/bastion.key.pem
       - BASTION_IP=${BASTION_IP}
       - SSH_USER=${SSH_USER}
-      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_DSN=${POSTGRES_DSN}
     depends_on:
       db:
         condition: service_healthy

@@ -9,12 +9,11 @@ load_dotenv()
 AWS_ACCESS_KEY_ID= os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY= os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION= os.getenv("AWS_REGION")
+S3_REGION = os.getenv("S3_REGION", AWS_REGION)
 
 s3 = boto3.client(
     "s3",
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name=AWS_REGION
+    region_name=S3_REGION
 )
 
 # bucket_name="user-upload-s3-bucket"
@@ -37,7 +36,7 @@ def upload_to_s3(local_path: str, s3_key: str) -> Tuple[str, str]:
             ExtraArgs={"ContentType": "text/html"}  # so browser knows it’s HTML
         )
         s3_uri = f"s3://{bucket_name}/{s3_key}"
-        https_url = f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+        https_url = f"https://{bucket_name}.s3.{S3_REGION}.amazonaws.com/{s3_key}"
     except (BotoCoreError, ClientError) as e:
         raise HTTPException(status_code=500, detail=f"S3 upload failed: {e}")
 

@@ -35,6 +35,7 @@ load_dotenv()
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
+S3_REGION = os.getenv("S3_REGION", AWS_REGION)
 S3_BUCKET = os.getenv("S3_BUCKET")
 POSTGRES_DSN = os.getenv("POSTGRES_DSN")
 UPLOAD_FOLDER = Path(os.getenv("UPLOAD_FOLDER", "./downloaded_files"))
@@ -42,15 +43,14 @@ INPUT_JSON = os.getenv("INPUT_JSON", "scraped_data.jsonl")
 INTERACTIVE = os.getenv("INTERACTIVE", "true").lower() in ("1","true","yes")
 
 # required env check
-for e in ("AWS_ACCESS_KEY_ID","AWS_SECRET_ACCESS_KEY","S3_BUCKET","POSTGRES_DSN"):
+# required env check
+for e in ("S3_BUCKET","POSTGRES_DSN"):
     if not os.getenv(e):
         raise SystemExit(f"Please set {e} in .env")
 
 s3 = boto3.client(
     "s3",
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name=AWS_REGION
+    region_name=S3_REGION
 )
 
 conn = psycopg2.connect(POSTGRES_DSN)
@@ -176,7 +176,7 @@ def s3_upload(local_path: Path, doc_id: str):
     elif ext==".docx": content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     s3.upload_file(str(local_path), S3_BUCKET, key, ExtraArgs={"ContentType": content_type})
     s3_uri = f"s3://{S3_BUCKET}/{key}"
-    https_url = f"https://{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}"
+    https_url = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{key}"
     return s3_uri, https_url
 
 def upsert_documents(records):

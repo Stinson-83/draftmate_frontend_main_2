@@ -85,7 +85,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
             try {
                 const text = await file.text();
                 // Navigate immediately for HTML
-                navigate('/editor', {
+                navigate('/dashboard/editor', {
                     state: {
                         htmlContent: text,
                         uploadDetails: `Uploaded file: ${file.name}`,
@@ -121,7 +121,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
             toast.dismiss();
             toast.success("File converted successfully!");
 
-            navigate('/editor', {
+            navigate('/dashboard/editor', {
                 state: {
                     htmlContent: htmlContent,
                     uploadDetails: `Uploaded file: ${file.name}`,
@@ -257,7 +257,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
                 }
             }
 
-            navigate('/editor', {
+            navigate('/dashboard/editor', {
                 state: {
                     prompt,
                     selectedFormat: selectedFormat.name,
@@ -303,7 +303,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
             const data = await response.json();
 
             // Assume data.draft contains the generated HTML/text
-            navigate('/editor', {
+            navigate('/dashboard/editor', {
                 state: {
                     htmlContent: data.draft, // The API returns markdown/text, Editor might expect HTML. 
                     // If the Editor expects raw HTML, we might need to convert MD to HTML or ensure API returns what's expected.

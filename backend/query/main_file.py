@@ -23,12 +23,9 @@ EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
 model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
-# Create S3 client
 s3_client = boto3.client(
     "s3",
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-    region_name=os.getenv("AWS_REGION", "ap-south-1")
+    region_name=os.getenv("S3_REGION", os.getenv("AWS_REGION", "ap-south-1"))
 )
 
 
