@@ -248,9 +248,13 @@ def run_query(
     Returns:
         Final state with answer and context
     """
+    # Rewrite query if needed (rule-based + LLM fallback)
+    from lex_bot.core.query_rewriter import rewrite_query
+    processed_query = rewrite_query(query, user_id=user_id, session_id=session_id)
+    
     initial_state = {
         "messages": [],
-        "original_query": query,
+        "original_query": processed_query,  # Use rewritten query
         "user_id": user_id,
         "session_id": session_id,
         "llm_mode": llm_mode,
