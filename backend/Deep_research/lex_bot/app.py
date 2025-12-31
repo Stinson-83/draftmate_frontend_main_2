@@ -395,12 +395,26 @@ Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
             case_ctx = result.get("case_context", [])
             all_sources = law_ctx + case_ctx
             
-            for i, doc in enumerate(all_sources[:15], 1):  # Limit to 15 sources
+            # Map internal source names to user-friendly labels
+            source_name_map = {
+                "Tavily": "Web",
+                "DuckDuckGo": "Web",
+                "Serper": "Web",
+                "Google": "Web",
+                "Database": "Legal Database",
+                "Indian Kanoon": "Case Law",
+                "eCourts": "Court Records",
+            }
+            
+            for i, doc in enumerate(all_sources, 1):  # No limit - show all cited sources
+                raw_source = doc.get("source", "Web")
+                friendly_source = source_name_map.get(raw_source, raw_source)
+                
                 source = {
                     "index": i,
                     "title": doc.get("title", "Untitled"),
                     "url": doc.get("url", ""),
-                    "type": doc.get("source", "Web"),
+                    "type": friendly_source,
                     "citation": doc.get("citation", "")
                 }
                 if source["url"]:  # Only include if URL exists
