@@ -33,6 +33,11 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
+# Install CPU-only PyTorch and heavy ML libraries
+# We install torch first from the CPU index, then easyocr/sentence-transformers
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir easyocr sentence-transformers
+
 # Copy all backend code
 COPY backend/ backend/
 

@@ -20,7 +20,6 @@ langchain-community
 langchain-core
 langchain-google-genai
 langchain-openai
-sentence-transformers
 faiss-cpu
 mem0ai
 numpy
@@ -46,7 +45,6 @@ ddgs
 # PDF & Document Processing
 pymupdf
 pdf2image
-easyocr
 pypdf
 PyPDF2
 Pillow
