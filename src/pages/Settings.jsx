@@ -599,13 +599,7 @@ const Settings = () => {
             {/* Settings Sidebar */}
             <aside className="w-72 flex-shrink-0 h-full overflow-y-auto border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151f2e] hidden lg:block">
                 <div className="p-6 flex flex-col gap-6">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="flex items-center gap-2 text-slate-500 hover:text-primary transition-colors px-1"
-                    >
-                        <span className="material-symbols-outlined">arrow_back</span>
-                        <span className="text-sm font-medium">Back to Dashboard</span>
-                    </button>
+
 
                     {/* Navigation */}
                     <nav className="flex flex-col gap-1">
@@ -614,7 +608,28 @@ const Settings = () => {
                         <NavButton id="document" icon="description" label="Document Settings" />
                         <NavButton id="billing" icon="credit_card" label="Billing & Plans" />
                         <div className="border-t border-slate-100 dark:border-slate-800 my-2"></div>
-                        <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors group w-full text-left">
+                        <button
+                            onClick={async () => {
+                                const sessionId = localStorage.getItem('session_id');
+                                const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+                                try {
+                                    if (sessionId) {
+                                        await fetch(`${API_URL}/auth/logout`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ session_id: sessionId })
+                                        });
+                                    }
+                                } catch (error) {
+                                    console.error('Logout failed:', error);
+                                } finally {
+                                    localStorage.clear();
+                                    toast.success('Logged out successfully');
+                                    navigate('/login');
+                                }
+                            }}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors group w-full text-left"
+                        >
                             <span className="material-symbols-outlined text-[#4c6c9a] group-hover:text-red-600" style={{ fontSize: '22px' }}>logout</span>
                             <p className="text-[#4c6c9a] group-hover:text-red-600 text-sm font-medium leading-normal">Sign Out</p>
                         </button>
@@ -626,15 +641,7 @@ const Settings = () => {
             <main className="flex-1 h-full overflow-y-auto min-w-0">
                 <div className="p-8 max-w-[1200px] mx-auto w-full">
                     {/* Mobile Back Button */}
-                    <div className="lg:hidden mb-6">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="flex items-center gap-2 text-slate-500 hover:text-primary transition-colors"
-                        >
-                            <span className="material-symbols-outlined">arrow_back</span>
-                            <span className="text-sm font-medium">Back to Dashboard</span>
-                        </button>
-                    </div>
+
 
                     {activeTab === 'personal' && <PersonalSettings />}
                     {activeTab === 'document' && <DocumentSettings />}

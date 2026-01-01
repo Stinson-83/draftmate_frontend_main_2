@@ -11,6 +11,7 @@ python-multipart
 python-dateutil
 six
 tqdm
+bcrypt
 
 # AI & LLM
 google-generativeai

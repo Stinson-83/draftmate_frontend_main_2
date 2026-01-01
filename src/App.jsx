@@ -1,4 +1,5 @@
 import React from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -22,6 +23,7 @@ const Placeholder = ({ title }) => (
 import { Toaster } from 'sonner';
 
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Onboarding from './pages/Onboarding';
 
 import Landing from './pages/Landing';
@@ -37,33 +39,36 @@ function App() {
   };
 
   return (
-    <BrowserRouter>
-      <Toaster position="top-center" richColors />
-      <Routes>
-        <Route path="/" element={<Landing />} />
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_CLIENT_ID}>
+      <BrowserRouter>
+        <Toaster position="top-center" richColors />
+        <Routes>
+          <Route path="/" element={<Landing />} />
 
-        <Route path="/login" element={<Login />} />
-        <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/onboarding" element={<Onboarding />} />
 
-        <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
+          <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
 
-        <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
-          <Route path="home" element={<Dashboard />} />
-          <Route path="editor" element={<Editor />} />
-          <Route path="pdf-editor" element={<PDFEditor />} />
-          <Route path="tools" element={<Tools />} />
-          <Route path="drafts" element={<MyDrafts />} />
-          <Route path="research" element={<ResearchChat />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="chat" element={<Placeholder title="AI Chat" />} />
-          {/* Catch-all relative to dashboard */}
-          <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
-        </Route>
+          <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
+            <Route path="home" element={<Dashboard />} />
+            <Route path="editor" element={<Editor />} />
+            <Route path="pdf-editor" element={<PDFEditor />} />
+            <Route path="tools" element={<Tools />} />
+            <Route path="drafts" element={<MyDrafts />} />
+            <Route path="research" element={<ResearchChat />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="chat" element={<Placeholder title="AI Chat" />} />
+            {/* Catch-all relative to dashboard */}
+            <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
+          </Route>
 
-        {/* Global catch-all redirect to Landing */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Global catch-all redirect to Landing */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </GoogleOAuthProvider>
   );
 }
 
