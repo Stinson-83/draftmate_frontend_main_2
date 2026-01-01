@@ -20,6 +20,22 @@ const Placeholder = ({ title }) => (
   </div>
 );
 
+  if (!import.meta.env.VITE_CLIENT_ID) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-red-50 text-red-800 p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Configuration Error</h1>
+          <p>
+            <code>VITE_CLIENT_ID</code> is missing from environment variables.
+          </p>
+          <p className="text-sm mt-2 text-red-600">
+            Please check your <code>.env</code> file and ensure the variable is set and passed to Docker.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
 import { Toaster } from 'sonner';
 
 import Login from './pages/Login';
