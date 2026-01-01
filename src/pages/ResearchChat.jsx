@@ -15,11 +15,11 @@ const LLM_OPTIONS = [
     { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast & efficient' },
 ];
 
-// Helper function to make [1], [2], etc. citations clickable
+// Helper function to make [1], [2] and [Strategy, Section 2] citations clickable
 const processCitations = (content, sources) => {
     if (!sources || sources.length === 0) return content;
 
-    // Replace [1], [2], etc. with markdown links
+    // 1. Handle numeric citations: [1], [2], etc.
     let processed = content;
     sources.forEach(source => {
         const pattern = new RegExp(`\\[${source.index}\\]`, 'g');
@@ -27,64 +27,137 @@ const processCitations = (content, sources) => {
         processed = processed.replace(pattern, link);
     });
 
+    // 2. Handle text-based citations: [Strategy, Section 2], [Case Law, Section 5, point 6]
+    // Regex matches [Something, Something else] but avoids [1] or [1, 2] strictly numeric lists if possible
+    // We look for at least one non-digit character to distinguish from numeric lists or simple refs.
+    // Captures: [ (Source Name) , (Section/Details) ]
+    const textCitationPattern = /\[([a-zA-Z\s]+),\s*([^\]]+)\]/g;
+
+    processed = processed.replace(textCitationPattern, (match, sourceName, details) => {
+        // Construct a special link format that CitationLink can parse
+        // We use a custom protocol/format to pass the identifiers safely
+        return `[${match}](citation://text?source=${encodeURIComponent(sourceName.trim())}&details=${encodeURIComponent(details.trim())})`;
+    });
+
     return processed;
 };
 
 // Citation Link with professional hover tooltip
 const CitationLink = ({ href, children, sources }) => {
-    // Find matching source for this citation
-    const citationMatch = children?.toString().match(/\[(\d+)\]/);
-    const citationIndex = citationMatch ? parseInt(citationMatch[1]) : null;
-    const source = sources?.find(s => s.index === citationIndex);
+    // 1. Check for Numeric Citation [1]
+    const numericMatch = children?.toString().match(/^\[(\d+)\]$/);
+
+    // 2. Check for Text Citation (via our custom protocol or just parsing text)
+    // The href from processCitations will be "citation://text?..."
+    const isTextCitation = href && href.startsWith('citation://');
+    let source = null;
+    let displayText = children;
+    let citationDetails = '';
+
+    if (numericMatch) {
+        const citationIndex = parseInt(numericMatch[1]);
+        source = sources?.find(s => s.index === citationIndex);
+    } else if (isTextCitation) {
+        try {
+            const url = new URL(href);
+            const sourceName = url.searchParams.get('source');
+            citationDetails = url.searchParams.get('details');
+
+            // ROBUST MATCHING LOGIC
+            // 1. Try exact type match
+            source = sources?.find(s => s.type?.toLowerCase() === sourceName?.toLowerCase());
+
+            // 2. Fallback: Try if title contains the source name (e.g. "Strategy" in "Legal Strategy 2024.pdf")
+            if (!source) {
+                source = sources?.find(s => s.title?.toLowerCase().includes(sourceName?.toLowerCase()));
+            }
+
+            // 3. Fallback: Fuzzy type match (e.g. "Strategy Doc" vs "Strategy")
+            if (!source) {
+                source = sources?.find(s => s.type?.toLowerCase().includes(sourceName?.toLowerCase()));
+            }
+
+            // If we found a source, we use its URL. If not, we still render the nice badge but with no link or a safe fallback.
+        } catch (e) {
+            console.warn("Failed to parse citation URL", href);
+        }
+    }
+
+    // Interactive element classes
+    const baseClasses = "relative inline-block group/citation cursor-pointer";
+    const linkClasses = "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold no-underline bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-all duration-200 border border-blue-200/50 dark:border-blue-700/50 hover:border-blue-300 dark:hover:border-blue-600";
+
+    // If it's a known source, we link to it. If it's a just a text citation without a resolved source,
+    // we just show the tooltip but correct visual style.
+    const targetUrl = source ? source.url : undefined;
 
     return (
-        <span className="relative inline-block group/citation">
+        <span className={baseClasses}>
             <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold no-underline bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-all duration-200 border border-blue-200/50 dark:border-blue-700/50 hover:border-blue-300 dark:hover:border-blue-600"
+                href={targetUrl}
+                target={targetUrl ? "_blank" : undefined}
+                rel={targetUrl ? "noopener noreferrer" : undefined}
+                className={linkClasses}
+                onClick={(e) => {
+                    if (!targetUrl) e.preventDefault(); // Don't navigate if no URL
+                }}
             >
-                {children}
+                {displayText}
             </a>
+
             {/* Tooltip */}
-            {source && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover/citation:opacity-100 group-hover/citation:visible transition-all duration-200 z-50 pointer-events-none group-hover/citation:pointer-events-auto">
-                    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-3 min-w-[280px] max-w-[350px] backdrop-blur-sm">
-                        {/* Header with type badge */}
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                            <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${source.type === 'Case'
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover/citation:opacity-100 group-hover/citation:visible transition-all duration-200 z-50 pointer-events-none group-hover/citation:pointer-events-auto">
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-3 min-w-[280px] max-w-[350px] backdrop-blur-sm">
+                    {/* Header with type badge */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                        <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${(source?.type || 'Reference') === 'Case'
                                 ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-                                : source.type === 'Law'
+                                : (source?.type || 'Reference') === 'Law'
                                     ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
                                     : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                                }`}>
-                                {source.type || 'Source'}
-                            </span>
-                            <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{source.index}]</span>
+                            }`}>
+                            {source?.type || 'Source'}
+                        </span>
+                        {source?.index && <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{source.index}]</span>}
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug mb-1 line-clamp-2">
+                        {source ? source.title : "Citation Reference"}
+                    </h4>
+
+                    {/* Citation Details from Text (e.g. Section 2) */}
+                    {citationDetails && (
+                        <div className="text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded mt-1 mb-2 border border-yellow-100 dark:border-yellow-800/30">
+                            📍 Refers to: <strong>{decodeURIComponent(citationDetails)}</strong>
                         </div>
-                        {/* Title */}
-                        <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug mb-1 line-clamp-2">
-                            {source.title}
-                        </h4>
-                        {/* Citation if available */}
-                        {source.citation && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-mono">
-                                {source.citation}
-                            </p>
-                        )}
-                        {/* Footer */}
+                    )}
+
+                    {/* Source Metadata Citation if available */}
+                    {source?.citation && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-mono">
+                            {source.citation}
+                        </p>
+                    )}
+
+                    {/* Footer */}
+                    {source ? (
                         <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                             <span className="material-symbols-outlined text-xs">open_in_new</span>
                             Click to view full source
                         </div>
-                    </div>
-                    {/* Arrow */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px]">
-                        <div className="border-8 border-transparent border-t-white dark:border-t-slate-800"></div>
-                    </div>
+                    ) : (
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                            <span className="material-symbols-outlined text-xs">link_off</span>
+                            Source document not directly linked
+                        </div>
+                    )}
                 </div>
-            )}
+                {/* Arrow */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px]">
+                    <div className="border-8 border-transparent border-t-white dark:border-t-slate-800"></div>
+                </div>
+            </div>
         </span>
     );
 };

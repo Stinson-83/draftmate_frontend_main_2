@@ -10,7 +10,7 @@
  */
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
-const BASE_URL = envBaseUrl !== undefined ? envBaseUrl : 'http://localhost:8080';
+const BASE_URL = envBaseUrl !== undefined ? envBaseUrl : '';
 
 export const API_CONFIG = {
     // Service: backend/converter (Port 8000)
@@ -44,7 +44,7 @@ export const API_CONFIG = {
     // Service: backend/Enhance_bot (Port 8002)
     ENHANCE_BOT: {
         // Direct local address to avoid Nginx requirement for dev
-        BASE_URL: 'http://localhost:8002',
+        BASE_URL: `${BASE_URL}/enhance`,
         ENDPOINTS: {
             ENHANCE_CONTENT: '/enhance_content', // POST
             ENHANCE_CLAUSE: '/enhance_clause', // POST
