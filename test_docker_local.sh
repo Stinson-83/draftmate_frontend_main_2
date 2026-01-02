@@ -2,9 +2,9 @@
 
 # Configuration
 IMAGE_NAME="draftmate-app-local"
-# Load VITE_CLIENT_ID from .env
+# Load VITE_CLIENT_ID from .env safely
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+  VITE_CLIENT_ID=$(grep "^VITE_CLIENT_ID=" .env | cut -d '=' -f2- | tr -d '"' | tr -d "'")
 fi
 
 if [ -z "$VITE_CLIENT_ID" ]; then

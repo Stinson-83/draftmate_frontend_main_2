@@ -4,9 +4,9 @@
 AWS_REGION="us-east-1"
 ECR_REPO_NAME="draftmate-app" # Updated from screenshot
 IMAGE_TAG="latest"
-# Load VITE_CLIENT_ID from .env
+# Load VITE_CLIENT_ID from .env safely
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+  VITE_CLIENT_ID=$(grep "^VITE_CLIENT_ID=" .env | cut -d '=' -f2- | tr -d '"' | tr -d "'")
 fi
 
 if [ -z "$VITE_CLIENT_ID" ]; then

@@ -135,6 +135,8 @@ def verify_session(session_id: str):
             
         return {"valid": True, "user_id": result[0]}
         
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Session verification error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

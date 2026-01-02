@@ -111,10 +111,10 @@ const CitationLink = ({ href, children, sources }) => {
                     {/* Header with type badge */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                         <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${(source?.type || 'Reference') === 'Case'
-                                ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-                                : (source?.type || 'Reference') === 'Law'
-                                    ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
-                                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                            ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                            : (source?.type || 'Reference') === 'Law'
+                                ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                             }`}>
                             {source?.type || 'Source'}
                         </span>
@@ -195,7 +195,9 @@ const ResearchChat = () => {
     }, []);
 
     useEffect(() => {
-        const newSessionId = crypto.randomUUID();
+        // Use existing session from login if available
+        const storedSessionId = localStorage.getItem('session_id');
+        const newSessionId = storedSessionId || crypto.randomUUID();
         setSessionId(newSessionId);
 
         // Fetch current LLM config on mount
