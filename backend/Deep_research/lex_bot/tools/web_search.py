@@ -144,30 +144,51 @@ class WebSearchTool:
             return []
 
     def _scrape_single(self, url: str) -> str:
+        """Scrape a single URL with caching."""
+        import time
+        from lex_bot.config import WEB_CACHE_TTL_SECONDS
+        
+        # --- SCRAPE CACHE ---
+        if not hasattr(self, '_scrape_cache'):
+            self._scrape_cache = {}
+        
+        cache_key = url.strip().lower()
+        if cache_key in self._scrape_cache:
+            timestamp, cached_content = self._scrape_cache[cache_key]
+            if time.time() - timestamp < WEB_CACHE_TTL_SECONDS:
+                logger.info(f"⚡ Scrape Cache HIT: {url[:50]}...")
+                return cached_content
+            else:
+                del self._scrape_cache[cache_key]
+        # --------------------
+        
+        content = ""
+        
         # 1. Trafilatura
         try:
             downloaded = trafilatura.fetch_url(url)
             if downloaded:
                 text = trafilatura.extract(downloaded, favor_precision=True)
                 if text:
-                    return f"\n\n{text}\n\n"
+                    content = f"\n\n{text}\n\n"
         except Exception as e:
             logger.error(f"Trafilatura failed for {url}: {e}")
-            pass
         
         # 2. Firecrawl Fallback
-        if self.firecrawl:
+        if not content and self.firecrawl:
             try:
-                # Attempt generic scrape (handling potential v1/v2 diffs purely by method existence if needed, 
-                # but assuming standard 'scrape_url' or 'scrape')
                 if hasattr(self.firecrawl, 'scrape_url'):
                     data = self.firecrawl.scrape_url(url, params={"formats": ["markdown"]})
                     if 'markdown' in data:
-                        return f"\n\n{data['markdown']}\n\n"
+                        content = f"\n\n{data['markdown']}\n\n"
             except Exception as e:
                 logger.error(f"Firecrawl failed for {url}: {e}")
         
-        return ""
+        # --- SAVE TO CACHE ---
+        if content:
+            self._scrape_cache[cache_key] = (time.time(), content)
+        
+        return content
 
     def scrape_urls(self, urls: List[str]) -> str:
         context = ""
@@ -181,14 +202,29 @@ class WebSearchTool:
 
     def run(self, query: str, domains: List[str] = None) -> Tuple[str, List[Dict]]:
         """
-        Executes "Omni-Search" Strategy:
-        1. Runs DuckDuckGo (Breadth/Free) AND Tavily (Depth/Smart) in PARALLEL.
-        2. Merges and deduplicates results.
-        3. Fallback to Serper/Google only if both fail.
-        4. Scrapes content.
-        
-        This maximizes recall and minimizes latency compared to sequential waterfalls.
+        Executes "Omni-Search" Strategy with Caching:
+        1. Check Cache first.
+        2. If miss, run Omni-Search (DDG + Tavily -> Fallbacks).
+        3. Save to Cache.
         """
+        import time
+        from lex_bot.config import WEB_CACHE_TTL_SECONDS
+
+        # --- CACHE LOOKUP ---
+        if not hasattr(self, '_search_cache'):
+            self._search_cache = {}
+
+        cache_key = f"{query.strip().lower()}:{','.join(sorted(domains)) if domains else 'all'}"
+        
+        if cache_key in self._search_cache:
+            timestamp, cached_context, cached_results = self._search_cache[cache_key]
+            if time.time() - timestamp < WEB_CACHE_TTL_SECONDS:
+                logger.info(f"⚡ Cache HIT for query: '{query}'")
+                return cached_context, cached_results
+            else:
+                del self._search_cache[cache_key]
+        # --------------------
+
         all_results = []
         
         # Parallel Execution of Primary Providers
@@ -246,6 +282,9 @@ class WebSearchTool:
         
         # Scrape
         full_context = self.scrape_urls(scrape_candidates)
+        
+        # --- SAVE TO CACHE ---
+        self._search_cache[cache_key] = (time.time(), full_context, unique_results)
         
         return full_context, unique_results
 

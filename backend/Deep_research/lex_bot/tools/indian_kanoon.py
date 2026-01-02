@@ -62,12 +62,33 @@ class IndianKanoonScraper:
         self.last_request_time = time.time()
     
     def _fetch_page(self, url: str) -> Optional[str]:
-        """Fetch a page with rate limiting."""
+        """Fetch a page with rate limiting and caching."""
+        from lex_bot.config import WEB_CACHE_TTL_SECONDS
+        
+        # --- CACHE CHECK ---
+        if not hasattr(self, '_fetch_cache'):
+            self._fetch_cache = {}
+        
+        cache_key = url.strip().lower()
+        if cache_key in self._fetch_cache:
+            timestamp, cached_html = self._fetch_cache[cache_key]
+            if time.time() - timestamp < WEB_CACHE_TTL_SECONDS:
+                logger.info(f"⚡ IK Cache HIT: {url[:50]}...")
+                return cached_html
+            else:
+                del self._fetch_cache[cache_key]
+        # -------------------
+        
         self._rate_limit()
         try:
             response = self.session.get(url, timeout=15)
             response.raise_for_status()
-            return response.text
+            html = response.text
+            
+            # --- SAVE TO CACHE ---
+            self._fetch_cache[cache_key] = (time.time(), html)
+            
+            return html
         except requests.RequestException as e:
             logger.error(f"Failed to fetch {url}: {e}")
             return None
