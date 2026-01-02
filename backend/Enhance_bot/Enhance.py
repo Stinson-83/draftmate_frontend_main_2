@@ -29,6 +29,7 @@ class EnhanceClauseRequest(BaseModel):
     selected_text: str
     case_context: str
     user_prompt: str = None
+    use_web_search: bool = False  # User toggle for web search (adds latency)
 
 class CreatePlaceholdersRequest(BaseModel):
     html_content: str
@@ -64,13 +65,14 @@ async def enhance_content_endpoint(request: EnhanceContentRequest):
 @app.post("/enhance_clause")
 async def enhance_clause_endpoint(request: EnhanceClauseRequest):
     try:
-        print(f"Received enhance clause request...")
+        print(f"Enhance clause request | Web search: {request.use_web_search}")
         
-        # Call the clause enhancement function
+        # Call the clause enhancement function with web search toggle
         enhanced_text = enhance_clause(
             request.selected_text, 
             request.case_context,
-            request.user_prompt
+            request.user_prompt,
+            request.use_web_search
         )
         
         # Check for errors from backend

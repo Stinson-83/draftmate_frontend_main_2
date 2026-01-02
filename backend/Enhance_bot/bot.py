@@ -1,27 +1,157 @@
 import os
+import json
+import logging
 import google.generativeai as genai
-from google.generativeai  import types
+from google.generativeai import types
 from dotenv import load_dotenv
 from web_search import web_search_tool
+
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # --- CONFIGURATION ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 LLM_MODEL = "gemini-2.5-flash"
 NO_CHANGES_MSG = "No significant suggestions"
 
-# Initialize Client
-client = None
+# --- LEGAL DICTIONARY ---
+# Load once at startup for efficiency
+LEGAL_DICTIONARY = []
+LEGAL_TERMS_INDEX = {}  # Quick lookup by lowercase term
+
+def _load_legal_dictionary():
+    """Load the legal dictionary JSON file."""
+    global LEGAL_DICTIONARY, LEGAL_TERMS_INDEX
+    try:
+        dict_path = os.path.join(os.path.dirname(__file__), "legal_dictionary.json")
+        with open(dict_path, "r", encoding="utf-8") as f:
+            LEGAL_DICTIONARY = json.load(f)
+        
+        # Build index for quick lookup (strip asterisks from terms)
+        for entry in LEGAL_DICTIONARY:
+            term = entry.get("Word", "").replace("*", "").strip().lower()
+            if term:
+                LEGAL_TERMS_INDEX[term] = entry.get("Meaning", "")
+        
+        print(f"Legal dictionary loaded: {len(LEGAL_DICTIONARY)} terms")
+    except Exception as e:
+        logger.error(f"Failed to load legal dictionary: {e}")
+        print(f"Legal dictionary load failed: {e}")
+
+_load_legal_dictionary()
+
+def get_relevant_latin_terms(text: str, case_context: str, limit: int = 10) -> str:
+    """
+    Find Latin legal terms relevant to the given text and context.
+    Returns a formatted string of terms with meanings.
+    """
+    if not LEGAL_DICTIONARY:
+        return ""
+    
+    # Common legal concepts to match
+    concept_mappings = {
+        "beginning": ["ab initio"],
+        "start": ["ab initio"],
+        "good faith": ["bona fide"],
+        "bad faith": ["mala fide"],
+        "from the start": ["ab initio"],
+        "jurisdiction": ["forum non conveniens", "in personam", "in rem"],
+        "contract": ["consensus ad idem", "pacta sunt servanda", "quid pro quo"],
+        "evidence": ["prima facie", "res ipsa loquitur", "corpus delicti"],
+        "court": ["amicus curiae", "in camera", "ex parte"],
+        "person": ["in personam", "per se"],
+        "thing": ["in rem", "res"],
+        "law": ["de jure", "de facto", "lex loci"],
+        "time": ["ex ante", "ex post", "nunc pro tunc"],
+        "innocent": ["presumption of innocence", "actus reus", "mens rea"],
+        "guilty": ["actus reus", "mens rea", "mala fide"],
+        "liability": ["res ipsa loquitur", "respondeat superior"],
+        "bail": ["habeas corpus", "in custodia legis"],
+        "arrest": ["habeas corpus", "in custodia legis"],
+        "custody": ["habeas corpus", "in custodia legis"],
+        "property": ["in rem", "bona vacantia", "res nullius"],
+        "intent": ["mens rea", "animus contrahendi", "animus nocendi"],
+        "void": ["ab initio", "void ab initio", "ultra vires"],
+        "death": ["in articulo mortis", "donatio mortis causa"],
+        "will": ["animus testandi", "testator"],
+        "arbitration": ["ad hoc", "in personam"],
+        "appeal": ["certiorari", "a quo", "ad quem"],
+        "injunction": ["status quo", "in terrorem"],
+    }
+    
+    combined_text = (text + " " + case_context).lower()
+    relevant_terms = set()
+    
+    # Find matching concepts
+    for concept, terms in concept_mappings.items():
+        if concept in combined_text:
+            relevant_terms.update(terms)
+    
+    # Look up actual definitions
+    result_terms = []
+    for term in relevant_terms:
+        term_lower = term.lower()
+        if term_lower in LEGAL_TERMS_INDEX:
+            meaning = LEGAL_TERMS_INDEX[term_lower]
+            result_terms.append(f"- {term}: {meaning}")
+    
+    # Limit results
+    result_terms = result_terms[:limit]
+    
+    if result_terms:
+        return "\n".join(result_terms)
+    return ""
+
+def get_web_legal_context(case_context: str, selected_text: str) -> str:
+    """
+    Fetch legal context from web search based on the case context.
+    Returns scraped content from relevant legal sources.
+    """
+    try:
+        # Build a focused search query
+        search_query = f"Indian law {case_context[:200]}"
+        
+        print(f"Web search: {search_query[:100]}...")
+        
+        # Use web_search_tool with Indian legal domains
+        legal_domains = ["indiankanoon.org", "scconline.com", "livelaw.in", "barandbench.com"]
+        context, results = web_search_tool.run(search_query, domains=legal_domains)
+        
+        # Limit context to avoid token overflow
+        if context and len(context) > 2000:
+            context = context[:2000] + "..."
+        
+        if context:
+            print(f"Web context fetched: {len(context)} chars")
+            return context
+        else:
+            print("No web context found")
+            return ""
+            
+    except Exception as e:
+        logger.error(f"Web search failed: {e}")
+        print(f"Web search error: {e}")
+        return ""
+
+# --- GEMINI INITIALIZATION ---
 try:
-    if GEMINI_API_KEY :
+    if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
         print("Gemini client initialized.")
 except Exception as e:
-    print(f"Warning: Client init failed ({e}). Using mock mode.")
+    print(f"Gemini client init failed ({e}). Using mock mode.")
 
-def enhance_clause(selected_text: str, case_context: str, user_prompt: str = None) -> str:
+def enhance_clause(selected_text: str, case_context: str, user_prompt: str = None, use_web_search: bool = False) -> str:
     """
     Analyzes a legal clause and returns a revision suggestion or 'No significant suggestions'.
+    
+    Args:
+        selected_text: The clause/text to enhance
+        case_context: Context about the case/document
+        user_prompt: Optional user instructions (e.g., "make it stricter", "add latin terms")
+        use_web_search: If True, fetch additional legal context from web (adds latency)
     """
     # 1. Handle Mock/Fallback Mode
     if not GEMINI_API_KEY:
@@ -29,34 +159,60 @@ def enhance_clause(selected_text: str, case_context: str, user_prompt: str = Non
             return NO_CHANGES_MSG
         return "Revised clause based on mock logic."
 
-    # 2. Construct Prompt
-    system_instruction = f"""
-    You are an expert Senior Legal Editor. Your task is to ENHANCE the 'Input Clause' based on the provided Case Context and any User Instructions.
+    # 2. Get relevant Latin terms
+    latin_terms = get_relevant_latin_terms(selected_text, case_context)
+    latin_section = ""
+    if latin_terms:
+        latin_section = f"""
 
-    INPUT DATA:
-    1. Case Context: The facts and background of the case.
-    2. User Instructions: Specific directions from the user on how to enhance the text (e.g., "make it stricter", "shorten it", "enhance usinf latin law words").
+LATIN LEGAL TERMS (use these appropriately to make the text more professional):
+{latin_terms}
+"""
+        print(f"Found relevant Latin terms")
 
-    Your Goal: Use the Case Context and User Instructions to rewrite the Input Clause. It must be professional, legally precise, and impactful.
+    # 3. Get web context if requested
+    web_context = ""
+    if use_web_search:
+        web_data = get_web_legal_context(case_context, selected_text)
+        if web_data:
+            web_context = f"""
 
-    STRICT OUTPUT RULES:
-    1. Output ONLY the enhanced version of the text.
-    2. Do NOT provide explanations, preambles, or quotes.
-    3. The output must be a direct replacement for the input text.
-    4. If the text is already perfect, return it exactly as is.
-    """
+LEGAL REFERENCE CONTEXT (from web research, use for accurate legal backing):
+{web_data[:1500]}
+"""
     
-    contents = f"""
-    Contexts:
-    - Case_context: {case_context}
-    - User Instructions: {user_prompt if user_prompt else "None"}
-    
-    Input Clause: {selected_text}
-    """
+    # 4. Construct Enhanced Prompt
+    system_instruction = f"""You are an expert Senior Legal Editor specializing in Indian law. Your task is to ENHANCE the 'Input Clause' based on the provided Case Context and any User Instructions.
 
-    # 3. Call API
+INPUT DATA:
+1. Case Context: The facts and background of the case.
+2. User Instructions: Specific directions from the user on how to enhance the text (e.g., "make it stricter", "shorten it", "add latin terms").
+{latin_section}{web_context}
+
+YOUR GOAL: 
+- Use the Case Context and User Instructions to rewrite the Input Clause
+- Make it professional, legally precise, and impactful
+- Ensure the language is suitable for court submissions or legal documents
+
+LATIN TERMS USAGE:
+- Use Latin terms ONLY when they naturally fit and add value
+- Do NOT force Latin terms into every sentence
+
+STRICT OUTPUT RULES:
+1. Output ONLY the enhanced version of the text.
+2. Do NOT provide explanations, preambles, or quotes.
+3. The output must be a direct replacement for the input text.
+4. If the text is already perfect, return it exactly as is.
+5. Do NOT wrap output in quotes or markdown."""
+    
+    contents = f"""Contexts:
+- Case Context: {case_context}
+- User Instructions: {user_prompt if user_prompt else "Enhance for clarity and legal impact"}
+    
+Input Clause: {selected_text}"""
+
+    # 5. Call Gemini API
     try:
-        
         model = genai.GenerativeModel(
             model_name=LLM_MODEL,
             system_instruction=system_instruction
@@ -66,7 +222,7 @@ def enhance_clause(selected_text: str, case_context: str, user_prompt: str = Non
             contents=[contents],
             generation_config={
                 "temperature": 0.1,
-                "max_output_tokens": 512*4
+                "max_output_tokens": 512 * 4
             },
             safety_settings={
                 types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
@@ -75,16 +231,27 @@ def enhance_clause(selected_text: str, case_context: str, user_prompt: str = Non
                 types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
             }
         )
+        
         try:
             result = response.text.strip()
-            # Ensure we match the "No significant suggestions" format strictly if close
+            # Clean up common LLM artifacts
+            if result.startswith('"') and result.endswith('"'):
+                result = result[1:-1]
+            if result.startswith("'") and result.endswith("'"):
+                result = result[1:-1]
+            
+            # Check for no-op response
             if result.lower() == NO_CHANGES_MSG.lower() or "no changes" in result.lower():
                 return NO_CHANGES_MSG
+            
+            print(f"Enhancement complete: {len(result)} chars")
             return result
+            
         except ValueError:
             return "Unable to enhance text due to safety filters."
 
     except Exception as e:
+        logger.error(f"Enhance Clause Error: {e}")
         with open("error.log", "a") as f:
             f.write(f"Enhance Clause Error: {str(e)}\n")
         return f"Error: {e}"
