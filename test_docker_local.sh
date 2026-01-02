@@ -2,7 +2,15 @@
 
 # Configuration
 IMAGE_NAME="draftmate-app-local"
-VITE_CLIENT_ID="462761102428-qa47r8k64d1log5488m2un9890iprauu.apps.googleusercontent.com"
+# Load VITE_CLIENT_ID from .env
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
+
+if [ -z "$VITE_CLIENT_ID" ]; then
+  echo "Error: VITE_CLIENT_ID not found in .env"
+  exit 1
+fi
 
 echo "🏗️ Building Docker Image for Local Testing..."
 docker build \

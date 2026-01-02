@@ -4,7 +4,15 @@
 AWS_REGION="us-east-1"
 ECR_REPO_NAME="draftmate-app" # Updated from screenshot
 IMAGE_TAG="latest"
-VITE_CLIENT_ID="462761102428-qa47r8k64d1log5488m2un9890iprauu.apps.googleusercontent.com"
+# Load VITE_CLIENT_ID from .env
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
+
+if [ -z "$VITE_CLIENT_ID" ]; then
+  echo "Error: VITE_CLIENT_ID not found in .env"
+  exit 1
+fi
 
 # 1. Authenticate with ECR
 echo "🔐 Authenticating with ECR..."
