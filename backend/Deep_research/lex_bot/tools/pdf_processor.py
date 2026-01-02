@@ -20,7 +20,12 @@ class PDFProcessor:
             chunk_overlap=chunk_overlap,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
-        self.reader = easyocr.Reader(['en'], gpu=False)
+        import os
+        easyocr_path = os.getenv("EASYOCR_MODULE_PATH")
+        if easyocr_path:
+             self.reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=easyocr_path)
+        else:
+             self.reader = easyocr.Reader(['en'], gpu=False)
 
     def extract_text(self, pdf_path: str) -> str:
             # 1. Try Direct Extraction

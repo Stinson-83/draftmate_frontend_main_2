@@ -47,7 +47,8 @@ try:
 
     # 2. Backfill Embeddings
     print("2. Backfilling Embeddings...")
-    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    embed_model_name = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    model = SentenceTransformer(embed_model_name)
     
     cur.execute("SELECT doc_id, title, snippet FROM documents WHERE embedding IS NULL")
     rows = cur.fetchall()

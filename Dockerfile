@@ -17,6 +17,9 @@ FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+ENV EMBED_MODEL=/app/models/embedding
+ENV RERANK_MODEL=/app/models/rerank
+ENV EASYOCR_MODULE_PATH=/app/models/easyocr
 
 # Set work directory
 WORKDIR /app
@@ -39,6 +42,10 @@ RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 # We install torch first from the CPU index, then easyocr/sentence-transformers
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir easyocr sentence-transformers
+
+# Pre-download models to bake them into the image
+COPY backend/download_models.py .
+RUN python download_models.py
 
 # Copy all backend code
 COPY backend/ backend/

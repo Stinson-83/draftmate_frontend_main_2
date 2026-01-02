@@ -24,7 +24,8 @@ from psycopg2.extras import execute_values
 from sentence_transformers import SentenceTransformer
 
 # Load Model (Global) - efficiently loaded only once
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+# Load Model (Global) - efficiently loaded only once
+EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
 model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
