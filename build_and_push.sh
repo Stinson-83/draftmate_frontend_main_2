@@ -3,7 +3,7 @@
 # Configuration
 AWS_REGION="us-east-1"
 ECR_REPO_NAME="draftmate-app" # Updated from screenshot
-IMAGE_TAG="latest"
+IMAGE_TAG="v10"
 # Load VITE_CLIENT_ID from .env safely
 if [ -f .env ]; then
   VITE_CLIENT_ID=$(grep "^VITE_CLIENT_ID=" .env | cut -d '=' -f2- | tr -d '"' | tr -d "'")
@@ -31,7 +31,7 @@ docker build \
 
 # 3. Tag the Image
 echo "🏷️ Tagging Image..."
-docker tag $ECR_REPO_NAME:latest $ECR_URI:$IMAGE_TAG
+docker tag $ECR_REPO_NAME:v10 $ECR_URI:$IMAGE_TAG
 
 # 4. Push to ECR
 echo "🚀 Pushing to ECR..."
