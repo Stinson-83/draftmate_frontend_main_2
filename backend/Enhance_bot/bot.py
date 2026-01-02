@@ -16,6 +16,79 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 LLM_MODEL = "gemini-2.5-flash"
 NO_CHANGES_MSG = "No significant suggestions"
 
+# --- ENHANCEMENT PRESETS ---
+ENHANCEMENT_PRESETS = {
+    "stronger": {
+        "name": "Stronger",
+        "prompt": "Make the language more assertive, persuasive, and impactful. Use stronger verbs and more decisive phrasing."
+    },
+    "concise": {
+        "name": "Concise",
+        "prompt": "Shorten and tighten the language significantly. Remove redundant words while preserving all legal meaning."
+    },
+    "formal": {
+        "name": "Formal",
+        "prompt": "Make the language more formal, professional, and suitable for court submissions. Use proper legal terminology."
+    },
+    "citations": {
+        "name": "Citations",
+        "prompt": "Where appropriate, suggest relevant legal citations, case references, statutory provisions, or legal principles that support the argument."
+    }
+}
+
+# --- SECTION DETECTION ---
+# Comprehensive keywords for detecting legal document sections
+# Only applies section-specific enhancement if a section is detected
+SECTION_KEYWORDS = {
+    "title": [
+        "in the court of", "in the high court", "in the supreme court", 
+        "before the", "hon'ble", "honourable", "criminal case", "civil case",
+        "writ petition", "special leave petition", "criminal appeal", "civil appeal",
+        "arbitration petition", "company petition", "original jurisdiction"
+    ],
+    "facts": [
+        "that the applicant", "that the petitioner", "that the accused",
+        "that on", "dated", "fir no", "fir bearing", "police station",
+        "was arrested", "was registered", "occurred on", "took place",
+        "the brief facts", "facts of the case", "factual matrix",
+        "it is submitted that", "the complainant", "the deceased"
+    ],
+    "grounds": [
+        "grounds for", "ground no", "because", "submitted that",
+        "contended that", "argued that", "it is humbly submitted",
+        "on the ground", "grounds of appeal", "grounds of revision",
+        "without prejudice", "in the alternative", "further submitted",
+        "the learned", "trial court erred", "lower court failed"
+    ],
+    "prayer": [
+        "prayer", "relief sought", "reliefs claimed", "wherefore",
+        "in light of the above", "humbly prays", "respectfully prays",
+        "this hon'ble court may", "be pleased to", "grant bail",
+        "set aside", "quash", "stay", "direct the respondent",
+        "pass such other order", "deemed fit and proper"
+    ],
+    "verification": [
+        "verification", "verified at", "solemnly affirm", "solemnly declare",
+        "true to my knowledge", "true and correct", "belief and information",
+        "on oath", "deponent", "verifier", "sworn before"
+    ],
+    "arguments": [
+        "legal submissions", "arguments advanced", "it is well settled",
+        "the hon'ble supreme court", "held in", "observed in",
+        "ratio decidendi", "precedent", "binding authority",
+        "constitution of india", "article", "section", "under section"
+    ]
+}
+
+SECTION_PROMPTS = {
+    "title": "This is a document title/caption. Ensure proper legal formatting, court names, and case details are accurate and professionally presented.",
+    "facts": "This is the FACTS section. Keep the language precise, factual, and chronological. Avoid argumentative language. Focus on clarity and accuracy of events, dates, and persons involved.",
+    "grounds": "This is the GROUNDS/ARGUMENTS section. Make the language persuasive and assertive. Strengthen legal arguments. Use compelling language to support the case.",
+    "prayer": "This is the PRAYER/RELIEF section. Use formal legal language for requesting relief. Ensure the reliefs sought are clearly and precisely stated.",
+    "verification": "This is the VERIFICATION section. Use standard legal verification language. Keep it formal and in the required legal format.",
+    "arguments": "This is the LEGAL ARGUMENTS section. Strengthen citations, legal principles, and precedents. Make arguments more compelling and legally sound."
+}
+
 # --- LEGAL DICTIONARY ---
 # Load once at startup for efficiency
 LEGAL_DICTIONARY = []
@@ -135,6 +208,30 @@ def get_web_legal_context(case_context: str, selected_text: str) -> str:
         print(f"Web search error: {e}")
         return ""
 
+def detect_section_type(text: str, context: str) -> str:
+    """
+    Detect the type of legal document section based on keywords.
+    Returns None if no section is detected (skips section-aware enhancement).
+    """
+    combined = (text + " " + context).lower()
+    
+    # Count matches for each section type
+    section_scores = {}
+    for section, keywords in SECTION_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in combined)
+        if score > 0:
+            section_scores[section] = score
+    
+    # Return the section with highest score, or None if no matches
+    if section_scores:
+        best_section = max(section_scores, key=section_scores.get)
+        # Only return if we have at least 2 keyword matches for confidence
+        if section_scores[best_section] >= 2:
+            print(f"Section detected: {best_section} (score: {section_scores[best_section]})")
+            return best_section
+    
+    return None  # No section detected, skip section-aware enhancement
+
 # --- GEMINI INITIALIZATION ---
 try:
     if GEMINI_API_KEY:
@@ -143,67 +240,87 @@ try:
 except Exception as e:
     print(f"Gemini client init failed ({e}). Using mock mode.")
 
-def enhance_clause(selected_text: str, case_context: str, user_prompt: str = None, use_web_search: bool = False) -> str:
+def enhance_clause(
+    selected_text: str, 
+    case_context: str, 
+    user_prompt: str = None, 
+    use_web_search: bool = False,
+    preset: str = None,
+    suggest_only: bool = False
+) -> dict:
     """
-    Analyzes a legal clause and returns a revision suggestion or 'No significant suggestions'.
+    Analyzes a legal clause and returns an enhanced version.
     
     Args:
         selected_text: The clause/text to enhance
         case_context: Context about the case/document
-        user_prompt: Optional user instructions (e.g., "make it stricter", "add latin terms")
-        use_web_search: If True, fetch additional legal context from web (adds latency)
+        user_prompt: Optional user instructions
+        use_web_search: If True, fetch additional legal context from web
+        preset: Enhancement preset (stronger, concise, formal, citations)
+        suggest_only: If True, return both original and enhanced for diff preview
+    
+    Returns:
+        If suggest_only=False: Enhanced text string
+        If suggest_only=True: Dict with 'original', 'enhanced', 'section_detected'
     """
     # 1. Handle Mock/Fallback Mode
     if not GEMINI_API_KEY:
-        if "governing law" in selected_text.lower() and "Delaware" in case_context:
-            return NO_CHANGES_MSG
+        if suggest_only:
+            return {"original": selected_text, "enhanced": "Mock enhanced text", "section_detected": None}
         return "Revised clause based on mock logic."
 
-    # 2. Get relevant Latin terms
+    # 2. Build additional instructions from preset
+    preset_instruction = ""
+    if preset and preset in ENHANCEMENT_PRESETS:
+        preset_instruction = f"\n\nPRESET INSTRUCTION: {ENHANCEMENT_PRESETS[preset]['prompt']}"
+        print(f"Using preset: {preset}")
+
+    # 3. Detect section type (only applies if detected)
+    section_type = detect_section_type(selected_text, case_context)
+    section_instruction = ""
+    if section_type and section_type in SECTION_PROMPTS:
+        section_instruction = f"\n\nSECTION CONTEXT: {SECTION_PROMPTS[section_type]}"
+
+    # 4. Get relevant Latin terms
     latin_terms = get_relevant_latin_terms(selected_text, case_context)
     latin_section = ""
     if latin_terms:
         latin_section = f"""
 
-LATIN LEGAL TERMS (use these appropriately to make the text more professional):
+LATIN LEGAL TERMS (use only if naturally appropriate):
 {latin_terms}
 """
-        print(f"Found relevant Latin terms")
 
-    # 3. Get web context if requested
+    # 5. Get web context if requested
     web_context = ""
     if use_web_search:
         web_data = get_web_legal_context(case_context, selected_text)
         if web_data:
             web_context = f"""
 
-LEGAL REFERENCE CONTEXT (from web research, use for accurate legal backing):
+LEGAL REFERENCE CONTEXT (from web research):
 {web_data[:1500]}
 """
     
-    # 4. Construct Enhanced Prompt
-    system_instruction = f"""You are an expert Senior Legal Editor specializing in Indian law. Your task is to ENHANCE the 'Input Clause' based on the provided Case Context and any User Instructions.
+    # 6. Construct Enhanced Prompt
+    system_instruction = f"""You are an expert Senior Legal Editor specializing in Indian law. Your task is to ENHANCE the 'Input Clause' based on the provided context and instructions.
 
 INPUT DATA:
-1. Case Context: The facts and background of the case.
-2. User Instructions: Specific directions from the user on how to enhance the text (e.g., "make it stricter", "shorten it", "add latin terms").
-{latin_section}{web_context}
+1. Case Context: Background information about the case/document.
+2. User Instructions: Specific enhancement directions from the user.
+{preset_instruction}{section_instruction}{latin_section}{web_context}
 
 YOUR GOAL: 
-- Use the Case Context and User Instructions to rewrite the Input Clause
-- Make it professional, legally precise, and impactful
+- Rewrite the Input Clause to be more professional, legally precise, and impactful
+- Follow any preset or section-specific instructions provided
 - Ensure the language is suitable for court submissions or legal documents
 
-LATIN TERMS USAGE:
-- Use Latin terms ONLY when they naturally fit and add value
+IMPORTANT RULES:
+- Use Latin terms ONLY when they naturally fit
 - Do NOT force Latin terms into every sentence
-
-STRICT OUTPUT RULES:
-1. Output ONLY the enhanced version of the text.
-2. Do NOT provide explanations, preambles, or quotes.
-3. The output must be a direct replacement for the input text.
-4. If the text is already perfect, return it exactly as is.
-5. Do NOT wrap output in quotes or markdown."""
+- Output ONLY the enhanced text, no explanations
+- Do NOT wrap output in quotes or markdown
+- If text is already perfect, return it as is"""
     
     contents = f"""Contexts:
 - Case Context: {case_context}
@@ -211,7 +328,7 @@ STRICT OUTPUT RULES:
     
 Input Clause: {selected_text}"""
 
-    # 5. Call Gemini API
+    # 7. Call Gemini API
     try:
         model = genai.GenerativeModel(
             model_name=LLM_MODEL,
@@ -242,19 +359,33 @@ Input Clause: {selected_text}"""
             
             # Check for no-op response
             if result.lower() == NO_CHANGES_MSG.lower() or "no changes" in result.lower():
-                return NO_CHANGES_MSG
+                result = selected_text  # Return original if no changes
             
             print(f"Enhancement complete: {len(result)} chars")
+            
+            # Return appropriate format based on suggest_only
+            if suggest_only:
+                return {
+                    "original": selected_text,
+                    "enhanced": result,
+                    "section_detected": section_type
+                }
             return result
             
         except ValueError:
-            return "Unable to enhance text due to safety filters."
+            error_msg = "Unable to enhance text due to safety filters."
+            if suggest_only:
+                return {"original": selected_text, "enhanced": error_msg, "section_detected": None}
+            return error_msg
 
     except Exception as e:
         logger.error(f"Enhance Clause Error: {e}")
         with open("error.log", "a") as f:
             f.write(f"Enhance Clause Error: {str(e)}\n")
-        return f"Error: {e}"
+        error_msg = f"Error: {e}"
+        if suggest_only:
+            return {"original": selected_text, "enhanced": error_msg, "section_detected": None}
+        return error_msg
 
 def enhance_content(selected_text: str, user_context: str) -> str:
     """
