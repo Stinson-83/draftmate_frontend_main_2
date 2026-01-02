@@ -25,7 +25,7 @@ model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
 s3_client = boto3.client(
     "s3",
-    region_name=os.getenv("S3_REGION", os.getenv("AWS_REGION", "ap-south-1"))
+    region_name=os.getenv("S3_REGION", os.getenv("AWS_REGION", "ap-south-1").strip()).strip()
 )
 
 

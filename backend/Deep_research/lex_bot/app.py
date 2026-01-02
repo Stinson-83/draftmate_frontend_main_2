@@ -22,7 +22,7 @@ from typing import Optional, List
 from datetime import datetime
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -247,6 +247,57 @@ _runtime_config = {
 
 
 # ============ Endpoints ============
+# ============ Auth Dependency ============
+import httpx
+
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8009")
+
+async def verify_token(request: Request):
+    """
+    Verify session token with Auth Service.
+    Expects 'Authorization: Bearer <session_id>' or 'session_id' in body/query.
+    """
+    # 1. Try Authorization header
+    auth_header = request.headers.get("Authorization")
+    session_id = None
+    if auth_header and auth_header.startswith("Bearer "):
+        session_id = auth_header.split(" ")[1]
+    
+    # 2. Try body (for some endpoints)
+    if not session_id:
+        try:
+            body = await request.json()
+            session_id = body.get("session_id")
+        except:
+            pass
+            
+    # 3. Try query param
+    if not session_id:
+        session_id = request.query_params.get("session_id")
+        
+    # 4. Try form data (for upload)
+    if not session_id:
+        try:
+            form = await request.form()
+            session_id = form.get("session_id")
+        except:
+            pass
+
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Missing session_id or Authorization header")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{AUTH_SERVICE_URL}/verify_session/{session_id}")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=401, detail="Invalid session")
+            return resp.json().get("user_id")
+    except httpx.RequestError as e:
+        logger.error(f"Auth service connection failed: {e}")
+        raise HTTPException(status_code=500, detail="Auth service unavailable")
+
+
+# ============ Endpoints ============
 @app.get("/")
 def health_check():
     """Health check endpoint."""
@@ -294,23 +345,28 @@ def set_llm_config(request: LLMConfigRequest):
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_normal(request: ChatRequest):
+async def chat_normal(request: ChatRequest, user_id: str = Depends(verify_token)):
     """
     Normal mode - standard response without chain-of-thought.
     """
+    # Override user_id from token if present
+    if user_id:
+        request.user_id = user_id
     return await _process_chat(request, llm_mode="fast", include_cot=False)
 
 
 @app.post("/chat/reasoning", response_model=ChatResponse)
-async def chat_reasoning(request: ChatRequest):
+async def chat_reasoning(request: ChatRequest, user_id: str = Depends(verify_token)):
     """
     Reasoning mode - same model as normal, but with chain-of-thought enabled.
     """
+    if user_id:
+        request.user_id = user_id
     return await _process_chat(request, llm_mode="reasoning", include_cot=True)
 
 
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest): # Streaming is tricky with Depends, handling manually inside if needed or via query param
     """
     Streaming chat with token-by-token response.
     Uses Server-Sent Events (SSE) to push:
@@ -320,8 +376,29 @@ async def chat_stream(request: ChatRequest):
     - followups: Suggested follow-up questions
     - done: Final metadata
     """
+    # Manual verification for streaming to avoid breaking SSE flow immediately
+    # Ideally should be protected, but for now we'll check if session_id is valid via internal logic if needed
+    # For strict security, we should verify here:
+    # try:
+    #    await verify_token(Request(scope={"type": "http", "headers": [], "query_string": f"session_id={request.session_id}".encode()}))
+    # except:
+    #    pass 
+    
     async def event_generator():
         session_id = request.session_id or str(uuid.uuid4())
+        
+        # Verify Token Manually for Stream
+        try:
+             async with httpx.AsyncClient() as client:
+                resp = await client.get(f"{AUTH_SERVICE_URL}/verify_session/{session_id}")
+                if resp.status_code != 200:
+                     yield f"data: {json.dumps({'event': 'error', 'message': 'Unauthorized'})}\n\n"
+                     return
+        except Exception:
+             # Fail open or closed? Closed for security.
+             yield f"data: {json.dumps({'event': 'error', 'message': 'Auth check failed'})}\n\n"
+             return
+
         start_time = time.time()
         
         try:

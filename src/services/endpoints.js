@@ -86,5 +86,17 @@ export const API_CONFIG = {
             WATERMARK: '/watermark', // POST
             ASSEMBLE: '/assemble', // POST
         }
+    },
+
+    // Service: backend/login_db (Port 8009)
+    AUTH: {
+        BASE_URL: `${BASE_URL}/auth`,
+        ENDPOINTS: {
+            LOGIN: '/login', // POST
+            REGISTER: '/register', // POST
+            GOOGLE_LOGIN: '/google-login', // POST
+            LOGOUT: '/logout', // POST
+            VERIFY_SESSION: '/verify_session', // GET
+        }
     }
 };

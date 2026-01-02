@@ -25,16 +25,74 @@ app.add_middleware(
 )
 
 # Database Connection
+import sys
+from sshtunnel import SSHTunnelForwarder
+import paramiko
+
+# Monkey-patch paramiko.DSSKey for compatibility with sshtunnel + paramiko 3.0+
+if not hasattr(paramiko, "DSSKey"):
+    class MockDSSKey:
+        @classmethod
+        def from_private_key_file(cls, filename, password=None):
+            return None
+    paramiko.DSSKey = MockDSSKey
+
+# Configuration
+POSTGRES_DSN = os.getenv("POSTGRES_DSN")
+BASTION_IP = os.getenv("BASTION_IP")
+SSH_KEY_PATH = os.getenv("SSH_KEY_PATH")
+RDS_ENDPOINT = os.getenv("RDS_ENDPOINT")
+SSH_USER = os.getenv("SSH_USER", "ec2-user")
+LOCAL_BIND_PORT = 5432
+
+# Global tunnel reference to keep it alive
+_tunnel = None
+
 def get_db_connection():
+    global _tunnel
     try:
-        conn = psycopg2.connect(
-            host=os.getenv("AUTH_DB_HOST", "user-login-1.cpqe0w8omttt.eu-north-1.rds.amazonaws.com"),
-            dbname=os.getenv("AUTH_DB_NAME", "postgres"),
-            user=os.getenv("AUTH_DB_USER", "postgres"),
-            password=os.getenv("AUTH_DB_PASSWORD", "ItnCEoJrFOVDAvHDwt1u"),
-            port=os.getenv("AUTH_DB_PORT", "5432")
-        )
-        return conn
+        # Check if we need to use SSH tunnel
+        if BASTION_IP and SSH_KEY_PATH and RDS_ENDPOINT:
+            # Only start tunnel if not already active
+            if _tunnel is None or not _tunnel.is_active:
+                print(f"🔒 Starting SSH tunnel via {BASTION_IP}...")
+                try:
+                    _tunnel = SSHTunnelForwarder(
+                        (BASTION_IP, 22),
+                        ssh_username=SSH_USER,
+                        ssh_pkey=SSH_KEY_PATH,
+                        remote_bind_address=(RDS_ENDPOINT, 5432),
+                        local_bind_address=('127.0.0.1', LOCAL_BIND_PORT)
+                    )
+                    _tunnel.start()
+                    print(f"✅ Tunnel active on port {_tunnel.local_bind_port}")
+                except Exception as e:
+                    print(f"❌ Tunnel connection failed: {e}")
+                    raise
+
+            # Connect to local forwarded port
+            conn = psycopg2.connect(
+                host='127.0.0.1',
+                port=_tunnel.local_bind_port,
+                user=os.getenv("POSTGRES_USER", "lawuser"),
+                password=os.getenv("POSTGRES_PASSWORD", "Siddchick2506"),
+                dbname=os.getenv("POSTGRES_DB", "postgres")
+            )
+            return conn
+        else:
+            # Direct connection
+            dsn = os.getenv("POSTGRES_DSN")
+            if dsn:
+                conn = psycopg2.connect(dsn)
+            else:
+                conn = psycopg2.connect(
+                    host=os.getenv("POSTGRES_HOST", "db"),
+                    dbname=os.getenv("POSTGRES_DB", "lex_bot_db"),
+                    user=os.getenv("POSTGRES_USER", "postgres"),
+                    password=os.getenv("POSTGRES_PASSWORD", "password"),
+                    port=os.getenv("POSTGRES_PORT", "5432")
+                )
+            return conn
     except Exception as e:
         print(f"Database connection error: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
@@ -62,6 +120,27 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 @app.get("/")
 def read_root():
     return {"message": "Auth Service is running"}
+
+@app.get("/verify_session/{session_id}")
+def verify_session(session_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("SELECT user_id FROM sessions WHERE session_id = %s", (session_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            raise HTTPException(status_code=401, detail="Invalid session")
+            
+        return {"valid": True, "user_id": result[0]}
+        
+    except Exception as e:
+        print(f"Session verification error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        cur.close()
+        conn.close()
 
 @app.post("/register")
 def register(user: UserSignup):
