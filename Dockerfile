@@ -8,7 +8,7 @@ COPY src/ src/
 COPY public/ public/
 ARG VITE_CLIENT_ID
 ENV VITE_CLIENT_ID=$VITE_CLIENT_ID
-RUN VITE_BASE_PATH=/ VITE_API_BASE_URL="" VITE_CLIENT_ID=$VITE_CLIENT_ID npm run build
+RUN VITE_BASE_PATH=/ VITE_API_BASE_URL=/ VITE_CLIENT_ID=$VITE_CLIENT_ID npm run build
 
 # Stage 2: Backend & Runtime
 FROM python:3.11-slim-bookworm
