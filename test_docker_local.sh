@@ -14,6 +14,7 @@ fi
 
 echo "🏗️ Building Docker Image for Local Testing..."
 docker build \
+  --no-cache \
   --build-arg VITE_CLIENT_ID=$VITE_CLIENT_ID \
   -t $IMAGE_NAME \
   .

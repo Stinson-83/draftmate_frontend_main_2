@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { toast } from 'sonner';
 import logo from '../assets/draftmate_logo.png';
+import { API_CONFIG } from '../services/endpoints';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -16,8 +17,8 @@ const Login = () => {
         const loadingToast = toast.loading("Logging in...");
 
         try {
-            const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-            const response = await fetch(`${API_URL}/auth/login`, {
+            const loginUrl = `${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.LOGIN}`;
+            const response = await fetch(loginUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -51,8 +52,8 @@ const Login = () => {
             setIsLoading(true);
             const loadingToast = toast.loading("Logging in with Google...");
             try {
-                const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-                const response = await fetch(`${API_URL}/auth/google-login`, {
+                const googleLoginUrl = `${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.GOOGLE_LOGIN}`;
+                const response = await fetch(googleLoginUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token: tokenResponse.credential || tokenResponse.access_token }),

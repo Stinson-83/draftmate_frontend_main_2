@@ -10,7 +10,13 @@
  */
 
 const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
-const BASE_URL = envBaseUrl !== undefined ? envBaseUrl : '';
+let BASE_URL = envBaseUrl !== undefined ? envBaseUrl : '';
+
+// Remove trailing slash if present to avoid double slashes (e.g. //auth)
+// which browsers interpret as protocol-relative URLs
+if (BASE_URL.endsWith('/')) {
+    BASE_URL = BASE_URL.slice(0, -1);
+}
 
 export const API_CONFIG = {
     // Service: backend/converter (Port 8000)
