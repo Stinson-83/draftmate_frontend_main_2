@@ -287,7 +287,10 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
         try {
             const response = await fetch(`${DRAFTER_API_URL}/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('session_id')}`
+                },
                 body: JSON.stringify({
                     case_context: prompt,
                     document_type: selectedFormat?.name || "Legal Document",

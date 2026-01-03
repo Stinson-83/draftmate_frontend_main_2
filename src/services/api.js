@@ -78,6 +78,7 @@ export const api = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
             },
             body: JSON.stringify({
                 query: query,
@@ -107,6 +108,7 @@ export const api = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
                 },
                 body: JSON.stringify({
                     query: query,

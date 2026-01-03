@@ -557,6 +557,8 @@ const DocumentSettings = () => {
     );
 };
 
+import { API_CONFIG } from '../services/endpoints';
+
 const Settings = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('personal');
@@ -611,10 +613,10 @@ const Settings = () => {
                         <button
                             onClick={async () => {
                                 const sessionId = localStorage.getItem('session_id');
-                                const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
                                 try {
                                     if (sessionId) {
-                                        await fetch(`${API_URL}/auth/logout`, {
+                                        const logoutUrl = `${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.LOGOUT}`;
+                                        await fetch(logoutUrl, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ session_id: sessionId })
