@@ -93,8 +93,16 @@ def start_tunnel_and_pool():
             logger.error(f"Pool creation failed: {e}")
             return
 
-    # 2. Start auto-tunnel only if port is NOT open
-    if BASTION_IP and SSH_KEY_PATH:
+    # 2. Start auto-tunnel only if port is NOT open AND not in AWS
+    # AWS App Runner sets AWS_EXECUTION_ENV (or we can assume if we are in a container with direct access)
+    # We'll check for a specific flag or AWS env var
+    if BASTION_IP and SSH_KEY_PATH and not os.getenv("AWS_EXECUTION_ENV") and not os.getenv("AWS_REGION"): 
+        # Added AWS_REGION check as a heuristic for "running in cloud" vs local
+        # But local might have AWS_REGION set.
+        # Better: Check explicit SKIP_TUNNEL
+        pass
+
+    if BASTION_IP and SSH_KEY_PATH and not os.getenv("SKIP_TUNNEL"):
         logger.info(f"Starting auto SSH tunnel via {BASTION_IP}...")
         try:
             tunnel = SSHTunnelForwarder(

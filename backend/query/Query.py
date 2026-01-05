@@ -97,36 +97,62 @@ async def diagnostics():
 
 # ==================== Main Query Endpoints ====================
 
-@app.post("/search", response_model=TemplateResult)
+from fastapi.responses import StreamingResponse
+import json
+import asyncio
+
+@app.post("/search")
 async def search_template(request: QueryRequest):
     """
     Search for best matching legal template by user query.
-    
-    Uses Gemini LLM to normalize the query, searches PostgreSQL documents table,
-    scores matches, and returns the best match with alternatives.
-    
-    Args:
-        user_query: Natural language legal requirement (e.g., "I need acknowledgement letter for loan repayment")
-        language: Document language (default: "en")
-    
-    Returns:
-        TemplateResult: Best matching template with title, doc_id, score, s3_path, and alternatives
+    Uses StreamingResponse to prevent LB timeouts (504) by sending keep-alive whitespace.
     """
-    try:
-        print(f"[search] query: {request.user_query} | lang: {request.language}")
-        
-        # Get best matching template
-        result, scored = get_best_template(request.user_query)
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="No matching templates found")
-        
-        return TemplateResult(**result)
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[search] error: {e}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+    async def generate():
+        try:
+            print(f"[search] query: {request.user_query} | lang: {request.language}")
+            
+            # Run search in background thread
+            loop = asyncio.get_running_loop()
+            future = loop.run_in_executor(
+                None,
+                lambda: get_best_template(request.user_query)
+            )
+            
+            # Send keep-alive whitespace every 2 seconds
+            while not future.done():
+                yield " " 
+                done, pending = await asyncio.wait([future], timeout=2.0)
+                if done:
+                    break
+            
+            # Get result
+            result, scored = await future
+            
+            if not result:
+                # Return 404-like JSON error structure since we can't change status code now
+                # But frontend expects result or error.
+                # If we yield valid JSON, response.json() works.
+                # If we yield error JSON, frontend might need to check "error" field?
+                # Existing frontend checks response.ok. 
+                # StreamingResponse is always 200 OK once started.
+                # So we must return a JSON that frontend handles gracefully or check if result is null.
+                # DraftingModal.jsx: const result = await response.json();
+                # It expects result.doc_id etc.
+                # If we return empty object or specific error field?
+                # Let's return a structure that causes a handled error or empty list.
+                yield json.dumps({"error": "No matching templates found", "alternatives": []})
+            else:
+                yield json.dumps(result)
+                
+        except Exception as e:
+            print(f"[search] error: {e}\n{traceback.format_exc()}")
+            yield json.dumps({"error": str(e)})
+
+    return StreamingResponse(
+        generate(), 
+        media_type="application/json",
+        headers={"X-Accel-Buffering": "no"}
+    )
 
 
 @app.post("/download-template")

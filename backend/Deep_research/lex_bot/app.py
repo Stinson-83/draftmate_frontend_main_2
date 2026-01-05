@@ -410,7 +410,10 @@ async def chat_stream(request: ChatRequest): # Streaming is tricky with Depends,
             yield f"data: {json.dumps({'event': 'status', 'message': 'Researching precedents and statutes...'})}\n\n"
             
             # Run the query (this is the heavy lifting)
-            result = await asyncio.get_event_loop().run_in_executor(
+            # Run the query (this is the heavy lifting)
+            # We use a loop with timeout to send keep-alive pings to prevent LB timeouts
+            loop = asyncio.get_running_loop()
+            query_future = loop.run_in_executor(
                 None,
                 lambda: run_query(
                     query=request.query,
@@ -421,24 +424,21 @@ async def chat_stream(request: ChatRequest): # Streaming is tricky with Depends,
                 )
             )
             
+            while not query_future.done():
+                # Send keep-alive comment (starts with :) to keep connection open
+                yield f": keep-alive\n\n"
+                done, pending = await asyncio.wait([query_future], timeout=2.0)
+                if done:
+                    break
+            
+            result = await query_future
+            
             # Status: Generating
             yield f"data: {json.dumps({'event': 'status', 'message': 'Drafting the legal opinion...'})}\n\n"
             await asyncio.sleep(0.05)
             
-            answer = result.get("final_answer", "No answer generated.")
-            
-            # Stream answer in chunks (typewriter effect)
-            words = answer.split(' ')
-            chunk_size = 5  # Send 5 words at a time
-            accumulated = ""
-            
-            for i in range(0, len(words), chunk_size):
-                chunk = ' '.join(words[i:i+chunk_size])
-                accumulated += chunk + ' '
-                yield f"data: {json.dumps({'event': 'token', 'chunk': chunk + ' ', 'accumulated': accumulated.strip()})}\n\n"
-                await asyncio.sleep(0.02)  # Small delay for visual effect
-            
             # Signal answer complete
+            answer = result.get("final_answer", "No answer generated.")
             yield f"data: {json.dumps({'event': 'answer_complete', 'content': answer})}\n\n"
             
             # Generate follow-ups
