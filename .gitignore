@@ -24,4 +24,5 @@ dist-ssr
 *.sw?
 venv/
 env/
-.envapprunner_config.json
+.env
+apprunner_config.json
