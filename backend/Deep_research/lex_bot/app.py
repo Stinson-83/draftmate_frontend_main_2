@@ -487,15 +487,38 @@ Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
                 raw_source = doc.get("source", "Web")
                 friendly_source = source_name_map.get(raw_source, raw_source)
                 
+                # Get the URL, or generate a fallback
+                url = doc.get("url", "")
+                title = doc.get("title", "Untitled")
+                citation = doc.get("citation", "")
+                court = doc.get("court", "")
+                
+                # Build a better display title: prefer citation, then title
+                # If citation exists and is meaningful, use it as the display title
+                display_title = title
+                if citation and len(citation) > 5:
+                    # Citation exists - use it as primary display
+                    display_title = citation
+                elif court and title:
+                    # No citation but have court - combine for better display
+                    display_title = f"{title} ({court})" if court not in title else title
+                
+                # Generate fallback URL if missing
+                if not url:
+                    search_term = citation if citation else title
+                    if search_term and search_term != "Untitled":
+                        from urllib.parse import quote
+                        url = f"https://indiankanoon.org/search/?formInput={quote(search_term)}"
+                
                 source = {
                     "index": i,
-                    "title": doc.get("title", "Untitled"),
-                    "url": doc.get("url", ""),
+                    "title": display_title,  # Use improved display title
+                    "url": url,
                     "type": friendly_source,
-                    "citation": doc.get("citation", "")
+                    "citation": citation,  # Keep raw citation for tooltip
+                    "court": court
                 }
-                if source["url"]:  # Only include if URL exists
-                    sources.append(source)
+                sources.append(source)
             
             if sources:
                 yield f"data: {json.dumps({'event': 'sources', 'sources': sources})}\n\n"

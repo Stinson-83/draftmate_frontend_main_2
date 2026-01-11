@@ -343,11 +343,15 @@ class ManagerAgent(BaseAgent):
             - Provide a clear, actionable answer.
             - Note any caveats or limitations.
             
-            ## Format
-            - Use clear headings
-            - Cite sources as [1], [2], etc.
-            - Distinguish between statutes (Law) and precedents (Cases)
-            - Be professional and legally precise
+            ## Citation Format
+            Use PROPER INDIAN LEGAL CITATIONS:
+            - Cases: Case Name, (Year) Volume Reporter Page (e.g., (2024) 5 SCC 123)
+            - Statutes: Section X of Act Name, Year
+            - Rules: Rule X of Regulations Name, Year
+            - Orders: W.P./SLP No., Court Name
+            
+            Use [1], [2] references to link to the source list.
+            Be professional and legally precise.
             """)
         else:
             # Standard prompt for fast mode
@@ -361,7 +365,11 @@ class ManagerAgent(BaseAgent):
             
             Instructions:
             - Breakdown the query into aspects and answer each from the context.
-            - Cite your sources using [Number] format.
+            - Use PROPER INDIAN LEGAL CITATIONS:
+              * Cases: Case Name, (Year) Volume Reporter Page (e.g., (2024) 5 SCC 123)
+              * Statutes: Section X of Act Name, Year
+              * Rules/Orders: Rule X of Regulations, Year or W.P. No., Court
+            - Use [Number] references to link to the source list.
             - Differentiate between Statutes (Law) and Precedents (Cases).
             - If context is insufficient, say so but infer from general legal knowledge if safe.
             - Be professional, precise, and legally sound.

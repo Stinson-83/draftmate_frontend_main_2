@@ -15,81 +15,156 @@ const LLM_OPTIONS = [
     { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast & efficient' },
 ];
 
-// Helper function to make [1], [2] and [Strategy, Section 2] citations clickable
+// Helper function to make all citations clickable
+// Handles: [1], [2], [1, 3, 4, 6], [7, 8], [Case Law], [Strategy, Section 2], etc.
 const processCitations = (content, sources) => {
     if (!sources || sources.length === 0) return content;
 
-    // 1. Handle numeric citations: [1], [2], etc.
     let processed = content;
+
+    // Create a map for quick source lookup
+    const sourceByIndex = {};
     sources.forEach(source => {
-        const pattern = new RegExp(`\\[${source.index}\\]`, 'g');
-        const link = `[\\[${source.index}\\]](${source.url})`;
-        processed = processed.replace(pattern, link);
+        if (source.index !== undefined && source.index !== null) {
+            sourceByIndex[source.index] = source;
+        }
     });
 
-    // 2. Handle text-based citations: [Strategy, Section 2], [Case Law, Section 5, point 6]
-    // Regex matches [Something, Something else] but avoids [1] or [1, 2] strictly numeric lists if possible
-    // We look for at least one non-digit character to distinguish from numeric lists or simple refs.
-    // Captures: [ (Source Name) , (Section/Details) ]
-    const textCitationPattern = /\[([a-zA-Z\s]+),\s*([^\]]+)\]/g;
+    // 1. Handle MULTI-number citations FIRST: [1, 3, 4, 6], [7, 8], etc.
+    // Must be done before single number citations to avoid partial matches
+    const multiNumPattern = /\[(\d+(?:\s*,\s*\d+)+)\](?!\()/g;
+    processed = processed.replace(multiNumPattern, (match, nums) => {
+        const indices = nums.split(',').map(n => parseInt(n.trim()));
+        // Check if at least one source exists
+        const firstSource = indices.find(idx => sourceByIndex[idx]);
+        if (firstSource !== undefined) {
+            return `[${match}](citation://multi?nums=${encodeURIComponent(nums)})`;
+        }
+        return match;
+    });
 
-    processed = processed.replace(textCitationPattern, (match, sourceName, details) => {
-        // Construct a special link format that CitationLink can parse
-        // We use a custom protocol/format to pass the identifiers safely
+    // 2. Handle SINGLE numeric citations: [1], [2], etc.
+    processed = processed.replace(/\[(\d+)\](?!\()/g, (match, num) => {
+        const index = parseInt(num);
+        const source = sourceByIndex[index];
+        if (source) {
+            const url = source.url || `citation://numeric?index=${index}`;
+            return `[\\[${index}\\]](${url})`;
+        }
+        return match;
+    });
+
+    // 3. Handle text-based citations WITH comma: [Strategy, Section 2]
+    const textWithCommaPattern = /\[([a-zA-Z][a-zA-Z\s]*),\s*([^\]]+)\](?!\()/g;
+    processed = processed.replace(textWithCommaPattern, (match, sourceName, details) => {
         return `[${match}](citation://text?source=${encodeURIComponent(sourceName.trim())}&details=${encodeURIComponent(details.trim())})`;
+    });
+
+    // 4. Handle simple text citations WITHOUT comma: [Case Law], [Strategy]
+    const simpleTextPattern = /\[([A-Za-z][A-Za-z0-9\s.-]*)\](?!\()/g;
+    processed = processed.replace(simpleTextPattern, (match, text) => {
+        if (/^\d+$/.test(text.trim())) return match;
+        if (text.includes('\\')) return match;
+        return `[${match}](citation://simple?text=${encodeURIComponent(text.trim())})`;
     });
 
     return processed;
 };
 
 // Citation Link with professional hover tooltip
+// Handles all citation types: numeric, multi, simple text, text with comma
 const CitationLink = ({ href, children, sources }) => {
-    // 1. Check for Numeric Citation [1]
-    const numericMatch = children?.toString().match(/^\[(\d+)\]$/);
-
-    // 2. Check for Text Citation (via our custom protocol or just parsing text)
-    // The href from processCitations will be "citation://text?..."
-    const isTextCitation = href && href.startsWith('citation://');
     let source = null;
+    let matchedSources = []; // For multi citations
     let displayText = children;
     let citationDetails = '';
+    let citationType = 'unknown';
 
-    if (numericMatch) {
-        const citationIndex = parseInt(numericMatch[1]);
-        source = sources?.find(s => s.index === citationIndex);
-    } else if (isTextCitation) {
+    // Parse the href to determine citation type
+    const isCustomCitation = href && href.startsWith('citation://');
+    const isDirectUrl = href && (href.startsWith('http://') || href.startsWith('https://'));
+
+    if (isCustomCitation) {
         try {
             const url = new URL(href);
-            const sourceName = url.searchParams.get('source');
-            citationDetails = url.searchParams.get('details');
+            citationType = url.hostname; // 'numeric', 'multi', 'text', 'simple'
 
-            // ROBUST MATCHING LOGIC
-            // 1. Try exact type match
-            source = sources?.find(s => s.type?.toLowerCase() === sourceName?.toLowerCase());
+            if (citationType === 'numeric') {
+                // Numeric citation without direct URL
+                const index = parseInt(url.searchParams.get('index'));
+                source = sources?.find(s => s.index === index);
+            } else if (citationType === 'multi') {
+                // Multiple citations like [1, 3, 4, 6]
+                const nums = url.searchParams.get('nums');
+                const indices = nums.split(',').map(n => parseInt(n.trim()));
+                matchedSources = sources?.filter(s => indices.includes(s.index)) || [];
+                if (matchedSources.length > 0) {
+                    source = matchedSources[0]; // Use first for primary display
+                }
+            } else if (citationType === 'text') {
+                // Text with comma like [Strategy, Section 2]
+                const sourceName = url.searchParams.get('source');
+                citationDetails = url.searchParams.get('details');
 
-            // 2. Fallback: Try if title contains the source name (e.g. "Strategy" in "Legal Strategy 2024.pdf")
-            if (!source) {
-                source = sources?.find(s => s.title?.toLowerCase().includes(sourceName?.toLowerCase()));
+                // ROBUST MATCHING LOGIC
+                source = sources?.find(s => s.type?.toLowerCase() === sourceName?.toLowerCase());
+                if (!source) {
+                    source = sources?.find(s => s.title?.toLowerCase().includes(sourceName?.toLowerCase()));
+                }
+                if (!source) {
+                    source = sources?.find(s => s.type?.toLowerCase().includes(sourceName?.toLowerCase()));
+                }
+            } else if (citationType === 'simple') {
+                // Simple text like [Case Law], [Strategy]
+                const text = url.searchParams.get('text');
+
+                source = sources?.find(s => s.type?.toLowerCase() === text?.toLowerCase());
+                if (!source) {
+                    source = sources?.find(s => s.title?.toLowerCase().includes(text?.toLowerCase()));
+                }
+                if (!source) {
+                    source = sources?.find(s => s.type?.toLowerCase().includes(text?.toLowerCase()));
+                }
+                if (!source) {
+                    source = sources?.find(s => s.citation?.toLowerCase()?.includes(text?.toLowerCase()));
+                }
             }
-
-            // 3. Fallback: Fuzzy type match (e.g. "Strategy Doc" vs "Strategy")
-            if (!source) {
-                source = sources?.find(s => s.type?.toLowerCase().includes(sourceName?.toLowerCase()));
-            }
-
-            // If we found a source, we use its URL. If not, we still render the nice badge but with no link or a safe fallback.
         } catch (e) {
-            console.warn("Failed to parse citation URL", href);
+            console.warn("Failed to parse citation URL", href, e);
+        }
+    } else if (isDirectUrl) {
+        // Direct URL - find source by URL match or by numeric pattern in children
+        const numericMatch = children?.toString().match(/\\\[(\d+)\\\]|\[(\d+)\]/);
+        if (numericMatch) {
+            const citationIndex = parseInt(numericMatch[1] || numericMatch[2]);
+            source = sources?.find(s => s.index === citationIndex);
+        }
+        // If no source found by index, try matching by URL
+        if (!source) {
+            source = sources?.find(s => s.url === href);
+        }
+    } else {
+        // Fallback: try to match numeric pattern in children
+        const numericMatch = children?.toString().match(/\\\[(\d+)\\\]|\[(\d+)\]/);
+        if (numericMatch) {
+            const citationIndex = parseInt(numericMatch[1] || numericMatch[2]);
+            source = sources?.find(s => s.index === citationIndex);
         }
     }
 
     // Interactive element classes
     const baseClasses = "relative inline-block group/citation cursor-pointer";
-    const linkClasses = "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold no-underline bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-all duration-200 border border-blue-200/50 dark:border-blue-700/50 hover:border-blue-300 dark:hover:border-blue-600";
+    // Show blue styling if we have any source with URL
+    const hasValidUrl = source?.url || matchedSources.some(s => s.url);
+    const linkClasses = hasValidUrl
+        ? "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold no-underline bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-all duration-200 border border-blue-200/50 dark:border-blue-700/50 hover:border-blue-300 dark:hover:border-blue-600"
+        : "text-amber-600 dark:text-amber-400 font-semibold no-underline bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded transition-all duration-200 border border-amber-200/50 dark:border-amber-700/50";
 
-    // If it's a known source, we link to it. If it's a just a text citation without a resolved source,
-    // we just show the tooltip but correct visual style.
-    const targetUrl = source ? source.url : undefined;
+    // Determine the target URL (use first source for multi)
+    const targetUrl = source?.url || (isDirectUrl ? href : undefined);
+
+    // Check if we have multiple sources
+    const hasMultipleSources = matchedSources.length > 1;
 
     return (
         <span className={baseClasses}>
@@ -99,7 +174,7 @@ const CitationLink = ({ href, children, sources }) => {
                 rel={targetUrl ? "noopener noreferrer" : undefined}
                 className={linkClasses}
                 onClick={(e) => {
-                    if (!targetUrl) e.preventDefault(); // Don't navigate if no URL
+                    if (!targetUrl) e.preventDefault();
                 }}
             >
                 {displayText}
@@ -108,48 +183,85 @@ const CitationLink = ({ href, children, sources }) => {
             {/* Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover/citation:opacity-100 group-hover/citation:visible transition-all duration-200 z-50 pointer-events-none group-hover/citation:pointer-events-auto">
                 <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 p-3 min-w-[280px] max-w-[350px] backdrop-blur-sm">
-                    {/* Header with type badge */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${(source?.type || 'Reference') === 'Case'
-                            ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
-                            : (source?.type || 'Reference') === 'Law'
-                                ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
-                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                            }`}>
-                            {source?.type || 'Source'}
-                        </span>
-                        {source?.index && <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{source.index}]</span>}
-                    </div>
 
-                    {/* Title */}
-                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug mb-1 line-clamp-2">
-                        {source ? source.title : "Citation Reference"}
-                    </h4>
+                    {/* Multiple Sources Display */}
+                    {hasMultipleSources ? (
+                        <>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                                    {matchedSources.length} Sources
+                                </span>
+                            </div>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                {matchedSources.map((s, idx) => (
+                                    <a
+                                        key={idx}
+                                        href={s.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block p-2 rounded bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{s.index}]</span>
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${s.type === 'Case' ? 'bg-purple-100 text-purple-700' :
+                                                    s.type === 'Law' ? 'bg-green-100 text-green-700' :
+                                                        'bg-slate-200 text-slate-600'
+                                                }`}>{s.type}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2 mt-1">{s.title}</p>
+                                    </a>
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Single Source Display */}
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                                <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${(source?.type || 'Reference') === 'Case'
+                                    ? 'bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300'
+                                    : (source?.type || 'Reference') === 'Law'
+                                        ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
+                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                                    }`}>
+                                    {source?.type || 'Source'}
+                                </span>
+                                {source?.index && <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{source.index}]</span>}
+                            </div>
 
-                    {/* Citation Details from Text (e.g. Section 2) */}
-                    {citationDetails && (
-                        <div className="text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded mt-1 mb-2 border border-yellow-100 dark:border-yellow-800/30">
-                            📍 Refers to: <strong>{decodeURIComponent(citationDetails)}</strong>
-                        </div>
-                    )}
+                            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-snug mb-1 line-clamp-2">
+                                {source ? source.title : "Citation Reference"}
+                            </h4>
 
-                    {/* Source Metadata Citation if available */}
-                    {source?.citation && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-mono">
-                            {source.citation}
-                        </p>
+                            {citationDetails && (
+                                <div className="text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded mt-1 mb-2 border border-yellow-100 dark:border-yellow-800/30">
+                                    📍 Refers to: <strong>{decodeURIComponent(citationDetails)}</strong>
+                                </div>
+                            )}
+
+                            {source?.citation && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 font-mono">
+                                    {source.citation}
+                                </p>
+                            )}
+
+                            {source?.court && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                                    🏛️ {source.court}
+                                </p>
+                            )}
+                        </>
                     )}
 
                     {/* Footer */}
-                    {source ? (
+                    {targetUrl ? (
                         <div className="flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                             <span className="material-symbols-outlined text-xs">open_in_new</span>
                             Click to view full source
                         </div>
                     ) : (
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
-                            <span className="material-symbols-outlined text-xs">link_off</span>
-                            Source document not directly linked
+                        <div className="flex items-center gap-1.5 text-[10px] text-amber-500 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                            <span className="material-symbols-outlined text-xs">info</span>
+                            Source referenced but not directly linked
                         </div>
                     )}
                 </div>

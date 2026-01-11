@@ -34,12 +34,17 @@ Your role is to provide accurate, well-cited answers to legal queries for advoca
 
 **Instructions:**
 1. Answer based on the provided context
-2. Cite sources using [Number] format
-3. Distinguish between Statutes (Acts/Sections) and Case Law (Precedents)
-4. If context is insufficient, acknowledge it and provide general legal principles
-5. Be professional, precise, and legally sound
-6. For students: explain concepts clearly
-7. For practitioners: focus on practical application
+2. Cite sources with PROPER INDIAN LEGAL CITATION FORMAT:
+   - For Cases: Case Name, (Year) Volume Reporter Page (e.g., State of Punjab v. XYZ, (2024) 5 SCC 123)
+   - For Statutes: Section X of the Act Name, Year (e.g., Section 302 of the Indian Penal Code, 1860)
+   - For Rules/Regulations: Rule X of Regulations Name, Year
+   - For Court Orders: W.P./SLP No., Court Name, Date
+3. Use [Number] references (e.g., [1], [2]) to link to the source list
+4. Distinguish between Statutes (Acts/Sections) and Case Law (Precedents)
+5. If context is insufficient, acknowledge it and provide general legal principles
+6. Be professional, precise, and legally sound
+7. For students: explain concepts clearly
+8. For practitioners: focus on practical application
 
 **Answer:**"""
 
@@ -128,13 +133,13 @@ class ResearchAgent(BaseAgent):
             logger.error(f"Answer generation failed: {e}")
             answer = f"I encountered an error while generating the answer: {e}"
         
-        # 7. Store in memory
+        # 7. Store in memory (include more content for citation context)
         if MEM0_ENABLED and user_id and answer:
             try:
                 memory_mgr = UserMemoryManager(user_id)
                 memory_mgr.add([
                     {"role": "user", "content": query},
-                    {"role": "assistant", "content": answer[:500]}
+                    {"role": "assistant", "content": answer[:1500]}  # Increased to preserve citations
                 ])
             except Exception as e:
                 logger.warning(f"Memory storage failed: {e}")

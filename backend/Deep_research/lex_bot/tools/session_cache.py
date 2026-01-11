@@ -68,7 +68,14 @@ class SessionCache:
     def _get_or_create_session(self, session_id: str) -> Dict[str, Any]:
         """Get or create a session cache entry."""
         if session_id not in self._sessions:
-            dim = self._model.get_sentence_embedding_dimension() if self._model else 384
+            # Ensure dim is always an integer for FAISS
+            dim = 384  # Default dimension
+            if self._model:
+                try:
+                    dim = int(self._model.get_sentence_embedding_dimension())
+                except Exception as e:
+                    logger.warning(f"Could not get embedding dimension: {e}, using default 384")
+            
             self._sessions[session_id] = {
                 "index": self._faiss.IndexFlatIP(dim) if self._faiss else None,  # Inner product for similarity
                 "documents": [],
@@ -101,6 +108,11 @@ class SessionCache:
             logger.warning("SessionCache not initialized")
             return 0
         
+        # Extra safety check - ensure model is actually usable
+        if self._model is None or not hasattr(self._model, 'encode'):
+            logger.warning("Embedding model not properly loaded, skipping document caching")
+            return 0
+        
         session = self._get_or_create_session(session_id)
         added_count = 0
         new_docs = []
@@ -126,11 +138,14 @@ class SessionCache:
             return 0
         
         # Generate embeddings and add to index
-        embeddings = self._model.encode(new_texts, normalize_embeddings=True)
-        session["index"].add(np.array(embeddings, dtype=np.float32))
-        session["documents"].extend(new_docs)
-        
-        logger.info(f"Added {added_count} documents to session {session_id}")
+        try:
+            embeddings = self._model.encode(new_texts, normalize_embeddings=True)
+            session["index"].add(np.array(embeddings, dtype=np.float32))
+            session["documents"].extend(new_docs)
+            logger.info(f"Added {added_count} documents to session {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to encode documents: {e}")
+            return 0
         return added_count
     
     def search(
