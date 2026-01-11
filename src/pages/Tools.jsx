@@ -113,8 +113,34 @@ const Tools = () => {
         { id: 'All features', icon: 'grid_view', label: 'All features' },
         { id: 'Drafting', icon: 'edit_document', label: 'Drafting' },
         { id: 'PDF Tools', icon: 'picture_as_pdf', label: 'PDF Tools' },
-        { id: 'Research', icon: 'search', label: 'Research' }
+        { id: 'Research', icon: 'search', label: 'Research' },
+        { id: 'How to use ?', icon: 'help', label: 'How to use ?' }
     ];
+
+    const TUTORIAL_VIDEOS = [
+        { id: 1, url: 'https://www.youtube.com/embed/TDkH3EbWTYc', title: 'Tutorial 1' },
+        { id: 2, url: 'https://www.youtube.com/watch?v=tdIUMkXxtHg', title: 'Tutorial 2' },
+        { id: 3, url: 'https://www.youtube.com/embed/TDkH3EbWTYc', title: 'Tutorial 3' },
+        { id: 4, url: 'https://www.youtube.com/embed/TDkH3EbWTYc', title: 'Tutorial 4' }
+    ];
+
+    // Helper to convert watch URL to embed URL
+    const getEmbedUrl = (url) => {
+        if (!url) return '';
+        if (url.includes('embed')) return url;
+        const videoId = url.split('v=')[1]?.split('&')[0];
+        return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+    };
+
+    const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+
+    const nextVideo = () => {
+        setCurrentVideoIndex((prev) => (prev + 1) % TUTORIAL_VIDEOS.length);
+    };
+
+    const prevVideo = () => {
+        setCurrentVideoIndex((prev) => (prev - 1 + TUTORIAL_VIDEOS.length) % TUTORIAL_VIDEOS.length);
+    };
 
     return (
         <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden bg-background-light dark:bg-background-dark font-display">
@@ -136,8 +162,8 @@ const Tools = () => {
             </div>
 
             {/* Content Container */}
-            <div className="flex-1 overflow-y-auto pb-20">
-                <div className="w-full max-w-[1200px] mx-auto px-4 md:px-10 lg:px-40 py-12 flex flex-col gap-16">
+            <div className={`flex-1 ${activeCategory === 'How to use ?' ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto pb-20'}`}>
+                <div className={`w-full max-w-[1200px] mx-auto px-4 md:px-10 lg:px-40 ${activeCategory === 'How to use ?' ? '' : 'pt-6 pb-12 flex flex-col gap-16'}`}>
 
                     {/* Drafting Section */}
                     {(activeCategory === 'All features' || activeCategory === 'Drafting') && (
@@ -234,6 +260,64 @@ const Tools = () => {
                             </section>
                         )}
                     </div>
+
+                    {/* How to use? Section */}
+                    {activeCategory === 'How to use ?' && (
+                        <section className="flex flex-col gap-6">
+                            <h3 className="text-2xl font-bold text-[#0d131b] dark:text-white text-center">
+                                {TUTORIAL_VIDEOS[currentVideoIndex].title}
+                            </h3>
+                            <div className="w-full flex items-center justify-center gap-4 py-2">
+                                {/* Prev Button */}
+                                <button
+                                    onClick={prevVideo}
+                                    className="p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm transition-all"
+                                >
+                                    <span className="material-symbols-outlined">chevron_left</span>
+                                </button>
+
+                                {/* Video Player */}
+                                <div className="w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800 relative group">
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        src={getEmbedUrl(TUTORIAL_VIDEOS[currentVideoIndex].url)}
+                                        title={TUTORIAL_VIDEOS[currentVideoIndex].title}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                    ></iframe>
+
+                                    {/* Video Counter/Indicator */}
+                                    <div className="absolute top-4 right-4 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+                                        {currentVideoIndex + 1} / {TUTORIAL_VIDEOS.length}
+                                    </div>
+                                </div>
+
+                                {/* Next Button */}
+                                <button
+                                    onClick={nextVideo}
+                                    className="p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm transition-all"
+                                >
+                                    <span className="material-symbols-outlined">chevron_right</span>
+                                </button>
+                            </div>
+
+                            {/* Dot Indicators */}
+                            <div className="flex justify-center gap-2">
+                                {TUTORIAL_VIDEOS.map((_, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setCurrentVideoIndex(idx)}
+                                        className={`w-2.5 h-2.5 rounded-full transition-all ${idx === currentVideoIndex
+                                            ? 'bg-primary w-6'
+                                            : 'bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'
+                                            }`}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    )}
                 </div>
             </div>
 

@@ -3,12 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { toast } from 'sonner';
 import logo from '../assets/draftmate_logo.png';
+import fullLogo from '../assets/Full_logo.png';
 import { API_CONFIG } from '../services/endpoints';
 
 const Login = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleLogin = async (e) => {
@@ -93,10 +95,9 @@ const Login = () => {
                 {/* Logo Area */}
                 <div className="px-8 py-6 lg:px-16 lg:py-8">
                     <div className="flex items-center gap-3 text-slate-900 dark:text-white">
-                        <div className="w-8 h-8">
-                            <img src={logo} alt="DraftMate" className="w-full h-full object-contain" />
+                        <div className="h-12">
+                            <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
                         </div>
-                        <h2 className="text-xl font-bold leading-tight tracking-tight">DraftMate</h2>
                     </div>
                 </div>
 
@@ -131,13 +132,18 @@ const Login = () => {
                                     <input
                                         className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 h-14 pl-4 pr-12 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base transition-colors"
                                         placeholder="••••••••"
-                                        type="password"
+                                        type={showPassword ? "text" : "password"}
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                     />
-                                    <div className="absolute right-0 top-0 bottom-0 pr-3 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 transition-colors">
-                                        <span className="material-symbols-outlined text-[24px]">visibility_off</span>
+                                    <div
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-0 top-0 bottom-0 pr-3 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-[24px]">
+                                            {showPassword ? 'visibility' : 'visibility_off'}
+                                        </span>
                                     </div>
                                 </div>
                             </label>

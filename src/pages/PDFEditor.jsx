@@ -47,6 +47,7 @@ const PDFEditor = () => {
     const [selectedPageIndex, setSelectedPageIndex] = useState(0);
     const [splitPoints, setSplitPoints] = useState([]); // Array of indices (after page X)
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isLoadingFiles, setIsLoadingFiles] = useState(false);
     const [outputName, setOutputName] = useState("document");
     const [compressLevel, setCompressLevel] = useState("medium");
     const [zoomLevel, setZoomLevel] = useState(1.0); // 1.0 = 100%
@@ -135,13 +136,17 @@ const PDFEditor = () => {
 
         // For Builder/Splitter (and now Watermark which uses Builder layout), fetch pages
         if (activeTool.mode !== MODES.SIMPLE || activeTool.id === 'watermark') {
-            // Note: 'watermark' is now MODE.BUILDER, so the check above covers it.
-            // But just to be sure logic holds.
+            setIsLoadingFiles(true);
             const startIdx = pages.length > 0 ? pages[pages.length - 1].fileIndex + 1 : 0;
 
-            selectedFiles.forEach((file, i) => {
-                fetchPagesForFile(file, startIdx + i);
-            });
+            try {
+                const uploadPromises = selectedFiles.map((file, i) => fetchPagesForFile(file, startIdx + i));
+                await Promise.all(uploadPromises);
+            } catch (err) {
+                console.error("Error loading files:", err);
+            } finally {
+                setIsLoadingFiles(false);
+            }
         }
     };
 
@@ -367,6 +372,14 @@ const PDFEditor = () => {
                 ))}
             </div>
 
+            {/* Loading Overlay */}
+            {isLoadingFiles && (
+                <div className="loading-overlay">
+                    <div className="pdf-spinner"></div>
+                    <p>Processing files...</p>
+                </div>
+            )}
+
             {/* 2. Builder Interface (Thumbnails + Preview) */}
             {(activeMode === MODES.BUILDER || activeMode === MODES.SPLITTER) ? (
                 <div className="builder-container">
@@ -497,7 +510,11 @@ const PDFEditor = () => {
                                 />
 
                                 <button className="btn-process" onClick={handleProcess} disabled={isProcessing || pages.length === 0}>
-                                    {isProcessing ? '...' : (activeTool.id === 'watermark' ? 'Apply' : (activeMode === MODES.SPLITTER ? 'Split' : 'Download'))}
+                                    {isProcessing ? (
+                                        <div className="processing-dots">
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                    ) : (activeTool.id === 'watermark' ? 'Apply' : (activeMode === MODES.SPLITTER ? 'Split' : 'Download'))}
                                 </button>
                             </div>
                         </div>

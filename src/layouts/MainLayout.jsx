@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import './MainLayout.css';
-import logo from '../assets/draftmate_logo.png';
+import smallLogo from '../assets/draftmate_logo.png';
+import fullLogo from '../assets/Full_logo.png';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -66,60 +67,89 @@ const MainLayout = () => {
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display antialiased overflow-hidden h-screen flex w-full">
       <aside className={`hidden md:flex flex-col ${isCollapsed ? 'w-12' : 'w-64'} bg-white dark:bg-[#151f2e] border-r border-slate-200 dark:border-slate-800 h-full flex-shrink-0 transition-all duration-300`}>
-        <div className={`p-6 flex flex-col h-full justify-between ${isCollapsed ? 'px-0 py-4 items-center' : ''}`}>
-          <div className="flex flex-col gap-8 w-full">
-            {/* Logo */}
-            <div className={`flex items-center gap-3 px-2 ${isCollapsed ? 'justify-center px-0' : ''}`}>
-              <img src={logo} alt="DraftMate" className={`object-contain transition-all ${isCollapsed ? 'size-8' : 'size-8'}`} />
-              {!isCollapsed && <h1 className="text-slate-900 dark:text-white text-lg font-bold tracking-tight whitespace-nowrap">DraftMate</h1>}
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex flex-col gap-2 w-full">
-              <NavItem to="/dashboard/home" icon="dashboard" label="Dashboard" />
-              <NavItem to="/dashboard/tools" icon="handyman" label="Tools" />
-              <NavItem to="/dashboard/drafts" icon="article" label="My Drafts" />
-
-              <Link to="/dashboard/settings" className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors ${isCollapsed ? 'justify-center px-0 w-8 h-8 mx-auto rounded-lg' : ''}`} title={isCollapsed ? "Settings" : ""}>
-                <span className={`material-symbols-outlined ${isCollapsed ? 'text-xl' : ''}`}>settings</span>
-                {!isCollapsed && <span className="text-sm font-medium">Settings</span>}
-              </Link>
-            </nav>
+        <div className={`p-6 flex flex-col h-full ${isCollapsed ? 'px-0 py-4 items-center' : ''}`}>
+          {/* Logo */}
+          <div className={`flex items-center gap-3 px-2 mb-8 ${isCollapsed ? 'justify-center px-0' : ''}`}>
+            <img
+              src={isCollapsed ? smallLogo : fullLogo}
+              alt="DraftMate"
+              className={`object-contain transition-all ${isCollapsed ? 'w-8 h-8' : 'h-12'}`}
+            />
           </div>
 
-          {/* Profile Footer */}
-          <div className={`mt-auto w-full ${!isCollapsed && 'border-t border-slate-200 dark:border-slate-800 pt-4'}`}>
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto px-4 -mx-4 scrollbar-none flex flex-col gap-2 min-h-0">
+            <div className="space-y-1">
+              <NavItem to="/dashboard/home" icon="dashboard" label="Dashboard" />
+              <NavItem to="/dashboard/tools" icon="build" label="Tools" />
+              <NavItem to="/dashboard/drafts" icon="article" label="My Drafts" />
+              <NavItem to="/dashboard/research" icon="balance" label="AI Research" />
+              <NavItem to="/dashboard/settings" icon="settings" label="Settings" />
+            </div>
+          </nav>
+
+          {/* Support & Utility */}
+          <div className={`w-full pt-4 border-t border-slate-200 dark:border-slate-800 ${isCollapsed ? 'px-1' : ''}`}>
+            <div className={`flex items-center gap-2 ${isCollapsed ? 'flex-col space-y-2' : 'px-2'}`}>
+              <button
+                className={`flex items-center justify-center p-2.5 rounded-lg transition-colors group text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white border border-transparent hover:border-slate-200 dark:hover:border-slate-700 ${isCollapsed ? '' : 'flex-1'}`}
+                title="Notifications"
+              >
+                <span className="material-symbols-outlined text-xl">notifications</span>
+              </button>
+
+              <Link
+                to="/dashboard/help"
+                className={`flex items-center justify-center p-2.5 rounded-lg transition-colors group text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white border border-transparent hover:border-slate-200 dark:hover:border-slate-700 ${isCollapsed ? '' : 'flex-1'}`}
+                title="Help Center"
+              >
+                <span className="material-symbols-outlined text-xl">help</span>
+              </Link>
+
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  window.location.href = '/login';
+                }}
+                className={`flex items-center justify-center p-2.5 rounded-lg transition-colors group text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-red-100 dark:hover:border-red-900/40 ${isCollapsed ? '' : 'flex-1'}`}
+                title="Logout"
+              >
+                <span className="material-symbols-outlined text-xl">logout</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Profile Section */}
+          <div className={`w-full pt-4 ${isCollapsed ? '' : ''}`}>
             <Link
               to="/dashboard/settings"
               className={`flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer group relative overflow-hidden ${isCollapsed ? 'justify-center w-10 h-10 mx-auto p-0' : ''}`}
             >
-              <img
-                src={userProfile.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.name || 'User')}&background=0D8ABC&color=fff`}
-                alt="Profile"
-                className={`rounded-full shrink-0 object-cover ring-2 ring-white dark:ring-slate-700 ${isCollapsed ? 'size-8' : 'size-10'}`}
-                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.name || 'User')}&background=0D8ABC&color=fff`; }}
-              />
-
+              <div className="relative shrink-0">
+                <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-200 dark:border-slate-600">
+                  {userProfile?.image ? (
+                    <img src={userProfile.image} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-500 font-medium">
+                      {userProfile?.name?.charAt(0) || 'U'}
+                    </div>
+                  )}
+                </div>
+                <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white dark:border-[#151f2e]"></div>
+              </div>
               {!isCollapsed && (
-                <div className="flex flex-col min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
-                    {userProfile.name || 'Attorney Davis'}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    {userProfile.email || 'View Profile'}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{userProfile?.name || 'Attorney Davis'}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{userProfile?.email || 'View Profile'}</p>
                 </div>
               )}
-
               {!isCollapsed && (
-                <span className="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors text-[20px]">
-                  chevron_right
-                </span>
+                <span className="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors">chevron_right</span>
               )}
             </Link>
           </div>
         </div>
-      </aside>
+      </aside >
 
       <main className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative bg-background-light dark:bg-background-dark">
         {/* Top Header */}
@@ -145,7 +175,7 @@ const MainLayout = () => {
         {/* Content Area */}
         <Outlet />
       </main>
-    </div>
+    </div >
   );
 };
 
