@@ -204,8 +204,8 @@ const CitationLink = ({ href, children, sources }) => {
                                         <div className="flex items-center gap-2">
                                             <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{s.index}]</span>
                                             <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${s.type === 'Case' ? 'bg-purple-100 text-purple-700' :
-                                                    s.type === 'Law' ? 'bg-green-100 text-green-700' :
-                                                        'bg-slate-200 text-slate-600'
+                                                s.type === 'Law' ? 'bg-green-100 text-green-700' :
+                                                    'bg-slate-200 text-slate-600'
                                                 }`}>{s.type}</span>
                                         </div>
                                         <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2 mt-1">{s.title}</p>
@@ -285,17 +285,16 @@ const ResearchChat = () => {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
 
+    // Sidebar & Session State
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [sessions, setSessions] = useState([]);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
     // Deep Think and LLM state
     const [deepThinkEnabled, setDeepThinkEnabled] = useState(false);
     const [selectedLLM, setSelectedLLM] = useState('gemini-2.5-flash');
     const [isLLMDropdownOpen, setIsLLMDropdownOpen] = useState(false);
-    const [messages, setMessages] = useState([
-        {
-            id: 1,
-            role: 'ai',
-            content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
-        }
-    ]);
+    const [messages, setMessages] = useState([]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -306,12 +305,22 @@ const ResearchChat = () => {
         document.title = 'AI Research | DraftMate';
     }, []);
 
-    useEffect(() => {
-        // Use existing session from login if available
-        const storedSessionId = localStorage.getItem('session_id');
-        const newSessionId = storedSessionId || crypto.randomUUID();
-        setSessionId(newSessionId);
+    // Fetch Sessions
+    const fetchSessions = async () => {
+        try {
+            setIsLoadingSessions(true);
+            const data = await api.getSessions();
+            setSessions(data.sessions || []);
+        } catch (error) {
+            console.error("Failed to fetch sessions:", error);
+            toast.error("Failed to load chat history");
+        } finally {
+            setIsLoadingSessions(false);
+        }
+    };
 
+    // Initialize
+    useEffect(() => {
         // Fetch current LLM config on mount
         const fetchLLMConfig = async () => {
             try {
@@ -324,11 +333,105 @@ const ResearchChat = () => {
             }
         };
         fetchLLMConfig();
+        fetchSessions();
+
+        // Check for existing session in URL or localStorage
+        // For now, let's start fresh or load if ID is present
+        const storedSessionId = localStorage.getItem('session_id');
+        if (storedSessionId) {
+            loadSession(storedSessionId);
+        } else {
+            startNewChat();
+        }
     }, []);
 
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    // Group Sessions by Date
+    const groupSessions = (sessions) => {
+        const groups = {
+            'Today': [],
+            'Yesterday': [],
+            'Previous 7 Days': [],
+            'Older': []
+        };
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const lastWeek = new Date(today);
+        lastWeek.setDate(lastWeek.getDate() - 7);
+
+        sessions.forEach(session => {
+            const date = new Date(session.created_at);
+            if (date >= today) {
+                groups['Today'].push(session);
+            } else if (date >= yesterday) {
+                groups['Yesterday'].push(session);
+            } else if (date >= lastWeek) {
+                groups['Previous 7 Days'].push(session);
+            } else {
+                groups['Older'].push(session);
+            }
+        });
+
+        return groups;
+    };
+
+    const sessionGroups = groupSessions(sessions);
+
+    const startNewChat = () => {
+        const newId = crypto.randomUUID();
+        setSessionId(newId);
+        setMessages([
+            {
+                id: 1,
+                role: 'ai',
+                content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
+            }
+        ]);
+        localStorage.setItem('session_id', newId);
+        // Optionally clear URL param
+        window.history.replaceState({}, '', '/research');
+    };
+
+    const loadSession = async (id) => {
+        try {
+            setSessionId(id);
+            localStorage.setItem('session_id', id);
+            // Update URL without reload
+            // window.history.replaceState({}, '', `/research?session_id=${id}`);
+
+            const data = await api.getSessionHistory(id);
+            if (data.messages && data.messages.length > 0) {
+                // Map backend messages to frontend format
+                const formattedMessages = data.messages.map((msg, idx) => ({
+                    id: msg.id || idx,
+                    role: msg.role === 'assistant' ? 'ai' : msg.role,
+                    content: msg.content,
+                    sources: msg.metadata?.sources, // Assuming backend stores sources in metadata
+                    // Add other fields if needed
+                }));
+                setMessages(formattedMessages);
+            } else {
+                // If empty session, show welcome
+                setMessages([
+                    {
+                        id: 1,
+                        role: 'ai',
+                        content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
+                    }
+                ]);
+            }
+        } catch (error) {
+            console.error("Failed to load session:", error);
+            toast.error("Failed to load chat");
+            startNewChat();
+        }
+    };
 
     const handleSend = async () => {
         if (!input.trim() && !selectedFile) return;
@@ -364,6 +467,8 @@ const ResearchChat = () => {
                     content: aiContent,
                     isDeepThink: true
                 }]);
+                // Refresh sessions list to show new chat title if it was new
+                fetchSessions();
             } else {
                 // Normal mode: Use streaming /chat/stream
                 await api.chatStream(currentInput, sessionId, {
@@ -395,6 +500,8 @@ const ResearchChat = () => {
                                 return [...prev, { id: aiMsgId, role: 'ai', content: aiContent }];
                             }
                         });
+                        // Refresh sessions list
+                        fetchSessions();
                     },
                     onFollowups: (questions) => {
                         aiFollowups = questions;
@@ -499,321 +606,361 @@ const ResearchChat = () => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
-            {/* Header */}
-            <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between shadow-sm z-10">
-                <div className="flex items-center">
+        <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
+
+            {/* Sidebar */}
+            <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} flex-none bg-slate-900 text-slate-300 flex flex-col transition-all duration-300 overflow-hidden border-r border-slate-800`}>
+                <div className="p-4 flex-none">
                     <button
-                        onClick={() => navigate('/')}
-                        aria-label="Go back"
-                        className="mr-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                        onClick={startNewChat}
+                        className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
                     >
-                        <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                        <span className="material-symbols-outlined text-xl">add</span>
+                        <span className="text-sm font-medium">New Chat</span>
                     </button>
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-                            <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-semibold text-slate-900 dark:text-white leading-tight">AI Legal Research</h1>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">Ask anything about Indian Law</p>
-                        </div>
-                    </div>
                 </div>
 
-                {/* LLM Switcher Dropdown */}
-                <div className="relative">
-                    <button
-                        onClick={() => setIsLLMDropdownOpen(!isLLMDropdownOpen)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all shadow-sm hover:shadow-md group"
-                    >
-                        <span className="material-symbols-outlined text-lg text-blue-600 dark:text-blue-400">smart_toy</span>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                            {LLM_OPTIONS.find(o => o.value === selectedLLM)?.label || 'Select Model'}
-                        </span>
-                        <span className={`material-symbols-outlined text-sm text-slate-400 transition-transform duration-200 ${isLLMDropdownOpen ? 'rotate-180' : ''}`}>
-                            expand_more
-                        </span>
-                    </button>
-
-                    {isLLMDropdownOpen && (
-                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in-up">
-                            <div className="p-2">
-                                {LLM_OPTIONS.map((option) => (
-                                    <button
-                                        key={option.value}
-                                        onClick={() => handleLLMChange(option.value)}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${selectedLLM === option.value
-                                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                                            : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
-                                            }`}
-                                    >
-                                        <span className={`material-symbols-outlined text-lg ${selectedLLM === option.value ? 'text-blue-600' : 'text-slate-400'
-                                            }`}>
-                                            {selectedLLM === option.value ? 'check_circle' : 'radio_button_unchecked'}
-                                        </span>
-                                        <div>
-                                            <div className="text-sm font-medium">{option.label}</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400">{option.description}</div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
+                <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-6">
+                    {isLoadingSessions ? (
+                        <div className="flex justify-center py-4">
+                            <span className="material-symbols-outlined animate-spin text-slate-500">progress_activity</span>
                         </div>
-                    )}
-                </div>
-            </header>
-
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto relative flex flex-col bg-slate-50 dark:bg-slate-900">
-                {/* Dot Pattern Background */}
-                <div className="absolute inset-0 pointer-events-none opacity-50"
-                    style={{
-                        backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
-                        backgroundSize: '24px 24px'
-                    }}
-                ></div>
-
-                <div className="relative z-0 flex-1 w-full max-w-4xl mx-auto px-4 py-8 flex flex-col gap-6">
-                    {/* Messages */}
-                    {messages.map((msg, index) => (
-                        <div key={msg.id} className={`flex gap-4 items-start ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in-up`}>
-                            {/* Avatar */}
-                            <div className={`flex-none w-10 h-10 rounded-full flex items-center justify-center shadow-sm overflow-hidden
-                                ${msg.role === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700' : 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800'}`}
-                            >
-                                {msg.role === 'ai' ? (
-                                    <span className="material-symbols-outlined text-blue-600 text-xl">gavel</span>
-                                ) : (
-                                    <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-xl">person</span>
-                                )}
-                            </div>
-
-                            {/* Bubble */}
-                            <div className={`flex-1 max-w-[85%] p-6 rounded-2xl shadow-sm border leading-relaxed text-base
-                                ${msg.role === 'ai'
-                                    ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-tl-none text-slate-900 dark:text-slate-100'
-                                    : 'bg-blue-600 text-white border-blue-600 rounded-tr-none'
-                                }`}
-                            >
-                                <div className={`markdown-content ${msg.role === 'user' ? 'text-white' : ''}`}>
-                                    <ReactMarkdown
-                                        components={{
-                                            p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
-                                            // Ensure lists and other elements are styled correctly within markdown
-                                            ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-3" {...props} />,
-                                            ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-3" {...props} />,
-                                            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
-                                            h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
-                                            h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                                            h3: ({ node, ...props }) => <h3 className="text-base font-bold mt-3 mb-1" {...props} />,
-                                            code: ({ node, inline, ...props }) => (
-                                                inline
-                                                    ? <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-sm font-mono" {...props} />
-                                                    : <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-sm font-mono my-3"><code {...props} /></pre>
-                                            ),
-                                            strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
-                                            // Style citation links with hover tooltip
-                                            a: ({ node, href, children, ...props }) => (
-                                                <CitationLink href={href} sources={msg.sources}>
-                                                    {children}
-                                                </CitationLink>
-                                            )
-                                        }}
-                                    >
-                                        {processCitations(msg.content, msg.sources)}
-                                    </ReactMarkdown>
-                                </div>
-                                {msg.role === 'ai' && index > 0 && messages[index - 1].role === 'user' && (
-                                    <div className="mt-4 flex flex-wrap gap-2">
-                                        <button
-                                            className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium transition-colors border border-transparent hover:border-blue-200 dark:hover:border-blue-800"
-                                            onClick={() => navigate('/', {
-                                                state: {
-                                                    openDrafting: true,
-                                                    prompt: `Draft the legal document required for: ${messages[index - 1].content || (messages[index - 1].file ? `the uploaded document ${messages[index - 1].file.name}` : 'this query')}. Focus on drafting the actual legal papers.`
-                                                }
-                                            })}
-                                        >
-                                            <span className="material-symbols-outlined text-sm">edit_document</span>
-                                            Draft
-                                        </button>
-                                    </div>
-                                )}
-                                {/* Follow-up Suggestions */}
-                                {msg.followups && msg.followups.length > 0 && (
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        {msg.followups.map((question, qIdx) => (
+                    ) : (
+                        Object.entries(sessionGroups).map(([group, groupSessions]) => (
+                            groupSessions.length > 0 && (
+                                <div key={group}>
+                                    <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group}</h3>
+                                    <div className="space-y-1">
+                                        {groupSessions.map(session => (
                                             <button
-                                                key={qIdx}
-                                                onClick={() => setInput(question)}
-                                                className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                                                key={session.session_id}
+                                                onClick={() => loadSession(session.session_id)}
+                                                className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${sessionId === session.session_id
+                                                        ? 'bg-slate-800 text-white'
+                                                        : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
+                                                    }`}
+                                                title={session.title}
                                             >
-                                                {question}
+                                                {session.title || "New Chat"}
                                             </button>
                                         ))}
                                     </div>
-                                )}
-                                {/* Sources Reference */}
-                                {msg.sources && msg.sources.length > 0 && (
-                                    <details className="mt-4 group">
-                                        <summary className="cursor-pointer text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-sm">menu_book</span>
-                                            {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''} Referenced
-                                            <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
-                                        </summary>
-                                        <div className="mt-2 space-y-1 pl-1 border-l-2 border-blue-200 dark:border-blue-800">
-                                            {msg.sources.map((source, sIdx) => (
-                                                <a
-                                                    key={sIdx}
-                                                    href={source.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="block text-xs py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                </div>
+                            )
+                        ))
+                    )}
+                </div>
+
+                {/* User Profile / Bottom Actions */}
+                <div className="p-4 border-t border-slate-800 flex-none">
+                    <button className="flex items-center gap-3 w-full px-2 py-2 hover:bg-slate-800 rounded-lg transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-medium text-xs">
+                            U
+                        </div>
+                        <div className="text-sm font-medium text-slate-200">User</div>
+                    </button>
+                </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-full relative">
+
+                {/* Header */}
+                <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between shadow-sm z-10">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+                        >
+                            <span className="material-symbols-outlined">menu</span>
+                        </button>
+
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md">
+                                <span className="material-symbols-outlined text-white text-lg">auto_awesome</span>
+                            </div>
+                            <h1 className="text-base font-semibold text-slate-900 dark:text-white hidden sm:block">AI Legal Research</h1>
+                        </div>
+                    </div>
+
+                    {/* LLM Switcher Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsLLMDropdownOpen(!isLLMDropdownOpen)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg hover:border-blue-400 dark:hover:border-blue-500 transition-all"
+                        >
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                                {LLM_OPTIONS.find(o => o.value === selectedLLM)?.label || 'Select Model'}
+                            </span>
+                            <span className={`material-symbols-outlined text-sm text-slate-400 transition-transform duration-200 ${isLLMDropdownOpen ? 'rotate-180' : ''}`}>
+                                expand_more
+                            </span>
+                        </button>
+
+                        {isLLMDropdownOpen && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-fade-in-up">
+                                <div className="p-2">
+                                    {LLM_OPTIONS.map((option) => (
+                                        <button
+                                            key={option.value}
+                                            onClick={() => handleLLMChange(option.value)}
+                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${selectedLLM === option.value
+                                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                                : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                                                }`}
+                                        >
+                                            <span className={`material-symbols-outlined text-lg ${selectedLLM === option.value ? 'text-blue-600' : 'text-slate-400'
+                                                }`}>
+                                                {selectedLLM === option.value ? 'check_circle' : 'radio_button_unchecked'}
+                                            </span>
+                                            <div>
+                                                <div className="text-sm font-medium">{option.label}</div>
+                                                <div className="text-xs text-slate-500 dark:text-slate-400">{option.description}</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </header>
+
+                {/* Messages Area */}
+                <main className="flex-1 overflow-y-auto relative flex flex-col bg-slate-50 dark:bg-slate-900">
+                    {/* Dot Pattern Background */}
+                    <div className="absolute inset-0 pointer-events-none opacity-50"
+                        style={{
+                            backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+                            backgroundSize: '24px 24px'
+                        }}
+                    ></div>
+
+                    <div className="relative z-0 flex-1 w-full max-w-3xl mx-auto px-4 py-8 flex flex-col gap-6">
+                        {/* Messages */}
+                        {messages.map((msg, index) => (
+                            <div key={msg.id} className={`flex gap-4 items-start ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in-up`}>
+                                {/* Avatar */}
+                                <div className={`flex-none w-8 h-8 rounded-full flex items-center justify-center shadow-sm overflow-hidden
+                                    ${msg.role === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700' : 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800'}`}
+                                >
+                                    {msg.role === 'ai' ? (
+                                        <span className="material-symbols-outlined text-blue-600 text-base">gavel</span>
+                                    ) : (
+                                        <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-base">person</span>
+                                    )}
+                                </div>
+
+                                {/* Bubble */}
+                                <div className={`flex-1 max-w-[90%] p-4 rounded-2xl shadow-sm border leading-relaxed text-sm
+                                    ${msg.role === 'ai'
+                                        ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-tl-none text-slate-900 dark:text-slate-100'
+                                        : 'bg-blue-600 text-white border-blue-600 rounded-tr-none'
+                                    }`}
+                                >
+                                    <div className={`markdown-content ${msg.role === 'user' ? 'text-white' : ''}`}>
+                                        <ReactMarkdown
+                                            components={{
+                                                p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                                                ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-3" {...props} />,
+                                                ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-3" {...props} />,
+                                                li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                                h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                                                h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold mt-3 mb-1" {...props} />,
+                                                code: ({ node, inline, ...props }) => (
+                                                    inline
+                                                        ? <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-xs font-mono" {...props} />
+                                                        : <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs font-mono my-3"><code {...props} /></pre>
+                                                ),
+                                                strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+                                                a: ({ node, href, children, ...props }) => (
+                                                    <CitationLink href={href} sources={msg.sources}>
+                                                        {children}
+                                                    </CitationLink>
+                                                )
+                                            }}
+                                        >
+                                            {processCitations(msg.content, msg.sources)}
+                                        </ReactMarkdown>
+                                    </div>
+
+                                    {/* Follow-up Suggestions */}
+                                    {msg.followups && msg.followups.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {msg.followups.map((question, qIdx) => (
+                                                <button
+                                                    key={qIdx}
+                                                    onClick={() => setInput(question)}
+                                                    className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
                                                 >
-                                                    <span className="font-medium text-blue-600 dark:text-blue-400">[{source.index}]</span>
-                                                    <span className="text-slate-600 dark:text-slate-300 ml-1">{source.title}</span>
-                                                    <span className="text-slate-400 dark:text-slate-500 ml-1 text-[10px]">({source.type})</span>
-                                                </a>
+                                                    {question}
+                                                </button>
                                             ))}
                                         </div>
-                                    </details>
-                                )}
-                                {msg.file && (
-                                    <div className="flex items-center gap-2 mt-2 bg-white/20 p-2 rounded-lg text-sm">
-                                        <span className="material-symbols-outlined text-sm">description</span>
-                                        {msg.file.name}
-                                    </div>
-                                )}
+                                    )}
+
+                                    {/* Sources Reference */}
+                                    {msg.sources && msg.sources.length > 0 && (
+                                        <details className="mt-4 group">
+                                            <summary className="cursor-pointer text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-sm">menu_book</span>
+                                                {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''} Referenced
+                                                <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
+                                            </summary>
+                                            <div className="mt-2 space-y-1 pl-1 border-l-2 border-blue-200 dark:border-blue-800">
+                                                {msg.sources.map((source, sIdx) => (
+                                                    <a
+                                                        key={sIdx}
+                                                        href={source.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="block text-xs py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                                    >
+                                                        <span className="font-medium text-blue-600 dark:text-blue-400">[{source.index}]</span>
+                                                        <span className="text-slate-600 dark:text-slate-300 ml-1">{source.title}</span>
+                                                        <span className="text-slate-400 dark:text-slate-500 ml-1 text-[10px]">({source.type})</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </details>
+                                    )}
+
+                                    {msg.file && (
+                                        <div className="flex items-center gap-2 mt-2 bg-white/20 p-2 rounded-lg text-xs">
+                                            <span className="material-symbols-outlined text-sm">description</span>
+                                            {msg.file.name}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
 
-                    {/* Typing Indicator with Status Message */}
-                    {isTyping && (
-                        <div className="flex gap-4 items-start animate-fade-in-up">
-                            <div className="flex-none w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm">
-                                <span className="material-symbols-outlined text-blue-600 text-xl">gavel</span>
+                        {/* Typing Indicator */}
+                        {isTyping && (
+                            <div className="flex gap-4 items-start animate-fade-in-up">
+                                <div className="flex-none w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm">
+                                    <span className="material-symbols-outlined text-blue-600 text-base">gavel</span>
+                                </div>
+                                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700">
+                                    {statusMessage ? (
+                                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                            <span className="material-symbols-outlined animate-spin text-blue-500 text-sm">progress_activity</span>
+                                            <span className="text-sm font-medium">{statusMessage}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-1.5">
+                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700">
-                                {statusMessage ? (
-                                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                        <span className="material-symbols-outlined animate-spin text-blue-500">progress_activity</span>
-                                        <span className="text-sm font-medium">{statusMessage}</span>
-                                    </div>
-                                ) : (
-                                    <div className="flex gap-1.5">
-                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
-                                    </div>
-                                )}
+                        )}
+
+                        {/* Suggested Prompts */}
+                        {messages.length === 1 && !isTyping && (
+                            <div className="mt-auto pb-4 grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in-up">
+                                <button
+                                    onClick={() => setInput("What are the latest Supreme Court judgments on Section 138 of NI Act?")}
+                                    className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
+                                >
+                                    <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Section 138 of NI Act</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">Latest Supreme Court judgments summary</div>
+                                </button>
+                                <button
+                                    onClick={() => setInput("Draft a Legal Notice for breach of contract under Indian Contract Act")}
+                                    className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
+                                >
+                                    <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Draft a Legal Notice</div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">For breach of contract under Indian Contract Act</div>
+                                </button>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Suggested Prompts (Only show when only welcome message exists) */}
-                    {messages.length === 1 && !isTyping && (
-                        <div className="mt-auto pb-4 grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in-up">
-                            <button
-                                onClick={() => setInput("What are the latest Supreme Court judgments on Section 138 of NI Act?")}
-                                className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
-                            >
-                                <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Section 138 of NI Act</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">Latest Supreme Court judgments summary</div>
-                            </button>
-                            <button
-                                onClick={() => setInput("Draft a Legal Notice for breach of contract under Indian Contract Act")}
-                                className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
-                            >
-                                <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Draft a Legal Notice</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">For breach of contract under Indian Contract Act</div>
-                            </button>
-                        </div>
-                    )}
-
-                    <div ref={messagesEndRef} />
-                </div>
-            </main>
-
-            {/* Footer / Input */}
-            <footer className="flex-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 pb-6 pt-4 px-4 z-20">
-                <div className="max-w-4xl mx-auto w-full space-y-3">
-                    {/* File Preview */}
-                    {selectedFile && (
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 w-fit shadow-sm animate-slide-up">
-                            <span className="material-symbols-outlined text-red-500">picture_as_pdf</span>
-                            <span className="text-sm text-slate-700 dark:text-slate-200">{selectedFile.name}</span>
-                            <button onClick={removeFile} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                <span className="material-symbols-outlined text-base">close</span>
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="relative flex items-end gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-2">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileSelect}
-                            accept=".pdf,application/pdf"
-                            className="hidden"
-                        />
-                        <button
-                            onClick={triggerFileSelect}
-                            className="flex-none p-3 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Add attachment"
-                            disabled={isUploading}
-                        >
-                            <span className="material-symbols-outlined text-xl">add</span>
-                        </button>
-                        <textarea
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Ask a legal question... (e.g., 'What are the latest Supreme Court judgments on Section 138 of NI Act?')"
-                            rows={1}
-                            className="flex-1 bg-transparent border-0 focus:ring-0 p-3 text-slate-900 dark:text-white placeholder-slate-400 resize-none max-h-48 overflow-y-auto outline-none shadow-none"
-                            style={{ minHeight: '48px' }}
-                            onInput={(e) => {
-                                e.target.style.height = 'auto';
-                                e.target.style.height = e.target.scrollHeight + 'px';
-                            }}
-                        />
-                        {/* Deep Think Toggle Button */}
-                        <button
-                            onClick={() => setDeepThinkEnabled(!deepThinkEnabled)}
-                            className={`flex-none flex items-center gap-1.5 px-3 py-2 mb-1 rounded-full text-sm font-medium transition-all duration-300 ${deepThinkEnabled
-                                ? 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-                                }`}
-                            title={deepThinkEnabled ? 'Deep Think enabled - Advanced reasoning mode' : 'Enable Deep Think for detailed analysis'}
-                        >
-                            <span className={`material-symbols-outlined text-base transition-all duration-300 ${deepThinkEnabled ? 'animate-pulse' : ''
-                                }`}>
-                                psychology
-                            </span>
-                            <span className="hidden sm:inline">Deep Think</span>
-                            {deepThinkEnabled && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                            )}
-                        </button>
-
-                        {/* Send Button */}
-                        <button
-                            onClick={handleSend}
-                            disabled={(!input.trim() && !selectedFile) || isUploading || isTyping}
-                            className="flex-none p-2 mb-1 mr-1 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                        >
-                            <span className="material-symbols-outlined text-xl group-hover:translate-x-0.5 transition-transform">send</span>
-                        </button>
+                        <div ref={messagesEndRef} />
                     </div>
-                    <div className="text-center">
-                        <p className="text-xs text-slate-400 dark:text-slate-500">
-                            AI can make mistakes. Please verify important information.
-                        </p>
+                </main>
+
+                {/* Footer / Input */}
+                <footer className="flex-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 pb-6 pt-4 px-4 z-20">
+                    <div className="max-w-3xl mx-auto w-full space-y-3">
+                        {/* File Preview */}
+                        {selectedFile && (
+                            <div className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 w-fit shadow-sm animate-slide-up">
+                                <span className="material-symbols-outlined text-red-500">picture_as_pdf</span>
+                                <span className="text-sm text-slate-700 dark:text-slate-200">{selectedFile.name}</span>
+                                <button onClick={removeFile} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                    <span className="material-symbols-outlined text-base">close</span>
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="relative flex items-end gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-2">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileSelect}
+                                accept=".pdf,application/pdf"
+                                className="hidden"
+                            />
+                            <button
+                                onClick={triggerFileSelect}
+                                className="flex-none p-3 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                title="Add attachment"
+                                disabled={isUploading}
+                            >
+                                <span className="material-symbols-outlined text-xl">add</span>
+                            </button>
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Ask a legal question..."
+                                rows={1}
+                                className="flex-1 bg-transparent border-0 focus:ring-0 p-3 text-slate-900 dark:text-white placeholder-slate-400 resize-none max-h-48 overflow-y-auto outline-none shadow-none text-sm"
+                                style={{ minHeight: '44px' }}
+                                onInput={(e) => {
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = e.target.scrollHeight + 'px';
+                                }}
+                            />
+                            {/* Deep Think Toggle Button */}
+                            <button
+                                onClick={() => setDeepThinkEnabled(!deepThinkEnabled)}
+                                className={`flex-none flex items-center gap-1.5 px-3 py-2 mb-1 rounded-full text-xs font-medium transition-all duration-300 ${deepThinkEnabled
+                                    ? 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                                    }`}
+                                title={deepThinkEnabled ? 'Deep Think enabled' : 'Enable Deep Think'}
+                            >
+                                <span className={`material-symbols-outlined text-sm transition-all duration-300 ${deepThinkEnabled ? 'animate-pulse' : ''
+                                    }`}>
+                                    psychology
+                                </span>
+                                <span className="hidden sm:inline">Deep Think</span>
+                            </button>
+
+                            <button
+                                onClick={handleSend}
+                                disabled={!input.trim() && !selectedFile}
+                                className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() || selectedFile
+                                        ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                    }`}
+                            >
+                                <span className="material-symbols-outlined text-xl">send</span>
+                            </button>
+                        </div>
+
+                        <div className="text-center">
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                AI can make mistakes. Check important info.
+                            </p>
+                        </div>
                     </div>
-                </div>
-            </footer>
+                </footer>
+            </div>
         </div>
     );
 };

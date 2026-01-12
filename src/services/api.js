@@ -174,6 +174,44 @@ export const api = {
             onError?.(error);
             throw error;
         }
+    },
+    /**
+     * Get list of user sessions.
+     * @returns {Promise<Object>} - { sessions: [], total: int }
+     */
+    getSessions: async () => {
+        const response = await fetch(`${API_BASE_URL}/sessions`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch sessions: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Get history for a specific session.
+     * @param {string} sessionId 
+     * @returns {Promise<Object>} - Session object with messages
+     */
+    getSessionHistory: async (sessionId) => {
+        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch session history: ${response.status}`);
+        }
+
+        return response.json();
     }
 };
 
