@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Save, Wand2, Download, Undo, Redo,
     Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
-    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical
+    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon
 } from 'lucide-react';
 
 const EditorToolbar = ({
@@ -21,6 +21,9 @@ const EditorToolbar = ({
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showHighlightMenu, setShowHighlightMenu] = useState(false);
     const [showLineSpacingMenu, setShowLineSpacingMenu] = useState(false);
+    const [showTableMenu, setShowTableMenu] = useState(false);
+    const [tableRows, setTableRows] = useState(3);
+    const [tableCols, setTableCols] = useState(3);
     const [showLinkInput, setShowLinkInput] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
 
@@ -205,6 +208,32 @@ const EditorToolbar = ({
                 </div>
                 <button className="tool-btn" onClick={() => execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('insertOrderedList')} title="Numbered List"><ListOrdered size={18} /></button>
+
+                {/* Table Button */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="tool-btn"
+                        onClick={() => setShowTableMenu(!showTableMenu)}
+                        title="Insert Table"
+                    >
+                        <TableIcon size={18} />
+                    </button>
+                    {showTableMenu && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, padding: 12, zIndex: 60, minWidth: 160 }}>
+                            <div style={{ marginBottom: 8, fontSize: '0.85rem', fontWeight: 500 }}>Insert Table</div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                <label style={{ fontSize: '0.8rem' }}>Rows: <input type="number" min="1" max="10" value={tableRows} onChange={e => setTableRows(e.target.value)} style={{ width: 40, padding: 2 }} /></label>
+                                <label style={{ fontSize: '0.8rem' }}>Cols: <input type="number" min="1" max="10" value={tableCols} onChange={e => setTableCols(e.target.value)} style={{ width: 40, padding: 2 }} /></label>
+                            </div>
+                            <button
+                                onClick={() => { execCommand('insertTable', { rows: parseInt(tableRows), cols: parseInt(tableCols) }); setShowTableMenu(false); }}
+                                style={{ width: '100%', padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}
+                            >
+                                Insert
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
             <div className="toolbar-divider"></div>
 

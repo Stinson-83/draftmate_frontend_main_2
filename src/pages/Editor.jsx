@@ -30,6 +30,7 @@ const Editor = () => {
     // Floating Toolbar State
     const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
     const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
+    const [isTableContext, setIsTableContext] = useState(false);
 
     // Modify Draft Modal State
     const [showModifyModal, setShowModifyModal] = useState(false);
@@ -498,6 +499,132 @@ const Editor = () => {
             });
 
             // 3. Trigger Pagination (Layout changed)
+            setTimeout(paginateAll, 50);
+            return;
+        }
+
+        if (command === 'insertTable') {
+            const { rows, cols } = value;
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+
+            // Create Table
+            const table = document.createElement('table');
+            table.className = 'editor-table';
+            table.contentEditable = 'false';
+            table.style.width = '100%';
+
+            const tbody = document.createElement('tbody');
+            for (let i = 0; i < rows; i++) {
+                const tr = document.createElement('tr');
+                for (let j = 0; j < cols; j++) {
+                    const td = document.createElement('td');
+                    td.contentEditable = 'true';
+                    td.style.border = '1px solid #000';
+                    td.style.padding = '8px';
+                    const p = document.createElement('p');
+                    p.innerHTML = '<br>'; // Empty line
+                    td.appendChild(p);
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            }
+            table.appendChild(tbody);
+
+            // Insert Table
+            range.deleteContents();
+            // If inside a P, we might need to split it? 
+            // Simplest: Insert at cursor.
+            // If cursor is INSIDE a P, inserting a TABLE inside a P is invalid HTML5 (P cannot contain table).
+            // We must traverse up to find the P, split it, or insert after.
+
+            let container = range.commonAncestorContainer;
+            if (container.nodeType === 3) container = container.parentElement;
+            const parentP = container.closest('p');
+
+            if (parentP) {
+                // Split P or insert after
+                // Easy way: Insert table AFTER the P
+                if (parentP.nextSibling) {
+                    parentP.parentNode.insertBefore(table, parentP.nextSibling);
+                } else {
+                    parentP.parentNode.appendChild(table);
+                }
+                // Add an empty P after table for cursor continuation
+                const pAfter = document.createElement('p');
+                pAfter.innerHTML = '<br>';
+                table.parentNode.insertBefore(pAfter, table.nextSibling);
+            } else {
+                range.insertNode(table);
+                // Ensure P after
+                const pAfter = document.createElement('p');
+                pAfter.innerHTML = '<br>';
+                range.insertNode(pAfter); // This might put it before? Range behavior is tricky.
+                table.parentNode.insertBefore(pAfter, table.nextSibling);
+
+            }
+
+            setTimeout(paginateAll, 50);
+            return;
+        }
+
+        if (command === 'modifyTable') {
+            // value: { action: 'addRowAbove' | 'addRowBelow' | 'addColLeft' | 'addColRight' | 'deleteRow' | 'deleteCol' | 'deleteTable' }
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            let container = range.commonAncestorContainer;
+            if (container.nodeType === 3) container = container.parentElement;
+
+            const td = container.closest('td');
+            const table = container.closest('table');
+            if (!td || !table) return;
+
+            const tr = td.parentElement;
+            const tbody = tr.parentElement;
+            const rowIndex = Array.from(tbody.children).indexOf(tr);
+            const colIndex = Array.from(tr.children).indexOf(td);
+
+            const action = value.action;
+
+            if (action === 'deleteTable') {
+                table.remove();
+            } else if (action === 'deleteRow') {
+                tr.remove();
+                if (tbody.children.length === 0) table.remove();
+            } else if (action === 'deleteCol') {
+                Array.from(tbody.children).forEach(row => {
+                    if (row.children[colIndex]) row.children[colIndex].remove();
+                });
+                // If no cols left, delete table?
+                if (tbody.children.length > 0 && tbody.children[0].children.length === 0) table.remove();
+            } else if (action === 'addRowAbove' || action === 'addRowBelow') {
+                const newTr = document.createElement('tr');
+                const colCount = tr.children.length;
+                for (let i = 0; i < colCount; i++) {
+                    const newTd = document.createElement('td');
+                    newTd.contentEditable = 'true';
+                    newTd.style.border = '1px solid #000';
+                    newTd.style.padding = '8px';
+                    newTd.innerHTML = '<p><br></p>';
+                    newTr.appendChild(newTd);
+                }
+                if (action === 'addRowAbove') tbody.insertBefore(newTr, tr);
+                else tbody.insertBefore(newTr, tr.nextSibling);
+            } else if (action === 'addColLeft' || action === 'addColRight') {
+                Array.from(tbody.children).forEach(row => {
+                    const newTd = document.createElement('td');
+                    newTd.contentEditable = 'true';
+                    newTd.style.border = '1px solid #000';
+                    newTd.style.padding = '8px';
+                    newTd.innerHTML = '<p><br></p>';
+                    const refTd = row.children[colIndex];
+                    if (action === 'addColLeft') row.insertBefore(newTd, refTd);
+                    else row.insertBefore(newTd, refTd.nextSibling);
+                });
+            }
+
             setTimeout(paginateAll, 50);
             return;
         }
@@ -1264,30 +1391,55 @@ const Editor = () => {
             }
 
             const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-                // Calculate position for floating toolbar
+            if (selection && selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
+                const container = range.commonAncestorContainer;
+                const node = container.nodeType === 3 ? container.parentElement : container;
+                const table = node.closest('table');
 
-                // Only show if selection is within the editor area
-                const editorRect = pagesContainerRef.current.getBoundingClientRect();
+                const isTable = !!table;
+                setIsTableContext(isTable);
 
-                if (rect.top >= editorRect.top && rect.bottom <= editorRect.bottom) {
-                    setToolbarPosition({
-                        x: rect.left + (rect.width / 2),
-                        y: rect.top - 10
-                    });
-                    setShowFloatingToolbar(true);
+                // Show toolbar if:
+                // 1. Valid range selection (!collapsed)
+                // 2. OR Inside a table (allow collapsed)
 
-                    // SAVE SELECTION for Floating Toolbar actions (like Link Input)
-                    savedSelectionRef.current = range.cloneRange();
+                if ((!selection.isCollapsed || isTable) && mainContainerRef.current) {
+                    // Check if valid editor area
+                    const editorRect = pagesContainerRef.current.getBoundingClientRect();
+
+                    // If collapsed (table mode), we need a valid rect. 
+                    // range.getBoundingClientRect() might be 0 width if collapsed.
+                    let finalRect = rect;
+                    if (selection.isCollapsed && isTable) {
+                        // Use the td or closest element rect
+                        const td = node.closest('td');
+                        if (td) finalRect = td.getBoundingClientRect();
+                    }
+
+                    if (finalRect.top >= editorRect.top && finalRect.bottom <= editorRect.bottom) {
+                        setToolbarPosition({
+                            x: finalRect.left + (finalRect.width / 2),
+                            y: finalRect.top - 10
+                        });
+                        setShowFloatingToolbar(true);
+
+                        if (!selection.isCollapsed) {
+                            savedSelectionRef.current = range.cloneRange();
+                        } else {
+                            // If table mode and collapsed, we don't necessarily save selection for "text actions",
+                            // but we might need it for table actions.
+                            savedSelectionRef.current = range.cloneRange();
+                        }
+                    } else {
+                        setShowFloatingToolbar(false);
+                    }
                 } else {
                     setShowFloatingToolbar(false);
-                    savedSelectionRef.current = null; // Clear if selection is outside editor
                 }
             } else {
                 setShowFloatingToolbar(false);
-                savedSelectionRef.current = null; // Clear if no selection
             }
         };
 

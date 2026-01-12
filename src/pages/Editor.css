@@ -401,6 +401,36 @@
     /* Or inherit */
 }
 
+.variable {
+    background-color: transparent;
+    color: inherit;
+    border-bottom: none;
+    padding: 0;
+    border-radius: 0;
+    font-weight: normal;
+    /* Or inherit */
+}
+
+/* Tables */
+.editor-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+    table-layout: fixed;
+    /* Ensures rigid columns */
+}
+
+.editor-table td {
+    border: 1px solid #000;
+    padding: 6px 8px;
+    vertical-align: top;
+    min-width: 50px;
+}
+
+.editor-table p {
+    margin: 0;
+}
+
 .variable-deleted {
     background-color: transparent;
     color: inherit;

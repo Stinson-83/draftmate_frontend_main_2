@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown, Link as LinkIcon } from 'lucide-react';
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown, Link as LinkIcon, Trash2, Plus, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 
-const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
+const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContext }) => {
     const toolbarRef = useRef(null);
     const [showInput, setShowInput] = useState(false);
     const [inputValue, setInputValue] = useState('');
@@ -69,6 +69,19 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
         >
             {!showInput ? (
                 <>
+                    {isTableContext && (
+                        <>
+                            <div className="toolbar-group">
+                                <button className="tool-btn" onClick={() => onFormat('modifyTable', { action: 'addRowAbove' })} title="Add Row Above"><ArrowUp size={14} /><Plus size={10} style={{ marginLeft: -4 }} /></button>
+                                <button className="tool-btn" onClick={() => onFormat('modifyTable', { action: 'addRowBelow' })} title="Add Row Below"><ArrowDown size={14} /><Plus size={10} style={{ marginLeft: -4 }} /></button>
+                                <button className="tool-btn" onClick={() => onFormat('modifyTable', { action: 'addColLeft' })} title="Add Col Left"><ArrowLeft size={14} /><Plus size={10} style={{ marginLeft: -4 }} /></button>
+                                <button className="tool-btn" onClick={() => onFormat('modifyTable', { action: 'addColRight' })} title="Add Col Right"><ArrowRight size={14} /><Plus size={10} style={{ marginLeft: -4 }} /></button>
+                                <button className="tool-btn" onClick={() => onFormat('modifyTable', { action: 'deleteRow' })} title="Delete Row"><Trash2 size={14} /><span style={{ fontSize: 10 }}>R</span></button>
+                                <button className="tool-btn" onClick={() => onFormat('modifyTable', { action: 'deleteCol' })} title="Delete Col"><Trash2 size={14} /><span style={{ fontSize: 10 }}>C</span></button>
+                            </div>
+                            <div className="toolbar-divider"></div>
+                        </>
+                    )}
                     <div className="toolbar-group">
                         <button className="tool-btn" onClick={() => onFormat('bold')} title="Bold"><Bold size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('italic')} title="Italic"><Italic size={16} /></button>
