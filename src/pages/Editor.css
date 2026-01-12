@@ -321,7 +321,7 @@
 
 /* Force transparent background on text elements to prevent unwanted highlighting */
 .editor-root p,
-.editor-root span,
+.editor-root span:not([class*='highlight-']),
 .editor-root div,
 .editor-root h1,
 .editor-root h2,
@@ -330,6 +330,27 @@
 .editor-root h5,
 .editor-root h6 {
     background-color: transparent !important;
+}
+
+/* Highlight Colors */
+.highlight-yellow {
+    background-color: #fef08a !important;
+}
+
+.highlight-green {
+    background-color: #bbf7d0 !important;
+}
+
+.highlight-cyan {
+    background-color: #a5f3fc !important;
+}
+
+.highlight-magenta {
+    background-color: #f5d0fe !important;
+}
+
+.highlight-gray {
+    background-color: #e2e8f0 !important;
 }
 
 .document-page h1,
@@ -510,6 +531,42 @@
     background: #f1f5f9;
     color: var(--primary);
 }
+
+.highlight-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    padding: 8px;
+    min-width: max-content;
+    z-index: 50;
+    display: flex;
+    gap: 6px;
+    border: 1px solid var(--border);
+}
+
+.highlight-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.highlight-swatch:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
 
 /* Notes Area */
 .notes-area {

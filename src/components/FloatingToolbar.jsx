@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X } from 'lucide-react';
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown } from 'lucide-react';
 
 const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
     const toolbarRef = useRef(null);
     const [showInput, setShowInput] = useState(false);
     const [inputValue, setInputValue] = useState('');
+    const [showHighlightMenu, setShowHighlightMenu] = useState(false);
 
     useEffect(() => {
         if (!visible) {
             setShowInput(false);
             setInputValue('');
+            setShowHighlightMenu(false);
         }
     }, [visible]);
 
@@ -67,6 +69,33 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
                         <button className="tool-btn" onClick={() => onFormat('bold')} title="Bold"><Bold size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('italic')} title="Italic"><Italic size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('underline')} title="Underline"><Underline size={16} /></button>
+                        <button className="tool-btn" onClick={() => onFormat('underline')} title="Underline"><Underline size={16} /></button>
+
+                        {/* Highlight Dropdown */}
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="tool-btn"
+                                onClick={() => setShowHighlightMenu(!showHighlightMenu)}
+                                title="Highlight Color"
+                                style={{ display: 'flex', alignItems: 'center', width: 'auto', padding: '0 4px' }}
+                            >
+                                <Highlighter size={16} />
+                                <ChevronDown size={10} style={{ marginLeft: 2, opacity: 0.7 }} />
+                            </button>
+                            {showHighlightMenu && (
+                                <div className="highlight-menu glass-panel" style={{ top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: '8px' }}>
+                                    <button className="highlight-swatch" onClick={() => { onFormat('highlight', 'yellow'); setShowHighlightMenu(false); }} title="Yellow" style={{ background: '#fef08a' }} />
+                                    <button className="highlight-swatch" onClick={() => { onFormat('highlight', 'green'); setShowHighlightMenu(false); }} title="Green" style={{ background: '#bbf7d0' }} />
+                                    <button className="highlight-swatch" onClick={() => { onFormat('highlight', 'cyan'); setShowHighlightMenu(false); }} title="Cyan" style={{ background: '#a5f3fc' }} />
+                                    <button className="highlight-swatch" onClick={() => { onFormat('highlight', 'magenta'); setShowHighlightMenu(false); }} title="Magenta" style={{ background: '#f5d0fe' }} />
+                                    <button className="highlight-swatch" onClick={() => { onFormat('highlight', 'gray'); setShowHighlightMenu(false); }} title="Gray" style={{ background: '#e2e8f0' }} />
+                                    <div style={{ width: 1, height: 24, background: '#e2e8f0', margin: '0 2px' }}></div>
+                                    <button className="highlight-swatch" onClick={() => { onFormat('highlight', 'none'); setShowHighlightMenu(false); }} title="No Color" style={{ background: 'transparent', color: '#64748b' }}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="toolbar-divider"></div>
