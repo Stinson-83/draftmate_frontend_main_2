@@ -13,7 +13,9 @@ import {
     Download,
     Minimize2,
     Stamp, // for watermark
-    Layers // for merge
+    Layers, // for merge
+    Hash, // for page numbers
+    GripVertical // for drag handle
 } from 'lucide-react';
 import './PDFEditor.css';
 import { API_CONFIG } from '../services/endpoints';
@@ -33,7 +35,8 @@ const TOOLS = [
     { id: 'compress', name: 'Compress PDF', icon: Minimize2, desc: 'Reduce file size while optimizing for maximal quality.', mode: MODES.SIMPLE },
     { id: 'pdf-to-word', name: 'PDF to Word', icon: FileText, desc: 'Convert your PDF to editable Word documents.', mode: MODES.SIMPLE },
     { id: 'word-to-pdf', name: 'Word to PDF', icon: FileText, desc: 'Make DOC and DOCX files easy to read by converting them to PDF.', mode: MODES.SIMPLE },
-    { id: 'watermark', name: 'Watermark PDF', icon: Stamp, desc: 'Stamp text over your PDF pages.', mode: MODES.BUILDER }
+    { id: 'watermark', name: 'Watermark PDF', icon: Stamp, desc: 'Stamp text over your PDF pages.', mode: MODES.BUILDER },
+    { id: 'page-numbers', name: 'Page Numbers', icon: Hash, desc: 'Add customizable page numbers to your PDF.', mode: MODES.BUILDER }
 ];
 
 const PDFEditor = () => {
@@ -57,6 +60,14 @@ const PDFEditor = () => {
     const [watermarkOpacity, setWatermarkOpacity] = useState(0.3);
     const [watermarkRotation, setWatermarkRotation] = useState(45);
     const [watermarkScale, setWatermarkScale] = useState(1.0);
+
+    // Page Numbering State
+    const [pageNumFormat, setPageNumFormat] = useState('number'); // 'number', 'page-of', 'roman'
+    const [pageNumPosition, setPageNumPosition] = useState('bottom-center'); // 'top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'
+    const [pageNumStartFrom, setPageNumStartFrom] = useState(1);
+    const [pageNumFontSize, setPageNumFontSize] = useState(12);
+    const [pageNumColor, setPageNumColor] = useState('#000000');
+    const [pageNumMargin, setPageNumMargin] = useState(36);
 
     const fileInputRef = useRef(null);
     const dragItem = useRef(null);
@@ -231,6 +242,55 @@ const PDFEditor = () => {
         }
     };
 
+    // Helper: Format page number text
+    const getPageNumberText = (pageIndex, totalPages) => {
+        const num = pageIndex + pageNumStartFrom;
+        switch (pageNumFormat) {
+            case 'page-of':
+                return `Page ${num} of ${totalPages + pageNumStartFrom - 1}`;
+            case 'roman':
+                // Simple roman numeral conversion for common numbers
+                const romanNumerals = [
+                    ['', 'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix'],
+                    ['', 'x', 'xx', 'xxx', 'xl', 'l', 'lx', 'lxx', 'lxxx', 'xc'],
+                    ['', 'c', 'cc', 'ccc', 'cd', 'd', 'dc', 'dcc', 'dccc', 'cm']
+                ];
+                if (num <= 0 || num > 999) return num.toString();
+                const hundreds = Math.floor(num / 100);
+                const tens = Math.floor((num % 100) / 10);
+                const ones = num % 10;
+                return (romanNumerals[2][hundreds] || '') + (romanNumerals[1][tens] || '') + (romanNumerals[0][ones] || '');
+            default:
+                return num.toString();
+        }
+    };
+
+    // Helper: Get position styles for page number overlay
+    const getPageNumPositionStyle = () => {
+        const baseStyle = {
+            position: 'absolute',
+            pointerEvents: 'none',
+            fontSize: `${pageNumFontSize * zoomLevel}px`,
+            color: pageNumColor,
+            zIndex: 10,
+            fontFamily: 'Arial, sans-serif',
+            padding: '4px 8px',
+            background: 'rgba(255,255,255,0.7)',
+            borderRadius: '4px'
+        };
+        const margin = pageNumMargin * zoomLevel / 2;
+
+        switch (pageNumPosition) {
+            case 'top-left': return { ...baseStyle, top: margin, left: margin };
+            case 'top-center': return { ...baseStyle, top: margin, left: '50%', transform: 'translateX(-50%)' };
+            case 'top-right': return { ...baseStyle, top: margin, right: margin };
+            case 'bottom-left': return { ...baseStyle, bottom: margin, left: margin };
+            case 'bottom-center': return { ...baseStyle, bottom: margin, left: '50%', transform: 'translateX(-50%)' };
+            case 'bottom-right': return { ...baseStyle, bottom: margin, right: margin };
+            default: return { ...baseStyle, bottom: margin, left: '50%', transform: 'translateX(-50%)' };
+        }
+    };
+
     const handleProcess = async () => {
         setIsProcessing(true);
         const formData = new FormData();
@@ -239,7 +299,19 @@ const PDFEditor = () => {
         try {
             let endpoint = '';
 
-            if (activeTool.id === 'watermark') {
+            if (activeTool.id === 'page-numbers') {
+                endpoint = '/add_page_numbers';
+                if (rawFiles.length === 0) throw new Error("No file loaded");
+                formData.append('file', rawFiles[0]);
+                formData.append('format', pageNumFormat);
+                formData.append('position', pageNumPosition);
+                formData.append('start_from', pageNumStartFrom.toString());
+                formData.append('font_size', pageNumFontSize.toString());
+                formData.append('color', pageNumColor);
+                formData.append('margin', pageNumMargin.toString());
+                formData.append('total_pages', pages.length.toString());
+
+            } else if (activeTool.id === 'watermark') {
                 endpoint = '/watermark';
                 // For watermark, we need the raw file. 
                 if (rawFiles.length === 0) throw new Error("No file loaded");
@@ -413,6 +485,11 @@ const PDFEditor = () => {
                                     onDragEnd={handleDragEnd}
                                 >
                                     <div className="thumbnail-image-container">
+                                        {activeMode === MODES.BUILDER && (
+                                            <div className="drag-handle" title="Drag to reorder">
+                                                <GripVertical size={14} />
+                                            </div>
+                                        )}
                                         <img
                                             src={page.imageSrc}
                                             style={{ transform: `rotate(${page.rotation}deg)` }}
@@ -514,7 +591,7 @@ const PDFEditor = () => {
                                         <div className="processing-dots">
                                             <span></span><span></span><span></span>
                                         </div>
-                                    ) : (activeTool.id === 'watermark' ? 'Apply' : (activeMode === MODES.SPLITTER ? 'Split' : 'Download'))}
+                                    ) : (activeTool.id === 'watermark' || activeTool.id === 'page-numbers' ? 'Apply' : (activeMode === MODES.SPLITTER ? 'Split' : 'Download'))}
                                 </button>
                             </div>
                         </div>
@@ -564,6 +641,73 @@ const PDFEditor = () => {
                             </div>
                         )}
 
+                        {/* Page Numbers Tools Panel */}
+                        {activeTool.id === 'page-numbers' && (
+                            <div className="page-number-toolbar">
+                                <div className="tool-group">
+                                    <label>Format</label>
+                                    <select
+                                        value={pageNumFormat}
+                                        onChange={(e) => setPageNumFormat(e.target.value)}
+                                        className="tool-select"
+                                    >
+                                        <option value="number">1, 2, 3...</option>
+                                        <option value="page-of">Page 1 of N</option>
+                                        <option value="roman">i, ii, iii...</option>
+                                    </select>
+                                </div>
+                                <div className="tool-divider"></div>
+                                <div className="tool-group">
+                                    <label>Position</label>
+                                    <div className="position-grid">
+                                        {['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'].map(pos => (
+                                            <button
+                                                key={pos}
+                                                className={`position-btn ${pageNumPosition === pos ? 'active' : ''}`}
+                                                onClick={() => setPageNumPosition(pos)}
+                                                title={pos.replace('-', ' ')}
+                                            >
+                                                {pos.includes('top') ? '⬆' : '⬇'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="tool-divider"></div>
+                                <div className="tool-group">
+                                    <label>Start From</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={pageNumStartFrom}
+                                        onChange={(e) => setPageNumStartFrom(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="tool-input-number"
+                                    />
+                                </div>
+                                <div className="tool-divider"></div>
+                                <div className="tool-group">
+                                    <label>Size ({pageNumFontSize}pt)</label>
+                                    <input
+                                        type="range"
+                                        min="8"
+                                        max="24"
+                                        value={pageNumFontSize}
+                                        onChange={(e) => setPageNumFontSize(parseInt(e.target.value))}
+                                        className="tool-slider"
+                                    />
+                                </div>
+                                <div className="tool-divider"></div>
+                                <div className="tool-group">
+                                    <label>Color</label>
+                                    <input
+                                        type="color"
+                                        value={pageNumColor}
+                                        onChange={(e) => setPageNumColor(e.target.value)}
+                                        className="tool-color"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Visual Canvas (Scrollable) */}
                         <div className="preview-canvas" id="main-scroll-container">
                             {pages.length > 0 ? (
@@ -607,6 +751,13 @@ const PDFEditor = () => {
                                                     }}
                                                 >
                                                     {watermarkText}
+                                                </div>
+                                            )}
+
+                                            {/* Page Number Preview Overlay */}
+                                            {activeTool.id === 'page-numbers' && (
+                                                <div style={getPageNumPositionStyle()}>
+                                                    {getPageNumberText(idx, pages.length)}
                                                 </div>
                                             )}
                                         </div>

@@ -164,6 +164,49 @@
     background: #ef4444;
 }
 
+/* Drag Handle */
+.drag-handle {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 20px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    cursor: grab;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 5;
+}
+
+.thumbnail-card:hover .drag-handle {
+    opacity: 1;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Dragging States */
+.thumbnail-card[draggable="true"] {
+    cursor: grab;
+}
+
+.thumbnail-card[draggable="true"]:active {
+    cursor: grabbing;
+    opacity: 0.6;
+    transform: scale(0.98);
+}
+
+.thumbnail-card.drag-over {
+    border: 2px dashed #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+}
+
 /* Main Preview Area */
 .main-preview-area {
     flex: 1;
@@ -364,6 +407,151 @@
     width: 1px;
     height: 24px;
     background: var(--border);
+}
+
+/* Page Number Toolbar - Glassmorphism Style */
+.page-number-toolbar {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    border-bottom: 1px solid rgba(37, 99, 235, 0.15);
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+    flex-wrap: wrap;
+}
+
+.page-number-toolbar .tool-group {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.page-number-toolbar label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Select Dropdown */
+.tool-select {
+    appearance: none;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border: 1.5px solid #e2e8f0;
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #1e293b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+}
+
+.tool-select:hover {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.tool-select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Position Grid - Visual 2x3 Grid */
+.position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 4px;
+    padding: 4px;
+    background: #f1f5f9;
+    border-radius: 8px;
+}
+
+.position-btn {
+    width: 28px;
+    height: 24px;
+    border: none;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.position-btn:hover {
+    background: #e2e8f0;
+    color: #2563eb;
+    transform: scale(1.05);
+}
+
+.position-btn.active {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* Number Input */
+.tool-input-number {
+    width: 60px;
+    border: 1.5px solid #e2e8f0;
+    padding: 0.5rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+    color: #1e293b;
+    transition: all 0.2s ease;
+}
+
+.tool-input-number:hover {
+    border-color: #2563eb;
+}
+
+.tool-input-number:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Color Picker */
+.tool-color {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    background: transparent;
+}
+
+.tool-color:hover {
+    border-color: #2563eb;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tool-color::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.tool-color::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
 }
 
 /* Simple Mode Uploader */

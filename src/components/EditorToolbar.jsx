@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Save, Wand2, Download, Undo, Redo,
     Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
-    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon
+    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon, Hash
 } from 'lucide-react';
 
 const EditorToolbar = ({
@@ -16,6 +16,8 @@ const EditorToolbar = ({
     setShowHeader,
     showFooter,
     setShowFooter,
+    showPageNumbers,
+    setShowPageNumbers,
     onModify
 }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -254,6 +256,15 @@ const EditorToolbar = ({
                     style={{ color: showFooter ? 'var(--primary)' : 'inherit', background: showFooter ? '#f1f5f9' : 'transparent' }}
                 >
                     Footer
+                </button>
+                <button
+                    className={`tool-btn ${showPageNumbers ? 'active' : ''}`}
+                    onClick={() => setShowPageNumbers(!showPageNumbers)}
+                    title="Toggle Page Numbers"
+                    style={{ color: showPageNumbers ? 'var(--primary)' : 'inherit', background: showPageNumbers ? '#f1f5f9' : 'transparent', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                    <Hash size={14} />
+                    Page #
                 </button>
             </div>
             <div className="toolbar-divider"></div>

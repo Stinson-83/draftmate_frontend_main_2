@@ -716,6 +716,29 @@
     outline: 1px dashed #cbd5e1;
 }
 
+/* Page Number Display */
+.page-number-display {
+    position: absolute;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #64748b;
+    font-family: 'Arial', sans-serif;
+    font-weight: 500;
+    z-index: 5;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 2px 12px;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: opacity 0.2s;
+}
+
+.document-page:hover .page-number-display {
+    opacity: 0.7;
+}
+
 /* Floating Toolbar */
 .floating-toolbar {
     display: flex;

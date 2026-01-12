@@ -24,6 +24,7 @@ const Editor = () => {
     // Header/Footer Toggle State
     const [showHeader, setShowHeader] = useState(true);
     const [showFooter, setShowFooter] = useState(false);
+    const [showPageNumbers, setShowPageNumbers] = useState(true); // Default enabled
 
     const [isHeaderEditing, setIsHeaderEditing] = useState(false);
 
@@ -1060,6 +1061,37 @@ const Editor = () => {
         updateFooters();
     }, [pageCount, showFooter, updateFooters]);
 
+    // Update page numbers on all pages
+    const updatePageNumbers = useCallback(() => {
+        const container = pagesContainerRef.current;
+        if (!container) return;
+
+        const pages = Array.from(container.querySelectorAll('.document-page'));
+
+        pages.forEach((page, index) => {
+            let pageNumEl = page.querySelector('.page-number-display');
+
+            if (showPageNumbers) {
+                if (!pageNumEl) {
+                    pageNumEl = document.createElement('div');
+                    pageNumEl.className = 'page-number-display';
+                    page.appendChild(pageNumEl);
+                }
+                pageNumEl.textContent = (index + 1).toString();
+                pageNumEl.style.display = 'block';
+            } else {
+                if (pageNumEl) {
+                    pageNumEl.remove();
+                }
+            }
+        });
+    }, [showPageNumbers]);
+
+    // Trigger page numbers update
+    useEffect(() => {
+        updatePageNumbers();
+    }, [pageCount, showPageNumbers, updatePageNumbers]);
+
     const initEmptyEditor = (pageEl) => {
         let ed = pageEl.querySelector('.editor-root');
         if (!ed) {
@@ -1625,6 +1657,8 @@ const Editor = () => {
                 setShowHeader={setShowHeader}
                 showFooter={showFooter}
                 setShowFooter={setShowFooter}
+                showPageNumbers={showPageNumbers}
+                setShowPageNumbers={setShowPageNumbers}
                 onModify={() => setShowModifyModal(true)}
             />
 

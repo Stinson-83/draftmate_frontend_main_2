@@ -91,6 +91,7 @@ export const API_CONFIG = {
             REORDER: '/reorder', // POST
             WATERMARK: '/watermark', // POST
             ASSEMBLE: '/assemble', // POST
+            ADD_PAGE_NUMBERS: '/add_page_numbers', // POST
         }
     },
 

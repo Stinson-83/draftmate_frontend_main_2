@@ -504,6 +504,124 @@ async def watermark_pdf_endpoint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+def int_to_roman(num):
+    """Convert integer to roman numeral"""
+    val = [
+        1000, 900, 500, 400,
+        100, 90, 50, 40,
+        10, 9, 5, 4,
+        1
+    ]
+    syms = [
+        'm', 'cm', 'd', 'cd',
+        'c', 'xc', 'l', 'xl',
+        'x', 'ix', 'v', 'iv',
+        'i'
+    ]
+    roman_num = ''
+    i = 0
+    while num > 0:
+        for _ in range(num // val[i]):
+            roman_num += syms[i]
+            num -= val[i]
+        i += 1
+    return roman_num
+
+
+def add_page_numbers_logic(pdf_bytes, format_type="number", position="bottom-center", 
+                           start_from=1, font_size=12, color="#000000", margin=36, total_pages=None):
+    """Add page numbers to PDF"""
+    try:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        total = len(doc) if total_pages is None else total_pages
+        
+        # Parse hex color to RGB tuple (0-1 range for fitz)
+        hex_color = color.lstrip('#')
+        r = int(hex_color[0:2], 16) / 255
+        g = int(hex_color[2:4], 16) / 255
+        b = int(hex_color[4:6], 16) / 255
+        text_color = (r, g, b)
+        
+        for page_num, page in enumerate(doc):
+            page_width = page.rect.width
+            page_height = page.rect.height
+            
+            # Calculate actual page number based on start_from
+            actual_num = page_num + start_from
+            
+            # Generate page number text based on format
+            if format_type == "page-of":
+                page_text = f"Page {actual_num} of {total + start_from - 1}"
+            elif format_type == "roman":
+                page_text = int_to_roman(actual_num)
+            else:  # number
+                page_text = str(actual_num)
+            
+            # Calculate position
+            text_width = len(page_text) * font_size * 0.5  # Approximate
+            
+            if position.startswith("top"):
+                y = margin
+            else:  # bottom
+                y = page_height - margin - font_size
+            
+            if position.endswith("left"):
+                x = margin
+            elif position.endswith("right"):
+                x = page_width - margin - text_width
+            else:  # center
+                x = (page_width - text_width) / 2
+            
+            # Insert text
+            point = fitz.Point(x, y + font_size)  # y + font_size because fitz uses baseline
+            page.insert_text(
+                point,
+                page_text,
+                fontsize=font_size,
+                color=text_color,
+                fontname="helv"  # Helvetica
+            )
+        
+        output = io.BytesIO(doc.tobytes())
+        doc.close()
+        return output
+    except Exception as e:
+        raise Exception(f"Page numbering error: {str(e)}")
+
+
+@app.post("/add_page_numbers")
+async def add_page_numbers_endpoint(
+    file: UploadFile,
+    format: str = Form("number"),  # "number", "page-of", "roman"
+    position: str = Form("bottom-center"),  # "top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"
+    start_from: int = Form(1),
+    font_size: int = Form(12),
+    color: str = Form("#000000"),
+    margin: int = Form(36),
+    total_pages: int = Form(None)
+):
+    try:
+        content = await file.read()
+        result = add_page_numbers_logic(
+            content, 
+            format_type=format,
+            position=position,
+            start_from=start_from,
+            font_size=font_size,
+            color=color,
+            margin=margin,
+            total_pages=total_pages
+        )
+        return StreamingResponse(
+            result, 
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=numbered.pdf"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/assemble")
 async def assemble_pdf_endpoint(files: list[UploadFile], manifest: str = Form(...)):
     # manifest is a JSON string
