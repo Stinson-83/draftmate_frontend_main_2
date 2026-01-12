@@ -1,17 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown } from 'lucide-react';
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown, Link as LinkIcon } from 'lucide-react';
 
 const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
     const toolbarRef = useRef(null);
     const [showInput, setShowInput] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [showHighlightMenu, setShowHighlightMenu] = useState(false);
+    const [showLinkInput, setShowLinkInput] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
 
     useEffect(() => {
         if (!visible) {
             setShowInput(false);
             setInputValue('');
             setShowHighlightMenu(false);
+            setShowLinkInput(false);
+            setLinkUrl('');
         }
     }, [visible]);
 
@@ -70,6 +74,16 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
                         <button className="tool-btn" onClick={() => onFormat('italic')} title="Italic"><Italic size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('underline')} title="Underline"><Underline size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('underline')} title="Underline"><Underline size={16} /></button>
+                        <button
+                            className={`tool-btn ${showLinkInput ? 'active' : ''}`}
+                            onClick={() => {
+                                setShowLinkInput(true);
+                                setShowInput(true);
+                            }}
+                            title="Insert Link"
+                        >
+                            <LinkIcon size={16} />
+                        </button>
 
                         {/* Highlight Dropdown */}
                         <div style={{ position: 'relative' }}>
@@ -118,31 +132,74 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible }) => {
                     </button>
                 </>
             ) : (
-                <div className="flex items-center gap-2 p-1">
-                    <input
-                        type="text"
-                        className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-48"
-                        placeholder="How should I change this?"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        autoFocus
-                    />
-                    <button
-                        className="btn-enhance px-3 py-1 text-xs"
-                        onClick={handleSubmitEnhance}
-                    >
-                        Enhance
-                    </button>
-                    <button
-                        onClick={() => setShowInput(false)}
-                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
-            )}
-        </div>
+                <>
+                    {/* Link Input Mode */}
+                    {showLinkInput ? (
+                        <div className="flex items-center gap-2 p-1">
+                            <input
+                                type="text"
+                                className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-48"
+                                placeholder="Paste link URL..."
+                                value={linkUrl}
+                                onChange={(e) => setLinkUrl(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        onFormat('insertLink', linkUrl);
+                                        setShowLinkInput(false);
+                                        setLinkUrl('');
+                                    } else if (e.key === 'Escape') {
+                                        setShowLinkInput(false);
+                                    }
+                                }}
+                                autoFocus
+                            />
+                            <button
+                                className="btn-enhance px-3 py-1 text-xs"
+                                onClick={() => {
+                                    onFormat('insertLink', linkUrl);
+                                    setShowLinkInput(false);
+                                    setLinkUrl('');
+                                }}
+                            >
+                                Link
+                            </button>
+                            <button
+                                onClick={() => setShowLinkInput(false)}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    ) : (
+                        /* AI Assist Mode */
+                        <div className="flex items-center gap-2 p-1">
+                            <input
+                                type="text"
+                                className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-48"
+                                placeholder="How should I change this?"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                autoFocus
+                            />
+                            <button
+                                className="btn-enhance px-3 py-1 text-xs"
+                                onClick={handleSubmitEnhance}
+                            >
+                                Enhance
+                            </button>
+                            <button
+                                onClick={() => setShowInput(false)}
+                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+                </>
+            )
+            }
+        </div >
     );
 };
 

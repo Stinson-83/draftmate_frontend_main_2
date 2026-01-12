@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     Save, Wand2, Download, Undo, Redo,
     Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
-    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter
+    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical
 } from 'lucide-react';
 
 const EditorToolbar = ({
@@ -20,6 +20,18 @@ const EditorToolbar = ({
 }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showHighlightMenu, setShowHighlightMenu] = useState(false);
+    const [showLineSpacingMenu, setShowLineSpacingMenu] = useState(false);
+    const [showLinkInput, setShowLinkInput] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
+
+    const handleInsertLink = () => {
+        if (linkUrl) {
+            execCommand('insertLink', linkUrl);
+            setLinkUrl('');
+            setShowLinkInput(false);
+        }
+    };
+
 
     return (
         <div className="editor-toolbar glass-panel">
@@ -129,12 +141,68 @@ const EditorToolbar = ({
                         </div>
                     )}
                 </div>
+                {/* Link Button */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className={`tool-btn ${showLinkInput ? 'active' : ''}`}
+                        onClick={() => setShowLinkInput(!showLinkInput)}
+                        title="Insert Link"
+                    >
+                        <LinkIcon size={18} />
+                    </button>
+                    {showLinkInput && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, padding: 8, zIndex: 50, display: 'flex', gap: 4, alignItems: 'center', minWidth: 260 }}>
+                            <input
+                                type="text"
+                                value={linkUrl}
+                                onChange={(e) => setLinkUrl(e.target.value)}
+                                placeholder="Paste URL..."
+                                style={{ flex: 1, padding: '4px 8px', fontSize: '13px', borderRadius: 4, border: '1px solid #e2e8f0', outline: 'none' }}
+                                onKeyDown={(e) => e.key === 'Enter' && handleInsertLink()}
+                                autoFocus
+                            />
+                            <button
+                                onClick={handleInsertLink}
+                                style={{ padding: '4px 8px', background: '#2563eb', color: 'white', borderRadius: 4, fontSize: '12px', border: 'none', cursor: 'pointer' }}
+                            >
+                                Add
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
             <div className="toolbar-divider"></div>
             <div className="toolbar-group">
                 <button className="tool-btn" onClick={() => execCommand('justifyLeft')} title="Align Left"><AlignLeft size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('justifyCenter')} title="Align Center"><AlignCenter size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('justifyRight')} title="Align Right"><AlignRight size={18} /></button>
+
+                {/* Line Spacing Dropdown */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="tool-btn"
+                        onClick={() => setShowLineSpacingMenu(!showLineSpacingMenu)}
+                        title="Line Spacing"
+                        style={{ display: 'flex', alignItems: 'center' }}
+                    >
+                        <MoveVertical size={16} />
+                        <ChevronDown size={10} style={{ marginLeft: 2, opacity: 0.7 }} />
+                    </button>
+                    {showLineSpacingMenu && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, padding: 4, zIndex: 50, display: 'flex', flexDirection: 'column', minWidth: 80 }}>
+                            {[1.0, 1.15, 1.5, 2.0, 2.5, 3.0].map(val => (
+                                <button
+                                    key={val}
+                                    onClick={() => { execCommand('lineSpacing', val); setShowLineSpacingMenu(false); }}
+                                    style={{ padding: '6px 12px', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}
+                                    className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm"
+                                >
+                                    {val}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
                 <button className="tool-btn" onClick={() => execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('insertOrderedList')} title="Numbered List"><ListOrdered size={18} /></button>
             </div>

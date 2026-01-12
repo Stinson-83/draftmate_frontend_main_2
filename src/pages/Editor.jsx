@@ -64,6 +64,7 @@ const Editor = () => {
 
     const documentRef = useRef(null);
     const mainContainerRef = useRef(null);
+    const savedSelectionRef = useRef(null);
 
     const [placeholders, setPlaceholders] = useState([]);
     const [deletedPlaceholders, setDeletedPlaceholders] = useState([]);
@@ -448,6 +449,127 @@ const Editor = () => {
             return;
         }
 
+        if (command === 'lineSpacing') {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+
+            // Helper to get block parent
+            const getBlockParent = (node) => {
+                // Return closest P, H1-6, LI, DIV that is editable
+                let el = node.nodeType === 3 ? node.parentElement : node;
+                return el.closest('p, h1, h2, h3, h4, h5, h6, li, div.editor-root > div');
+            };
+
+            // 1. Identify specific paragraphs to change
+            const blocksToUpdate = new Set();
+
+            if (selection.isCollapsed) {
+                const block = getBlockParent(range.startContainer);
+                if (block) blocksToUpdate.add(block);
+            } else {
+                // Walk the range
+                const walker = document.createTreeWalker(
+                    range.commonAncestorContainer,
+                    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+                    {
+                        acceptNode: (node) => {
+                            if (range.intersectsNode(node)) return NodeFilter.FILTER_ACCEPT;
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                    }
+                );
+
+                let node = walker.currentNode;
+                while (node) {
+                    const block = getBlockParent(node);
+                    if (block && block.closest('.editor-root')) {
+                        blocksToUpdate.add(block);
+                    }
+                    node = walker.nextNode();
+                }
+            }
+
+            // 2. Apply Spacing
+            blocksToUpdate.forEach(block => {
+                if (block) {
+                    block.style.lineHeight = value;
+                }
+            });
+
+            // 3. Trigger Pagination (Layout changed)
+            setTimeout(paginateAll, 50);
+            return;
+        }
+
+
+        if (command === 'insertLink') {
+            let selection = window.getSelection();
+            let range = null;
+
+            // Check if current selection is valid (in editor)
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                const r = selection.getRangeAt(0);
+                const common = r.commonAncestorContainer;
+                const el = common.nodeType === 3 ? common.parentElement : common;
+                if (el.closest('.editor-root')) {
+                    range = r;
+                }
+            }
+
+            // Fallback to saved selection if current is invalid (e.g. focus in input)
+            if (!range && savedSelectionRef.current) {
+                range = savedSelectionRef.current;
+                selection = null; // Don't rely on window selection for operations if we use saved range
+            }
+
+            if (range) {
+                // Prevent nesting: Check if selection is already inside a link
+                let container = range.commonAncestorContainer;
+                if (container.nodeType === 3) container = container.parentElement;
+
+                if (container.closest('a')) {
+                    // Update existing link
+                    let normalizedValue = value;
+                    if (!/^https?:\/\//i.test(normalizedValue) && !/^mailto:/i.test(normalizedValue)) {
+                        normalizedValue = 'https://' + normalizedValue;
+                    }
+                    container.closest('a').href = normalizedValue;
+                    return;
+                }
+
+                // Create link
+                const a = document.createElement('a');
+                let normalizedValue = value;
+                if (!/^https?:\/\//i.test(normalizedValue) && !/^mailto:/i.test(normalizedValue)) {
+                    normalizedValue = 'https://' + normalizedValue;
+                }
+                a.href = normalizedValue;
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+
+                try {
+                    const content = range.extractContents(); // This consumes the range content
+
+                    // CLEANUP: Ensure we don't nest links
+                    const existingLinks = content.querySelectorAll('a');
+                    existingLinks.forEach(link => {
+                        const parent = link.parentNode;
+                        while (link.firstChild) parent.insertBefore(link.firstChild, link);
+                        parent.removeChild(link);
+                    });
+
+                    a.appendChild(content);
+                    range.insertNode(a);
+
+                    // Cleanup saved selection as it's now invalid/used
+                    savedSelectionRef.current = null;
+                } catch (e) {
+                    console.error('Error inserting link:', e);
+                }
+            }
+            return;
+        }
 
         if (command === 'highlight') {
             const selection = window.getSelection();
@@ -455,46 +577,34 @@ const Editor = () => {
                 const range = selection.getRangeAt(0);
 
                 if (value === 'none') {
+                    // ... (existing remove logic) ...
                     // Remove Highlighting Logic
                     const container = range.commonAncestorContainer;
                     // Find container element (if text node)
                     const rootEl = container.nodeType === 3 ? container.parentElement : container;
 
-                    // 1. Check if we are directly inside a highlight span
+                    // 1. Check directly inside
                     let current = rootEl;
                     while (current && current !== document.body && !current.classList?.contains('editor-root')) {
                         if (current.tagName === 'SPAN' && current.className.includes('highlight-')) {
-                            // Unwrap this specific span
+                            // Unwrap
                             const parent = current.parentNode;
-                            while (current.firstChild) {
-                                parent.insertBefore(current.firstChild, current);
-                            }
+                            while (current.firstChild) parent.insertBefore(current.firstChild, current);
                             parent.removeChild(current);
-                            return; // Done for simple click-inside case
+                            return;
                         }
                         current = current.parentNode;
                     }
 
-                    // 2. Selection covers multiple elements; find all highlight spans within range
-                    // Note: This is a bit aggressive but works for "select phrase -> remove"
+                    // 2. Selection covers multiple
                     if (!selection.isCollapsed) {
-                        // We need a robust way to find intersecting nodes.
-                        // Simple approach: selection.containsNode is unavailable in all contexts or flaky.
-                        // We'll query all highlight spans in the common ancestor and check intersection.
-
                         let context = rootEl;
-                        // Go up one level to be safe if common ancestor is the span itself (handled above) 
-                        // or inside text.
                         if (context.nodeType === 3) context = context.parentElement;
-
                         const highlights = context.querySelectorAll("span[class*='highlight-']");
                         highlights.forEach(span => {
                             if (selection.containsNode(span, true)) {
-                                // Unwrap
                                 const parent = span.parentNode;
-                                while (span.firstChild) {
-                                    parent.insertBefore(span.firstChild, span);
-                                }
+                                while (span.firstChild) parent.insertBefore(span.firstChild, span);
                                 parent.removeChild(span);
                             }
                         });
@@ -503,22 +613,90 @@ const Editor = () => {
                 }
 
                 if (!selection.isCollapsed) {
-                    // Create highlight span
-                    const span = document.createElement('span');
-                    span.className = `highlight-${value}`;
+                    // Prevent wrapping standard logic if we need to skip links
+                    // We need a custom walker to wrap text nodes BUT SKIP anchors.
 
                     try {
                         const content = range.extractContents();
-                        span.appendChild(content);
-                        range.insertNode(span);
 
-                        // Reselect to keep user context
+                        // We need to rebuild this fragment with highlights applied 
+                        // ONLY to non-link nodes.
+
+                        const applyHighlightToFragment = (fragment, color) => {
+                            // Helper to recursively wrap text
+                            const nodes = Array.from(fragment.childNodes);
+                            nodes.forEach(node => {
+                                if (node.nodeName === 'A') {
+                                    // Don't wrap the anchor itself.
+                                    // But we might want to wrap content *inside* the anchor? 
+                                    // No, prompt says "Prevent wrapping highlights inside links".
+                                    // So we leave the link ALONE.
+                                    return;
+                                } else if (node.nodeType === 3) { // Text
+                                    if (node.textContent.trim().length === 0) return;
+                                    const span = document.createElement('span');
+                                    span.className = `highlight-${color}`;
+                                    span.textContent = node.textContent;
+                                    fragment.replaceChild(span, node);
+                                } else if (node.nodeType === 1) { // Element (e.g. bold span)
+                                    // Recurse? No, we can wrap the element itself if it's not a link.
+                                    // Safe to wrap other spans.
+                                    if (node.tagName === 'SPAN' && !node.classList.contains('highlight-' + color)) {
+                                        // Check if it already has a highlight? 
+                                        // Nested highlights are tricky. Let's just wrap the span.
+                                        const wrapper = document.createElement('span');
+                                        wrapper.className = `highlight-${color}`;
+                                        fragment.replaceChild(wrapper, node);
+                                        wrapper.appendChild(node);
+                                    } else {
+                                        // Generic
+                                        const wrapper = document.createElement('span');
+                                        wrapper.className = `highlight-${color}`;
+                                        fragment.replaceChild(wrapper, node);
+                                        wrapper.appendChild(node);
+                                    }
+                                }
+                            });
+                        };
+
+                        // NOTE: The above recursive logic is simplified. 
+                        // `extractContents` gives us a fragment.
+                        // Standard formatting usually just wraps.
+                        // Since we extracted, we just need to verify we aren't wrapping an A.
+                        // To allow mixed content (Text - Link - Text), we traverse the fragment.
+
+                        const fragment = content;
+                        const children = Array.from(fragment.childNodes);
+
+                        // If it's just text, simple wrap
+                        if (children.every(n => n.nodeType === 3)) {
+                            const span = document.createElement('span');
+                            span.className = `highlight-${value}`;
+                            while (fragment.firstChild) span.appendChild(fragment.firstChild);
+                            fragment.appendChild(span);
+                        } else {
+                            // Complex mix
+                            // We will intentionally NOT wrap the whole thing in one span.
+                            // We will wrap individual non-link siblings.
+                            children.forEach(child => {
+                                if (child.nodeName === 'A') {
+                                    // Update: Do nothing to the link.
+                                } else {
+                                    // Wrap this child (text or span)
+                                    const span = document.createElement('span');
+                                    span.className = `highlight-${value}`;
+                                    // We need to replace the child in the fragment
+                                    fragment.replaceChild(span, child);
+                                    span.appendChild(child);
+                                }
+                            });
+                        }
+
+                        range.insertNode(fragment);
                         selection.removeAllRanges();
-                        const newRange = document.createRange();
-                        newRange.selectNode(span);
-                        selection.addRange(newRange);
                     } catch (e) {
-                        console.error('Error applying highlight:', e);
+                        console.error('HIGHLIGHT ERROR', e);
+                        // Fallback?
                     }
                 }
             }
@@ -835,7 +1013,63 @@ const Editor = () => {
         sel.removeAllRanges();
         sel.addRange(range);
     };
+    // Link Interaction Handlers
+    useEffect(() => {
+        const handleEditorClick = (e) => {
+            if (e.target.tagName === 'A') {
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+Click: Open Link
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Ctrl+Click: Open Link
+                    e.preventDefault();
+                    e.stopPropagation();
+                    let url = e.target.getAttribute('href');
+                    if (url && !/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) {
+                        url = 'https://' + url;
+                    }
+                    window.open(url, '_blank');
+                } else {
+                    // Regular Click: Allow default caret placement (user edits text)
+                }
+            }
+        };
 
+        const handleEditorDoubleClick = (e) => {
+            // Double Click: Edit Link
+            const link = e.target.closest('a');
+            if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+                const newUrl = prompt("Edit Link URL:", link.href);
+                if (newUrl !== null) {
+                    if (newUrl === '') {
+                        // Unlink if empty
+                        const parent = link.parentNode;
+                        while (link.firstChild) parent.insertBefore(link.firstChild, link);
+                        parent.removeChild(link);
+                    } else {
+                        link.href = newUrl;
+                    }
+                }
+            }
+        };
+
+        const pages = pagesContainerRef.current;
+        if (pages) {
+            pages.addEventListener('click', handleEditorClick);
+            pages.addEventListener('dblclick', handleEditorDoubleClick);
+        }
+
+        return () => {
+            if (pages) {
+                pages.removeEventListener('click', handleEditorClick);
+                pages.removeEventListener('dblclick', handleEditorDoubleClick);
+            }
+        };
+    }, []);
+
+    // Pagination Logic
     const paginateAll = useCallback(() => {
         const container = pagesContainerRef.current;
         if (!container) return;
@@ -1031,25 +1265,29 @@ const Editor = () => {
 
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+                // Calculate position for floating toolbar
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
 
-                // Only show if selection is within the editor main area (roughly)
-                if (mainContainerRef.current && mainContainerRef.current.contains(selection.anchorNode.parentElement || selection.anchorNode)) {
+                // Only show if selection is within the editor area
+                const editorRect = pagesContainerRef.current.getBoundingClientRect();
+
+                if (rect.top >= editorRect.top && rect.bottom <= editorRect.bottom) {
                     setToolbarPosition({
-                        x: rect.left + rect.width / 2,
-                        y: rect.top - 10 // Position slightly above
+                        x: rect.left + (rect.width / 2),
+                        y: rect.top - 10
                     });
                     setShowFloatingToolbar(true);
-                    // Save the range!
-                    activeRangeRef.current = range.cloneRange();
+
+                    // SAVE SELECTION for Floating Toolbar actions (like Link Input)
+                    savedSelectionRef.current = range.cloneRange();
                 } else {
                     setShowFloatingToolbar(false);
-                    activeRangeRef.current = null;
+                    savedSelectionRef.current = null; // Clear if selection is outside editor
                 }
             } else {
                 setShowFloatingToolbar(false);
-                activeRangeRef.current = null;
+                savedSelectionRef.current = null; // Clear if no selection
             }
         };
 
