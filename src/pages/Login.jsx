@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { toast } from 'sonner';
 import logo from '../assets/draftmate_logo.png';
-import fullLogo from '../assets/Full_logo.png';
+import fullLogo from '../assets/FULL_LOGO.svg';
 import { API_CONFIG } from '../services/endpoints';
 
 const Login = () => {

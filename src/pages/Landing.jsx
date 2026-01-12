@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import fullLogo from '../assets/Full_logo.png';
+import fullLogo from '../assets/FULL_LOGO.svg';
 
 const Landing = () => {
     useEffect(() => {

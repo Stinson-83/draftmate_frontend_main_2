@@ -555,7 +555,7 @@ const PDFEditor = () => {
                                 <div className="tool-group">
                                     <label>Scale ({watermarkScale}x)</label>
                                     <input
-                                        type="range" min="0.1" max="3.0" step="0.1"
+                                        type="range" min="0.05" max="1.0" step="0.05"
                                         value={watermarkScale}
                                         onChange={(e) => setWatermarkScale(parseFloat(e.target.value))}
                                         className="tool-slider"
@@ -584,6 +584,31 @@ const PDFEditor = () => {
                                                 }}
                                                 alt={`Page ${idx + 1}`}
                                             />
+
+                                            {/* Watermark Preview Overlay */}
+                                            {activeTool.id === 'watermark' && watermarkText && (
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '50%',
+                                                        left: '50%',
+                                                        transform: `translate(-50%, -50%) rotate(${watermarkRotation}deg)`,
+                                                        opacity: watermarkOpacity,
+                                                        pointerEvents: 'none',
+                                                        color: 'rgba(0,0,0,0.5)',
+                                                        // Unified Logic: Font Size = Page Width * Scale
+                                                        // Page Width in Preview = 800 * zoomLevel
+                                                        fontSize: `${(800 * zoomLevel) * watermarkScale}px`,
+                                                        fontWeight: 'bold',
+                                                        whiteSpace: 'nowrap',
+                                                        zIndex: 10,
+                                                        textAlign: 'center',
+                                                        textShadow: '0 0 2px rgba(255,255,255,0.5)'
+                                                    }}
+                                                >
+                                                    {watermarkText}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import './MainLayout.css';
 import smallLogo from '../assets/draftmate_logo.png';
-import fullLogo from '../assets/Full_logo.png';
+import fullLogo from '../assets/FULL_LOGO.svg';
 
 const MainLayout = () => {
   const location = useLocation();

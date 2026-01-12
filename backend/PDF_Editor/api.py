@@ -393,36 +393,54 @@ def watermark_pdf_logic(pdf_bytes, text, opacity=0.3, rotation=45, color=(0, 0, 
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # Font size base
-        font_size = 50
-        
         for page in doc:
             page_width = page.rect.width
             page_height = page.rect.height
             
+            # Dynamic Font Size: ~15% of page width
+            # This ensures consistent look regardless of PDF resolution
+            base_font_size = page_width * 0.15
+            font_size = int(base_font_size)
+            
             # Create a PIL image for the watermark
             text_length = len(text)
             # Base dimensions
-            img_width = int(text_length * font_size * 0.7 * scale)
+            # We estimate text width roughly. 
+            # Better to measure if we had the font loaded, but estimation is okay for container size.
+            img_width = int(text_length * font_size * 0.6 * scale)
             img_height = int(font_size * 2 * scale)
             
             # Create transparent image
             watermark_img = Image.new('RGBA', (img_width, img_height), (255, 255, 255, 0))
             draw = ImageDraw.Draw(watermark_img)
             
-            # Try to use a font, fallback to default
-            try:
-                # Use Liberation Sans which we installed in Docker
-                font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", int(font_size * scale))
-            except:
+            # Try to use a font, fallback to reasonable system fonts
+            font_paths = [
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", # Docker/Linux
+                "C:/Windows/Fonts/arial.ttf", # Windows
+                "C:/Windows/Fonts/Arial.ttf",
+                "Arial.ttf",
+                "/System/Library/Fonts/Helvetica.ttc" # Mac
+            ]
+            
+            font = None
+            scaled_size = int(font_size * scale)
+            
+            for path in font_paths:
                 try:
-                    # Fallback for local testing if not on Linux/Docker
-                    font = ImageFont.truetype("Arial.ttf", int(font_size * scale))
+                    font = ImageFont.truetype(path, scaled_size)
+                    break 
                 except:
-                    try:
-                        font = ImageFont.load_default()
-                    except:
-                        pass
+                    continue
+            
+            if font is None:
+                try:
+                    # Last resort: load_default (might be tiny on some systems)
+                    font = ImageFont.load_default()
+                    # Warn or log?
+                    print("Warning: Using default PIL font (not scalable)")
+                except:
+                    pass
             
             # Calculate text color with opacity
             alpha = int(opacity * 255)
