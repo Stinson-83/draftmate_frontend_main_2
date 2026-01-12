@@ -119,7 +119,7 @@ class ResearchAgent(BaseAgent):
         # Format context
         formatted_context = self._format_context(top_results)
         
-        # 6. Generate answer
+        # 6. Generate answer with fallback on quota errors
         prompt = ChatPromptTemplate.from_template(RESEARCH_PROMPT)
         chain = prompt | self.llm | StrOutputParser()
         
@@ -130,8 +130,27 @@ class ResearchAgent(BaseAgent):
                 "query": query
             })
         except Exception as e:
-            logger.error(f"Answer generation failed: {e}")
-            answer = f"I encountered an error while generating the answer: {e}"
+            error_str = str(e).lower()
+            # Check for quota exhaustion errors
+            if "429" in str(e) or "resource_exhausted" in error_str or "quota" in error_str:
+                logger.warning(f"⚠️ Quota exhausted, retrying with fallback: {e}")
+                try:
+                    from lex_bot.core.llm_factory import LLMFactory, get_llm
+                    LLMFactory.mark_gemini_quota_exhausted()
+                    # Create new chain with fallback LLM
+                    fallback_llm = get_llm(mode="fast")
+                    fallback_chain = prompt | fallback_llm | StrOutputParser()
+                    answer = fallback_chain.invoke({
+                        "memory_context": memory_context,
+                        "context": formatted_context,
+                        "query": query
+                    })
+                except Exception as retry_error:
+                    logger.error(f"Fallback also failed: {retry_error}")
+                    answer = f"I encountered an error: API quota exceeded. Please try again later or check your API limits."
+            else:
+                logger.error(f"Answer generation failed: {e}")
+                answer = f"I encountered an error while generating the answer: {e}"
         
         # 7. Store in memory (include more content for citation context)
         if MEM0_ENABLED and user_id and answer:

@@ -97,16 +97,38 @@ class RouterCache:
     Caches router decisions to avoid redundant LLM calls.
     
     Simple pattern matching for common query types.
+    Saves ~500-1000ms by skipping router LLM call.
     """
     
     # Pattern -> (complexity, suggested_agents)
     PATTERNS = {
-        # Simple patterns
+        # Simple patterns - direct to research_agent (no LLM routing needed)
         "what is section": ("simple", []),
+        "what is article": ("simple", []),
+        "what is rule": ("simple", []),
         "define ": ("simple", []),
         "meaning of": ("simple", []),
+        "definition of": ("simple", []),
+        "explain section": ("simple", []),
+        "explain article": ("simple", []),
         "what are the grounds": ("simple", []),
-        "explain ": ("simple", []),
+        "what are the rights": ("simple", []),
+        "what is the punishment": ("simple", []),
+        "what is the penalty": ("simple", []),
+        "who can file": ("simple", []),
+        "how to file": ("simple", []),
+        "procedure for": ("simple", []),
+        "what is ipc": ("simple", []),
+        "what is bns": ("simple", []),
+        "what is crpc": ("simple", []),
+        "what is cpc": ("simple", []),
+        "section 302": ("simple", []),
+        "section 420": ("simple", []),
+        "section 376": ("simple", []),
+        "section 498a": ("simple", []),
+        "section 144": ("simple", []),
+        "bail provisions": ("simple", []),
+        "tell me about": ("simple", []),
         
         # Complex patterns  
         "compare ": ("complex", ["law_agent", "case_agent"]),
@@ -115,6 +137,8 @@ class RouterCache:
         "how has": ("complex", ["citation_agent"]),
         "arguments for": ("complex", ["strategy_agent"]),
         "legal strategy": ("complex", ["strategy_agent"]),
+        "draft petition": ("complex", ["strategy_agent", "law_agent"]),
+        "prepare argument": ("complex", ["strategy_agent", "case_agent"]),
     }
     
     @classmethod

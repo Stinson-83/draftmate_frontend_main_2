@@ -6,17 +6,33 @@ from .base_agent import BaseAgent
 from ..tools.reranker import rerank_documents
 from ..core.router import ROUTER_PROMPT  # Use enhanced router prompt
 from ..core.llm_factory import get_llm  # For dynamic mode switching
+from ..core.fallback import router_cache  # Fast-path classification
 
 class ManagerAgent(BaseAgent):
     def classify_and_route(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         First-stage router: Classifies query and assigns specific tasks to agents.
+        Uses fast-path cache for common patterns to skip LLM call (~500ms savings).
         
         Returns:
             State update with complexity, agent_tasks, synthesis_instruction, etc.
         """
         original_query = state.get("original_query")
         print(f"🧭 Router Analyzing: {original_query}")
+        
+        # FAST PATH: Check cache first to skip LLM call
+        cached_result = router_cache.check_cache(original_query)
+        if cached_result:
+            complexity = cached_result["complexity"]
+            selected_agents = cached_result.get("selected_agents", [])
+            print(f"   ⚡ Fast-path: {complexity.upper()} (cached)")
+            return {
+                "complexity": complexity,
+                "selected_agents": selected_agents,
+                "agent_tasks": {},
+                "synthesis_instruction": "Provide helpful response",
+                "synthesis_strategy": "equal_weight"
+            }
         
         # Format Document Context
         doc_ctx = state.get("document_context", [])

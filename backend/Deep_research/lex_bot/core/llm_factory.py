@@ -1,11 +1,16 @@
 """
-LLM Factory - Dual Mode LLM Provider
+LLM Factory - Dual Mode LLM Provider with Fallback
 
 Supports two modes:
 - Fast: gemini-2.5-flash / gpt-4o-mini (quick responses, lower cost)
 - Reasoning: gemini-2.5-pro / gpt-4o (complex analysis, higher accuracy)
+
+Features:
+- Automatic fallback to OpenAI when Gemini quota is exceeded
+- Rate limit error handling
 """
 
+import logging
 from typing import Literal, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
@@ -21,6 +26,11 @@ from lex_bot.config import (
     OPENAI_FAST_MODEL,
     OPENAI_REASONING_MODEL,
 )
+
+logger = logging.getLogger(__name__)
+
+# Track if Gemini is currently rate limited
+_gemini_quota_exhausted = False
 
 
 class LLMFactory:
@@ -39,7 +49,7 @@ class LLMFactory:
         temperature: float = 0.0,
     ) -> BaseChatModel:
         """
-        Create an LLM instance.
+        Create an LLM instance with automatic fallback.
         
         Args:
             mode: "fast" or "reasoning". Defaults to config.LLM_MODE
@@ -49,23 +59,34 @@ class LLMFactory:
         Returns:
             BaseChatModel instance (Gemini or OpenAI)
         """
+        global _gemini_quota_exhausted
+        
         mode = mode or LLM_MODE
         provider = provider or LLM_PROVIDER
+        
+        # Auto-switch to OpenAI if Gemini quota is exhausted
+        if provider == "gemini" and _gemini_quota_exhausted and OPENAI_API_KEY:
+            logger.warning("⚠️ Gemini quota exhausted, falling back to OpenAI")
+            provider = "openai"
         
         # Select model based on mode and provider
         if provider == "gemini":
             model_name = GEMINI_REASONING_MODEL if mode == "reasoning" else GEMINI_FAST_MODEL
             
             if not GOOGLE_API_KEY:
-                raise ValueError("GOOGLE_API_KEY not set. Cannot use Gemini provider.")
-            
-            return ChatGoogleGenerativeAI(
-                model=model_name,
-                google_api_key=GOOGLE_API_KEY,
-                temperature=temperature,
-            )
+                if OPENAI_API_KEY:
+                    logger.warning("GOOGLE_API_KEY not set, falling back to OpenAI")
+                    provider = "openai"
+                else:
+                    raise ValueError("GOOGLE_API_KEY not set. Cannot use Gemini provider.")
+            else:
+                return ChatGoogleGenerativeAI(
+                    model=model_name,
+                    google_api_key=GOOGLE_API_KEY,
+                    temperature=temperature,
+                )
         
-        elif provider == "openai":
+        if provider == "openai":
             model_name = OPENAI_REASONING_MODEL if mode == "reasoning" else OPENAI_FAST_MODEL
             
             if not OPENAI_API_KEY:
@@ -77,8 +98,21 @@ class LLMFactory:
                 temperature=temperature,
             )
         
-        else:
-            raise ValueError(f"Unknown provider: {provider}. Use 'gemini' or 'openai'.")
+        raise ValueError(f"Unknown provider: {provider}. Use 'gemini' or 'openai'.")
+    
+    @staticmethod
+    def mark_gemini_quota_exhausted():
+        """Mark Gemini as quota exhausted to enable fallback."""
+        global _gemini_quota_exhausted
+        _gemini_quota_exhausted = True
+        logger.warning("🔴 Gemini quota marked as exhausted - will use OpenAI fallback")
+    
+    @staticmethod
+    def reset_gemini_quota():
+        """Reset Gemini quota status (e.g., after some time)."""
+        global _gemini_quota_exhausted
+        _gemini_quota_exhausted = False
+        logger.info("🟢 Gemini quota reset - will use Gemini again")
     
     @staticmethod
     def get_model_name(
