@@ -45,19 +45,22 @@ class ChatStore:
         history = store.get_session_history("user_123", "sess_456")
     """
     
-    def __init__(self):
+    def __init__(self, db_url: Optional[str] = None):
         """Initialize database connection."""
         self.engine = None
         self.SessionLocal = None
         self._initialized = False
         
-        if DATABASE_URL:
+        # Use provided URL or fallback to config
+        self.db_url = db_url or DATABASE_URL
+        
+        if self.db_url:
             self._init_db()
     
     def _init_db(self):
         """Initialize database engine and create tables."""
         try:
-            self.engine = create_engine(DATABASE_URL)
+            self.engine = create_engine(self.db_url)
             Base.metadata.create_all(self.engine)
             self.SessionLocal = sessionmaker(bind=self.engine)
             self._initialized = True

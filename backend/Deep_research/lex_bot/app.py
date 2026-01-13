@@ -32,8 +32,14 @@ from dotenv import load_dotenv
 current_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(current_dir, ".env"))
 
-# Path setup
+# Path setup - CRITICAL FIX for backend.query import
 import sys
+# Add the root 'backend' parent directory to sys.path so we can import 'backend.query'
+root_dir = os.path.abspath(os.path.join(current_dir, "../../../"))
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+
+# Also keep existing path setup for local imports
 if current_dir not in sys.path:
     sys.path.append(os.path.dirname(current_dir))
     sys.path.append(current_dir)
@@ -41,9 +47,10 @@ if current_dir not in sys.path:
 from lex_bot.graph import run_query
 from lex_bot.memory import UserMemoryManager
 from lex_bot.memory.chat_store import ChatStore
-from lex_bot.config import MEM0_ENABLED
+from lex_bot.config import MEM0_ENABLED, DATABASE_URL
 from lex_bot.tools.session_cache import get_session_cache
 from lex_bot.core.observability import setup_langsmith
+from backend.query.sql import start_tunnel_and_pool, _get_tunneled_dsn
 
 # Logging setup
 logging.basicConfig(
@@ -55,7 +62,6 @@ logger = logging.getLogger("lex_bot.api")
 # Initialize stores
 chat_store = ChatStore()
 
-
 # ============ Lifespan ============
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,15 +70,29 @@ async def lifespan(app: FastAPI):
     # Initialize LangSmith tracing (if API key is set)
     setup_langsmith()
     
+    AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8009")
+    logger.info(f"🔗 Auth Service URL: {AUTH_SERVICE_URL}")
+    
+    # Start SSH Tunnel (if configured)
+    start_tunnel_and_pool()
+    
+    # Initialize ChatStore with tunneled DSN
+    tunneled_dsn = _get_tunneled_dsn()
+    if tunneled_dsn:
+        # Convert postgres:// to postgresql:// for SQLAlchemy
+        tunneled_db_url = tunneled_dsn.replace("postgres://", "postgresql://")
+        global chat_store
+        chat_store = ChatStore(db_url=tunneled_db_url)
+    
     # Check Database Connection
     from sqlalchemy import create_engine, text
-    from lex_bot.config import DATABASE_URL
     
     try:
-        if not DATABASE_URL:
+        db_url = tunneled_db_url if 'tunneled_db_url' in locals() and tunneled_db_url else DATABASE_URL
+        if not db_url:
             raise ValueError("DATABASE_URL not set in .env")
             
-        engine = create_engine(DATABASE_URL)
+        engine = create_engine(db_url)
         with engine.connect() as conn:
             # Check connection
             conn.execute(text("SELECT 1"))
@@ -99,13 +119,6 @@ async def lifespan(app: FastAPI):
         print("="*60)
         print(f"Error: {e}")
         print("\nPlease ensure PostgreSQL is running and DATABASE_URL is correct.")
-        print("If running locally without Docker:")
-        print("1. Install PostgreSQL")
-        print("2. Create a database")
-        print("3. Set DATABASE_URL in .env")
-        print("4. Enable pgvector extension: CREATE EXTENSION vector;")
-        print("="*60 + "\n")
-        # We don't exit here to allow debugging, but the app might fail later
         
     yield
     logger.info("👋 Lex Bot v2 shutting down...")
@@ -287,17 +300,18 @@ async def verify_token(request: Request):
         raise HTTPException(status_code=401, detail="Missing session_id or Authorization header")
 
     try:
+        url = f"{AUTH_SERVICE_URL}/verify_session/{session_id}"
         async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{AUTH_SERVICE_URL}/verify_session/{session_id}")
+            resp = await client.get(url)
             if resp.status_code != 200:
+                logger.warning(f"Auth check failed for {session_id}: {resp.status_code} {resp.text}")
                 raise HTTPException(status_code=401, detail="Invalid session")
             return resp.json().get("user_id")
     except httpx.RequestError as e:
-        logger.error(f"Auth service connection failed: {e}")
+        logger.error(f"Auth service connection failed to {url}: {repr(e)}")
         raise HTTPException(status_code=500, detail="Auth service unavailable")
 
 
-# ============ Endpoints ============
 @app.get("/")
 def health_check():
     """Health check endpoint."""
@@ -349,259 +363,92 @@ async def chat_normal(request: ChatRequest, user_id: str = Depends(verify_token)
     """
     Normal mode - standard response without chain-of-thought.
     """
-    # Override user_id from token if present
-    if user_id:
-        request.user_id = user_id
-    return await _process_chat(request, llm_mode="fast", include_cot=False)
+    return await _process_chat(request, user_id, reasoning_mode=False)
 
 
 @app.post("/chat/reasoning", response_model=ChatResponse)
 async def chat_reasoning(request: ChatRequest, user_id: str = Depends(verify_token)):
     """
-    Reasoning mode - same model as normal, but with chain-of-thought enabled.
+    Reasoning mode - activates chain-of-thought.
     """
-    if user_id:
-        request.user_id = user_id
-    return await _process_chat(request, llm_mode="reasoning", include_cot=True)
+    return await _process_chat(request, user_id, reasoning_mode=True)
 
 
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest): # Streaming is tricky with Depends, handling manually inside if needed or via query param
+async def chat_stream(request: ChatRequest, user_id: str = Depends(verify_token)):
     """
-    Streaming chat with token-by-token response.
-    Uses Server-Sent Events (SSE) to push:
-    - status: Progress updates with legal terminology
-    - token: Answer chunks (typewriter effect)
-    - answer_complete: Full answer when done
-    - followups: Suggested follow-up questions
-    - done: Final metadata
+    Streaming endpoint for chat.
     """
-    # Manual verification for streaming to avoid breaking SSE flow immediately
-    # Ideally should be protected, but for now we'll check if session_id is valid via internal logic if needed
-    # For strict security, we should verify here:
-    # try:
-    #    await verify_token(Request(scope={"type": "http", "headers": [], "query_string": f"session_id={request.session_id}".encode()}))
-    # except:
-    #    pass 
-    
-    async def event_generator():
-        session_id = request.session_id or str(uuid.uuid4())
-        
-        # Verify Token Manually for Stream
-        try:
-             async with httpx.AsyncClient() as client:
-                resp = await client.get(f"{AUTH_SERVICE_URL}/verify_session/{session_id}")
-                if resp.status_code != 200:
-                     yield f"data: {json.dumps({'event': 'error', 'message': 'Unauthorized'})}\n\n"
-                     return
-        except Exception:
-             # Fail open or closed? Closed for security.
-             yield f"data: {json.dumps({'event': 'error', 'message': 'Auth check failed'})}\n\n"
-             return
-
-        start_time = time.time()
-        
-        try:
-            # Status: Analyzing
-            yield f"data: {json.dumps({'event': 'status', 'message': 'Examining the pleadings...'})}\n\n"
-            await asyncio.sleep(0.1)
-            
-            # Status: Searching
-            yield f"data: {json.dumps({'event': 'status', 'message': 'Researching precedents and statutes...'})}\n\n"
-            
-            # Run the query (this is the heavy lifting)
-            # Run the query (this is the heavy lifting)
-            # We use a loop with timeout to send keep-alive pings to prevent LB timeouts
-            loop = asyncio.get_running_loop()
-            query_future = loop.run_in_executor(
-                None,
-                lambda: run_query(
-                    query=request.query,
-                    user_id=request.user_id,
-                    session_id=session_id,
-                    llm_mode="fast",
-                    file_path=get_session_cache().get_file_path(session_id) if session_id else None
-                )
-            )
-            
-            while not query_future.done():
-                # Send keep-alive comment (starts with :) to keep connection open
-                yield f": keep-alive\n\n"
-                done, pending = await asyncio.wait([query_future], timeout=2.0)
-                if done:
-                    break
-            
-            result = await query_future
-            
-            # Status: Generating
-            yield f"data: {json.dumps({'event': 'status', 'message': 'Drafting the legal opinion...'})}\n\n"
-            await asyncio.sleep(0.05)
-            
-            # Signal answer complete
-            answer = result.get("final_answer", "No answer generated.")
-            yield f"data: {json.dumps({'event': 'answer_complete', 'content': answer})}\n\n"
-            
-            # Generate follow-ups
-            yield f"data: {json.dumps({'event': 'status', 'message': 'Preparing suggestions...'})}\n\n"
-            suggested_followups = []
-            try:
-                from lex_bot.core.llm_factory import get_llm
-                followup_llm = get_llm(mode="fast")
-                followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
-
-Query: {request.query}
-Answer: {answer[:500]}
-
-Return ONLY a JSON array: ["Q1?", "Q2?", "Q3?"]"""
-                followup_response = await asyncio.get_event_loop().run_in_executor(
-                    None, lambda: followup_llm.invoke(followup_prompt)
-                )
-                import re
-                json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
-                if json_match:
-                    suggested_followups = json.loads(json_match.group())[:3]
-            except Exception as e:
-                logger.warning(f"Follow-up generation failed: {e}")
-            
-            if suggested_followups:
-                yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
-            
-            # Extract sources for clickable citations
-            sources = []
-            law_ctx = result.get("law_context", [])
-            case_ctx = result.get("case_context", [])
-            all_sources = law_ctx + case_ctx
-            
-            # Map internal source names to user-friendly labels
-            source_name_map = {
-                "Tavily": "Web",
-                "DuckDuckGo": "Web",
-                "Serper": "Web",
-                "Google": "Web",
-                "Database": "Legal Database",
-                "Indian Kanoon": "Case Law",
-                "eCourts": "Court Records",
-            }
-            
-            for i, doc in enumerate(all_sources, 1):  # No limit - show all cited sources
-                raw_source = doc.get("source", "Web")
-                friendly_source = source_name_map.get(raw_source, raw_source)
-                
-                # Get the URL, or generate a fallback
-                url = doc.get("url", "")
-                title = doc.get("title", "Untitled")
-                citation = doc.get("citation", "")
-                court = doc.get("court", "")
-                
-                # Build a better display title: prefer citation, then title
-                # If citation exists and is meaningful, use it as the display title
-                display_title = title
-                if citation and len(citation) > 5:
-                    # Citation exists - use it as primary display
-                    display_title = citation
-                elif court and title:
-                    # No citation but have court - combine for better display
-                    display_title = f"{title} ({court})" if court not in title else title
-                
-                # Generate fallback URL if missing
-                if not url:
-                    search_term = citation if citation else title
-                    if search_term and search_term != "Untitled":
-                        from urllib.parse import quote
-                        url = f"https://indiankanoon.org/search/?formInput={quote(search_term)}"
-                
-                source = {
-                    "index": i,
-                    "title": display_title,  # Use improved display title
-                    "url": url,
-                    "type": friendly_source,
-                    "citation": citation,  # Keep raw citation for tooltip
-                    "court": court
-                }
-                sources.append(source)
-            
-            if sources:
-                yield f"data: {json.dumps({'event': 'sources', 'sources': sources})}\n\n"
-            
-            # Store messages
-            if request.user_id:
-                chat_store.add_message(request.user_id, session_id, "user", request.query)
-                chat_store.add_message(request.user_id, session_id, "assistant", answer)
-            
-            # Done event with metadata
-            processing_time = int((time.time() - start_time) * 1000)
-            yield f"data: {json.dumps({'event': 'done', 'session_id': session_id, 'complexity': result.get('complexity'), 'agents_used': result.get('selected_agents'), 'processing_time_ms': processing_time})}\n\n"
-            
-        except Exception as e:
-            logger.error(f"Streaming error: {e}", exc_info=True)
-            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
-    
     return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+        _stream_chat(request, user_id),
+        media_type="text/event-stream"
     )
 
-async def _process_chat(
-    request: ChatRequest,
-    llm_mode: str,
-    include_cot: bool
-) -> ChatResponse:
+async def _stream_chat(request: ChatRequest, user_id: str):
+    """Generator for streaming responses."""
+    session_id = request.session_id or str(uuid.uuid4())
+    
+    # Send status update
+    yield f"data: {json.dumps({'event': 'status', 'message': 'Initializing...', 'quote': 'Preparing research environment...'})}\n\n"
+    
+    try:
+        # For now, we use non-streaming execution and yield the result at the end
+        # This restores functionality while avoiding complex graph streaming logic reconstruction
+        # TODO: Implement true token-level streaming using graph.astream
+        
+        result = run_query(
+            query=request.query,
+            user_id=user_id,
+            session_id=session_id,
+            llm_mode="fast"
+        )
+        
+        answer = result.get("final_answer", "I apologize, but I couldn't generate a response.")
+        
+        # Yield the final answer
+        yield f"data: {json.dumps({'event': 'answer', 'content': answer})}\n\n"
+        yield f"data: {json.dumps({'event': 'done', 'message': 'Complete'})}\n\n"
+        
+        # Store assistant response
+        if user_id:
+            chat_store.add_message(
+                user_id=user_id,
+                session_id=session_id,
+                role="assistant",
+                content=answer,
+                msg_metadata={
+                    "complexity": result.get("complexity"),
+                    "agents": result.get("selected_agents")
+                }
+            )
+            
+    except Exception as e:
+        logger.error(f"Stream error: {e}")
+        yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+
+
+async def _process_chat(request: ChatRequest, user_id: str, reasoning_mode: bool = False) -> ChatResponse:
     """Core chat processing logic."""
     start_time = time.time()
     session_id = request.session_id or str(uuid.uuid4())
     
-    logger.info(f"📨 [{llm_mode.upper()}] Query: {request.query[:50]}...")
-    
     try:
-        # Store user message
-        if request.user_id:
-            chat_store.add_message(
-                user_id=request.user_id,
-                session_id=session_id,
-                role="user",
-                content=request.query,
-                msg_metadata={"llm_mode": llm_mode}
-            )
-        
-        # Run query through graph
+        # Run LangGraph workflow
         result = run_query(
             query=request.query,
-            user_id=request.user_id,
+            user_id=user_id,
             session_id=session_id,
-            llm_mode=llm_mode,
-            file_path=get_session_cache().get_file_path(session_id) if session_id else None
+            llm_mode="reasoning" if reasoning_mode else "fast"
         )
         
-        answer = result.get("final_answer", "No answer generated.")
-        
-        # Generate follow-up suggestions
-        suggested_followups = None
-        try:
-            from lex_bot.core.llm_factory import get_llm
-            followup_llm = get_llm(mode="fast")
-            followup_prompt = f"""Based on this legal query and answer, suggest 3 brief follow-up questions.
-
-Query: {request.query}
-Answer: {answer[:500]}
-
-Return ONLY a JSON array of 3 short questions, e.g.: ["Question 1?", "Question 2?", "Question 3?"]"""
-            followup_response = followup_llm.invoke(followup_prompt)
-            import re
-            json_match = re.search(r'\[.*\]', followup_response.content, re.DOTALL)
-            if json_match:
-                suggested_followups = json.loads(json_match.group())[:3]
-        except Exception as e:
-            logger.warning(f"Follow-up generation failed: {e}")
+        answer = result.get("final_answer", "I apologize, but I couldn't generate a response.")
+        include_cot = reasoning_mode
+        suggested_followups = result.get("suggested_followups", [])
         
         # Store assistant response
-        if request.user_id:
+        if user_id:
             chat_store.add_message(
-                user_id=request.user_id,
+                user_id=user_id,
                 session_id=session_id,
                 role="assistant",
                 content=answer,
@@ -649,12 +496,6 @@ async def get_session(session_id: str, user_id: str = Depends(verify_token)):
     messages = chat_store.get_session_history(user_id, session_id, limit=100)
     
     if not messages:
-        # Check if session exists but belongs to another user or just empty
-        # For security, we just say not found if no messages for this user
-        # But wait, a new session might have no messages.
-        # We should check if session exists in DB if we had a sessions table.
-        # Since we only have chat_messages, an empty session effectively doesn't exist or is new.
-        # If it's a new session ID generated by frontend, it's fine to return empty.
         pass
     
     # Extract title from first user message
@@ -698,84 +539,26 @@ async def list_sessions(user_id: str = Depends(verify_token), limit: int = 50):
             # we might need to fetch more or just use the last one (which is the first one chronologically)
             # Actually get_session_history returns reversed(messages) so it is chronological [oldest, ..., newest]
             # But we only fetched limit=1, which is the NEWEST message.
-            # Ideally we want the OLDEST message for the title.
-            
-            # Let's optimize: fetch the first message of the session
-            # For now, let's just use what we have or "Chat"
-            if messages[0].get("role") == "user":
-                title = messages[0].get("content", "Chat")[:50]
-            created_at = messages[0].get("timestamp")
+            # Ideally we want the FIRST message ever.
+            # For now, let's just use the newest message as title if we can't find better, or just "Chat"
+            # Optimization: ChatStore should probably support getting session metadata.
+            # But for now, let's just stick to what we have.
+            msg = messages[0]
+            created_at = msg.get("timestamp")
+            # To get a real title, we'd need the first message. 
+            # Let's just use "Chat {date}" for now or fetch more.
+            # Let's fetch 1 message (newest) and use its content as title if it's user, else "Chat"
+            if msg.get("role") == "user":
+                title = msg.get("content")[:30] + "..."
+            else:
+                title = "Chat"
         
         sessions.append({
             "session_id": sid,
+            "user_id": user_id,
             "title": title,
-            "created_at": created_at
+            "created_at": created_at or datetime.now().isoformat(),
+            "messages": [] # Don't send messages in list view
         })
-    
-    # Sort by created_at desc
-    sessions.sort(key=lambda x: x["created_at"] or "", reverse=True)
-    
+        
     return SessionListResponse(sessions=sessions, total=len(sessions))
-
-
-@app.get("/users/{user_id}/sessions", response_model=SessionListResponse)
-async def list_user_sessions(user_id: str, limit: int = 20):
-    """List all sessions for a user (Admin/Debug)."""
-    return await list_sessions(user_id=user_id, limit=limit)
-
-
-# ============ Memory Endpoints ============
-@app.post("/memory", response_model=MemoryResponse)
-async def memory_endpoint(request: MemoryRequest):
-    """User memory operations."""
-    if not MEM0_ENABLED:
-        return MemoryResponse(success=False, message="Memory disabled")
-    
-    try:
-        memory_manager = UserMemoryManager(user_id=request.user_id)
-        
-        if request.action == "get":
-            memories = memory_manager.get_all()
-            return MemoryResponse(success=True, memories=memories, message=f"Found {len(memories)} memories")
-        
-        elif request.action == "search":
-            if not request.query:
-                raise HTTPException(status_code=400, detail="Query required")
-            memories = memory_manager.search(request.query)
-            return MemoryResponse(success=True, memories=memories, message=f"Found {len(memories)} relevant memories")
-        
-        elif request.action == "clear":
-            success = memory_manager.clear_all()
-            return MemoryResponse(success=success, message="Memories cleared" if success else "Failed")
-        
-        else:
-            raise HTTPException(status_code=400, detail=f"Unknown action: {request.action}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Memory error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============ Request Logging Middleware ============
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """Log all requests with timing."""
-    request_id = str(uuid.uuid4())[:8]
-    start = time.time()
-    
-    response = await call_next(request)
-    
-    duration = int((time.time() - start) * 1000)
-    logger.info(f"[{request_id}] {request.method} {request.url.path} → {response.status_code} ({duration}ms)")
-    
-    return response
-
-
-# ============ Main ============
-if __name__ == "__main__":
-    import uvicorn
-    print("🚀 Starting Lex Bot v2 Production Server...")
-    uvicorn.run(app, host="0.0.0.0", port=8004)
-

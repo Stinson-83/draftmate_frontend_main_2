@@ -344,7 +344,7 @@ const ResearchChat = () => {
 
         // Check for existing session in URL or localStorage
         // For now, let's start fresh or load if ID is present
-        const storedSessionId = localStorage.getItem('session_id');
+        const storedSessionId = localStorage.getItem('last_chat_session_id');
         if (storedSessionId) {
             loadSession(storedSessionId);
         } else {
@@ -400,7 +400,7 @@ const ResearchChat = () => {
                 content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
             }
         ]);
-        localStorage.setItem('session_id', newId);
+        localStorage.setItem('last_chat_session_id', newId);
         // Optionally clear URL param
         window.history.replaceState({}, '', '/research');
     };
@@ -408,7 +408,7 @@ const ResearchChat = () => {
     const loadSession = async (id) => {
         try {
             setSessionId(id);
-            localStorage.setItem('session_id', id);
+            localStorage.setItem('last_chat_session_id', id);
             // Update URL without reload
             // window.history.replaceState({}, '', `/research?session_id=${id}`);
 

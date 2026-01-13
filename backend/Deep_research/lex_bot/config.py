@@ -13,7 +13,13 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")  # Fallback search
 GOOGLE_SERP_API_KEY = os.getenv("GOOGLE_SERP_API_KEY")  # Fallback search
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+# Database Config
+POSTGRES_DSN = os.getenv("POSTGRES_DSN")
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Fallback: Use POSTGRES_DSN if DATABASE_URL is not set
+if not DATABASE_URL and POSTGRES_DSN:
+    DATABASE_URL = POSTGRES_DSN.replace("postgres://", "postgresql://")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")  # Future: voyage-law-2
 
 # --- LLM MODES ---
