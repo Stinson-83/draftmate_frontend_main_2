@@ -1660,6 +1660,11 @@ const Editor = () => {
                 showPageNumbers={showPageNumbers}
                 setShowPageNumbers={setShowPageNumbers}
                 onModify={() => setShowModifyModal(true)}
+                totalPages={pageCount}
+                onPrint={(options) => {
+                    console.log('Print with options:', options);
+                    window.print();
+                }}
             />
 
             <div className="editor-layout">

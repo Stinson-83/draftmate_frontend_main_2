@@ -558,29 +558,47 @@ def add_page_numbers_logic(pdf_bytes, format_type="number", position="bottom-cen
             else:  # number
                 page_text = str(actual_num)
             
-            # Calculate position
-            text_width = len(page_text) * font_size * 0.5  # Approximate
+            # Calculate accurate text width using fitz
+            # Use get_text_length for proper measurement
+            try:
+                text_width = fitz.get_text_length(page_text, fontname="helv", fontsize=font_size)
+            except:
+                # Fallback: more accurate approximation (0.6 is average char width ratio for Helvetica)
+                text_width = len(page_text) * font_size * 0.6
             
+            # Y position
             if position.startswith("top"):
-                y = margin
+                y_top = margin
+                y_bottom = margin + font_size + 10
             else:  # bottom
-                y = page_height - margin - font_size
+                y_top = page_height - margin - font_size - 10
+                y_bottom = page_height - margin
             
+            # X position and alignment
             if position.endswith("left"):
-                x = margin
+                x_left = margin
+                x_right = margin + 150  # wide enough for any page number text
+                align = fitz.TEXT_ALIGN_LEFT
             elif position.endswith("right"):
-                x = page_width - margin - text_width
+                x_left = page_width - 50 - 150  # 50pt from right edge, 150pt wide box
+                x_right = page_width - 50
+                align = fitz.TEXT_ALIGN_RIGHT
             else:  # center
-                x = (page_width - text_width) / 2
+                x_left = page_width / 4
+                x_right = page_width * 3 / 4
+                align = fitz.TEXT_ALIGN_CENTER
             
-            # Insert text
-            point = fitz.Point(x, y + font_size)  # y + font_size because fitz uses baseline
-            page.insert_text(
-                point,
+            # Create text rectangle
+            text_rect = fitz.Rect(x_left, y_top, x_right, y_bottom)
+            
+            # Insert text in box with alignment
+            page.insert_textbox(
+                text_rect,
                 page_text,
                 fontsize=font_size,
                 color=text_color,
-                fontname="helv"  # Helvetica
+                fontname="helv",
+                align=align
             )
         
         output = io.BytesIO(doc.tobytes())

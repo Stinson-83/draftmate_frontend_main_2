@@ -15,10 +15,14 @@ import {
     Stamp, // for watermark
     Layers, // for merge
     Hash, // for page numbers
-    GripVertical // for drag handle
+    GripVertical, // for drag handle
+    Printer, // for print
+    FileOutput, // for PDF to Word
+    FilePlus2 // for Word to PDF
 } from 'lucide-react';
 import './PDFEditor.css';
 import { API_CONFIG } from '../services/endpoints';
+import PrintModal from '../components/PrintModal';
 
 const API_URL = API_CONFIG.PDF_EDITOR_API.BASE_URL;
 
@@ -33,8 +37,8 @@ const TOOLS = [
     { id: 'merge', name: 'Merge & Organize', icon: Layers, desc: 'Combine multiple PDFs, reorder, and rotate pages.', mode: MODES.BUILDER },
     { id: 'split', name: 'Split PDF', icon: Scissors, desc: 'Separate one page or a whole set for easy conversion.', mode: MODES.SPLITTER },
     { id: 'compress', name: 'Compress PDF', icon: Minimize2, desc: 'Reduce file size while optimizing for maximal quality.', mode: MODES.SIMPLE },
-    { id: 'pdf-to-word', name: 'PDF to Word', icon: FileText, desc: 'Convert your PDF to editable Word documents.', mode: MODES.SIMPLE },
-    { id: 'word-to-pdf', name: 'Word to PDF', icon: FileText, desc: 'Make DOC and DOCX files easy to read by converting them to PDF.', mode: MODES.SIMPLE },
+    { id: 'pdf-to-word', name: 'PDF to Word', icon: FileOutput, desc: 'Convert your PDF to editable Word documents.', mode: MODES.SIMPLE },
+    { id: 'word-to-pdf', name: 'Word to PDF', icon: FilePlus2, desc: 'Make DOC and DOCX files easy to read by converting them to PDF.', mode: MODES.SIMPLE },
     { id: 'watermark', name: 'Watermark PDF', icon: Stamp, desc: 'Stamp text over your PDF pages.', mode: MODES.BUILDER },
     { id: 'page-numbers', name: 'Page Numbers', icon: Hash, desc: 'Add customizable page numbers to your PDF.', mode: MODES.BUILDER }
 ];
@@ -68,6 +72,9 @@ const PDFEditor = () => {
     const [pageNumFontSize, setPageNumFontSize] = useState(12);
     const [pageNumColor, setPageNumColor] = useState('#000000');
     const [pageNumMargin, setPageNumMargin] = useState(36);
+
+    // Print Modal State
+    const [showPrintModal, setShowPrintModal] = useState(false);
 
     const fileInputRef = useRef(null);
     const dragItem = useRef(null);
@@ -278,16 +285,17 @@ const PDFEditor = () => {
             background: 'rgba(255,255,255,0.7)',
             borderRadius: '4px'
         };
-        const margin = pageNumMargin * zoomLevel / 2;
+        // Use percentage-based margins (approx 7% = 50pt on 700pt page)
+        const edgeMargin = '7%';
 
         switch (pageNumPosition) {
-            case 'top-left': return { ...baseStyle, top: margin, left: margin };
-            case 'top-center': return { ...baseStyle, top: margin, left: '50%', transform: 'translateX(-50%)' };
-            case 'top-right': return { ...baseStyle, top: margin, right: margin };
-            case 'bottom-left': return { ...baseStyle, bottom: margin, left: margin };
-            case 'bottom-center': return { ...baseStyle, bottom: margin, left: '50%', transform: 'translateX(-50%)' };
-            case 'bottom-right': return { ...baseStyle, bottom: margin, right: margin };
-            default: return { ...baseStyle, bottom: margin, left: '50%', transform: 'translateX(-50%)' };
+            case 'top-left': return { ...baseStyle, top: edgeMargin, left: edgeMargin };
+            case 'top-center': return { ...baseStyle, top: edgeMargin, left: '50%', transform: 'translateX(-50%)' };
+            case 'top-right': return { ...baseStyle, top: edgeMargin, right: edgeMargin };
+            case 'bottom-left': return { ...baseStyle, bottom: edgeMargin, left: edgeMargin };
+            case 'bottom-center': return { ...baseStyle, bottom: edgeMargin, left: '50%', transform: 'translateX(-50%)' };
+            case 'bottom-right': return { ...baseStyle, bottom: edgeMargin, right: edgeMargin };
+            default: return { ...baseStyle, bottom: edgeMargin, left: '50%', transform: 'translateX(-50%)' };
         }
     };
 
@@ -436,7 +444,7 @@ const PDFEditor = () => {
                     <div
                         key={tool.id}
                         className={`tool-icon-btn ${activeTool.id === tool.id ? 'active' : ''}`}
-                        onClick={() => { setActiveTool(tool); reset(); }}
+                        onClick={() => setActiveTool(tool)}
                         title={tool.name}
                     >
                         <tool.icon size={20} />
@@ -574,6 +582,9 @@ const PDFEditor = () => {
                                         </button>
                                         <button className="btn btn-ghost btn-icon" onClick={() => rotatePage(90)} title="Rotate Right">
                                             <RotateCw size={18} />
+                                        </button>
+                                        <button className="btn btn-ghost btn-icon" onClick={() => setShowPrintModal(true)} title="Print Options">
+                                            <Printer size={18} />
                                         </button>
                                     </>
                                 )}
@@ -884,6 +895,17 @@ const PDFEditor = () => {
                     </div>
                 </div>
             )}
+
+            <PrintModal
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                onPrint={(options) => {
+                    console.log('Print with options:', options);
+                    window.print();
+                }}
+                onDownloadPDF={handleProcess}
+                totalPages={pages.length}
+            />
         </div >
     );
 };

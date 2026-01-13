@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import {
     Save, Wand2, Download, Undo, Redo,
     Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
-    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon, Hash
+    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon, Hash, Printer
 } from 'lucide-react';
+import PrintModal from './PrintModal';
 
 const EditorToolbar = ({
     execCommand,
     onExportPDF,
     onExportWord,
+    onPrint,
     onSave,
     draftName,
     setDraftName,
@@ -18,7 +20,8 @@ const EditorToolbar = ({
     setShowFooter,
     showPageNumbers,
     setShowPageNumbers,
-    onModify
+    onModify,
+    totalPages = 1
 }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showHighlightMenu, setShowHighlightMenu] = useState(false);
@@ -28,6 +31,7 @@ const EditorToolbar = ({
     const [tableCols, setTableCols] = useState(3);
     const [showLinkInput, setShowLinkInput] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
+    const [showPrintModal, setShowPrintModal] = useState(false);
 
     const handleInsertLink = () => {
         if (linkUrl) {
@@ -307,6 +311,9 @@ const EditorToolbar = ({
                     <Save size={16} style={{ marginRight: 8 }} />
                     Save
                 </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowPrintModal(true)} title="Print & Download Options">
+                    <Printer size={16} />
+                </button>
                 <div style={{ position: 'relative' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setShowExportMenu(!showExportMenu)}>
                         <Download size={16} />
@@ -323,6 +330,15 @@ const EditorToolbar = ({
                     )}
                 </div>
             </div>
+
+            <PrintModal
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                onPrint={onPrint || (() => window.print())}
+                onDownloadPDF={onExportPDF}
+                onDownloadWord={onExportWord}
+                totalPages={totalPages}
+            />
         </div>
     );
 };
