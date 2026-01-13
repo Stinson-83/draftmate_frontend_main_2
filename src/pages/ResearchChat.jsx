@@ -3,6 +3,13 @@ import ReactMarkdown from 'react-markdown';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+// Markdown enhancements
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import 'katex/dist/katex.min.css';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 // Using specific imports if needed, but switching to Material Symbols for UI icons
 // keeping logo just in case, though mostly using icons now
 import lawJuristLogo from '../assets/draftmate_logo.png';
@@ -636,8 +643,8 @@ const ResearchChat = () => {
                                                 key={session.session_id}
                                                 onClick={() => loadSession(session.session_id)}
                                                 className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${sessionId === session.session_id
-                                                        ? 'bg-slate-800 text-white'
-                                                        : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
+                                                    ? 'bg-slate-800 text-white'
+                                                    : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
                                                     }`}
                                                 title={session.title}
                                             >
@@ -759,6 +766,8 @@ const ResearchChat = () => {
                                 >
                                     <div className={`markdown-content ${msg.role === 'user' ? 'text-white' : ''}`}>
                                         <ReactMarkdown
+                                            remarkPlugins={[remarkMath, remarkGfm]}
+                                            rehypePlugins={[rehypeKatex]}
                                             components={{
                                                 p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
                                                 ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-3" {...props} />,
@@ -767,12 +776,60 @@ const ResearchChat = () => {
                                                 h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
                                                 h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
                                                 h3: ({ node, ...props }) => <h3 className="text-base font-bold mt-3 mb-1" {...props} />,
-                                                code: ({ node, inline, ...props }) => (
-                                                    inline
-                                                        ? <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-xs font-mono" {...props} />
-                                                        : <pre className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg overflow-x-auto text-xs font-mono my-3"><code {...props} /></pre>
-                                                ),
+                                                // Syntax highlighted code blocks
+                                                code: ({ node, inline, className, children, ...props }) => {
+                                                    const match = /language-(\w+)/.exec(className || '');
+                                                    return !inline && match ? (
+                                                        <SyntaxHighlighter
+                                                            style={oneDark}
+                                                            language={match[1]}
+                                                            PreTag="div"
+                                                            className="rounded-lg my-3 text-xs"
+                                                            {...props}
+                                                        >
+                                                            {String(children).replace(/\n$/, '')}
+                                                        </SyntaxHighlighter>
+                                                    ) : inline ? (
+                                                        <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                                            {children}
+                                                        </code>
+                                                    ) : (
+                                                        <pre className="bg-slate-800 text-slate-100 p-3 rounded-lg overflow-x-auto text-xs font-mono my-3">
+                                                            <code {...props}>{children}</code>
+                                                        </pre>
+                                                    );
+                                                },
                                                 strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
+                                                // Blockquote styling
+                                                blockquote: ({ node, ...props }) => (
+                                                    <blockquote
+                                                        className="border-l-4 border-blue-500 dark:border-blue-400 pl-4 py-2 my-3 bg-blue-50 dark:bg-blue-900/20 italic text-slate-700 dark:text-slate-300 rounded-r"
+                                                        {...props}
+                                                    />
+                                                ),
+                                                // Horizontal rule styling
+                                                hr: ({ node, ...props }) => (
+                                                    <hr className="my-4 border-t-2 border-slate-200 dark:border-slate-700" {...props} />
+                                                ),
+                                                // Table styling (GFM)
+                                                table: ({ node, ...props }) => (
+                                                    <div className="overflow-x-auto my-3">
+                                                        <table className="min-w-full border-collapse border border-slate-300 dark:border-slate-600 text-sm" {...props} />
+                                                    </div>
+                                                ),
+                                                thead: ({ node, ...props }) => (
+                                                    <thead className="bg-slate-100 dark:bg-slate-700" {...props} />
+                                                ),
+                                                th: ({ node, ...props }) => (
+                                                    <th className="border border-slate-300 dark:border-slate-600 px-3 py-2 text-left font-semibold" {...props} />
+                                                ),
+                                                td: ({ node, ...props }) => (
+                                                    <td className="border border-slate-300 dark:border-slate-600 px-3 py-2" {...props} />
+                                                ),
+                                                // Strikethrough (GFM)
+                                                del: ({ node, ...props }) => (
+                                                    <del className="text-slate-500 line-through" {...props} />
+                                                ),
                                                 a: ({ node, href, children, ...props }) => (
                                                     <CitationLink href={href} sources={msg.sources}>
                                                         {children}
@@ -945,8 +1002,8 @@ const ResearchChat = () => {
                                 onClick={handleSend}
                                 disabled={!input.trim() && !selectedFile}
                                 className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() || selectedFile
-                                        ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
+                                    ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                     }`}
                             >
                                 <span className="material-symbols-outlined text-xl">send</span>
