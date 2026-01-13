@@ -40,7 +40,7 @@ const AiSidebar = ({
             {isOpen && (
                 <>
                     {activeTab === 'ai' ? (
-                        <>
+                        <div className="chat-content-wrapper" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                             <div className="chat-messages">
                                 {chatMessages.map((msg, idx) => (
                                     <div key={idx} className={`message ${msg.role}`}>
@@ -65,7 +65,7 @@ const AiSidebar = ({
                                     </button>
                                 </div>
                             </div>
-                        </>
+                        </div>
                     ) : (
                         <div className="notes-area">
                             <h4 style={{ padding: '0 16px 8px', margin: 0 }}>Research Notes</h4>

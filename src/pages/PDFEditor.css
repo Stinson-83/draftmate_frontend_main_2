@@ -465,42 +465,93 @@
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
-/* Position Grid - Visual 2x3 Grid */
-.position-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 4px;
-    padding: 4px;
-    background: #f1f5f9;
-    border-radius: 8px;
-}
-
-.position-btn {
-    width: 28px;
-    height: 24px;
-    border: none;
-    background: white;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 10px;
-    color: #94a3b8;
-    transition: all 0.2s ease;
+/* Position Grid - Visual Page Preview */
+.position-grid-wrapper {
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.position-btn:hover {
-    background: #e2e8f0;
-    color: #2563eb;
-    transform: scale(1.05);
+.position-page-preview {
+    position: relative;
+    width: 60px;
+    height: 80px;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    border: 2px solid #e2e8f0;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
-.position-btn.active {
+.position-dot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #cbd5e1;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.position-dot:hover {
+    background: #94a3b8;
+    transform: scale(1.2);
+}
+
+.position-dot.active {
     background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25), 0 2px 4px rgba(37, 99, 235, 0.4);
+    transform: scale(1.3);
+}
+
+/* Position dot locations */
+.position-dot.top-left {
+    top: 6px;
+    left: 6px;
+}
+
+.position-dot.top-center {
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.position-dot.top-center:hover {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.position-dot.top-center.active {
+    transform: translateX(-50%) scale(1.3);
+}
+
+.position-dot.top-right {
+    top: 6px;
+    right: 6px;
+}
+
+.position-dot.bottom-left {
+    bottom: 6px;
+    left: 6px;
+}
+
+.position-dot.bottom-center {
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.position-dot.bottom-center:hover {
+    transform: translateX(-50%) scale(1.2);
+}
+
+.position-dot.bottom-center.active {
+    transform: translateX(-50%) scale(1.3);
+}
+
+.position-dot.bottom-right {
+    bottom: 6px;
+    right: 6px;
 }
 
 /* Number Input */

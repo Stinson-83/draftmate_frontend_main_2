@@ -670,17 +670,17 @@ const PDFEditor = () => {
                                 <div className="tool-divider"></div>
                                 <div className="tool-group">
                                     <label>Position</label>
-                                    <div className="position-grid">
-                                        {['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'].map(pos => (
-                                            <button
-                                                key={pos}
-                                                className={`position-btn ${pageNumPosition === pos ? 'active' : ''}`}
-                                                onClick={() => setPageNumPosition(pos)}
-                                                title={pos.replace('-', ' ')}
-                                            >
-                                                {pos.includes('top') ? '⬆' : '⬇'}
-                                            </button>
-                                        ))}
+                                    <div className="position-grid-wrapper">
+                                        <div className="position-page-preview">
+                                            {['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'].map(pos => (
+                                                <button
+                                                    key={pos}
+                                                    className={`position-dot ${pos} ${pageNumPosition === pos ? 'active' : ''}`}
+                                                    onClick={() => setPageNumPosition(pos)}
+                                                    title={pos.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="tool-divider"></div>

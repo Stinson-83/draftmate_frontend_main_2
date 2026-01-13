@@ -18,6 +18,7 @@
 
 .toolbar-group {
     display: flex;
+    align-items: center;
     gap: 4px;
 }
 
@@ -42,6 +43,10 @@
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
 }
 
 .tool-btn:hover {
@@ -55,6 +60,7 @@
 
 .toolbar-actions {
     display: flex;
+    align-items: center;
     gap: var(--spacing-sm);
 }
 
@@ -68,9 +74,10 @@
     flex: 1;
     display: flex;
     gap: var(--spacing-md);
-    height: calc(100vh - 120px);
-    /* Adjusted for removed header */
+    height: calc(100vh - 160px);
+    /* Adjusted for toolbar and bottom padding */
     overflow: hidden;
+    padding-bottom: 20px;
 }
 
 .editor-sidebar {
@@ -81,6 +88,7 @@
     flex-direction: column;
     overflow: hidden;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 100%;
 }
 
 .editor-sidebar.left {
@@ -474,6 +482,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    min-height: 0;
 }
 
 .message {
@@ -510,8 +519,10 @@
 
 .chat-input-area {
     padding: var(--spacing-md);
+    padding-bottom: 28px;
     border-top: 1px solid var(--border);
     background: white;
+    flex-shrink: 0;
 }
 
 .input-wrapper {

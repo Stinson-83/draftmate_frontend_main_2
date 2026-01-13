@@ -265,10 +265,10 @@ const EditorToolbar = ({
                     className={`tool-btn ${showPageNumbers ? 'active' : ''}`}
                     onClick={() => setShowPageNumbers(!showPageNumbers)}
                     title="Toggle Page Numbers"
-                    style={{ color: showPageNumbers ? 'var(--primary)' : 'inherit', background: showPageNumbers ? '#f1f5f9' : 'transparent', display: 'flex', alignItems: 'center', gap: 4 }}
+                    style={{ color: showPageNumbers ? 'var(--primary)' : 'inherit', background: showPageNumbers ? '#f1f5f9' : 'transparent' }}
                 >
                     <Hash size={14} />
-                    Page #
+                    Page
                 </button>
             </div>
             <div className="toolbar-divider"></div>
