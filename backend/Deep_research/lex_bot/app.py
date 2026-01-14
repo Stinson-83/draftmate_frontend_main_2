@@ -426,7 +426,6 @@ async def _stream_chat(request: ChatRequest, user_id: str):
         )
         
         # Generate and store title if it's a new session (or check if title exists)
-        # We can check if it's the first message or just try to update if it's "New Chat"
         current_title = chat_store.get_session_title(session_id)
         if not current_title or current_title == "New Chat":
             logger.info("Generating title...")
@@ -434,17 +433,27 @@ async def _stream_chat(request: ChatRequest, user_id: str):
             chat_store.update_session_title(session_id, user_id, new_title)
 
     try:
-        # For now, we use non-streaming execution and yield the result at the end
-        # This restores functionality while avoiding complex graph streaming logic reconstruction
-        # TODO: Implement true token-level streaming using graph.astream
-        
         logger.info(f"🚀 Calling run_query for session {session_id}...")
-        result = run_query(
-            query=request.query,
-            user_id=user_id,
-            session_id=session_id,
-            llm_mode="fast"
+        
+        # Run run_query in a separate thread to allow yielding keep-alive pings
+        loop = asyncio.get_running_loop()
+        future = loop.run_in_executor(
+            None, 
+            lambda: run_query(
+                query=request.query,
+                user_id=user_id,
+                session_id=session_id,
+                llm_mode="fast"
+            )
         )
+        
+        # Wait for result while yielding pings
+        while not future.done():
+            await asyncio.sleep(2)  # Check every 2 seconds
+            # Yield a ping/status update to keep connection alive
+            yield f"data: {json.dumps({'event': 'ping', 'message': 'Processing...'})}\n\n"
+            
+        result = await future
         logger.info("✅ run_query returned successfully")
         
         answer = result.get("final_answer", "I apologize, but I couldn't generate a response.")
