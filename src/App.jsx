@@ -11,6 +11,8 @@ import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
 
 import Settings from './pages/Settings';
+import HelpCenter from './pages/HelpCenter';
+
 
 // Placeholder for other routes
 const Placeholder = ({ title }) => (
@@ -85,6 +87,7 @@ function App() {
             <Route path="drafts" element={<MyDrafts />} />
             <Route path="research" element={<ResearchChat />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="help" element={<HelpCenter />} />
             <Route path="chat" element={<Placeholder title="AI Chat" />} />
             {/* Catch-all relative to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard/home" replace />} />

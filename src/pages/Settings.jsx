@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import MiniEditor from '../components/MiniEditor';
@@ -32,9 +32,34 @@ const PersonalSettings = () => {
         }
     }, []);
 
+    const fileInputRef = useRef(null);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setProfile(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                toast.error("Image size should be less than 5MB");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfile(prev => ({ ...prev, image: reader.result }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleDeleteImage = () => {
+        setProfile(prev => ({
+            ...prev,
+            image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
+        }));
     };
 
     const handleSave = () => {
@@ -110,10 +135,23 @@ const PersonalSettings = () => {
                                 <p className="text-[#4c6c9a] text-sm mt-1 max-w-sm">We recommend an image of at least 400x400px. JPG or PNG allowed.</p>
                             </div>
                             <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-1">
-                                <button className="flex items-center justify-center rounded-lg h-9 px-4 bg-white dark:bg-slate-700 border border-[#cfd9e7] dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-[#0d131b] dark:text-white text-sm font-medium transition-colors shadow-sm">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleImageUpload}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+                                <button
+                                    onClick={() => fileInputRef.current.click()}
+                                    className="flex items-center justify-center rounded-lg h-9 px-4 bg-white dark:bg-slate-700 border border-[#cfd9e7] dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-[#0d131b] dark:text-white text-sm font-medium transition-colors shadow-sm"
+                                >
                                     Upload New
                                 </button>
-                                <button className="flex items-center justify-center rounded-lg h-9 px-4 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 text-sm font-medium transition-colors">
+                                <button
+                                    onClick={handleDeleteImage}
+                                    className="flex items-center justify-center rounded-lg h-9 px-4 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 text-sm font-medium transition-colors"
+                                >
                                     Delete
                                 </button>
                             </div>
