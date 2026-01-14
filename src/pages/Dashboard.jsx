@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CalendarWidget from '../components/CalendarWidget';
+import ProfileCompletionCard from '../components/ProfileCompletionCard';
 
 const ActionButton = ({ onClick }) => (
     <button onClick={onClick} className="text-slate-400 hover:text-primary transition-colors">
@@ -87,6 +88,9 @@ const Dashboard = () => {
 
                         {/* Active Descriptions Table */}
                         <div className="xl:col-span-2 space-y-6">
+                            {/* Profile Completion Card */}
+                            <ProfileCompletionCard />
+
                             <div className="bg-white dark:bg-[#151f2e] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-full">
                                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Active Descriptions</h3>

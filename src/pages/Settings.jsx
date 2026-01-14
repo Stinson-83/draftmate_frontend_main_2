@@ -47,12 +47,55 @@ const PersonalSettings = () => {
         window.dispatchEvent(new Event('user_profile_updated'));
         toast.success('Personal profile updated successfully!');
     };
+    // Calculate completion percentage
+    const calculateCompletion = () => {
+        const fields = ['firstName', 'lastName', 'role', 'workplace', 'bio'];
+        const filled = fields.filter(f => profile[f] && profile[f].trim() !== '').length;
+        return Math.round((filled / fields.length) * 100);
+    };
+
+    const completionPercentage = calculateCompletion();
+    const isComplete = completionPercentage === 100;
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-[#0d131b] dark:text-white tracking-tight text-[32px] font-bold leading-tight">Personal Profile</h1>
-                <p className="text-[#4c6c9a] text-base font-normal leading-normal">Manage your personal information and public profile visible to clients and colleagues.</p>
+            {/* Header with Progress */}
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                    <div className="flex flex-col gap-2">
+                        <h1 className="text-[#0d131b] dark:text-white tracking-tight text-[32px] font-bold leading-tight">Personal Profile</h1>
+                        <p className="text-[#4c6c9a] text-base font-normal leading-normal">Manage your personal information and public profile visible to clients and colleagues.</p>
+                    </div>
+                    {/* Completion Badge */}
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${isComplete ? 'bg-green-100 dark:bg-green-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                        <span className={`material-symbols-outlined text-lg ${isComplete ? 'text-green-600' : 'text-blue-600'}`}>
+                            {isComplete ? 'check_circle' : 'pending'}
+                        </span>
+                        <span className={`text-sm font-semibold ${isComplete ? 'text-green-700 dark:text-green-400' : 'text-blue-700 dark:text-blue-400'}`}>
+                            {completionPercentage}% Complete
+                        </span>
+                    </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                        className={`h-full rounded-full transition-all duration-500 ease-out ${isComplete ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500'}`}
+                        style={{ width: `${completionPercentage}%` }}
+                    ></div>
+                </div>
+
+                {/* Incomplete Fields Hint */}
+                {!isComplete && (
+                    <div className="flex flex-wrap gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        <span>Missing:</span>
+                        {!profile.firstName && <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">First Name</span>}
+                        {!profile.lastName && <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">Last Name</span>}
+                        {!profile.role && <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">Role</span>}
+                        {!profile.workplace && <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">Workplace</span>}
+                        {!profile.bio && <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-medium">Bio</span>}
+                    </div>
+                )}
             </div>
 
             <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">

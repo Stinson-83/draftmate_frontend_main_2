@@ -38,9 +38,30 @@ const Signup = () => {
                 throw new Error(data.detail || 'Registration failed');
             }
 
+            // Auto-login after successful signup
+            const loginUrl = `${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.LOGIN}`;
+            const loginResponse = await fetch(loginUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+
+            const loginData = await loginResponse.json();
+
+            if (loginResponse.ok) {
+                // Save session
+                localStorage.setItem('session_id', loginData.session_id);
+                localStorage.setItem('user_id', loginData.user_id);
+                localStorage.setItem('user_profile', JSON.stringify({
+                    email: email,
+                    id: loginData.user_id,
+                    isNewUser: true
+                }));
+            }
+
             toast.dismiss(loadingToast);
-            toast.success("Account created successfully!");
-            navigate('/login');
+            toast.success("Account created! Let's complete your profile.");
+            navigate('/dashboard/settings');
         } catch (error) {
             toast.dismiss(loadingToast);
             toast.error(error.message);
