@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Optional
 import trafilatura
 from tavily import TavilyClient
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from lex_bot.config import (
     TAVILY_API_KEY, SERPER_API_KEY, GOOGLE_SERP_API_KEY,
     FIRECRAWL_API_KEY, WEB_SEARCH_MAX_RESULTS, PREFERRED_DOMAINS

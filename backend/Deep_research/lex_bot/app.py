@@ -408,13 +408,16 @@ def generate_title(query: str) -> str:
 
 async def _stream_chat(request: ChatRequest, user_id: str):
     """Generator for streaming responses."""
+    logger.info(f"➡️ _stream_chat called for user_id={user_id}, session_id={request.session_id}")
     session_id = request.session_id or str(uuid.uuid4())
     
     # Send status update
+    logger.info("Yielding status update...")
     yield f"data: {json.dumps({'event': 'status', 'message': 'Initializing...', 'quote': 'Preparing research environment...'})}\n\n"
     
     # Store user message
     if user_id:
+        logger.info("Storing user message...")
         chat_store.add_message(
             user_id=user_id,
             session_id=session_id,
@@ -426,6 +429,7 @@ async def _stream_chat(request: ChatRequest, user_id: str):
         # We can check if it's the first message or just try to update if it's "New Chat"
         current_title = chat_store.get_session_title(session_id)
         if not current_title or current_title == "New Chat":
+            logger.info("Generating title...")
             new_title = generate_title(request.query)
             chat_store.update_session_title(session_id, user_id, new_title)
 
@@ -434,17 +438,30 @@ async def _stream_chat(request: ChatRequest, user_id: str):
         # This restores functionality while avoiding complex graph streaming logic reconstruction
         # TODO: Implement true token-level streaming using graph.astream
         
+        logger.info(f"🚀 Calling run_query for session {session_id}...")
         result = run_query(
             query=request.query,
             user_id=user_id,
             session_id=session_id,
             llm_mode="fast"
         )
+        logger.info("✅ run_query returned successfully")
         
         answer = result.get("final_answer", "I apologize, but I couldn't generate a response.")
+        suggested_followups = result.get("suggested_followups", [])
+        sources = result.get("sources", [])
         
         # Yield the final answer
         yield f"data: {json.dumps({'event': 'answer', 'content': answer})}\n\n"
+        
+        # Yield followups
+        if suggested_followups:
+            yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
+            
+        # Yield sources
+        if sources:
+            yield f"data: {json.dumps({'event': 'sources', 'sources': sources})}\n\n"
+
         yield f"data: {json.dumps({'event': 'done', 'message': 'Complete'})}\n\n"
         
         # Store assistant response

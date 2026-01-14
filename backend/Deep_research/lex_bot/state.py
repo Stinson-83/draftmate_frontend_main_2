@@ -62,6 +62,10 @@ class AgentState(TypedDict):
     # Final answer
     final_answer: Optional[str]
     
+    # UI specific fields
+    sources: Optional[List[Dict[str, Any]]]
+    suggested_followups: Optional[List[str]]
+    
     # Error tracking
     errors: Annotated[List[str], operator.add]
 

@@ -314,12 +314,21 @@ class ManagerAgent(BaseAgent):
         # Add tool results (e.g. from Explainer or Research agent in complex mode)
         tool_results = state.get("tool_results", [])
         if tool_results:
-            context_str += "\n\n=== AGENT REPORTS ===\n"
+            context_str += "\n\n=== ADDITIONAL ANALYSIS ===\n"
+            agent_map = {
+                "research_agent": "Legal Research Findings",
+                "explainer": "Concept Explanation",
+                "law_agent": "Statutory Analysis",
+                "case_agent": "Case Law Analysis",
+                "citation_agent": "Citation Verification",
+                "strategy_agent": "Legal Strategy"
+            }
             for res in tool_results:
                 agent = res.get("agent", "Unknown Agent")
+                friendly_name = agent_map.get(agent, agent.replace("_", " ").title())
                 content = res.get("content", "")
                 if content:
-                    context_str += f"\n--- Report from {agent} ---\n{content}\n"
+                    context_str += f"\n--- {friendly_name} ---\n{content}\n"
         
         # Choose prompt based on mode
         if llm_mode == "reasoning":
@@ -354,6 +363,8 @@ class ManagerAgent(BaseAgent):
             **Step 4: Synthesize**
             - Combine statutory and case law analysis.
             - Address any conflicts or nuances.
+            - **INTEGRATE** the findings from "Additional Analysis" (if any) naturally into your answer.
+            - **DO NOT** mention "Research Agent", "Explainer", or "Report" in your final output. Just use the information.
             
             **Step 5: Conclude**
             - Provide a clear, actionable answer.
@@ -381,6 +392,7 @@ class ManagerAgent(BaseAgent):
             
             Instructions:
             - Breakdown the query into aspects and answer each from the context.
+            - **INTEGRATE** any "Additional Analysis" naturally. DO NOT mention the source agents (e.g. "Research Agent") by name.
             - Use PROPER INDIAN LEGAL CITATIONS:
               * Cases: Case Name, (Year) Volume Reporter Page (e.g., (2024) 5 SCC 123)
               * Statutes: Section X of Act Name, Year
@@ -394,8 +406,20 @@ class ManagerAgent(BaseAgent):
         chain = prompt | llm | StrOutputParser()
         answer = chain.invoke({"context": context_str, "query": state["original_query"]})
         
+        # Enrich sources with index for UI
+        enriched_sources = []
+        for i, doc in enumerate(top_docs, 1):
+            doc_copy = doc.copy()
+            doc_copy["index"] = i
+            doc_copy["type"] = doc.get("source", "Web")
+            enriched_sources.append(doc_copy)
+
         # For reasoning mode, extract the reasoning trace
-        result = {"final_answer": answer}
+        result = {
+            "final_answer": answer,
+            "sources": enriched_sources,
+            "suggested_followups": self._generate_followups(state["original_query"], answer)
+        }
         if llm_mode == "reasoning":
             result["reasoning_trace"] = answer  # Full CoT is the reasoning trace
         

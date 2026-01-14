@@ -10,7 +10,7 @@ Supports:
 import os
 from typing import Literal
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from lex_bot.core.llm_factory import LLMFactory, get_llm
@@ -99,3 +99,19 @@ class BaseAgent:
             # Fallback to original query
             return query
 
+    def _generate_followups(self, query: str, answer: str) -> list[str]:
+        """Generate 3 follow-up questions based on the answer."""
+        prompt = ChatPromptTemplate.from_template("""
+        You are a helpful legal assistant.
+        Based on the user's query and your answer, suggest 3 relevant follow-up questions the user might want to ask next.
+        
+        Query: {query}
+        Answer: {answer}
+        
+        Return ONLY a JSON list of strings, e.g.: ["Question 1?", "Question 2?", "Question 3?"]
+        """)
+        chain = prompt | self.llm | JsonOutputParser()
+        try:
+            return chain.invoke({"query": query, "answer": answer[:2000]})
+        except Exception:
+            return []

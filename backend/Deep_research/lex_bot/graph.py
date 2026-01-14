@@ -249,8 +249,11 @@ def run_query(
         Final state with answer and context
     """
     # Rewrite query if needed (rule-based + LLM fallback)
+    print(f"🔄 run_query called with: {query}")
     from lex_bot.core.query_rewriter import rewrite_query
+    print("🔄 Calling rewrite_query...")
     processed_query = rewrite_query(query, user_id=user_id, session_id=session_id)
+    print(f"✅ Query rewritten to: {processed_query}")
     
     initial_state = {
         "messages": [],
@@ -267,7 +270,9 @@ def run_query(
         "errors": [],
     }
     
+    print("🚀 Invoking graph app.invoke(initial_state)...")
     result = app.invoke(initial_state)
+    print("✅ Graph invocation complete.")
     return result
 
 
