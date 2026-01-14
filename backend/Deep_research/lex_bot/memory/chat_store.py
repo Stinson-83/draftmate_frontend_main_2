@@ -35,6 +35,16 @@ class ChatMessage(Base):
     msg_metadata = Column(JSON, nullable=True)  # Extra info like query_complexity, llm_mode
 
 
+class ChatSession(Base):
+    """SQLAlchemy model for chat sessions."""
+    __tablename__ = "chat_sessions"
+    
+    session_id = Column(String(255), primary_key=True)
+    user_id = Column(String(255), index=True, nullable=False)
+    title = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class ChatStore:
     """
     Manages chat history persistence.
@@ -69,6 +79,49 @@ class ChatStore:
             logger.error(f"❌ ChatStore init failed: {e}")
             self._initialized = False
     
+    def update_session_title(self, session_id: str, user_id: str, title: str) -> bool:
+        """Update or create session title."""
+        if not self._initialized:
+            return False
+            
+        try:
+            with self.SessionLocal() as session:
+                # Check if session exists
+                chat_session = session.query(ChatSession).filter(
+                    ChatSession.session_id == session_id
+                ).first()
+                
+                if chat_session:
+                    chat_session.title = title
+                else:
+                    chat_session = ChatSession(
+                        session_id=session_id,
+                        user_id=user_id,
+                        title=title
+                    )
+                    session.add(chat_session)
+                
+                session.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Failed to update session title: {e}")
+            return False
+
+    def get_session_title(self, session_id: str) -> Optional[str]:
+        """Get session title."""
+        if not self._initialized:
+            return None
+            
+        try:
+            with self.SessionLocal() as session:
+                chat_session = session.query(ChatSession).filter(
+                    ChatSession.session_id == session_id
+                ).first()
+                return chat_session.title if chat_session else None
+        except Exception as e:
+            logger.error(f"Failed to get session title: {e}")
+            return None
+
     def add_message(
         self,
         user_id: str,
@@ -104,6 +157,20 @@ class ChatStore:
                     msg_metadata=msg_metadata
                 )
                 session.add(msg)
+                
+                # Ensure session record exists
+                chat_session = session.query(ChatSession).filter(
+                    ChatSession.session_id == session_id
+                ).first()
+                
+                if not chat_session:
+                    chat_session = ChatSession(
+                        session_id=session_id,
+                        user_id=user_id,
+                        title="New Chat"
+                    )
+                    session.add(chat_session)
+                
                 session.commit()
                 return True
         except Exception as e:
@@ -143,6 +210,20 @@ class ChatStore:
                         msg_metadata=msg_metadata
                     )
                     session.add(msg)
+                
+                # Ensure session record exists
+                chat_session = session.query(ChatSession).filter(
+                    ChatSession.session_id == session_id
+                ).first()
+                
+                if not chat_session:
+                    chat_session = ChatSession(
+                        session_id=session_id,
+                        user_id=user_id,
+                        title="New Chat"
+                    )
+                    session.add(chat_session)
+
                 session.commit()
                 return True
         except Exception as e:
@@ -190,17 +271,33 @@ class ChatStore:
             logger.error(f"Failed to get session history: {e}")
             return []
     
-    def get_user_sessions(self, user_id: str, limit: int = 20) -> List[str]:
-        """Get list of session IDs for a user."""
+    def get_user_sessions(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get list of sessions for a user with metadata."""
         if not self._initialized:
             return []
         
         try:
             with self.SessionLocal() as session:
+                # Try to get from ChatSession table first
+                sessions = session.query(ChatSession).filter(
+                    ChatSession.user_id == user_id
+                ).order_by(ChatSession.created_at.desc()).limit(limit).all()
+                
+                if sessions:
+                    return [
+                        {
+                            "session_id": s.session_id,
+                            "title": s.title,
+                            "created_at": s.created_at.isoformat() if s.created_at else None
+                        }
+                        for s in sessions
+                    ]
+                
+                # Fallback to old method if no ChatSession records
                 results = session.query(ChatMessage.session_id).filter(
                     ChatMessage.user_id == user_id
                 ).distinct().limit(limit).all()
-                return [r[0] for r in results]
+                return [{"session_id": r[0], "title": None, "created_at": None} for r in results]
         except Exception as e:
             logger.error(f"Failed to get user sessions: {e}")
             return []
@@ -216,12 +313,41 @@ class ChatStore:
                     ChatMessage.user_id == user_id,
                     ChatMessage.session_id == session_id
                 ).delete()
+                
+                session.query(ChatSession).filter(
+                    ChatSession.user_id == user_id,
+                    ChatSession.session_id == session_id
+                ).delete()
+                
                 session.commit()
                 return True
         except Exception as e:
             logger.error(f"Failed to delete session: {e}")
             return False
     
+    def get_first_user_message(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get the first user message in a session (for title/timestamp)."""
+        if not self._initialized:
+            return None
+        
+        try:
+            with self.SessionLocal() as session:
+                msg = session.query(ChatMessage).filter(
+                    ChatMessage.user_id == user_id,
+                    ChatMessage.session_id == session_id,
+                    ChatMessage.role == "user"
+                ).order_by(ChatMessage.timestamp.asc()).first()
+                
+                if msg:
+                    return {
+                        "content": msg.content,
+                        "timestamp": msg.timestamp.isoformat() if msg.timestamp else None
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get first user message: {e}")
+            return None
+
     def cleanup_old_sessions(self, retention_days: int = 15) -> int:
         """
         Delete chat sessions older than retention_days.
@@ -243,6 +369,11 @@ class ChatStore:
                 result = session.query(ChatMessage).filter(
                     ChatMessage.timestamp < cutoff_date
                 ).delete()
+                
+                session.query(ChatSession).filter(
+                    ChatSession.created_at < cutoff_date
+                ).delete()
+
                 session.commit()
                 
                 if result > 0:

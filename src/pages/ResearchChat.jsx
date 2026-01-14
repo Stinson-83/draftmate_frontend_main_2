@@ -658,15 +658,15 @@ const ResearchChat = () => {
                     )}
                 </div>
 
-                {/* User Profile / Bottom Actions */}
-                <div className="p-4 border-t border-slate-800 flex-none">
+                {/* User Profile / Bottom Actions - REMOVED as per request */}
+                {/* <div className="p-4 border-t border-slate-800 flex-none">
                     <button className="flex items-center gap-3 w-full px-2 py-2 hover:bg-slate-800 rounded-lg transition-colors">
                         <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-medium text-xs">
                             U
                         </div>
                         <div className="text-sm font-medium text-slate-200">User</div>
                     </button>
-                </div>
+                </div> */}
             </div>
 
             {/* Main Content Area */}

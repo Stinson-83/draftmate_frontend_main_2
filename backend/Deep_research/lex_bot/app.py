@@ -384,6 +384,28 @@ async def chat_stream(request: ChatRequest, user_id: str = Depends(verify_token)
         media_type="text/event-stream"
     )
 
+def generate_title(query: str) -> str:
+    """Generate a short 3-5 word title for the chat session."""
+    try:
+        logger.info(f"Generating title for query: {query[:50]}...")
+        # Simple heuristic for very short queries
+        if len(query.split()) <= 5:
+            logger.info("Query short enough, using as title")
+            return query[:50]
+            
+        # Use LLM to summarize
+        from backend.query.QueryParsing import GenerativeModel
+        model = GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(
+            f"Summarize this query into a concise 3-5 word title. Do not use quotes. Query: {query}"
+        )
+        title = response.text.strip()
+        logger.info(f"Generated title: {title}")
+        return title
+    except Exception as e:
+        logger.error(f"Title generation failed: {e}")
+        return query[:50]
+
 async def _stream_chat(request: ChatRequest, user_id: str):
     """Generator for streaming responses."""
     session_id = request.session_id or str(uuid.uuid4())
@@ -391,6 +413,22 @@ async def _stream_chat(request: ChatRequest, user_id: str):
     # Send status update
     yield f"data: {json.dumps({'event': 'status', 'message': 'Initializing...', 'quote': 'Preparing research environment...'})}\n\n"
     
+    # Store user message
+    if user_id:
+        chat_store.add_message(
+            user_id=user_id,
+            session_id=session_id,
+            role="user",
+            content=request.query
+        )
+        
+        # Generate and store title if it's a new session (or check if title exists)
+        # We can check if it's the first message or just try to update if it's "New Chat"
+        current_title = chat_store.get_session_title(session_id)
+        if not current_title or current_title == "New Chat":
+            new_title = generate_title(request.query)
+            chat_store.update_session_title(session_id, user_id, new_title)
+
     try:
         # For now, we use non-streaming execution and yield the result at the end
         # This restores functionality while avoiding complex graph streaming logic reconstruction
@@ -432,6 +470,21 @@ async def _process_chat(request: ChatRequest, user_id: str, reasoning_mode: bool
     start_time = time.time()
     session_id = request.session_id or str(uuid.uuid4())
     
+    # Store user message
+    if user_id:
+        chat_store.add_message(
+            user_id=user_id,
+            session_id=session_id,
+            role="user",
+            content=request.query
+        )
+        
+        # Generate title
+        current_title = chat_store.get_session_title(session_id)
+        if not current_title or current_title == "New Chat":
+            new_title = generate_title(request.query)
+            chat_store.update_session_title(session_id, user_id, new_title)
+
     try:
         # Run LangGraph workflow
         result = run_query(
@@ -481,6 +534,9 @@ async def _process_chat(request: ChatRequest, user_id: str, reasoning_mode: bool
 async def create_session(user_id: str):
     """Create a new chat session."""
     session_id = str(uuid.uuid4())
+    # Initialize session in DB
+    chat_store.update_session_title(session_id, user_id, "New Chat")
+    
     return SessionResponse(
         session_id=session_id,
         user_id=user_id,
@@ -494,16 +550,7 @@ async def create_session(user_id: str):
 async def get_session(session_id: str, user_id: str = Depends(verify_token)):
     """Get session history."""
     messages = chat_store.get_session_history(user_id, session_id, limit=100)
-    
-    if not messages:
-        pass
-    
-    # Extract title from first user message
-    title = "Chat"
-    for msg in messages:
-        if msg.get("role") == "user":
-            title = msg.get("content", "Chat")[:50]
-            break
+    title = chat_store.get_session_title(session_id) or "Chat"
     
     return SessionResponse(
         session_id=session_id,
@@ -526,39 +573,17 @@ async def delete_session(session_id: str, user_id: str):
 @app.get("/sessions", response_model=SessionListResponse)
 async def list_sessions(user_id: str = Depends(verify_token), limit: int = 50):
     """List all sessions for the authenticated user."""
-    session_ids = chat_store.get_user_sessions(user_id, limit=limit)
+    # Get sessions with metadata from ChatSession table
+    raw_sessions = chat_store.get_user_sessions(user_id, limit=limit)
     
     sessions = []
-    for sid in session_ids:
-        messages = chat_store.get_session_history(user_id, sid, limit=1)
-        title = "New Chat"
-        created_at = None
-        if messages:
-            # Try to find the first user message for the title
-            # Since get_session_history returns reversed (chronological), 
-            # we might need to fetch more or just use the last one (which is the first one chronologically)
-            # Actually get_session_history returns reversed(messages) so it is chronological [oldest, ..., newest]
-            # But we only fetched limit=1, which is the NEWEST message.
-            # Ideally we want the FIRST message ever.
-            # For now, let's just use the newest message as title if we can't find better, or just "Chat"
-            # Optimization: ChatStore should probably support getting session metadata.
-            # But for now, let's just stick to what we have.
-            msg = messages[0]
-            created_at = msg.get("timestamp")
-            # To get a real title, we'd need the first message. 
-            # Let's just use "Chat {date}" for now or fetch more.
-            # Let's fetch 1 message (newest) and use its content as title if it's user, else "Chat"
-            if msg.get("role") == "user":
-                title = msg.get("content")[:30] + "..."
-            else:
-                title = "Chat"
-        
+    for s in raw_sessions:
         sessions.append({
-            "session_id": sid,
+            "session_id": s["session_id"],
             "user_id": user_id,
-            "title": title,
-            "created_at": created_at or datetime.now().isoformat(),
-            "messages": [] # Don't send messages in list view
+            "title": s["title"] or "New Chat",
+            "created_at": s["created_at"] or datetime.now().isoformat(),
+            "messages": []
         })
         
     return SessionListResponse(sessions=sessions, total=len(sessions))
