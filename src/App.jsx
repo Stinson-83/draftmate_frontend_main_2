@@ -29,6 +29,9 @@ import Signup from './pages/Signup';
 import Onboarding from './pages/Onboarding';
 
 import Landing from './pages/Landing';
+import Features from './pages/Features';
+import HowItWorks from './pages/HowItWorks';
+import ComingSoon from './pages/ComingSoon';
 
 function App() {
   // Check if user has onboarded (simple check)
@@ -66,6 +69,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/onboarding" element={<Onboarding />} />
+
+          {/* Public pages */}
+          <Route path="/features" element={<Features />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/blogs" element={<ComingSoon title="Blog" />} />
 
           <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
 

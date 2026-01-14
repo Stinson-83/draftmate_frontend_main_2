@@ -1,29 +1,39 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import fullLogo from '../assets/FULL_LOGO.svg';
 
 const Landing = () => {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     useEffect(() => {
         document.title = 'DraftMate';
     }, []);
+
+    const scrollToSection = (sectionId) => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        setMobileMenuOpen(false);
+    };
 
     return (
         <div className="bg-slate-50 dark:bg-[#101622] text-[#111318] font-sans overflow-x-hidden">
             {/* Header */}
             <header className="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#f0f2f4] bg-white/95 backdrop-blur-sm px-6 py-3 lg:px-40">
-                <div className="flex items-center gap-4 text-[#111318]">
-                    <div className="h-12 flex items-center justify-center">
+                <Link to="/" className="flex items-center gap-4 text-[#111318]">
+                    <div className="h-12 flex items-center justify-center hover:opacity-80 transition-opacity">
                         <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
                     </div>
-                </div>
+                </Link>
                 <div className="hidden lg:flex flex-1 justify-end gap-8">
                     <div className="flex items-center gap-9">
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Law Jurist</a>
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Features</a>
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Blogs</a>
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">About</a>
+                        <a href="https://lawjurist.com/" target="_blank" rel="noopener noreferrer" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Law Jurist</a>
+                        <Link to="/features" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">Features</Link>
+                        <Link to="/blogs" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">Blogs</Link>
+                        <button onClick={() => scrollToSection('testimonials')} className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">About</button>
                         <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Pricing</a>
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">How it Works</a>
+                        <Link to="/how-it-works" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">How it Works</Link>
                     </div>
                     <div className="flex gap-2">
                         <Link to="/login" className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
@@ -34,10 +44,98 @@ const Landing = () => {
                         </Link>
                     </div>
                 </div>
-                <div className="lg:hidden">
-                    <span className="material-symbols-outlined text-2xl">menu</span>
-                </div>
+                <button
+                    className="lg:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                >
+                    <span className="material-symbols-outlined text-2xl">{mobileMenuOpen ? 'close' : 'menu'}</span>
+                </button>
             </header>
+
+            {/* Mobile Menu */}
+            {mobileMenuOpen && (
+                <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
+                    <div
+                        className="absolute top-0 right-0 w-80 h-full bg-white shadow-2xl transform transition-transform duration-300"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-8">
+                                <img src={fullLogo} alt="DraftMate" className="h-10 object-contain" />
+                                <button
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                            <nav className="flex flex-col gap-4">
+                                <a
+                                    href="https://lawjurist.com/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors"
+                                >
+                                    <span className="material-symbols-outlined">gavel</span>
+                                    Law Jurist
+                                    <span className="material-symbols-outlined text-sm ml-auto">open_in_new</span>
+                                </a>
+                                <Link
+                                    to="/features"
+                                    className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    <span className="material-symbols-outlined">auto_awesome</span>
+                                    Features
+                                </Link>
+                                <Link
+                                    to="/blogs"
+                                    className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    <span className="material-symbols-outlined">article</span>
+                                    Blogs
+                                </Link>
+                                <button
+                                    onClick={() => scrollToSection('testimonials')}
+                                    className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors text-left"
+                                >
+                                    <span className="material-symbols-outlined">info</span>
+                                    About
+                                </button>
+                                <a className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors cursor-pointer">
+                                    <span className="material-symbols-outlined">sell</span>
+                                    Pricing
+                                </a>
+                                <Link
+                                    to="/how-it-works"
+                                    className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    <span className="material-symbols-outlined">school</span>
+                                    How it Works
+                                </Link>
+                            </nav>
+                            <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col gap-3">
+                                <Link
+                                    to="/login"
+                                    className="flex items-center justify-center h-12 px-6 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 transition-colors"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    Start Drafting
+                                </Link>
+                                <Link
+                                    to="/login"
+                                    className="flex items-center justify-center h-12 px-6 bg-slate-100 text-[#111318] font-bold rounded-lg hover:bg-slate-200 transition-colors"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    Login
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Hero Section */}
             <section className="relative flex flex-col items-center justify-center py-16 lg:py-24 px-4 bg-white overflow-hidden">
@@ -404,7 +502,7 @@ const Landing = () => {
             </section>
 
             {/* Testimonials */}
-            <section className="py-20 px-4 lg:px-40 bg-background-light dark:bg-background-dark border-t border-[#f0f2f4]">
+            <section id="testimonials" className="py-20 px-4 lg:px-40 bg-background-light dark:bg-background-dark border-t border-[#f0f2f4]">
                 <div className="layout-content-container flex flex-col max-w-[960px] mx-auto gap-12">
                     <div className="flex flex-col gap-4 text-center">
                         <div className="inline-flex items-center justify-center gap-2 text-primary font-bold uppercase tracking-wider text-sm">
@@ -550,11 +648,11 @@ const Landing = () => {
                 <div className="layout-content-container max-w-[960px] mx-auto flex flex-col gap-8">
                     <div className="flex flex-col md:flex-row justify-between gap-8">
                         <div className="flex flex-col gap-4 max-w-xs">
-                            <div className="flex items-center gap-2">
-                                <div className="h-12">
+                            <Link to="/" className="flex items-center gap-2">
+                                <div className="h-10 bg-white/90 backdrop-blur-sm rounded-full px-4 py-1.5 shadow-sm">
                                     <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
                                 </div>
-                            </div>
+                            </Link>
                             <p className="text-gray-400 text-sm">Empowering Indian Advocates with next-gen AI tools for drafting and research.</p>
                         </div>
                         <div className="flex flex-wrap gap-12">
