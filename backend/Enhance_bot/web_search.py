@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Optional
 import trafilatura
 from tavily import TavilyClient
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 import os
 from dotenv import load_dotenv
 load_dotenv()

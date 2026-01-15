@@ -21,23 +21,27 @@ class CaseAgent(BaseAgent):
         if not instruction:
             return {"case_context": []}
             
-        print(f"🏛️ Case Agent Task: {instruction[:80]}...")
-        
-        # 1. Enhance Query
-        enhanced_query = self.enhance_query(instruction, "case")
-        print(f"   Enhanced: {enhanced_query[:80]}...")
-        
-        # 2. Define Domains - prioritize Indian Kanoon
-        domains = [TARGET_CASE_SITE]
-        
-        # 3. Web Search
-        context_str, results = web_search_tool.run(enhanced_query, domains)
-        
-        # 4. Rerank against original instruction
-        reranked = rerank_documents(instruction, results, top_n=10)
-        
-        # 5. Return update
-        return {"case_context": reranked}
+        try:
+            print(f"🏛️ Case Agent Task: {instruction[:80]}...")
+            
+            # 1. Enhance Query
+            enhanced_query = self.enhance_query(instruction, "case")
+            print(f"   Enhanced: {enhanced_query[:80]}...")
+            
+            # 2. Define Domains - prioritize Indian Kanoon
+            domains = [TARGET_CASE_SITE]
+            
+            # 3. Web Search
+            context_str, results = web_search_tool.run(enhanced_query, domains)
+            
+            # 4. Rerank against original instruction
+            reranked = rerank_documents(instruction, results, top_n=10)
+            
+            # 5. Return update
+            return {"case_context": reranked}
+        except Exception as e:
+            print(f"❌ Case Agent Failed: {e}")
+            return {"case_context": [], "errors": [f"Case Agent failed: {str(e)}"]}
 
 case_agent = CaseAgent()
 

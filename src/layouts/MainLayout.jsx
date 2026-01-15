@@ -164,9 +164,9 @@ const MainLayout = () => {
                 <button className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
                   <span className="material-symbols-outlined text-[22px]">notifications</span>
                 </button>
-                <button className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                <Link to="/dashboard/help" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
                   Help Center
-                </button>
+                </Link>
               </>
             )}
           </div>

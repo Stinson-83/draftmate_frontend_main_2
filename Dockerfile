@@ -35,14 +35,19 @@ RUN apt-get update && apt-get install -y \
     nginx \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
+# Install Base Python dependencies (Cached Layer)
+COPY requirements_base.txt .
+RUN pip install --default-timeout=3000 --no-cache-dir -r requirements_base.txt
 
 # Install CPU-only PyTorch and heavy ML libraries
 # We install torch first from the CPU index, then easyocr/sentence-transformers
-RUN pip install --default-timeout=1000 --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --default-timeout=1000 --no-cache-dir easyocr sentence-transformers
+RUN pip install --default-timeout=3000 --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install --default-timeout=3000 --no-cache-dir easyocr sentence-transformers
+
+# Install Remaining Python dependencies
+COPY requirements.txt .
+RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
 
 # Pre-download models to bake them into the image
 COPY backend/download_models.py .

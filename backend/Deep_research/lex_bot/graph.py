@@ -249,11 +249,29 @@ def run_query(
         Final state with answer and context
     """
     # Rewrite query if needed (rule-based + LLM fallback)
+    print(f"🔄 run_query called with: {query}")
     from lex_bot.core.query_rewriter import rewrite_query
+    print("🔄 Calling rewrite_query...")
     processed_query = rewrite_query(query, user_id=user_id, session_id=session_id)
+    print(f"✅ Query rewritten to: {processed_query}")
     
+    # Fetch chat history
+    chat_history = []
+    if user_id and session_id:
+        try:
+            from lex_bot.memory.chat_store import ChatStore
+            store = ChatStore()
+            # Get last 10 messages
+            history = store.get_session_history(user_id, session_id, limit=10)
+            # Convert to LangChain format
+            for msg in history:
+                chat_history.append({"role": msg["role"], "content": msg["content"]})
+            print(f"📜 Loaded {len(chat_history)} previous messages for context")
+        except Exception as e:
+            print(f"⚠️ Failed to load chat history: {e}")
+
     initial_state = {
-        "messages": [],
+        "messages": chat_history,
         "original_query": processed_query,  # Use rewritten query
         "user_id": user_id,
         "session_id": session_id,
@@ -267,7 +285,9 @@ def run_query(
         "errors": [],
     }
     
+    print("🚀 Invoking graph app.invoke(initial_state)...")
     result = app.invoke(initial_state)
+    print("✅ Graph invocation complete.")
     return result
 
 

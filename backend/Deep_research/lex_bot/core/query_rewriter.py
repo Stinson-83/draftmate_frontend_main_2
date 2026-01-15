@@ -130,38 +130,43 @@ def expand_abbreviations(query: str) -> str:
 # ============ Get Context from mem0 ============
 def get_conversation_context(user_id: str, query: str, session_id: str = None) -> str:
     """
-    Get relevant context from mem0 for follow-up queries.
-    mem0 stores actual conversation turns so it has the context needed.
-    
-    Returns:
-        Formatted context string or empty string
+    Get relevant context from ChatStore (recent history) or mem0.
     """
-    if not user_id:
-        return ""
+    context_parts = []
     
-    try:
-        from lex_bot.config import MEM0_ENABLED
-        if not MEM0_ENABLED:
-            return ""
-        
-        from lex_bot.memory import UserMemoryManager
-        memory_mgr = UserMemoryManager(user_id)
-        memories = memory_mgr.search(query, limit=5)  # Get last 5 relevant memories
-        
-        if memories:
-            context_parts = []
-            for m in memories:
-                memory_text = m.get('memory', '')
-                if memory_text:
-                    context_parts.append(f"- {memory_text[:250]}")
-            
-            if context_parts:
-                return "\n".join(context_parts)
+    # 1. Try ChatStore (Immediate Session History)
+    if user_id and session_id:
+        try:
+            from lex_bot.memory.chat_store import ChatStore
+            store = ChatStore()
+            history = store.get_session_history(user_id, session_id, limit=6)
+            if history:
+                context_parts.append("IMMEDIATE CONVERSATION HISTORY:")
+                for msg in history:
+                    context_parts.append(f"- {msg['role'].upper()}: {msg['content']}")
+                context_parts.append("")
+        except Exception as e:
+            logger.warning(f"ChatStore context retrieval failed: {e}")
+
+    # 2. Try mem0 (Long-term Memory)
+    if user_id:
+        try:
+            from lex_bot.config import MEM0_ENABLED
+            if MEM0_ENABLED:
+                from lex_bot.memory import UserMemoryManager
+                memory_mgr = UserMemoryManager(user_id)
+                memories = memory_mgr.search(query, limit=3)
+                
+                if memories:
+                    context_parts.append("RELEVANT LONG-TERM MEMORIES:")
+                    for m in memories:
+                        memory_text = m.get('memory', '')
+                        if memory_text:
+                            context_parts.append(f"- {memory_text[:250]}")
+        except Exception as e:
+            logger.warning(f"mem0 context retrieval failed: {e}")
     
-    except Exception as e:
-        logger.warning(f"mem0 context retrieval failed: {e}")
-    
-    return ""
+    return "\n".join(context_parts) if context_parts else ""
 
 
 # ============ LLM-Based Rewriting ============

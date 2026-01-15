@@ -166,14 +166,24 @@ class ResearchAgent(BaseAgent):
         # 8. Return result based on complexity
         complexity = state.get("complexity", "simple")
         
+        # Enrich sources with index for UI
+        enriched_sources = []
+        for i, doc in enumerate(top_results, 1):
+            doc_copy = doc.copy()
+            doc_copy["index"] = i
+            doc_copy["type"] = doc.get("source", "Web")
+            enriched_sources.append(doc_copy)
+
         result = {
             "law_context": top_results,
-            "memory_context": [{"content": memory_context}] if memory_context else []
+            "memory_context": [{"content": memory_context}] if memory_context else [],
+            "sources": enriched_sources
         }
         
         # Only return final_answer if we are the sole agent (simple mode)
         if complexity != "complex":
             result["final_answer"] = answer
+            result["suggested_followups"] = self._generate_followups(query, answer)
         else:
             # In complex mode, return answer as a tool result for the manager to aggregate
             result["tool_results"] = [{

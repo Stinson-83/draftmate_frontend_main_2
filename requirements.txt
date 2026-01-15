@@ -1,39 +1,5 @@
-# Core Framework & Utilities
-fastapi
-uvicorn
-pydantic
-python-dotenv
-requests
-click
-colorama
-typing-extensions
-python-multipart
-python-dateutil
-six
-tqdm
-bcrypt
-
-# AI & LLM
-google-generativeai
-langchain
-langgraph
-langchain-community
-langchain-core
-langchain-google-genai
-langchain-openai
-faiss-cpu
-mem0ai
-numpy
-
-# Database & Storage
-sqlalchemy
-psycopg2-binary
-pgvector
-boto3
-s3transfer
-
 # Web Search & Scraping
-duckduckgo-search
+
 tavily-python
 trafilatura
 firecrawl-py
@@ -56,20 +22,11 @@ reportlab
 pypandoc
 wkhtmltopdf
 
-# Google API Clients
-google-api-python-client
-google-auth
-google-auth-httplib2
-google-ai-generativelanguage
-googleapis-common-protos
-
 # Other Dependencies
 cachetools
 certifi
 charset-normalizer
 greenlet
-grpcio
-grpcio-status
 h11
 httplib2
 httptools
@@ -77,8 +34,6 @@ paramiko
 sshtunnel
 idna
 jmespath
-proto-plus
-protobuf
 pyasn1
 pyasn1_modules
 pyparsing
@@ -94,4 +49,3 @@ streamlit
 altair
 pydeck
 watchdog
-opencv-python-headless

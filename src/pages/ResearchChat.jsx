@@ -13,6 +13,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 // Using specific imports if needed, but switching to Material Symbols for UI icons
 // keeping logo just in case, though mostly using icons now
 import lawJuristLogo from '../assets/draftmate_logo.png';
+import DraftingModal from '../components/DraftingModal';
 
 // LLM options for dropdown
 const LLM_OPTIONS = [
@@ -70,9 +71,11 @@ const processCitations = (content, sources) => {
     // 4. Handle simple text citations WITHOUT comma: [Case Law], [Strategy]
     const simpleTextPattern = /\[([A-Za-z][A-Za-z0-9\s.-]*)\](?!\()/g;
     processed = processed.replace(simpleTextPattern, (match, text) => {
-        if (/^\d+$/.test(text.trim())) return match;
-        if (text.includes('\\')) return match;
-        return `[${match}](citation://simple?text=${encodeURIComponent(text.trim())})`;
+        const t = text.trim();
+        if (/^\d+$/.test(t)) return match;
+        if (t.includes('\\')) return match;
+        if (t.toLowerCase() === 'explainer') return match; // Exclude Explainer agent signature
+        return `[${match}](citation://simple?text=${encodeURIComponent(t)})`;
     });
 
     return processed;
@@ -303,6 +306,10 @@ const ResearchChat = () => {
     const [isLLMDropdownOpen, setIsLLMDropdownOpen] = useState(false);
     const [messages, setMessages] = useState([]);
 
+    // Drafting Modal State
+    const [isDraftingOpen, setIsDraftingOpen] = useState(false);
+    const [draftingPrompt, setDraftingPrompt] = useState('');
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
@@ -511,6 +518,7 @@ const ResearchChat = () => {
                         fetchSessions();
                     },
                     onFollowups: (questions) => {
+                        console.log("Received followups:", questions);
                         aiFollowups = questions;
                         // Update message with followups
                         setMessages(prev => prev.map(m =>
@@ -518,12 +526,14 @@ const ResearchChat = () => {
                         ));
                     },
                     onSources: (sources) => {
+                        console.log("Received sources:", sources);
                         // Store sources for clickable citations
                         setMessages(prev => prev.map(m =>
                             m.id === aiMsgId ? { ...m, sources: sources } : m
                         ));
                     },
                     onDone: (event) => {
+                        console.log("Stream done:", event);
                         // Update with final metadata
                         setMessages(prev => prev.map(m =>
                             m.id === aiMsgId ? {
@@ -538,7 +548,7 @@ const ResearchChat = () => {
                         setMessages(prev => [...prev, {
                             id: aiMsgId,
                             role: 'ai',
-                            content: "I apologize, but I encountered an error. Please try again."
+                            content: error.message || "I apologize, but I encountered an error. Please try again."
                         }]);
                     }
                 });
@@ -857,6 +867,20 @@ const ResearchChat = () => {
                                     )}
 
                                     {/* Sources Reference */}
+                                    {/* Convert to Draft Button */}
+                                    {msg.role === 'ai' && !msg.isDeepThink && (
+                                        <button
+                                            onClick={() => {
+                                                setDraftingPrompt(`Draft the legal document required for: ${messages[index - 1]?.content || 'this query'}. Focus on drafting the actual legal papers.`);
+                                                setIsDraftingOpen(true);
+                                            }}
+                                            className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-800/50 transition-colors border border-purple-200 dark:border-purple-700 text-xs font-medium"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">edit_document</span>
+                                            Draft a document related to this query
+                                        </button>
+                                    )}
+
                                     {msg.sources && msg.sources.length > 0 && (
                                         <details className="mt-4 group">
                                             <summary className="cursor-pointer text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1">
@@ -1018,6 +1042,15 @@ const ResearchChat = () => {
                     </div>
                 </footer>
             </div>
+
+            {/* Drafting Modal */}
+            {isDraftingOpen && (
+                <DraftingModal
+                    isOpen={isDraftingOpen}
+                    onClose={() => setIsDraftingOpen(false)}
+                    initialPrompt={draftingPrompt}
+                />
+            )}
         </div>
     );
 };

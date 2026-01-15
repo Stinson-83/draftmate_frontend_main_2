@@ -48,12 +48,21 @@ class ManagerAgent(BaseAgent):
         case_ctx = state.get("case_context", [])
         case_str = "\n\n".join([f"Case: {c['title']}\nSummary: {c['summary']}" for c in case_ctx]) if case_ctx else "No specific cases found."
 
+        # Format Chat History
+        chat_history = state.get("messages", [])
+        history_str = ""
+        if chat_history:
+            # Get last 3 turns
+            recent = chat_history[-6:] 
+            history_str = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in recent])
+
         prompt = ChatPromptTemplate.from_template(ROUTER_PROMPT)
         chain = prompt | self.llm | JsonOutputParser()
         
         try:
             result = chain.invoke({
                 "query": original_query,
+                "chat_history": history_str,
                 "document_context": doc_str,
                 "law_context": law_str,
                 "case_context": case_str
@@ -314,13 +323,30 @@ class ManagerAgent(BaseAgent):
         # Add tool results (e.g. from Explainer or Research agent in complex mode)
         tool_results = state.get("tool_results", [])
         if tool_results:
-            context_str += "\n\n=== AGENT REPORTS ===\n"
+            context_str += "\n\n=== ADDITIONAL ANALYSIS ===\n"
+            agent_map = {
+                "research_agent": "Legal Research Findings",
+                "explainer": "Concept Explanation",
+                "law_agent": "Statutory Analysis",
+                "case_agent": "Case Law Analysis",
+                "citation_agent": "Citation Verification",
+                "strategy_agent": "Legal Strategy"
+            }
             for res in tool_results:
                 agent = res.get("agent", "Unknown Agent")
+                friendly_name = agent_map.get(agent, agent.replace("_", " ").title())
                 content = res.get("content", "")
                 if content:
-                    context_str += f"\n--- Report from {agent} ---\n{content}\n"
+                    context_str += f"\n--- {friendly_name} ---\n{content}\n"
         
+        # Format Chat History
+        chat_history = state.get("messages", [])
+        history_str = ""
+        if chat_history:
+            recent = chat_history[-6:]
+            history_str = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in recent])
+            context_str = f"=== CONVERSATION HISTORY ===\n{history_str}\n\n" + context_str
+
         # Choose prompt based on mode
         if llm_mode == "reasoning":
             # Chain-of-Thought prompt for reasoning mode
@@ -342,6 +368,7 @@ class ManagerAgent(BaseAgent):
             **Step 1: Understand the Query**
             - What is the user really asking?
             - What are the key legal issues involved?
+            - Consider the CONVERSATION HISTORY if this is a follow-up.
             
             **Step 2: Identify Relevant Law**
             - Which statutes, sections, or acts apply?
@@ -354,6 +381,8 @@ class ManagerAgent(BaseAgent):
             **Step 4: Synthesize**
             - Combine statutory and case law analysis.
             - Address any conflicts or nuances.
+            - **INTEGRATE** the findings from "Additional Analysis" (if any) naturally into your answer.
+            - **DO NOT** mention "Research Agent", "Explainer", or "Report" in your final output. Just use the information.
             
             **Step 5: Conclude**
             - Provide a clear, actionable answer.
@@ -381,6 +410,8 @@ class ManagerAgent(BaseAgent):
             
             Instructions:
             - Breakdown the query into aspects and answer each from the context.
+            - **INTEGRATE** any "Additional Analysis" naturally. DO NOT mention the source agents (e.g. "Research Agent") by name.
+            - Consider the CONVERSATION HISTORY if this is a follow-up.
             - Use PROPER INDIAN LEGAL CITATIONS:
               * Cases: Case Name, (Year) Volume Reporter Page (e.g., (2024) 5 SCC 123)
               * Statutes: Section X of Act Name, Year
@@ -394,8 +425,20 @@ class ManagerAgent(BaseAgent):
         chain = prompt | llm | StrOutputParser()
         answer = chain.invoke({"context": context_str, "query": state["original_query"]})
         
+        # Enrich sources with index for UI
+        enriched_sources = []
+        for i, doc in enumerate(top_docs, 1):
+            doc_copy = doc.copy()
+            doc_copy["index"] = i
+            doc_copy["type"] = doc.get("source", "Web")
+            enriched_sources.append(doc_copy)
+
         # For reasoning mode, extract the reasoning trace
-        result = {"final_answer": answer}
+        result = {
+            "final_answer": answer,
+            "sources": enriched_sources,
+            "suggested_followups": self._generate_followups(state["original_query"], answer)
+        }
         if llm_mode == "reasoning":
             result["reasoning_trace"] = answer  # Full CoT is the reasoning trace
         

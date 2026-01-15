@@ -1,0 +1,45 @@
+# Core Framework & Utilities
+fastapi
+uvicorn
+pydantic
+python-dotenv
+requests
+click
+colorama
+typing-extensions
+python-multipart
+python-dateutil
+six
+tqdm
+bcrypt
+
+# AI & LLM
+google-generativeai
+langchain
+langgraph
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-openai
+faiss-cpu
+mem0ai
+numpy
+
+# Database & Storage
+sqlalchemy
+psycopg2-binary
+pgvector
+boto3
+s3transfer
+
+# Other Heavy/Stable Dependencies
+grpcio
+grpcio-status
+opencv-python-headless
+protobuf
+proto-plus
+googleapis-common-protos
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-ai-generativelanguage

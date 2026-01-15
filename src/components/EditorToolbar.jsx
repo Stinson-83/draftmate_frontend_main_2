@@ -273,7 +273,7 @@ const EditorToolbar = ({
             </div>
             <div className="toolbar-divider"></div>
 
-            <div className="toolbar-group" style={{ flex: 2, padding: '0 16px', minWidth: '150px' }}>
+            <div className="toolbar-group" style={{ width: '140px' }}>
                 <input
                     type="text"
                     value={draftName || ''}
@@ -305,15 +305,12 @@ const EditorToolbar = ({
             <div className="toolbar-actions">
                 <button className="btn btn-primary btn-sm" onClick={onModify}>
                     <Wand2 size={16} style={{ marginRight: 8 }} />
-                    Modify Draft
+                    Modify
                 </button>
-                <button className="btn btn-ghost btn-sm" onClick={onSave}>
-                    <Save size={16} style={{ marginRight: 8 }} />
-                    Save
+                <button className="btn btn-ghost btn-sm" onClick={onSave} title="Save">
+                    <Save size={16} />
                 </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowPrintModal(true)} title="Print & Download Options">
-                    <Printer size={16} />
-                </button>
+
                 <div style={{ position: 'relative' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setShowExportMenu(!showExportMenu)}>
                         <Download size={16} />

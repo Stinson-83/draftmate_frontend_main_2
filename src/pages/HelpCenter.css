@@ -1,0 +1,12 @@
+/* src/pages/HelpCenter.css */
+details>summary {
+    list-style: none;
+}
+
+details>summary::-webkit-details-marker {
+    display: none;
+}
+
+details[open] .chevron-icon {
+    transform: rotate(180deg);
+}
