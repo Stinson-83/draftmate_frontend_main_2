@@ -50,14 +50,19 @@ from lex_bot.memory.chat_store import ChatStore
 from lex_bot.config import MEM0_ENABLED, DATABASE_URL
 from lex_bot.tools.session_cache import get_session_cache
 from lex_bot.core.observability import setup_langsmith
-from backend.query.sql import start_tunnel_and_pool, _get_tunneled_dsn
-
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)s | %(name)s | %(message)s'
 )
 logger = logging.getLogger("lex_bot.api")
+
+try:
+    from backend.query.sql import start_tunnel_and_pool, _get_tunneled_dsn
+except ImportError:
+    logger.warning("Could not import backend.query.sql. Using mock functions.")
+    def start_tunnel_and_pool(): pass
+    def _get_tunneled_dsn(): return None
 
 # Initialize stores
 chat_store = ChatStore()
@@ -613,3 +618,8 @@ async def list_sessions(user_id: str = Depends(verify_token), limit: int = 50):
         })
         
     return SessionListResponse(sessions=sessions, total=len(sessions))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8004)

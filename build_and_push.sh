@@ -3,7 +3,7 @@
 # Configuration
 AWS_REGION="us-east-1"
 ECR_REPO_NAME="draftmate-app" # Updated from screenshot
-IMAGE_TAG="v28"
+IMAGE_TAG="v29"
 # Load VITE_CLIENT_ID from .env safely
 if [ -f .env ]; then
   VITE_CLIENT_ID=$(grep "^VITE_CLIENT_ID=" .env | cut -d '=' -f2- | tr -d '"' | tr -d "'")

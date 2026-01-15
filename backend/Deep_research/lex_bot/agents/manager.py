@@ -48,12 +48,21 @@ class ManagerAgent(BaseAgent):
         case_ctx = state.get("case_context", [])
         case_str = "\n\n".join([f"Case: {c['title']}\nSummary: {c['summary']}" for c in case_ctx]) if case_ctx else "No specific cases found."
 
+        # Format Chat History
+        chat_history = state.get("messages", [])
+        history_str = ""
+        if chat_history:
+            # Get last 3 turns
+            recent = chat_history[-6:] 
+            history_str = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in recent])
+
         prompt = ChatPromptTemplate.from_template(ROUTER_PROMPT)
         chain = prompt | self.llm | JsonOutputParser()
         
         try:
             result = chain.invoke({
                 "query": original_query,
+                "chat_history": history_str,
                 "document_context": doc_str,
                 "law_context": law_str,
                 "case_context": case_str
@@ -330,6 +339,14 @@ class ManagerAgent(BaseAgent):
                 if content:
                     context_str += f"\n--- {friendly_name} ---\n{content}\n"
         
+        # Format Chat History
+        chat_history = state.get("messages", [])
+        history_str = ""
+        if chat_history:
+            recent = chat_history[-6:]
+            history_str = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in recent])
+            context_str = f"=== CONVERSATION HISTORY ===\n{history_str}\n\n" + context_str
+
         # Choose prompt based on mode
         if llm_mode == "reasoning":
             # Chain-of-Thought prompt for reasoning mode
@@ -351,6 +368,7 @@ class ManagerAgent(BaseAgent):
             **Step 1: Understand the Query**
             - What is the user really asking?
             - What are the key legal issues involved?
+            - Consider the CONVERSATION HISTORY if this is a follow-up.
             
             **Step 2: Identify Relevant Law**
             - Which statutes, sections, or acts apply?
@@ -393,6 +411,7 @@ class ManagerAgent(BaseAgent):
             Instructions:
             - Breakdown the query into aspects and answer each from the context.
             - **INTEGRATE** any "Additional Analysis" naturally. DO NOT mention the source agents (e.g. "Research Agent") by name.
+            - Consider the CONVERSATION HISTORY if this is a follow-up.
             - Use PROPER INDIAN LEGAL CITATIONS:
               * Cases: Case Name, (Year) Volume Reporter Page (e.g., (2024) 5 SCC 123)
               * Statutes: Section X of Act Name, Year
