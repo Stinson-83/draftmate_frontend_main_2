@@ -18,11 +18,16 @@ import {
     GripVertical, // for drag handle
     Printer, // for print
     FileOutput, // for PDF to Word
-    FilePlus2 // for Word to PDF
+    FilePlus2, // for Word to PDF
+    Image, // for image watermark
+    Save, // for save watermark
+    FolderOpen, // for load watermark
+    X // for close/delete
 } from 'lucide-react';
 import './PDFEditor.css';
 import { API_CONFIG } from '../services/endpoints';
 import PrintModal from '../components/PrintModal';
+import { useWatermarkStorage } from '../hooks/useWatermarkStorage';
 
 const API_URL = API_CONFIG.PDF_EDITOR_API.BASE_URL;
 
@@ -65,6 +70,18 @@ const PDFEditor = () => {
     const [watermarkRotation, setWatermarkRotation] = useState(45);
     const [watermarkScale, setWatermarkScale] = useState(1.0);
 
+    // Enhanced Watermark State
+    const [watermarkType, setWatermarkType] = useState('text'); // 'text', 'image', 'both'
+    const [watermarkImage, setWatermarkImage] = useState(null); // File object
+    const [watermarkImagePreview, setWatermarkImagePreview] = useState(null); // Data URL for preview
+    const [watermarkColorMode, setWatermarkColorMode] = useState('grayscale'); // 'original', 'grayscale', 'bw'
+    const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [saveWatermarkName, setSaveWatermarkName] = useState('');
+    const [showSavedDropdown, setShowSavedDropdown] = useState(false);
+
+    // Watermark Storage Hook
+    const { savedWatermarks, saveWatermark, deleteWatermark, getWatermark } = useWatermarkStorage();
+
     // Page Numbering State
     const [pageNumFormat, setPageNumFormat] = useState('number'); // 'number', 'page-of', 'roman'
     const [pageNumPosition, setPageNumPosition] = useState('bottom-center'); // 'top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right'
@@ -77,6 +94,7 @@ const PDFEditor = () => {
     const [showPrintModal, setShowPrintModal] = useState(false);
 
     const fileInputRef = useRef(null);
+    const watermarkImageInputRef = useRef(null);
     const dragItem = useRef(null);
     const dragOverItem = useRef(null);
     const mainScrollRef = useRef(null);
@@ -121,6 +139,109 @@ const PDFEditor = () => {
 
         return () => observer.disconnect();
     }, [pages]);
+
+    // --- Watermark Image Handling ---
+
+    const handleWatermarkImageChange = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please upload an image file (PNG, JPG, etc.)');
+            return;
+        }
+
+        // Check file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image size should be less than 5MB');
+            return;
+        }
+
+        setWatermarkImage(file);
+
+        // Create preview URL
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setWatermarkImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+
+        // Auto-switch to image type if currently on text
+        if (watermarkType === 'text') {
+            setWatermarkType('image');
+        }
+    };
+
+    const clearWatermarkImage = () => {
+        setWatermarkImage(null);
+        setWatermarkImagePreview(null);
+        if (watermarkImageInputRef.current) {
+            watermarkImageInputRef.current.value = '';
+        }
+        if (watermarkType === 'image') {
+            setWatermarkType('text');
+        }
+    };
+
+    const handleSaveWatermark = () => {
+        if (!saveWatermarkName.trim()) {
+            toast.error('Please enter a name for the watermark');
+            return;
+        }
+
+        saveWatermark({
+            name: saveWatermarkName.trim(),
+            type: watermarkType,
+            text: watermarkText,
+            imageDataUrl: watermarkImagePreview,
+            colorMode: watermarkColorMode,
+            opacity: watermarkOpacity,
+            rotation: watermarkRotation,
+            scale: watermarkScale,
+        });
+
+        toast.success('Watermark saved!');
+        setShowSaveDialog(false);
+        setSaveWatermarkName('');
+    };
+
+    const handleLoadWatermark = (wm) => {
+        setWatermarkType(wm.type);
+        setWatermarkText(wm.text || 'CONFIDENTIAL');
+        setWatermarkImagePreview(wm.imageDataUrl);
+        setWatermarkColorMode(wm.colorMode || 'grayscale');
+        setWatermarkOpacity(wm.opacity ?? 0.3);
+        setWatermarkRotation(wm.rotation ?? 45);
+        setWatermarkScale(wm.scale ?? 1.0);
+
+        // If there's an image, we need to convert dataURL back to File for upload
+        if (wm.imageDataUrl) {
+            fetch(wm.imageDataUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    const file = new File([blob], 'watermark.png', { type: 'image/png' });
+                    setWatermarkImage(file);
+                });
+        } else {
+            setWatermarkImage(null);
+        }
+
+        setShowSavedDropdown(false);
+        toast.success(`Loaded: ${wm.name}`);
+    };
+
+    // Get CSS filter for color mode preview
+    const getColorModeFilter = () => {
+        switch (watermarkColorMode) {
+            case 'grayscale':
+                return 'grayscale(100%)';
+            case 'bw':
+                return 'grayscale(100%) contrast(200%)';
+            default:
+                return 'none';
+        }
+    };
 
     // --- File Handling ---
 
@@ -324,10 +445,21 @@ const PDFEditor = () => {
                 // For watermark, we need the raw file. 
                 if (rawFiles.length === 0) throw new Error("No file loaded");
                 formData.append('file', rawFiles[0]);
-                formData.append('text', watermarkText);
+                formData.append('watermark_type', watermarkType);
                 formData.append('opacity', watermarkOpacity.toString());
                 formData.append('rotation', watermarkRotation.toString());
                 formData.append('scale', watermarkScale.toString());
+                formData.append('color_mode', watermarkColorMode);
+
+                // Add text if type is 'text' or 'both'
+                if (watermarkType === 'text' || watermarkType === 'both') {
+                    formData.append('text', watermarkText);
+                }
+
+                // Add image if type is 'image' or 'both'
+                if ((watermarkType === 'image' || watermarkType === 'both') && watermarkImage) {
+                    formData.append('image', watermarkImage);
+                }
 
             } else if (activeTool.mode === MODES.BUILDER) {
                 endpoint = '/assemble';
@@ -607,48 +739,199 @@ const PDFEditor = () => {
                             </div>
                         </div>
 
-                        {/* Watermark Tools Panel */}
+                        {/* Enhanced Watermark Tools Panel */}
                         {activeTool.id === 'watermark' && (
-                            <div className="watermark-toolbar">
-                                <div className="tool-group">
-                                    <label>Text</label>
-                                    <input
-                                        type="text"
-                                        value={watermarkText}
-                                        onChange={(e) => setWatermarkText(e.target.value)}
-                                        className="tool-input-text"
-                                    />
+                            <div className="watermark-toolbar enhanced">
+                                {/* Type Selector Tabs */}
+                                <div className="watermark-type-tabs">
+                                    {['text', 'image', 'both'].map(type => (
+                                        <button
+                                            key={type}
+                                            className={`type-tab ${watermarkType === type ? 'active' : ''}`}
+                                            onClick={() => setWatermarkType(type)}
+                                        >
+                                            {type === 'text' && <><Stamp size={14} /> Text</>}
+                                            {type === 'image' && <><Image size={14} /> Image</>}
+                                            {type === 'both' && <><Layers size={14} /> Both</>}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="tool-divider"></div>
-                                <div className="tool-group">
-                                    <label>Opacity ({watermarkOpacity})</label>
-                                    <input
-                                        type="range" min="0.1" max="1.0" step="0.1"
-                                        value={watermarkOpacity}
-                                        onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
-                                        className="tool-slider"
-                                    />
+
+                                <div className="watermark-controls-row">
+                                    {/* Left: Text/Image Input Area */}
+                                    <div className="watermark-input-area">
+                                        {(watermarkType === 'text' || watermarkType === 'both') && (
+                                            <div className="tool-group">
+                                                <label>Watermark Text</label>
+                                                <input
+                                                    type="text"
+                                                    value={watermarkText}
+                                                    onChange={(e) => setWatermarkText(e.target.value)}
+                                                    className="tool-input-text"
+                                                    placeholder="e.g. CONFIDENTIAL"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {(watermarkType === 'image' || watermarkType === 'both') && (
+                                            <div className="tool-group image-upload-group">
+                                                <label>Logo / Image</label>
+                                                <div
+                                                    className={`image-upload-zone ${watermarkImagePreview ? 'has-image' : ''}`}
+                                                    onClick={() => watermarkImageInputRef.current?.click()}
+                                                >
+                                                    {watermarkImagePreview ? (
+                                                        <div className="image-preview-container">
+                                                            <img
+                                                                src={watermarkImagePreview}
+                                                                alt="Watermark preview"
+                                                                style={{ filter: getColorModeFilter() }}
+                                                            />
+                                                            <button
+                                                                className="clear-image-btn"
+                                                                onClick={(e) => { e.stopPropagation(); clearWatermarkImage(); }}
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="upload-placeholder">
+                                                            <Upload size={20} />
+                                                            <span>Click to upload logo</span>
+                                                            <span className="hint">PNG, JPG (max 5MB)</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    ref={watermarkImageInputRef}
+                                                    accept="image/*"
+                                                    hidden
+                                                    onChange={handleWatermarkImageChange}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Middle: Color Mode & Settings */}
+                                    <div className="watermark-settings-area">
+                                        {(watermarkType === 'image' || watermarkType === 'both') && (
+                                            <div className="tool-group">
+                                                <label>Color Mode</label>
+                                                <select
+                                                    value={watermarkColorMode}
+                                                    onChange={(e) => setWatermarkColorMode(e.target.value)}
+                                                    className="tool-select"
+                                                >
+                                                    <option value="original">Original Color</option>
+                                                    <option value="grayscale">Grayscale</option>
+                                                    <option value="bw">Black & White</option>
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        <div className="tool-group">
+                                            <label>Opacity ({Math.round(watermarkOpacity * 100)}%)</label>
+                                            <input
+                                                type="range" min="0.1" max="1.0" step="0.1"
+                                                value={watermarkOpacity}
+                                                onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
+                                                className="tool-slider"
+                                            />
+                                        </div>
+
+                                        <div className="tool-group">
+                                            <label>Rotation ({watermarkRotation}°)</label>
+                                            <input
+                                                type="range" min="0" max="360" step="15"
+                                                value={watermarkRotation}
+                                                onChange={(e) => setWatermarkRotation(parseInt(e.target.value))}
+                                                className="tool-slider"
+                                            />
+                                        </div>
+
+                                        <div className="tool-group">
+                                            <label>Scale ({Math.round(watermarkScale * 100)}%)</label>
+                                            <input
+                                                type="range" min="0.05" max="1.0" step="0.05"
+                                                value={watermarkScale}
+                                                onChange={(e) => setWatermarkScale(parseFloat(e.target.value))}
+                                                className="tool-slider"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Save/Load Actions */}
+                                    <div className="watermark-actions-area">
+                                        <div className="action-buttons">
+                                            <button
+                                                className="action-btn save-btn"
+                                                onClick={() => setShowSaveDialog(true)}
+                                                title="Save for later"
+                                            >
+                                                <Save size={16} />
+                                                Save
+                                            </button>
+
+                                            <div className="saved-dropdown-container">
+                                                <button
+                                                    className="action-btn load-btn"
+                                                    onClick={() => setShowSavedDropdown(!showSavedDropdown)}
+                                                    disabled={savedWatermarks.length === 0}
+                                                    title="Load saved watermark"
+                                                >
+                                                    <FolderOpen size={16} />
+                                                    Saved ({savedWatermarks.length})
+                                                </button>
+
+                                                {showSavedDropdown && savedWatermarks.length > 0 && (
+                                                    <div className="saved-dropdown">
+                                                        {savedWatermarks.map(wm => (
+                                                            <div key={wm.id} className="saved-item">
+                                                                <button
+                                                                    className="saved-item-btn"
+                                                                    onClick={() => handleLoadWatermark(wm)}
+                                                                >
+                                                                    {wm.type === 'image' && <Image size={12} />}
+                                                                    {wm.type === 'text' && <Stamp size={12} />}
+                                                                    {wm.type === 'both' && <Layers size={12} />}
+                                                                    <span>{wm.name}</span>
+                                                                </button>
+                                                                <button
+                                                                    className="delete-saved-btn"
+                                                                    onClick={() => deleteWatermark(wm.id)}
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="tool-divider"></div>
-                                <div className="tool-group">
-                                    <label>Rotation ({watermarkRotation}°)</label>
-                                    <input
-                                        type="range" min="0" max="360" step="5"
-                                        value={watermarkRotation}
-                                        onChange={(e) => setWatermarkRotation(parseInt(e.target.value))}
-                                        className="tool-slider"
-                                    />
-                                </div>
-                                <div className="tool-divider"></div>
-                                <div className="tool-group">
-                                    <label>Scale ({watermarkScale}x)</label>
-                                    <input
-                                        type="range" min="0.05" max="1.0" step="0.05"
-                                        value={watermarkScale}
-                                        onChange={(e) => setWatermarkScale(parseFloat(e.target.value))}
-                                        className="tool-slider"
-                                    />
-                                </div>
+
+                                {/* Save Dialog Modal */}
+                                {showSaveDialog && (
+                                    <div className="save-dialog-overlay" onClick={() => setShowSaveDialog(false)}>
+                                        <div className="save-dialog" onClick={e => e.stopPropagation()}>
+                                            <h4>Save Watermark</h4>
+                                            <input
+                                                type="text"
+                                                placeholder="Enter a name..."
+                                                value={saveWatermarkName}
+                                                onChange={(e) => setSaveWatermarkName(e.target.value)}
+                                                className="save-input"
+                                                autoFocus
+                                            />
+                                            <div className="save-dialog-actions">
+                                                <button onClick={() => setShowSaveDialog(false)}>Cancel</button>
+                                                <button className="primary" onClick={handleSaveWatermark}>Save</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -741,7 +1024,7 @@ const PDFEditor = () => {
                                             />
 
                                             {/* Watermark Preview Overlay */}
-                                            {activeTool.id === 'watermark' && watermarkText && (
+                                            {activeTool.id === 'watermark' && (
                                                 <div
                                                     style={{
                                                         position: 'absolute',
@@ -750,18 +1033,42 @@ const PDFEditor = () => {
                                                         transform: `translate(-50%, -50%) rotate(${watermarkRotation}deg)`,
                                                         opacity: watermarkOpacity,
                                                         pointerEvents: 'none',
-                                                        color: 'rgba(0,0,0,0.5)',
-                                                        // Unified Logic: Font Size = Page Width * Scale
-                                                        // Page Width in Preview = 800 * zoomLevel
-                                                        fontSize: `${(800 * zoomLevel) * watermarkScale}px`,
-                                                        fontWeight: 'bold',
-                                                        whiteSpace: 'nowrap',
                                                         zIndex: 10,
-                                                        textAlign: 'center',
-                                                        textShadow: '0 0 2px rgba(255,255,255,0.5)'
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        gap: '10px'
                                                     }}
                                                 >
-                                                    {watermarkText}
+                                                    {/* Image Watermark */}
+                                                    {(watermarkType === 'image' || watermarkType === 'both') && watermarkImagePreview && (
+                                                        <img
+                                                            src={watermarkImagePreview}
+                                                            alt="Watermark"
+                                                            style={{
+                                                                maxWidth: `${300 * zoomLevel * watermarkScale}px`,
+                                                                maxHeight: `${200 * zoomLevel * watermarkScale}px`,
+                                                                objectFit: 'contain',
+                                                                filter: getColorModeFilter()
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {/* Text Watermark */}
+                                                    {(watermarkType === 'text' || watermarkType === 'both') && watermarkText && (
+                                                        <div
+                                                            style={{
+                                                                color: 'rgba(0,0,0,0.5)',
+                                                                fontSize: `${(800 * zoomLevel) * watermarkScale * 0.15}px`,
+                                                                fontWeight: 'bold',
+                                                                whiteSpace: 'nowrap',
+                                                                textAlign: 'center',
+                                                                textShadow: '0 0 2px rgba(255,255,255,0.5)'
+                                                            }}
+                                                        >
+                                                            {watermarkText}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
 

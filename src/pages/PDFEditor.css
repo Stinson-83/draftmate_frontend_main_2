@@ -366,7 +366,7 @@
     outline: none;
 }
 
-/* Watermark Toolbar */
+/* Watermark Toolbar - Enhanced */
 .watermark-toolbar {
     background: white;
     padding: 0.75rem 1.5rem;
@@ -375,6 +375,356 @@
     gap: 1.5rem;
     border-bottom: 1px solid var(--border);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.watermark-toolbar.enhanced {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem 1.5rem;
+    gap: 1rem;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
+    backdrop-filter: blur(10px);
+}
+
+/* Watermark Type Tabs */
+.watermark-type-tabs {
+    display: flex;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.type-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: white;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.type-tab:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.type-tab.active {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* Watermark Controls Row */
+.watermark-controls-row {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.watermark-input-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 200px;
+}
+
+.watermark-settings-area {
+    flex: 1.5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.watermark-settings-area .tool-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+}
+
+.watermark-actions-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 140px;
+}
+
+/* Image Upload Zone */
+.image-upload-group {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.image-upload-zone {
+    width: 100%;
+    min-height: 100px;
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(248, 250, 252, 0.5);
+}
+
+.image-upload-zone:hover {
+    border-color: var(--primary);
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.image-upload-zone.has-image {
+    border-style: solid;
+    border-color: var(--primary);
+    background: white;
+    padding: 0.5rem;
+}
+
+.upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    padding: 1rem;
+}
+
+.upload-placeholder span {
+    font-size: 0.85rem;
+}
+
+.upload-placeholder .hint {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.image-preview-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-preview-container img {
+    max-width: 180px;
+    max-height: 100px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.clear-image-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #ef4444;
+    color: white;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s;
+}
+
+.clear-image-btn:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text-main);
+}
+
+.action-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.action-btn.save-btn:hover {
+    border-color: #10b981;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+}
+
+/* Saved Watermarks Dropdown */
+.saved-dropdown-container {
+    position: relative;
+}
+
+.saved-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 0.25rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.saved-item {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.saved-item:last-child {
+    border-bottom: none;
+}
+
+.saved-item-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    transition: background 0.15s;
+}
+
+.saved-item-btn:hover {
+    background: rgba(37, 99, 235, 0.05);
+}
+
+.saved-item-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.delete-saved-btn {
+    padding: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.delete-saved-btn:hover {
+    color: #ef4444;
+}
+
+/* Save Dialog Modal */
+.save-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.save-dialog {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    width: 320px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.save-dialog h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    color: var(--text-main);
+}
+
+.save-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s;
+}
+
+.save-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.save-dialog-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.save-dialog-actions button {
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text-main);
+}
+
+.save-dialog-actions button:hover {
+    background: var(--surface-hover);
+}
+
+.save-dialog-actions button.primary {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: transparent;
+    color: white;
+}
+
+.save-dialog-actions button.primary:hover {
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .tool-group {
@@ -392,10 +742,16 @@
 
 .tool-input-text {
     border: 1px solid var(--border);
-    padding: 0.3rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
     font-size: 0.9rem;
-    width: 200px;
+    width: 100%;
+    transition: border-color 0.2s;
+}
+
+.tool-input-text:focus {
+    outline: none;
+    border-color: var(--primary);
 }
 
 .tool-slider {

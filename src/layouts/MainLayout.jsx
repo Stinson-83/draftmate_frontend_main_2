@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import './MainLayout.css';
 import smallLogo from '../assets/draftmate_logo.png';
 import fullLogo from '../assets/FULL_LOGO.svg';
+import { useNotifications } from '../context/NotificationContext';
 
 const MainLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
 
   const isActive = (path) => location.pathname === path;
 
@@ -91,12 +94,21 @@ const MainLayout = () => {
           {/* Support & Utility */}
           <div className={`w-full pt-4 border-t border-slate-200 dark:border-slate-800 ${isCollapsed ? 'px-1' : ''}`}>
             <div className={`flex items-center gap-2 ${isCollapsed ? 'flex-col space-y-2' : 'px-2'}`}>
-              <button
-                className={`flex items-center justify-center p-2.5 rounded-lg transition-colors group text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white border border-transparent hover:border-slate-200 dark:hover:border-slate-700 ${isCollapsed ? '' : 'flex-1'}`}
+              <Link
+                to="/dashboard/notifications"
+                className={`relative flex items-center justify-center p-2.5 rounded-lg transition-colors group text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white border border-transparent hover:border-slate-200 dark:hover:border-slate-700 ${isCollapsed ? '' : 'flex-1'}`}
                 title="Notifications"
               >
                 <span className="material-symbols-outlined text-xl">notifications</span>
-              </button>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 text-[8px] font-bold text-white items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  </span>
+                )}
+              </Link>
 
               <Link
                 to="/dashboard/help"
@@ -161,9 +173,20 @@ const MainLayout = () => {
           <div className="flex items-center gap-6">
             {location.pathname === '/dashboard/home' && (
               <>
-                <button className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+                <Link
+                  to="/dashboard/notifications"
+                  className="relative text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                >
                   <span className="material-symbols-outlined text-[22px]">notifications</span>
-                </button>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 text-[8px] font-bold text-white items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    </span>
+                  )}
+                </Link>
                 <Link to="/dashboard/help" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
                   Help Center
                 </Link>

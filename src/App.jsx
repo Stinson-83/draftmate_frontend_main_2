@@ -34,6 +34,8 @@ import Landing from './pages/Landing';
 import Features from './pages/Features';
 import HowItWorks from './pages/HowItWorks';
 import ComingSoon from './pages/ComingSoon';
+import NotificationsComingSoon from './pages/NotificationsComingSoon';
+import { NotificationProvider } from './context/NotificationContext';
 
 function App() {
   // Check if user has onboarded (simple check)
@@ -63,40 +65,43 @@ function App() {
 
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_CLIENT_ID}>
-      <BrowserRouter>
-        <Toaster position="top-center" richColors />
-        <Routes>
-          <Route path="/" element={<Landing />} />
+      <NotificationProvider>
+        <BrowserRouter>
+          <Toaster position="top-center" richColors />
+          <Routes>
+            <Route path="/" element={<Landing />} />
 
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/onboarding" element={<Onboarding />} />
 
-          {/* Public pages */}
-          <Route path="/features" element={<Features />} />
-          <Route path="/how-it-works" element={<HowItWorks />} />
-          <Route path="/blogs" element={<ComingSoon title="Blog" />} />
+            {/* Public pages */}
+            <Route path="/features" element={<Features />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/blogs" element={<ComingSoon title="Blog" />} />
 
-          <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
+            <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
 
-          <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
-            <Route path="home" element={<Dashboard />} />
-            <Route path="editor" element={<Editor />} />
-            <Route path="pdf-editor" element={<PDFEditor />} />
-            <Route path="tools" element={<Tools />} />
-            <Route path="drafts" element={<MyDrafts />} />
-            <Route path="research" element={<ResearchChat />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="help" element={<HelpCenter />} />
-            <Route path="chat" element={<Placeholder title="AI Chat" />} />
-            {/* Catch-all relative to dashboard */}
-            <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
-          </Route>
+            <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
+              <Route path="home" element={<Dashboard />} />
+              <Route path="editor" element={<Editor />} />
+              <Route path="pdf-editor" element={<PDFEditor />} />
+              <Route path="tools" element={<Tools />} />
+              <Route path="drafts" element={<MyDrafts />} />
+              <Route path="research" element={<ResearchChat />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="help" element={<HelpCenter />} />
+              <Route path="notifications" element={<NotificationsComingSoon />} />
+              <Route path="chat" element={<Placeholder title="AI Chat" />} />
+              {/* Catch-all relative to dashboard */}
+              <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
+            </Route>
 
-          {/* Global catch-all redirect to Landing */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            {/* Global catch-all redirect to Landing */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </NotificationProvider>
     </GoogleOAuthProvider>
   );
 }
