@@ -1,6 +1,7 @@
 import { API_CONFIG } from './endpoints';
 
 const API_BASE_URL = API_CONFIG.LEX_BOT.BASE_URL;
+const NOTIFICATION_BASE_URL = 'http://localhost:8015';
 
 export const api = {
     /**
@@ -211,6 +212,31 @@ export const api = {
             throw new Error(`Failed to fetch session history: ${response.status}`);
         }
 
+        return response.json();
+    },
+
+    /**
+     * Send email notification for calendar event.
+     * @param {string} toEmail - Recipient email
+     * @param {string} subject - Email subject
+     * @param {string} body - Email body
+     */
+    sendEmailNotification: async (toEmail, subject, body) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/send-email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                to_email: toEmail,
+                subject: subject,
+                body: body
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to send email notification');
+        }
         return response.json();
     }
 };

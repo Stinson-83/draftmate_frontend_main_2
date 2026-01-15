@@ -32,6 +32,7 @@ const EditorToolbar = ({
     const [showLinkInput, setShowLinkInput] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
     const [showPrintModal, setShowPrintModal] = useState(false);
+    const [showSaveMenu, setShowSaveMenu] = useState(false);
 
     const handleInsertLink = () => {
         if (linkUrl) {
@@ -307,9 +308,49 @@ const EditorToolbar = ({
                     <Wand2 size={16} style={{ marginRight: 8 }} />
                     Modify
                 </button>
-                <button className="btn btn-ghost btn-sm" onClick={onSave} title="Save">
-                    <Save size={16} />
-                </button>
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShowSaveMenu(!showSaveMenu)}
+                        title="Save options"
+                    >
+                        <Save size={16} />
+                    </button>
+                    {showSaveMenu && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 8, padding: 4, zIndex: 60, minWidth: 140, display: 'flex', flexDirection: 'column' }}>
+                            {['Started', 'In progress', 'Completed', 'Review'].map(status => {
+                                let color = '#94a3b8';
+                                if (status === 'In progress') color = '#facc15';
+                                if (status === 'Completed') color = '#22c55e';
+                                if (status === 'Review') color = '#60a5fa';
+
+                                return (
+                                    <button
+                                        key={status}
+                                        onClick={() => { onSave(status); setShowSaveMenu(false); }}
+                                        style={{
+                                            textAlign: 'left',
+                                            padding: '8px 12px',
+                                            fontSize: '0.85rem',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#334155',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                        className="hover:bg-slate-100 dark:hover:bg-slate-700 dark:text-slate-200"
+                                    >
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }}></span>
+                                        {status}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
 
                 <div style={{ position: 'relative' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setShowExportMenu(!showExportMenu)}>

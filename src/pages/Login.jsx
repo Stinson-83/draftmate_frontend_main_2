@@ -69,10 +69,18 @@ const Login = () => {
 
                 localStorage.setItem('session_id', data.session_id);
                 localStorage.setItem('user_id', data.user_id);
-                // We don't have email in response unless we modify backend to return it or decode token.
-                // But let's set a dummy profile or fetch it? 
-                // For now, let's just set a truthy profile to pass RequireAuth.
-                localStorage.setItem('user_profile', JSON.stringify({ id: data.user_id, google: true }));
+
+                // Save profile from backend response
+                const profileData = {
+                    id: data.user_id,
+                    email: data.email,
+                    name: data.name,
+                    image: data.picture,
+                    firstName: data.name ? data.name.split(' ')[0] : '',
+                    lastName: data.name ? data.name.split(' ').slice(1).join(' ') : '',
+                    google: true
+                };
+                localStorage.setItem('user_profile', JSON.stringify(profileData));
 
                 toast.dismiss(loadingToast);
                 toast.success("Welcome back!");

@@ -41,12 +41,63 @@ const Dashboard = () => {
     const dateStr = currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
 
-    const [activeDescriptions] = useState([
-        { title: "Brief for Smith v. Jones", ref: "#CASE-2023-89", modified: "Oct 24, 10:30 AM", status: "Drafting", statusColor: "yellow" },
-        { title: "Merger Agreement - TechCorp", ref: "#CASE-2023-44", modified: "Oct 23, 4:15 PM", status: "Review", statusColor: "blue" },
-        { title: "Motion to Dismiss", ref: "#CASE-2023-102", modified: "Oct 22, 09:00 AM", status: "Final", statusColor: "green" },
-        { title: "Discovery Request - Estate", ref: "#CASE-2023-55", modified: "Oct 21, 2:45 PM", status: "Overdue", statusColor: "red" },
-    ]);
+    const [allDrafts, setAllDrafts] = useState([]);
+    const [showAll, setShowAll] = useState(false);
+
+    React.useEffect(() => {
+        const loadDrafts = () => {
+            try {
+                const savedDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+
+                // Sort by lastModified (newest first)
+                const sortedDrafts = savedDrafts.sort((a, b) =>
+                    new Date(b.lastModified) - new Date(a.lastModified)
+                );
+
+                // Process all drafts
+                const processedDrafts = sortedDrafts.map(draft => {
+                    const status = draft.status || 'In progress';
+                    let statusColor = 'yellow';
+
+                    if (status === 'Started') statusColor = 'gray';
+                    else if (status === 'In progress') statusColor = 'yellow';
+                    else if (status === 'Review') statusColor = 'blue';
+                    else if (status === 'Completed') statusColor = 'green';
+                    else if (status === 'Overdue') statusColor = 'red';
+
+                    return {
+                        id: draft.id,
+                        title: draft.name || "Untitled Draft",
+                        modified: new Date(draft.lastModified).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        }),
+                        status: status,
+                        statusColor: statusColor,
+                        // Data needed for editor
+                        content: draft.content,
+                        placeholders: draft.placeholders,
+                        rawName: draft.name
+                    };
+                });
+
+                setAllDrafts(processedDrafts);
+            } catch (error) {
+                console.error("Failed to load drafts for dashboard", error);
+                setAllDrafts([]);
+            }
+        };
+
+        loadDrafts();
+
+        // Listen for updates
+        window.addEventListener('storage', loadDrafts);
+        return () => window.removeEventListener('storage', loadDrafts);
+    }, []);
+
+    const visibleDrafts = showAll ? allDrafts : allDrafts.slice(0, 5);
 
     const renderStatusBadge = (status, color) => {
         const colorClasses = {
@@ -54,6 +105,7 @@ const Dashboard = () => {
             blue: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
             green: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
             red: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+            gray: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300",
         };
 
         return (
@@ -61,6 +113,19 @@ const Dashboard = () => {
                 {status}
             </span>
         );
+    };
+
+    const handleEditDraft = (draft) => {
+        navigate('/dashboard/editor', {
+            state: {
+                htmlContent: draft.content,
+                placeholders: draft.placeholders || [],
+                uploadDetails: `Draft: ${draft.rawName}`,
+                isEmpty: false,
+                isSavedDraft: true,
+                id: draft.id
+            }
+        });
     };
 
     return (
@@ -94,30 +159,33 @@ const Dashboard = () => {
                             <div className="bg-white dark:bg-[#151f2e] rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-full">
                                 <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Active Descriptions</h3>
-                                    <button className="text-sm font-medium text-primary hover:underline">View All</button>
+                                    <button
+                                        onClick={() => setShowAll(!showAll)}
+                                        className="text-sm font-medium text-primary hover:underline"
+                                    >
+                                        {showAll ? 'Show Less' : 'View All'}
+                                    </button>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
                                         <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800/50">
                                             <tr>
                                                 <th className="px-6 py-3 font-medium" scope="col">Document Title</th>
-                                                <th className="px-6 py-3 font-medium" scope="col">Case Ref</th>
                                                 <th className="px-6 py-3 font-medium" scope="col">Last Modified</th>
                                                 <th className="px-6 py-3 font-medium" scope="col">Status</th>
                                                 <th className="px-6 py-3 font-medium text-right" scope="col">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {activeDescriptions.map((item, index) => (
+                                            {visibleDrafts.map((item, index) => (
                                                 <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                                     <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{item.title}</td>
-                                                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.ref}</td>
                                                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.modified}</td>
                                                     <td className="px-6 py-4">
                                                         {renderStatusBadge(item.status, item.statusColor)}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <ActionButton onClick={() => { }} />
+                                                        <ActionButton onClick={() => handleEditDraft(item)} />
                                                     </td>
                                                 </tr>
                                             ))}

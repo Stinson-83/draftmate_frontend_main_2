@@ -4,7 +4,27 @@ import { toast } from 'sonner';
 const CalendarWidget = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [events, setEvents] = useState({});
+    // Get User Email for Unique Storage Key
+    const getUserKey = () => {
+        try {
+            const userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+            return userProfile.email ? `${userProfile.email}_calendar_events` : 'guest_calendar_events';
+        } catch {
+            return 'guest_calendar_events';
+        }
+    };
+
+    // Initialize events from localStorage (Lazy initialization to prevent overwrite)
+    const [events, setEvents] = useState(() => {
+        try {
+            const key = getUserKey();
+            const saved = localStorage.getItem(key);
+            return saved ? JSON.parse(saved) : {};
+        } catch (error) {
+            console.error("Failed to load calendar events:", error);
+            return {};
+        }
+    });
     const [showEventModal, setShowEventModal] = useState(false);
     const [newEvent, setNewEvent] = useState({
         title: '',
@@ -14,17 +34,78 @@ const CalendarWidget = () => {
     });
     const [editingEventId, setEditingEventId] = useState(null);
 
-    // Load events from localStorage on mount
-    useEffect(() => {
-        const savedEvents = localStorage.getItem('calendar_events');
-        if (savedEvents) {
-            setEvents(JSON.parse(savedEvents));
-        }
-    }, []);
-
     // Save events to localStorage whenever they change
     useEffect(() => {
-        localStorage.setItem('calendar_events', JSON.stringify(events));
+        const key = getUserKey();
+        localStorage.setItem(key, JSON.stringify(events));
+    }, [events]);
+
+    // Polling for notifications (every 60s)
+    useEffect(() => {
+        const checkReminders = async () => {
+            const now = new Date();
+            const upcomingThreshold = 5 * 60 * 1000; // 5 minutes
+
+            // Flatten events and check
+            Object.values(events).flat().forEach(async event => {
+                if (!event.reminder || !event.time) return;
+
+                // Check if already notified
+                const notifiedKey = `notified_${event.id}`;
+                if (localStorage.getItem(notifiedKey)) return;
+
+                // Parse event time
+                const [hours, minutes] = event.time.split(':').map(Number);
+                const eventDateKey = Object.keys(events).find(key => events[key].some(e => e.id === event.id));
+                if (!eventDateKey) return;
+
+                const eventDate = new Date(eventDateKey);
+                eventDate.setHours(hours, minutes, 0, 0);
+
+                const diff = eventDate.getTime() - now.getTime();
+
+                // If event is within next 5 mins (and not passed)
+                if (diff > 0 && diff <= upcomingThreshold) {
+                    try {
+                        // Get user email from profile
+                        const userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+                        const userEmail = userProfile.email;
+
+                        if (userEmail) {
+                            // Import api (dynamic due to scoping, or assume global import available)
+                            // Ideally, we import 'api' at the top. I will use window.api or just standard fetch if import is tricky, 
+                            // but here I will assume 'api' needs to be imported. 
+                            // Wait, I can't easily add import at top with this tool without overwriting.
+                            // I will use the imported 'api' if I can ensure it is imported.
+                            // Let's assume I need to add the import to the top of the file separately.
+
+                            // Using direct fetch for simplicity if import is not present, BUT I should add the import.
+                            // Investigating file content... I see no 'api' import. I must add it.
+
+                            // Marking as notified immediately to avoid double firing
+                            localStorage.setItem(notifiedKey, 'true');
+
+                            // Send Notification
+                            const { api } = await import('../services/api');
+                            await api.sendEmailNotification(
+                                userEmail,
+                                `Reminder: ${event.title}`,
+                                `This is your Reminder from DraftMate: Your event "${event.title}" is starting at ${event.time}, reminder type- "${event.type}"`
+                            );
+
+                            toast.success(`Reminder sent for: ${event.title}`);
+                        }
+                    } catch (error) {
+                        console.error("Failed to send reminder:", error);
+                    }
+                }
+            });
+        };
+
+        const interval = setInterval(checkReminders, 60000); // Check every minute
+        checkReminders(); // Initial check
+
+        return () => clearInterval(interval);
     }, [events]);
 
     const getDaysInMonth = (date) => {

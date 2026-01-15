@@ -267,7 +267,14 @@ def google_login(model: GoogleLoginModel):
         )
         conn.commit()
         
-        return {"message": "Google login successful", "session_id": session_id, "user_id": user_id}
+        return {
+            "message": "Google login successful", 
+            "session_id": session_id, 
+            "user_id": user_id,
+            "email": email,
+            "name": id_info.get('name') if 'id_info' in locals() else user_info.get('name'),
+            "picture": id_info.get('picture') if 'id_info' in locals() else user_info.get('picture')
+        }
         
     except ValueError as e:
          print(f"Token verification failed: {e}")
