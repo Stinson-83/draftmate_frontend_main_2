@@ -61,7 +61,9 @@ const Landing = () => {
                     >
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-8">
-                                <img src={fullLogo} alt="DraftMate" className="h-10 object-contain" />
+                                <Link to="/" onClick={() => setMobileMenuOpen(false)}>
+                                    <img src={fullLogo} alt="DraftMate" className="h-10 object-contain" />
+                                </Link>
                                 <button
                                     onClick={() => setMobileMenuOpen(false)}
                                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -594,30 +596,142 @@ const Landing = () => {
                 </div>
             </section>
 
-            {/* Coming Soon */}
-            <section className="py-20 px-4 lg:px-40 bg-white border-t border-[#f0f2f4]">
-                <div className="layout-content-container flex flex-col max-w-[960px] mx-auto gap-8">
-                    <h2 className="text-[#111318] text-2xl font-bold leading-tight">Coming Soon to DraftMate</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-lg bg-white border border-[#dbdfe6] flex flex-col gap-2">
-                            <span className="material-symbols-outlined text-primary">groups</span>
-                            <h4 className="font-bold text-[#111318]">Team Collaboration</h4>
-                            <p className="text-xs text-[#616f89]">Edit drafts with your juniors in real-time.</p>
+            {/* Future Roadmap / Coming Soon */}
+            <section className="py-24 px-4 lg:px-40 bg-slate-900 overflow-hidden relative">
+                {/* Background Effects */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
+                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3"></div>
+                </div>
+
+                <div className="layout-content-container flex flex-col max-w-[1200px] mx-auto gap-16 relative z-10">
+                    <div className="flex flex-col gap-4 text-center items-center">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-blue-300 uppercase tracking-wide backdrop-blur-sm">
+                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                            Future Roadmap
                         </div>
-                        <div className="p-4 rounded-lg bg-white border border-[#dbdfe6] flex flex-col gap-2">
-                            <span className="material-symbols-outlined text-primary">psychology</span>
-                            <h4 className="font-bold text-[#111318]">Argument Gen</h4>
-                            <p className="text-xs text-[#616f89]">AI suggested counter-arguments for defense.</p>
+                        <h2 className="text-white text-3xl font-black leading-tight lg:text-5xl max-w-[800px]">
+                            The Future of Legal Tech <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">Is Being Built Here</span>
+                        </h2>
+                        <p className="text-gray-400 text-lg max-w-[600px]">
+                            We are constantly innovating. Here's what's coming next to DraftMate to make your practice even more powerful.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {/* Feature 1: Advocate Profile */}
+                        <div className="group relative p-1 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 hover:from-primary/50 hover:to-purple-600/50 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900 rounded-2xl m-[1px] z-0"></div>
+                            <div className="relative z-10 p-6 flex flex-col h-full gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="size-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined text-2xl">badge</span>
+                                    </div>
+                                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider border border-white/5">Coming Soon</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Advocate Profile & Digital Presence</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        Premium subscribers get a personalized SEO-optimized profile page. Showcase your expertise, areas of practice, and contact details like a digital visiting card.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-4 rounded-lg bg-white border border-[#dbdfe6] flex flex-col gap-2">
-                            <span className="material-symbols-outlined text-primary">lock</span>
-                            <h4 className="font-bold text-[#111318]">Secure Vault</h4>
-                            <p className="text-xs text-[#616f89]">End-to-end encrypted client document storage.</p>
+
+                        {/* Feature 2: Real-Time Sharing */}
+                        <div className="group relative p-1 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 hover:from-primary/50 hover:to-purple-600/50 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900 rounded-2xl m-[1px] z-0"></div>
+                            <div className="relative z-10 p-6 flex flex-col h-full gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="size-12 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 group-hover:bg-green-500 group-hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined text-2xl">share</span>
+                                    </div>
+                                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider border border-white/5">Coming Soon</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Real-Time Document Sharing</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        Securely share live drafts with colleagues or clients for review. Collaborate vertically with ease and maintain version control automatically.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-4 rounded-lg bg-white border border-[#dbdfe6] flex flex-col gap-2">
-                            <span className="material-symbols-outlined text-primary">translate</span>
-                            <h4 className="font-bold text-[#111318]">Regional Translation</h4>
-                            <p className="text-xs text-[#616f89]">Draft in English, translate to Hindi/Regional instantly.</p>
+
+                        {/* Feature 3: AI Voice Agent */}
+                        <div className="group relative p-1 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 hover:from-primary/50 hover:to-purple-600/50 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900 rounded-2xl m-[1px] z-0"></div>
+                            <div className="relative z-10 p-6 flex flex-col h-full gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="size-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined text-2xl">record_voice_over</span>
+                                    </div>
+                                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider border border-white/5">Coming Soon</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">AI Voice Agent (Judge Mode)</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        Practice your arguments with an AI that simulates a Judge. It listens to your voice arguments and counters with legal queries to help you prepare.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Feature 4: E-Courts & Case Tracker */}
+                        <div className="group relative p-1 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 hover:from-primary/50 hover:to-purple-600/50 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900 rounded-2xl m-[1px] z-0"></div>
+                            <div className="relative z-10 p-6 flex flex-col h-full gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="size-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined text-2xl">gavel</span>
+                                    </div>
+                                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider border border-white/5">Coming Soon</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">E-Courts Integration</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        Direct access to E-Courts services. Track case status, next hearing dates, and orders for all your running cases in one dashboard.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Feature 5: Multi-Language */}
+                        <div className="group relative p-1 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 hover:from-primary/50 hover:to-purple-600/50 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900 rounded-2xl m-[1px] z-0"></div>
+                            <div className="relative z-10 p-6 flex flex-col h-full gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="size-12 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined text-2xl">translate</span>
+                                    </div>
+                                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider border border-white/5">Coming Soon</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Multi-Language Translations</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        Draft in English and instantly translate to Hindi, Marathi, Tamil, and other regional languages for district court filings.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Feature 6: Built-in Library */}
+                        <div className="group relative p-1 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 hover:from-primary/50 hover:to-purple-600/50 transition-all duration-300">
+                            <div className="absolute inset-0 bg-slate-900 rounded-2xl m-[1px] z-0"></div>
+                            <div className="relative z-10 p-6 flex flex-col h-full gap-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="size-12 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                                        <span className="material-symbols-outlined text-2xl">library_books</span>
+                                    </div>
+                                    <span className="px-2 py-1 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider border border-white/5">Coming Soon</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Smart Legal Library</h3>
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        A centralized repository of verified court templates, bare acts, and legal maxims available at your fingertips while drafting.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

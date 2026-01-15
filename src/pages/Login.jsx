@@ -103,9 +103,9 @@ const Login = () => {
                 {/* Logo Area */}
                 <div className="px-8 py-6 lg:px-16 lg:py-8">
                     <div className="flex items-center gap-3 text-slate-900 dark:text-white">
-                        <div className="h-12">
+                        <Link to="/" className="h-12 block">
                             <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
-                        </div>
+                        </Link>
                     </div>
                 </div>
 
@@ -215,9 +215,9 @@ const Login = () => {
 
                 {/* Overlay Content */}
                 <div className="relative z-20 max-w-lg px-12 text-center text-white">
-                    <div className="mb-8 inline-flex p-4 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl">
+                    <Link to="/" className="mb-8 inline-flex p-4 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl hover:bg-white/20 transition-colors">
                         <img src={logo} alt="DraftMate" className="w-16 h-16 object-contain" />
-                    </div>
+                    </Link>
                     <h3 className="text-4xl font-bold mb-6 tracking-tight leading-tight">Streamline your legal practice</h3>
                     <p className="text-slate-100 text-lg leading-relaxed font-light opacity-90 mb-10">
                         Join over 10,000 legal professionals who trust DraftMate for secure case management, research, and client collaboration.

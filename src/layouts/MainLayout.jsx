@@ -69,13 +69,13 @@ const MainLayout = () => {
       <aside className={`hidden md:flex flex-col ${isCollapsed ? 'w-12' : 'w-64'} bg-white dark:bg-[#151f2e] border-r border-slate-200 dark:border-slate-800 h-full flex-shrink-0 transition-all duration-300`}>
         <div className={`p-6 flex flex-col h-full ${isCollapsed ? 'px-0 py-4 items-center' : ''}`}>
           {/* Logo */}
-          <div className={`flex items-center gap-3 px-2 mb-8 ${isCollapsed ? 'justify-center px-0' : ''}`}>
+          <Link to="/" className={`flex items-center gap-3 px-2 mb-8 ${isCollapsed ? 'justify-center px-0' : ''}`}>
             <img
               src={isCollapsed ? smallLogo : fullLogo}
               alt="DraftMate"
               className={`object-contain transition-all ${isCollapsed ? 'w-8 h-8' : 'h-12'}`}
             />
-          </div>
+          </Link>
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-4 -mx-4 scrollbar-none flex flex-col gap-2 min-h-0">

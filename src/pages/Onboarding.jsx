@@ -76,16 +76,16 @@ const Onboarding = () => {
                 {/* Background Image with Overlay */}
                 <div className="absolute inset-0 z-0">
                     <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 to-blue-600/80 z-10 mix-blend-multiply"></div>
-                    <div className="w-full h-full bg-cover bg-center opacity-40 mix-blend-overlay" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDb2CRzdwCjgYV-YgFxXs0c9EyHTaII2XLWdFig24IWoNTtUrvlJ8iEZPqC5MEdXQotRvXZMKk358BJ7g6_RtCV-mkRVf1MD66Jlup6o-zNdQihZj_YDV0uECvP3RgluhQS0B0Tm1gbsPn8GwOIM326M9bqBX4qz8V3lfzA37oq39Z_mSSxqk-MPck87U2WhNLevJgNN5GhwQ_d9BXDjzlRj350e1cxoasNQPKTW-Nf1R_jKxQqhE8q9oNM9oWvLpDwfdit3t3DBvc")' }}></div>
+                    <div className="w-full h-full bg-cover bg-center opacity-40 mix-blend-overlay" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDb2CRzdwCjgYV-YgFxXs0c9EyHTaII2XLWdFig24IWoNTtUrvlJ8iEZPqC5MEdXQotRvXZMKk358BJ7g6_RtCV-mkRVf1MD66Jlup6o-zNdQihZj_YDV0uECvP3RgluhQS0B0Tm1gbsPn8GwOIM326M358BJ7g6_RtCV-mkRVf1MD66Jlup6o-zNdQihZj_YDV0uECvP3RgluhQS0B0Tm1gbsPn8GwOIM326M9bqBX4qz8V3lfzA37oq39Z_mSSxqk-MPck87U2WhNLevJgNN5GhwQ_d9BXDjzlRj350e1cxoasNQPKTW-Nf1R_jKxQqhE8q9oNM9oWvLpDwfdit3t3DBvc")' }}></div>
                 </div>
 
                 {/* Content */}
                 <div className="relative z-20 flex flex-col h-full justify-between p-12 lg:p-16">
                     {/* Brand */}
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white border border-white/20">
+                        <Link to="/" className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-colors">
                             <img src={logo} alt="DraftMate" className="w-full h-full object-contain p-1" />
-                        </div>
+                        </Link>
                         <h1 className="text-2xl font-bold tracking-tight">DraftMate</h1>
                     </div>
 
