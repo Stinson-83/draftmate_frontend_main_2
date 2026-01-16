@@ -88,8 +88,20 @@ services:
       - POSTGRES_DSN=${POSTGRES_DSN}
       - AUTH_SERVICE_URL=http://127.0.0.1:8009
     depends_on:
-      db:
-        condition: service_healthy
+      - db
+      - notification_service
+
+  notification_service:
+    build:
+      context: ./backend/Notification
+      dockerfile: Dockerfile
+    ports:
+      - "8015:8015"
+    environment:
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     volumes:
       - ./backend/query/secrets/bastion.key.pem:/app/bastion.key.pem
 

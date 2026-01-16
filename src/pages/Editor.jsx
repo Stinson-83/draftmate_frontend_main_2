@@ -1377,7 +1377,7 @@ const Editor = () => {
         }, 50);
     }, [showHeader, showFooter, paginateAll]);
 
-    const handleSave = () => {
+    const handleSave = (status) => {
         if (!pagesContainerRef.current) return;
 
         // Gather content from ALL pages
@@ -1386,12 +1386,16 @@ const Editor = () => {
 
         const draftId = location.state?.id || Date.now().toString();
 
+        // Determine status: if argument is a string uses it, otherwise default to 'In progress'
+        const saveStatus = (typeof status === 'string') ? status : 'In progress';
+
         const draftData = {
             id: draftId,
             name: draftName || 'Untitled Draft',
             content: content,
             placeholders: placeholders,
             settings: editorSettings,
+            status: saveStatus,
             lastModified: new Date().toISOString()
         };
 
@@ -1400,7 +1404,7 @@ const Editor = () => {
         const updatedDrafts = [...otherDrafts, draftData];
 
         localStorage.setItem('my_drafts', JSON.stringify(updatedDrafts));
-        toast.success('Draft saved successfully!');
+        toast.success(`Draft saved as ${saveStatus}!`);
     };
 
     useEffect(() => {

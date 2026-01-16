@@ -95,7 +95,6 @@ const MyDrafts = () => {
                 {/* Filters */}
                 <div className="flex items-center space-x-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
                     <button className="shrink-0 px-4 py-2 bg-primary text-white text-sm font-medium rounded-full shadow-sm hover:bg-primary/90 transition-colors">All Drafts</button>
-                    <button className="shrink-0 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Recent</button>
                     <div className="flex-grow"></div>
                     <button
                         onClick={() => setSortOrder(prev => prev === 'date' ? 'alpha' : 'date')}
@@ -121,14 +120,30 @@ const MyDrafts = () => {
                     /* Grid Layout */
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {sortedDrafts.map((draft) => {
-                            const progress = getProgress(draft.id);
+                            const status = draft.status || 'In progress';
+
+                            // Map status to progress for visualization
+                            let progress = 20;
+                            if (status === 'Started') progress = 10;
+                            else if (status === 'In progress') progress = 45;
+                            else if (status === 'Review') progress = 80;
+                            else if (status === 'Completed') progress = 100;
+
+                            const getStatusColor = (s) => {
+                                if (s === 'Started') return 'bg-gray-400';
+                                if (s === 'In progress') return 'bg-yellow-400';
+                                if (s === 'Review') return 'bg-blue-400';
+                                if (s === 'Completed') return 'bg-green-500';
+                                return 'bg-yellow-400'; // Default
+                            };
+
                             return (
                                 <div
                                     key={draft.id}
                                     className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300 group flex flex-col h-full relative overflow-hidden"
                                 >
                                     {/* Accent Bar */}
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className={`absolute top-0 left-0 w-1 h-full ${getStatusColor(status).replace('bg-', 'bg-')} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
 
                                     {/* Card Content */}
                                     <div className="p-5 flex-1 cursor-pointer" onClick={() => handleOpenDraft(draft)}>
@@ -156,14 +171,14 @@ const MyDrafts = () => {
                                             Last edited: {new Date(draft.lastModified).toLocaleDateString()}
                                         </p>
 
-                                        {/* Fake Progress */}
+                                        {/* Status Bar */}
                                         <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mb-2">
                                             <div
-                                                className={`h-1.5 rounded-full ${getProgressColor(progress)}`}
+                                                className={`h-1.5 rounded-full ${getStatusColor(status)}`}
                                                 style={{ width: `${progress}%` }}
                                             ></div>
                                         </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{getStatusText(progress)}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{status}</p>
                                     </div>
 
                                     {/* Footer Button */}

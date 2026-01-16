@@ -74,7 +74,6 @@ const processCitations = (content, sources) => {
         const t = text.trim();
         if (/^\d+$/.test(t)) return match;
         if (t.includes('\\')) return match;
-        if (t.toLowerCase() === 'explainer') return match; // Exclude Explainer agent signature
         return `[${match}](citation://simple?text=${encodeURIComponent(t)})`;
     });
 

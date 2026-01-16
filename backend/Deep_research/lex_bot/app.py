@@ -487,7 +487,9 @@ async def _stream_chat(request: ChatRequest, user_id: str):
                 content=answer,
                 msg_metadata={
                     "complexity": result.get("complexity"),
-                    "agents": result.get("selected_agents")
+                    "agents": result.get("selected_agents"),
+                    "sources": sources,
+                    "suggested_followups": suggested_followups
                 }
             )
             
@@ -538,7 +540,9 @@ async def _process_chat(request: ChatRequest, user_id: str, reasoning_mode: bool
                 content=answer,
                 msg_metadata={
                     "complexity": result.get("complexity"),
-                    "agents": result.get("selected_agents")
+                    "agents": result.get("selected_agents"),
+                    "sources": result.get("sources", []),
+                    "suggested_followups": suggested_followups
                 }
             )
         
