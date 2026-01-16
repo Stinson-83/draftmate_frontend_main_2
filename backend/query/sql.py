@@ -80,28 +80,25 @@ def _get_tunneled_dsn():
 
 def start_tunnel_and_pool():
     global tunnel, connection_pool
+    logger.info("DEBUG: Entering start_tunnel_and_pool")
     
     # 1. Check if manual tunnel is already running
+    logger.info("DEBUG: Checking is_port_open...")
     if is_port_open():
         logger.info(f"Port {LOCAL_BIND_PORT} is open. Using existing tunnel.")
         try:
             dsn = _get_tunneled_dsn()
-            connection_pool = pool.ThreadedConnectionPool(1, 20, dsn)
-            logger.info("Threaded connection pool created (Manual Tunnel)")
+            logger.info(f"DEBUG: Creating pool with DSN: {dsn}")
+            pool_size = int(os.getenv("DB_POOL_SIZE", 5))
+            connection_pool = pool.ThreadedConnectionPool(1, pool_size, dsn, connect_timeout=5)
+            logger.info(f"Threaded connection pool created (Manual Tunnel, Size: {pool_size})")
             return
         except Exception as e:
             logger.error(f"Pool creation failed: {e}")
             return
 
     # 2. Start auto-tunnel only if port is NOT open AND not in AWS
-    # AWS App Runner sets AWS_EXECUTION_ENV (or we can assume if we are in a container with direct access)
-    # We'll check for a specific flag or AWS env var
-    if BASTION_IP and SSH_KEY_PATH and not os.getenv("AWS_EXECUTION_ENV") and not os.getenv("AWS_REGION"): 
-        # Added AWS_REGION check as a heuristic for "running in cloud" vs local
-        # But local might have AWS_REGION set.
-        # Better: Check explicit SKIP_TUNNEL
-        pass
-
+    logger.info("DEBUG: Checking tunnel conditions...")
     if BASTION_IP and SSH_KEY_PATH and not os.getenv("SKIP_TUNNEL"):
         logger.info(f"Starting auto SSH tunnel via {BASTION_IP}...")
         try:
@@ -117,12 +114,16 @@ def start_tunnel_and_pool():
         except Exception as e:
             logger.error(f"Auto-tunnel failed: {e}")
             return
+    else:
+        logger.info("DEBUG: Skipping tunnel (BASTION_IP not set or SKIP_TUNNEL=true)")
 
     # 3. Create connection pool
     try:
         dsn = _get_tunneled_dsn()
-        connection_pool = pool.ThreadedConnectionPool(1, 20, dsn)
-        logger.info("Threaded connection pool created")
+        logger.info(f"DEBUG: Creating pool with DSN: {dsn}")
+        pool_size = int(os.getenv("DB_POOL_SIZE", 5))
+        connection_pool = pool.ThreadedConnectionPool(1, pool_size, dsn, connect_timeout=5)
+        logger.info(f"Threaded connection pool created (Size: {pool_size})")
     except Exception as e:
         logger.error(f"Error creating connection pool: {e}")
 

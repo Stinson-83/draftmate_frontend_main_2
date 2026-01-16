@@ -160,7 +160,11 @@ def get_conversation_context(user_id: str, query: str, session_id: str = None) -
                 if memories:
                     context_parts.append("RELEVANT LONG-TERM MEMORIES:")
                     for m in memories:
-                        memory_text = m.get('memory', '')
+                        if isinstance(m, dict):
+                            memory_text = m.get('memory', m.get('text', ''))
+                        else:
+                            memory_text = str(m)
+                        
                         if memory_text:
                             context_parts.append(f"- {memory_text[:250]}")
         except Exception as e:
