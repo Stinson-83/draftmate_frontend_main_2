@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import MiniEditor from '../components/MiniEditor';
+import { API_CONFIG } from '../services/endpoints';
 
 const PersonalSettings = () => {
     const [profile, setProfile] = useState({
@@ -15,20 +16,46 @@ const PersonalSettings = () => {
     });
 
     useEffect(() => {
+        // Load from API if user is logged in
+        const userId = localStorage.getItem('user_id');
+        if (userId) {
+            fetch(`${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.GET_PROFILE(userId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && Object.keys(data).length > 0) {
+                        setProfile(prev => ({
+                            ...prev,
+                            firstName: data.firstName || prev.firstName,
+                            lastName: data.lastName || prev.lastName,
+                            role: data.role || prev.role,
+                            workplace: data.workplace || prev.workplace,
+                            email: prev.email, // Email usually comes from auth, not editable here directly easily without more logic
+                            bio: data.bio || prev.bio,
+                            image: data.image || prev.image
+                        }));
+                        // Sync to local storage for other components
+                        const currentLocal = JSON.parse(localStorage.getItem('user_profile') || '{}');
+                        localStorage.setItem('user_profile', JSON.stringify({ ...currentLocal, ...data }));
+                    }
+                })
+                .catch(err => console.error("Failed to load profile", err));
+        }
+
         const saved = localStorage.getItem('user_profile');
         if (saved) {
             const parsed = JSON.parse(saved);
             // Split name if needed or use fields if existing
             const nameParts = (parsed.name || '').split(' ');
-            setProfile({
-                firstName: parsed.firstName || nameParts[0] || '',
-                lastName: parsed.lastName || nameParts.slice(1).join(' ') || '',
-                role: parsed.role || '',
-                workplace: parsed.workplace || '',
-                email: parsed.email || 'attorney@draftmate.com',
-                bio: parsed.bio || '',
-                image: parsed.image || "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
-            });
+            setProfile(prev => ({
+                ...prev,
+                firstName: parsed.firstName || nameParts[0] || prev.firstName,
+                lastName: parsed.lastName || nameParts.slice(1).join(' ') || prev.lastName,
+                role: parsed.role || prev.role,
+                workplace: parsed.workplace || prev.workplace,
+                email: parsed.email || prev.email,
+                bio: parsed.bio || prev.bio,
+                image: parsed.image || prev.image
+            }));
         }
     }, []);
 
@@ -62,12 +89,36 @@ const PersonalSettings = () => {
         }));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const fullName = `${profile.firstName} ${profile.lastName}`.trim();
         const updatedProfile = {
             ...profile,
             name: fullName
         };
+
+        // Save to Database
+        const userId = localStorage.getItem('user_id');
+        if (userId) {
+            try {
+                await fetch(`${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.UPDATE_PROFILE}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        firstName: profile.firstName,
+                        lastName: profile.lastName,
+                        role: profile.role,
+                        workplace: profile.workplace,
+                        bio: profile.bio,
+                        image: profile.image
+                    })
+                });
+            } catch (err) {
+                console.error("Failed to save profile to DB", err);
+                toast.error("Failed to save to database, but saved locally.");
+            }
+        }
+
         localStorage.setItem('user_profile', JSON.stringify(updatedProfile));
         window.dispatchEvent(new Event('user_profile_updated'));
         toast.success('Personal profile updated successfully!');
@@ -638,7 +689,6 @@ const DocumentSettings = () => {
     );
 };
 
-import { API_CONFIG } from '../services/endpoints';
 
 const Settings = () => {
     const navigate = useNavigate();
@@ -706,7 +756,11 @@ const Settings = () => {
                                 } catch (error) {
                                     console.error('Logout failed:', error);
                                 } finally {
-                                    localStorage.clear();
+                                    // User requested to NOT clear local storage on logout
+                                    // localStorage.removeItem('session_id');
+                                    // localStorage.removeItem('user_id');
+                                    // localStorage.removeItem('user_profile');
+
                                     toast.success('Logged out successfully');
                                     navigate('/login');
                                 }

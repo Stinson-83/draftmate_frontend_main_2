@@ -104,6 +104,8 @@ export const API_CONFIG = {
             GOOGLE_LOGIN: '/google-login', // POST
             LOGOUT: '/logout', // POST
             VERIFY_SESSION: '/verify_session', // GET
+            GET_PROFILE: (userId) => `/profile/${userId}`, // GET
+            UPDATE_PROFILE: '/profile/update', // POST
         }
     }
 };
