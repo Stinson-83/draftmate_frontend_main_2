@@ -34,7 +34,7 @@ import Landing from './pages/Landing';
 import Features from './pages/Features';
 import HowItWorks from './pages/HowItWorks';
 import ComingSoon from './pages/ComingSoon';
-import NotificationsComingSoon from './pages/NotificationsComingSoon';
+import Notifications from './pages/Notifications';
 import { NotificationProvider } from './context/NotificationContext';
 
 function App() {
@@ -91,7 +91,7 @@ function App() {
               <Route path="research" element={<ResearchChat />} />
               <Route path="settings" element={<Settings />} />
               <Route path="help" element={<HelpCenter />} />
-              <Route path="notifications" element={<NotificationsComingSoon />} />
+              <Route path="notifications" element={<Notifications />} />
               <Route path="chat" element={<Placeholder title="AI Chat" />} />
               {/* Catch-all relative to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard/home" replace />} />

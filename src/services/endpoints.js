@@ -105,5 +105,19 @@ export const API_CONFIG = {
             LOGOUT: '/logout', // POST
             VERIFY_SESSION: '/verify_session', // GET
         }
+    },
+
+    // Service: backend/Notification (Port 8015)
+    NOTIFICATION: {
+        BASE_URL: `${BASE_URL}/notification`,
+        ENDPOINTS: {
+            GET_ALL: (userId) => `/notifications/${userId}`,
+            GET_COUNT: (userId) => `/notifications/${userId}/count`,
+            CREATE: '/notifications',
+            MARK_READ: (notificationId) => `/notifications/${notificationId}/read`,
+            MARK_ALL_READ: (userId) => `/notifications/${userId}/read-all`,
+            DELETE: (notificationId) => `/notifications/${notificationId}`,
+            DELETE_ALL: (userId) => `/notifications/${userId}/all`,
+        }
     }
 };

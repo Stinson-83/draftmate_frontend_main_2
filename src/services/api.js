@@ -238,6 +238,144 @@ export const api = {
             throw new Error('Failed to send email notification');
         }
         return response.json();
-    }
+    },
+
+    // =======================================================================
+    // NOTIFICATION CRUD API
+    // =======================================================================
+
+    /**
+     * Get all notifications for a user.
+     * @param {string} userId - User identifier
+     * @param {Object} options - Filter options { type, unreadOnly, limit }
+     * @returns {Promise<Array>} - List of notifications
+     */
+    getNotifications: async (userId, options = {}) => {
+        const params = new URLSearchParams();
+        if (options.type) params.append('type', options.type);
+        if (options.unreadOnly) params.append('unread_only', 'true');
+        if (options.limit) params.append('limit', options.limit.toString());
+
+        const queryString = params.toString();
+        const url = `${NOTIFICATION_BASE_URL}/notifications/${userId}${queryString ? `?${queryString}` : ''}`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch notifications');
+        }
+        return response.json();
+    },
+
+    /**
+     * Get unread notification count.
+     * @param {string} userId - User identifier
+     * @returns {Promise<Object>} - { user_id, unread_count }
+     */
+    getUnreadCount: async (userId) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/count`, {
+            method: 'GET',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch unread count');
+        }
+        return response.json();
+    },
+
+    /**
+     * Create a new notification.
+     * @param {Object} notification - { user_id, type, title, message, metadata }
+     * @returns {Promise<Object>} - Created notification
+     */
+    createNotification: async (notification) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(notification),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create notification');
+        }
+        return response.json();
+    },
+
+    /**
+     * Mark a notification as read.
+     * @param {string} notificationId - Notification ID
+     * @returns {Promise<Object>} - Updated notification
+     */
+    markNotificationRead: async (notificationId) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}/read`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to mark notification as read');
+        }
+        return response.json();
+    },
+
+    /**
+     * Mark all notifications as read for a user.
+     * @param {string} userId - User identifier
+     * @returns {Promise<Object>} - { success, message, affected_count }
+     */
+    markAllNotificationsRead: async (userId) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/read-all`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to mark all as read');
+        }
+        return response.json();
+    },
+
+    /**
+     * Delete a notification.
+     * @param {string} notificationId - Notification ID
+     * @returns {Promise<Object>} - { success, message }
+     */
+    deleteNotification: async (notificationId) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete notification');
+        }
+        return response.json();
+    },
+
+    /**
+     * Delete all notifications for a user.
+     * @param {string} userId - User identifier
+     * @returns {Promise<Object>} - { success, message, affected_count }
+     */
+    deleteAllNotifications: async (userId) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/all`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete all notifications');
+        }
+        return response.json();
+    },
 };
 
