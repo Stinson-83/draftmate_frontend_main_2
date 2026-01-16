@@ -197,16 +197,35 @@
 }
 
 /* Zoom Controls - Fixed at bottom right */
+/* Zoom Controls - Fixed at bottom */
 .zoom-controls-container {
     position: fixed;
     bottom: 24px;
+    /* Default (both open): Left 280+gap, Right 320+gap */
+    left: 320px;
     right: 360px;
     z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+    /* Allow clicking through empty space */
+    padding: 0 24px;
+}
+
+.zoom-controls-container>* {
+    pointer-events: auto;
+    /* Re-enable clicks on buttons/badges */
 }
 
 /* Adjust when right sidebar is collapsed */
 .editor-layout:has(.editor-sidebar.right.collapsed) .zoom-controls-container {
     right: 80px;
+}
+
+/* Adjust when left sidebar is collapsed */
+.editor-layout:has(.editor-sidebar.left.collapsed) .zoom-controls-container {
+    left: 80px;
 }
 
 .zoom-controls {
