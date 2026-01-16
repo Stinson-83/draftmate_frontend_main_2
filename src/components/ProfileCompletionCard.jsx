@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_CONFIG } from '../services/endpoints';
 
 /**
  * Calculate profile completion percentage based on filled fields
@@ -32,7 +33,32 @@ const ProfileCompletionCard = () => {
     });
 
     // Listen for profile updates
+    // Listen for profile updates and load from API
     React.useEffect(() => {
+        const loadProfile = async () => {
+            const userId = localStorage.getItem('user_id');
+            if (userId) {
+                try {
+                    const res = await fetch(`${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.GET_PROFILE(userId)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && Object.keys(data).length > 0) {
+                            setProfile(prev => {
+                                // Prevent update if data is identical
+                                if (JSON.stringify(prev) === JSON.stringify({ ...prev, ...data })) {
+                                    return prev;
+                                }
+                                return { ...prev, ...data };
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.error("Profile fetch error", e);
+                }
+            }
+        };
+        loadProfile();
+
         const handleUpdate = () => {
             const saved = localStorage.getItem('user_profile');
             if (saved) setProfile(JSON.parse(saved));
@@ -42,6 +68,10 @@ const ProfileCompletionCard = () => {
     }, []);
 
     const { percentage, missingFields } = calculateProfileCompletion(profile);
+
+    // Hide card if profile is complete
+    if (percentage === 100) return null;
+
     const isComplete = percentage === 100;
 
     // Circular progress variables

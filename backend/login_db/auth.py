@@ -1,8 +1,9 @@
 import os
 import uuid
 import psycopg2
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import bcrypt
@@ -109,6 +110,15 @@ class UserSignup(BaseModel):
 class GoogleLoginModel(BaseModel):
     token: str
 
+class ProfileUpdate(BaseModel):
+    user_id: str
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    role: Optional[str] = None
+    workplace: Optional[str] = None
+    bio: Optional[str] = None
+    image: Optional[str] = None
+
 # Helper Functions
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -140,6 +150,67 @@ def verify_session(session_id: str):
     except Exception as e:
         print(f"Session verification error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/profile/{user_id}")
+def get_profile(user_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT first_name, last_name, role, workplace, bio, profile_image_url 
+            FROM profiles 
+            WHERE user_id = %s
+        """, (user_id,))
+        result = cur.fetchone()
+        
+        if not result:
+            return {}
+            
+        return {
+            "firstName": result[0],
+            "lastName": result[1],
+            "role": result[2],
+            "workplace": result[3],
+            "bio": result[4],
+            "image": result[5]
+        }
+    except Exception as e:
+        print(f"Get profile error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch profile")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/profile/update")
+def update_profile(profile: ProfileUpdate):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Check if profile exists
+        cur.execute("SELECT profile_id FROM profiles WHERE user_id = %s", (profile.user_id,))
+        exists = cur.fetchone()
+        
+        if exists:
+            cur.execute("""
+                UPDATE profiles 
+                SET first_name = %s, last_name = %s, role = %s, workplace = %s, bio = %s, profile_image_url = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s
+            """, (profile.firstName, profile.lastName, profile.role, profile.workplace, profile.bio, profile.image, profile.user_id))
+        else:
+            cur.execute("""
+                INSERT INTO profiles (user_id, first_name, last_name, role, workplace, bio, profile_image_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (profile.user_id, profile.firstName, profile.lastName, profile.role, profile.workplace, profile.bio, profile.image))
+            
+        conn.commit()
+        return {"message": "Profile updated successfully"}
+    except Exception as e:
+        conn.rollback()
+        print(f"Update profile error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update profile")
     finally:
         cur.close()
         conn.close()
@@ -199,7 +270,12 @@ def login(user: UserLogin):
         )
         conn.commit()
         
-        return {"message": "Login successful", "session_id": session_id, "user_id": user_id}
+        return {
+            "message": "Login successful", 
+            "session_id": session_id, 
+            "user_id": user_id,
+            "email": user.email
+        }
         
     except HTTPException as he:
         raise he

@@ -5,7 +5,7 @@ import sys
 from sshtunnel import SSHTunnelForwarder
 import paramiko
 
-# Monkey-patch paramiko.DSSKey for compatibility with sshtunnel + paramiko 3.0+
+# Monkey-patch paramiko.DSSKey for compatibility
 if not hasattr(paramiko, "DSSKey"):
     class MockDSSKey:
         @classmethod
@@ -26,7 +26,6 @@ LOCAL_BIND_PORT = 5432
 
 def get_db_connection():
     """Establish a database connection, using SSH tunnel if configured."""
-    # Check if we need to use SSH tunnel
     if BASTION_IP and SSH_KEY_PATH and RDS_ENDPOINT:
         print(f"🔒 Starting SSH tunnel via {BASTION_IP}...")
         try:
@@ -40,7 +39,6 @@ def get_db_connection():
             server.start()
             print(f"✅ Tunnel active on port {server.local_bind_port}")
             
-            # Connect to local forwarded port
             conn = psycopg2.connect(
                 host='127.0.0.1',
                 port=server.local_bind_port,
@@ -53,7 +51,6 @@ def get_db_connection():
             print(f"❌ Tunnel connection failed: {e}")
             raise
     else:
-        # Direct connection (using DSN or env vars)
         print("🌍 Connecting directly...")
         if POSTGRES_DSN:
              conn = psycopg2.connect(POSTGRES_DSN)
@@ -67,60 +64,44 @@ def get_db_connection():
             )
         return conn, None
 
-def init_db():
+def view_profiles():
     conn = None
     tunnel = None
     try:
         conn, tunnel = get_db_connection()
         cur = conn.cursor()
         
-        print("Creating tables...")
+        print("\n📊 User Profiles Data:")
+        print("-" * 100)
         
-        # Create users table
         cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id UUID PRIMARY KEY,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            password_hash VARCHAR(255),
-            google_id VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+            SELECT 
+                p.first_name, 
+                p.last_name, 
+                p.role, 
+                p.workplace, 
+                u.email,
+                p.updated_at
+            FROM profiles p
+            JOIN users u ON p.user_id = u.id
         """)
         
-        # Create sessions table
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            session_id UUID PRIMARY KEY,
-            user_id UUID REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
+        rows = cur.fetchall()
         
-        conn.commit()
-        print("✅ Tables created successfully.")
-
-        # Create profiles table
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS profiles (
-            profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-            first_name VARCHAR(100),
-            last_name VARCHAR(100),
-            role VARCHAR(100),
-            workplace VARCHAR(100),
-            bio TEXT,
-            profile_image_url TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
+        if not rows:
+            print("No profiles found.")
+        else:
+            print(f"{'Name':<25} | {'Role':<20} | {'Workplace':<20} | {'Email':<30}")
+            print("-" * 100)
+            for row in rows:
+                full_name = f"{row[0]} {row[1]}"
+                print(f"{full_name:<25} | {row[2]:<20} | {row[3]:<20} | {row[4]:<30}")
         
-        conn.commit()
-        print("✅ Profiles table created successfully.")
-        
+        print("-" * 100)
         cur.close()
         
     except Exception as e:
-        print(f"❌ Error initializing database: {e}")
+        print(f"❌ Error fetching profiles: {e}")
     finally:
         if conn:
             conn.close()
@@ -129,4 +110,4 @@ def init_db():
             tunnel.stop()
 
 if __name__ == "__main__":
-    init_db()
+    view_profiles()

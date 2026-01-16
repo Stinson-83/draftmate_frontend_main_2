@@ -1282,14 +1282,21 @@ const Editor = () => {
 
                 while (nextEditor.firstChild) {
                     const node = nextEditor.firstChild;
-                    editor.appendChild(node);
+
+                    // NON-DESTRUCTIVE CHECK: Clone first to see if it fits
+                    const clone = node.cloneNode(true);
+                    editor.appendChild(clone);
 
                     if (editor.scrollHeight > editor.clientHeight + 1) {
-                        nextEditor.insertBefore(node, nextEditor.firstChild);
+                        // Doesn't fit, remove clone and stop
+                        clone.remove();
                         break;
-                    } else {
-                        changed = true;
                     }
+
+                    // Fits! Remove clone and move real node
+                    clone.remove();
+                    editor.appendChild(node);
+                    changed = true;
                 }
 
                 if (i === pages.length - 2 && !nextEditor.firstChild) {
@@ -1692,52 +1699,54 @@ const Editor = () => {
                             minHeight: `${(PAGE_HEIGHT * pageCount + 24 * (pageCount - 1)) * zoomLevel / 100 + 48}px`,
                         }}
                     >
-                        <div
-                            className="pages-wrapper"
-                            ref={pagesContainerRef}
-                            style={{
-                                transform: `scale(${zoomLevel / 100})`,
-                                transformOrigin: 'top left',
-                            }}
-                        >
-                            <div className="document-page">
-                                {/* Header: First Page Only, controlled by toggle */}
-                                {showHeader && (
-                                    <div
-                                        className="page-header"
-                                        contentEditable={isHeaderEditing}
-                                        suppressContentEditableWarning
-                                        spellCheck={false}
-                                        onDoubleClick={() => setIsHeaderEditing(true)}
-                                        onBlur={(e) => {
-                                            setIsHeaderEditing(false);
-                                            const newText = e.target.innerHTML;
-                                            setEditorSettings(prev => {
-                                                const updated = { ...prev, headerText: newText };
-                                                // localStorage.setItem('user_settings', JSON.stringify(updated)); // Decoupled
-                                                return updated;
-                                            });
-                                        }}
-                                        dangerouslySetInnerHTML={{ __html: editorSettings.headerText || '' }}
-                                    />
-                                )}
+                        {React.useMemo(() => (
+                            <div
+                                className="pages-wrapper"
+                                ref={pagesContainerRef}
+                                style={{
+                                    transform: `scale(${zoomLevel / 100})`,
+                                    transformOrigin: 'top left',
+                                }}
+                            >
+                                <div className="document-page">
+                                    {/* Header: First Page Only, controlled by toggle */}
+                                    {showHeader && (
+                                        <div
+                                            className="page-header"
+                                            contentEditable={isHeaderEditing}
+                                            suppressContentEditableWarning
+                                            spellCheck={false}
+                                            onDoubleClick={() => setIsHeaderEditing(true)}
+                                            onBlur={(e) => {
+                                                setIsHeaderEditing(false);
+                                                const newText = e.target.innerHTML;
+                                                setEditorSettings(prev => {
+                                                    const updated = { ...prev, headerText: newText };
+                                                    // localStorage.setItem('user_settings', JSON.stringify(updated)); // Decoupled
+                                                    return updated;
+                                                });
+                                            }}
+                                            dangerouslySetInnerHTML={{ __html: editorSettings.headerText || '' }}
+                                        />
+                                    )}
 
-                                <div
-                                    className="editor-root"
-                                    contentEditable
-                                    suppressContentEditableWarning
-                                    ref={documentRef}
-                                >
-                                    {!location.state?.htmlContent && !location.state?.isEmpty && (
-                                        <p><br /></p>
-                                    )}
-                                    {location.state?.isEmpty && (
-                                        <p><br /></p>
-                                    )}
+                                    <div
+                                        className="editor-root"
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        ref={documentRef}
+                                    >
+                                        {!location.state?.htmlContent && !location.state?.isEmpty && (
+                                            <p><br /></p>
+                                        )}
+                                        {location.state?.isEmpty && (
+                                            <p><br /></p>
+                                        )}
+                                    </div>
+                                    {/* Footer handled by updateFooters logic (Last Page Only) */}
                                 </div>
-                                {/* Footer handled by updateFooters logic (Last Page Only) */}
                             </div>
-                        </div>
+                        ), [zoomLevel, showHeader, isHeaderEditing, editorSettings.headerText, location.state])}
                     </div>
                 </div>
 

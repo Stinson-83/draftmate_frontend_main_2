@@ -120,7 +120,7 @@ const MainLayout = () => {
 
               <button
                 onClick={() => {
-                  localStorage.clear();
+                  // localStorage.clear();
                   window.location.href = '/login';
                 }}
                 className={`flex items-center justify-center p-2.5 rounded-lg transition-colors group text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-red-100 dark:hover:border-red-900/40 ${isCollapsed ? '' : 'flex-1'}`}
