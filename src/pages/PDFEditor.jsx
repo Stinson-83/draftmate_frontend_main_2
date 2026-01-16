@@ -853,7 +853,7 @@ const PDFEditor = () => {
                                         <div className="tool-group">
                                             <label>Scale ({Math.round(watermarkScale * 100)}%)</label>
                                             <input
-                                                type="range" min="0.05" max="1.0" step="0.05"
+                                                type="range" min="0.1" max="2.0" step="0.1"
                                                 value={watermarkScale}
                                                 onChange={(e) => setWatermarkScale(parseFloat(e.target.value))}
                                                 className="tool-slider"
@@ -1058,12 +1058,12 @@ const PDFEditor = () => {
                                                     {(watermarkType === 'text' || watermarkType === 'both') && watermarkText && (
                                                         <div
                                                             style={{
-                                                                color: 'rgba(0,0,0,0.5)',
+                                                                color: `rgba(60, 60, 60, ${watermarkOpacity})`,
                                                                 fontSize: `${(800 * zoomLevel) * watermarkScale * 0.15}px`,
                                                                 fontWeight: 'bold',
                                                                 whiteSpace: 'nowrap',
                                                                 textAlign: 'center',
-                                                                textShadow: '0 0 2px rgba(255,255,255,0.5)'
+                                                                textShadow: '0 0 2px rgba(255,255,255,0.3)'
                                                             }}
                                                         >
                                                             {watermarkText}

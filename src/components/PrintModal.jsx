@@ -21,14 +21,19 @@ const PrintModal = ({
     if (!isOpen) return null;
 
     const handlePrint = () => {
+        // Since we can't directly print a PDF from browser, 
+        // we download it and let user print from their PDF reader
+        // OR we use an iframe approach
         const options = {
             pageRange: pageRange === 'custom' ? { from: fromPage, to: toPage } : pageRange,
             orientation,
             paperSize,
             includePageNumbers,
-            includeHeaders
+            includeHeaders,
+            printAfterDownload: true // Signal to open print dialog
         };
-        onPrint(options);
+        // Download PDF first, user can then print from their PDF reader
+        onDownloadPDF(options);
         onClose();
     };
 

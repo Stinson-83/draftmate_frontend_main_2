@@ -473,52 +473,58 @@ def watermark_pdf_logic(pdf_bytes, text, opacity=0.3, rotation=45, color=(0, 0, 
         raise Exception(f"Watermark error: {str(e)}")
 
 def watermark_pdf_logic_enhanced(pdf_bytes, text=None, image_bytes=None, opacity=0.3, rotation=45, scale=1.0, color_mode="original"):
-    """Enhanced watermark function supporting text, image, or both with color mode transformations"""
+    """Enhanced watermark function - designed to EXACTLY match the frontend preview in PDFEditor.jsx.
+    
+    Frontend preview formula (at zoomLevel=1):
+    - Text fontSize = 800 * watermarkScale * 0.15 = 120px at scale 1.0 (15% of 800px width)
+    - Image maxWidth = 300 * watermarkScale, maxHeight = 200 * watermarkScale
+    
+    For PDF, we maintain the SAME RATIO relative to page width:
+    - Text should be 15% of page width at scale 1.0
+    - Image should be proportionally scaled
+    """
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
         for page in doc:
-            page_width = page.rect.width
-            page_height = page.rect.height
+            page_rect = page.rect
+            page_width = page_rect.width
+            page_height = page_rect.height
             
-            # Calculate center position for watermark
-            center_x = page_width / 2
-            center_y = page_height / 2
+            # Center of the page
+            center_x = page_rect.x0 + page_width / 2
+            center_y = page_rect.y0 + page_height / 2
             
             # Process image watermark if provided
             if image_bytes:
                 try:
-                    # Open image with PIL
                     img = Image.open(io.BytesIO(image_bytes))
                     
-                    # Convert to RGBA if not already
                     if img.mode != 'RGBA':
                         img = img.convert('RGBA')
                     
                     # Apply color mode transformation
                     if color_mode == "grayscale":
-                        # Convert to grayscale while preserving alpha
                         r, g, b, a = img.split()
                         gray = img.convert('L')
                         img = Image.merge('RGBA', (gray, gray, gray, a))
                     elif color_mode == "bw":
-                        # Convert to black and white
                         r, g, b, a = img.split()
                         gray = img.convert('L')
                         bw = gray.point(lambda x: 0 if x < 128 else 255, 'L')
                         img = Image.merge('RGBA', (bw, bw, bw, a))
                     
-                    # Apply opacity to alpha channel
+                    # Apply opacity
                     r, g, b, a = img.split()
                     a = a.point(lambda x: int(x * opacity))
                     img = Image.merge('RGBA', (r, g, b, a))
                     
-                    # Scale the image 
-                    # Base size: fit within 40% of page width at scale 1.0
-                    max_width = page_width * 0.4 * scale
-                    max_height = page_height * 0.3 * scale
+                    # Frontend uses 300x200 on 800px preview = 37.5% x 25% of preview
+                    # Apply same ratio to PDF page
+                    max_width = page_width * 0.375 * scale
+                    max_height = page_height * 0.25 * scale
                     
-                    img_ratio = img.width / img.height
+                    img_ratio = img.width / img.height if img.height > 0 else 1
                     if img.width > max_width or img.height > max_height:
                         if img_ratio > max_width / max_height:
                             new_width = int(max_width)
@@ -526,22 +532,27 @@ def watermark_pdf_logic_enhanced(pdf_bytes, text=None, image_bytes=None, opacity
                         else:
                             new_height = int(max_height)
                             new_width = int(max_height * img_ratio)
-                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    else:
+                        # Scale smaller images up to fit
+                        scale_up = min(max_width / img.width, max_height / img.height)
+                        new_width = int(img.width * scale_up)
+                        new_height = int(img.height * scale_up)
                     
-                    # Rotate image
+                    img = img.resize((max(1, new_width), max(1, new_height)), Image.Resampling.LANCZOS)
+                    
+                    # Rotate - CSS uses clockwise for positive angles, PIL uses counter-clockwise
+                    # So we negate the angle to match frontend preview
                     if rotation != 0:
-                        img = img.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
+                        img = img.rotate(-rotation, expand=True, resample=Image.Resampling.BICUBIC)
                     
-                    # Save to bytes
                     img_byte_arr = io.BytesIO()
                     img.save(img_byte_arr, format='PNG')
                     img_data = img_byte_arr.getvalue()
                     
-                    # Calculate position (centered, offset up if text is also being added)
                     img_x = center_x - img.width / 2
                     img_y = center_y - img.height / 2
-                    if text:  # Offset up if text will be below
-                        img_y -= 20
+                    if text:
+                        img_y -= page_height * 0.03  # Offset up slightly
                     
                     img_rect = fitz.Rect(img_x, img_y, img_x + img.width, img_y + img.height)
                     page.insert_image(img_rect, stream=img_data, overlay=True)
@@ -549,26 +560,31 @@ def watermark_pdf_logic_enhanced(pdf_bytes, text=None, image_bytes=None, opacity
                 except Exception as img_error:
                     print(f"Image watermark error: {str(img_error)}")
             
-            # Process text watermark if provided
+            # Process text watermark
             if text:
-                # Dynamic Font Size: ~15% of page width
-                base_font_size = page_width * 0.12 * scale
-                font_size = int(base_font_size)
+                # Frontend: fontSize = 800 * scale * 0.15 = 15% of 800px = 120px at scale 1.0
+                # For PDF: fontSize = 15% of page_width at scale 1.0
+                # This ensures the text appears the SAME relative size
+                font_size = int(page_width * 0.15 * scale)
+                font_size = max(24, font_size)  # Minimum readable size
                 
+                # Create a larger canvas to ensure text fits after rotation
+                # Width estimate: each character ~0.6 of font size, plus padding
                 text_length = len(text)
-                img_width = int(text_length * font_size * 0.6)
-                img_height = int(font_size * 2)
+                canvas_width = int(text_length * font_size * 0.8) + 100
+                canvas_height = int(font_size * 2) + 50
                 
-                # Create transparent image for text
-                watermark_img = Image.new('RGBA', (img_width, img_height), (255, 255, 255, 0))
+                watermark_img = Image.new('RGBA', (canvas_width, canvas_height), (255, 255, 255, 0))
                 draw = ImageDraw.Draw(watermark_img)
                 
-                # Try to use a font
+                # Load font
                 font_paths = [
+                    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
                     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                    "C:/Windows/Fonts/arialbd.ttf",
                     "C:/Windows/Fonts/arial.ttf",
-                    "C:/Windows/Fonts/Arial.ttf",
-                    "Arial.ttf",
                     "/System/Library/Fonts/Helvetica.ttc"
                 ]
                 
@@ -586,26 +602,34 @@ def watermark_pdf_logic_enhanced(pdf_bytes, text=None, image_bytes=None, opacity
                     except:
                         pass
                 
-                # Text color with opacity
+                # Frontend uses rgba(60, 60, 60, opacity) 
                 alpha = int(opacity * 255)
-                text_color = (80, 80, 80, alpha)
+                text_color = (60, 60, 60, alpha)
                 
-                draw.text((10, 10), text, fill=text_color, font=font)
+                # Draw text centered in canvas
+                text_x_pos = 50
+                text_y_pos = 25
+                draw.text((text_x_pos, text_y_pos), text, fill=text_color, font=font)
                 
-                # Rotate
+                # Crop to actual content to avoid huge empty space
+                bbox = watermark_img.getbbox()
+                if bbox:
+                    watermark_img = watermark_img.crop(bbox)
+                
+                # Rotate - CSS uses clockwise for positive angles, PIL uses counter-clockwise
+                # So we negate the angle to match frontend preview
                 if rotation != 0:
-                    watermark_img = watermark_img.rotate(rotation, expand=True)
+                    watermark_img = watermark_img.rotate(-rotation, expand=True, resample=Image.Resampling.BICUBIC)
                 
-                # Save to bytes
                 text_byte_arr = io.BytesIO()
                 watermark_img.save(text_byte_arr, format='PNG')
                 text_data = text_byte_arr.getvalue()
                 
-                # Position (centered, offset down if image was added above)
+                # Center on page
                 text_x = center_x - watermark_img.width / 2
                 text_y = center_y - watermark_img.height / 2
-                if image_bytes:  # Offset down if image is above
-                    text_y += 40
+                if image_bytes:
+                    text_y += page_height * 0.05  # Offset down if image above
                 
                 text_rect = fitz.Rect(text_x, text_y, text_x + watermark_img.width, text_y + watermark_img.height)
                 page.insert_image(text_rect, stream=text_data, overlay=True)
@@ -630,29 +654,33 @@ async def reorder_pdf_endpoint(file: UploadFile, order: str = Form(...)):
 
 @app.post("/watermark")
 async def watermark_pdf_endpoint(
-    file: UploadFile, 
+    file: UploadFile = File(...), 
     text: str = Form(None),  # Now optional
     opacity: float = Form(0.3),
     rotation: int = Form(45),
     scale: float = Form(1.0),
     watermark_type: str = Form("text"),  # 'text', 'image', or 'both'
     color_mode: str = Form("original"),  # 'original', 'grayscale', or 'bw'
-    image: UploadFile = None  # Optional image file
+    image: UploadFile = File(None)  # Optional image file
 ):
     try:
+        print(f"Watermark request: type={watermark_type}, text={text}, color_mode={color_mode}, scale={scale}")
         content = await file.read()
         
         # Read image if provided
         image_bytes = None
-        if image and (watermark_type == "image" or watermark_type == "both"):
+        if image and image.filename and (watermark_type == "image" or watermark_type == "both"):
+            print(f"Reading image: {image.filename}")
             image_bytes = await image.read()
         
         # Determine what to apply based on watermark_type
         apply_text = watermark_type in ("text", "both") and text
         apply_image = watermark_type in ("image", "both") and image_bytes
         
+        print(f"apply_text={apply_text}, apply_image={apply_image}")
+        
         if not apply_text and not apply_image:
-            raise HTTPException(status_code=400, detail="No watermark content provided")
+            raise HTTPException(status_code=400, detail="No watermark content provided. Please provide text or upload an image.")
         
         result = watermark_pdf_logic_enhanced(
             content, 
@@ -668,7 +696,10 @@ async def watermark_pdf_endpoint(
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=watermarked.pdf"}
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Watermark error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
