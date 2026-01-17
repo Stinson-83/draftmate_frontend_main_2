@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     supervisor \
     nginx \
+    pandoc \
+    wkhtmltopdf \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Base Python dependencies (Cached Layer)
