@@ -171,7 +171,11 @@ class UserMemoryManager:
         total_chars = 0
         
         for mem in memories:
-            mem_text = mem.get("memory", mem.get("text", ""))
+            if isinstance(mem, str):
+                mem_text = mem
+            else:
+                mem_text = mem.get("memory", mem.get("text", ""))
+            
             if total_chars + len(mem_text) > max_chars:
                 break
             context_parts.append(f"- {mem_text}")

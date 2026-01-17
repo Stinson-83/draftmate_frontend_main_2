@@ -250,6 +250,19 @@ def run_query(
     """
     # Rewrite query if needed (rule-based + LLM fallback)
     print(f"🔄 run_query called with: {query}")
+    
+    # Auto-detect file path from session cache if not provided
+    if not file_path and session_id:
+        try:
+            from lex_bot.tools.session_cache import get_session_cache
+            cache = get_session_cache()
+            cached_path = cache.get_file_path(session_id)
+            if cached_path:
+                print(f"📂 Found uploaded file in cache: {cached_path}")
+                file_path = cached_path
+        except Exception as e:
+            print(f"⚠️ Failed to check session cache for file: {e}")
+
     from lex_bot.core.query_rewriter import rewrite_query
     print("🔄 Calling rewrite_query...")
     processed_query = rewrite_query(query, user_id=user_id, session_id=session_id)
