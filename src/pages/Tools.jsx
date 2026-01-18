@@ -12,6 +12,7 @@ const Tools = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isCourtFeeModalOpen, setIsCourtFeeModalOpen] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState('');
     const [htmlContent, setHtmlContent] = useState('');
     const [initialDraftingPrompt, setInitialDraftingPrompt] = useState('');
@@ -39,6 +40,7 @@ const Tools = () => {
         if (!file) return;
 
         setUploadedFileName(file.name);
+        setIsUploading(true);
         const formData = new FormData();
         formData.append('file', file);
 
@@ -52,6 +54,8 @@ const Tools = () => {
         } catch (error) {
             console.error('Upload failed:', error);
             alert('Failed to upload and convert document. Please try again.');
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -143,7 +147,15 @@ const Tools = () => {
     };
 
     return (
-        <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden bg-background-light dark:bg-background-dark font-display">
+        <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden bg-background-light dark:bg-background-dark font-display relative">
+            {isUploading && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-2xl flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-lg font-medium text-slate-800 dark:text-white">Uploading & Converting...</p>
+                    </div>
+                </div>
+            )}
             {/* Sticky Filter Bar */}
             <div className="sticky top-0 z-20 w-full bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
                 <div className="w-full max-w-[1200px] mx-auto px-4 md:px-10 lg:px-40 py-3">
