@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     Save, Wand2, Download, Undo, Redo,
-    Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
+    Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify,
     Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon, Hash, Printer
 } from 'lucide-react';
 import PrintModal from './PrintModal';
@@ -186,6 +186,7 @@ const EditorToolbar = ({
                 <button className="tool-btn" onClick={() => execCommand('justifyLeft')} title="Align Left"><AlignLeft size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('justifyCenter')} title="Align Center"><AlignCenter size={18} /></button>
                 <button className="tool-btn" onClick={() => execCommand('justifyRight')} title="Align Right"><AlignRight size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('justifyFull')} title="Align Justify"><AlignJustify size={18} /></button>
 
                 {/* Line Spacing Dropdown */}
                 <div style={{ position: 'relative' }}>

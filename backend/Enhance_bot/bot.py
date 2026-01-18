@@ -402,9 +402,10 @@ def enhance_content(selected_text: str, user_context: str) -> str:
 
     STRICT GUIDELINES:
     1. **Preserve Placeholders**: You must NOT change, remove, or fill in any placeholders (e.g., [Date], [Name of Party], [Amount]). They must remain exactly as they are.
-    2. **Improve Quality**: Make the language more professional, legally sound, and coherent. Fix grammar and flow.
-    3. **Consistency**: Ensure terminology is consistent throughout.
-    4. **Output**: Return ONLY the enhanced full text. No conversational filler.
+    2. **Preserve HTML Structure**: The input is HTML. You MUST return valid HTML. Do NOT strip tags, classes, or styles. Keep the structure exactly as is.
+    3. **Improve Quality**: Make the language more professional, legally sound, and coherent. Fix grammar and flow.
+    4. **Consistency**: Ensure terminology is consistent throughout.
+    5. **Output**: Return ONLY the enhanced full HTML content. No markdown formatting (no ```html ... ```).
     """
 
     contents = f"""
