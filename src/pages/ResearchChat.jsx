@@ -17,10 +17,10 @@ import DraftingModal from '../components/DraftingModal';
 
 // LLM options for dropdown
 const LLM_OPTIONS = [
-    { value: 'gemini-2.5-flash', label: 'Gemini Flash', description: 'Fast responses' },
-    { value: 'gemini-2.5-pro', label: 'Gemini Pro', description: 'Advanced reasoning' },
-    { value: 'gpt-4o', label: 'GPT-4o', description: 'OpenAI flagship' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast & efficient' },
+    { value: 'gemini-2.5-flash', label: 'Fast', description: 'High speed responses' },
+    { value: 'gemini-2.5-pro', label: 'Advanced', description: 'Deep reasoning & analysis' },
+    { value: 'gpt-4o', label: 'Reasoning', description: 'Complex problem solving' },
+    { value: 'gpt-4o-mini', label: 'Fast & Efficient', description: 'Balanced performance' },
 ];
 
 // Helper function to make all citations clickable
@@ -38,8 +38,9 @@ const processCitations = (content, sources) => {
         }
     });
 
-    // 1. Handle MULTI-number citations FIRST: [1, 3, 4, 6], [7, 8], etc.
+    // 1. Handle MULTI-number citations FIRST: [1, 3, 4, 6], [7, 8], [1,2]
     // Must be done before single number citations to avoid partial matches
+    // Regex allows for comma separated digits with optional whitespace
     const multiNumPattern = /\[(\d+(?:\s*,\s*\d+)+)\](?!\()/g;
     processed = processed.replace(multiNumPattern, (match, nums) => {
         const indices = nums.split(',').map(n => parseInt(n.trim()));
@@ -87,7 +88,20 @@ const CitationLink = ({ href, children, sources }) => {
     let matchedSources = []; // For multi citations
     let displayText = children;
     let citationDetails = '';
+
     let citationType = 'unknown';
+
+    // Helper to format source type
+    const formatSourceType = (type) => {
+        if (!type) return 'Reference';
+        const t = type.toLowerCase();
+        if (t.includes('tavily') || t.includes('duck') || t.includes('google') || t.includes('bing') || t.includes('search')) return 'Web Source';
+        if (t === 'case') return 'Legal Precedent';
+        if (t === 'law' || t === 'act' || t === 'section') return 'Statute/Act';
+        if (t === 'youtube') return 'Video Source';
+        if (t === 'pdf' || t === 'doc') return 'Document';
+        return type; // Fallback to original
+    };
 
     // Parse the href to determine citation type
     const isCustomCitation = href && href.startsWith('citation://');
@@ -215,7 +229,7 @@ const CitationLink = ({ href, children, sources }) => {
                                             <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${s.type === 'Case' ? 'bg-purple-100 text-purple-700' :
                                                 s.type === 'Law' ? 'bg-green-100 text-green-700' :
                                                     'bg-slate-200 text-slate-600'
-                                                }`}>{s.type}</span>
+                                                }`}>{formatSourceType(s.type)}</span>
                                         </div>
                                         <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2 mt-1">{s.title}</p>
                                     </a>
@@ -232,7 +246,7 @@ const CitationLink = ({ href, children, sources }) => {
                                         ? 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300'
                                         : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                                     }`}>
-                                    {source?.type || 'Source'}
+                                    {formatSourceType(source?.type || 'Source')}
                                 </span>
                                 {source?.index && <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{source.index}]</span>}
                             </div>
