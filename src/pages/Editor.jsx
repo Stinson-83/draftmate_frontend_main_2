@@ -8,7 +8,9 @@ import VariablesSidebar from '../components/VariablesSidebar';
 import AiSidebar from '../components/AiSidebar';
 import FloatingToolbar from '../components/FloatingToolbar';
 import ModifyDraftModal from '../components/ModifyDraftModal';
+import EnhancementPreviewModal from '../components/EnhancementPreviewModal';
 import { API_CONFIG } from '../services/endpoints';
+import { api } from '../services/api';
 import './Editor.css';
 
 const Editor = () => {
@@ -35,6 +37,18 @@ const Editor = () => {
 
     // Modify Draft Modal State
     const [showModifyModal, setShowModifyModal] = useState(false);
+
+    // Enhancement Preview State (for accept/reject)
+    const [showEnhancementPreview, setShowEnhancementPreview] = useState(false);
+    const [isEnhancing, setIsEnhancing] = useState(false);
+    const [enhancementData, setEnhancementData] = useState({
+        originalContent: '',
+        enhancedContent: ''
+    });
+
+    // AI Sidebar Chat State
+    const [aiSessionId, setAiSessionId] = useState(() => crypto.randomUUID());
+    const [isAiTyping, setIsAiTyping] = useState(false);
 
     // Settings State
     const [editorSettings, setEditorSettings] = useState({ headerText: '', footerText: '', headerAlignment: 'center' });
@@ -274,13 +288,76 @@ const Editor = () => {
         }
     };
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (!chatInput.trim()) return;
-        setChatMessages([...chatMessages, { role: 'user', content: chatInput }]);
+
+        const userMessage = chatInput.trim();
+        setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
         setChatInput('');
-        setTimeout(() => {
-            setChatMessages(prev => [...prev, { role: 'ai', content: 'I am processing your request. This is a demo response.' }]);
-        }, 1000);
+        setIsAiTyping(true);
+
+        // Get current draft content as context
+        let draftContext = '';
+        if (pagesContainerRef.current) {
+            const allEditors = Array.from(pagesContainerRef.current.querySelectorAll('.editor-root'));
+            const fullContent = allEditors.map(ed => ed.textContent || '').join(' ');
+            // Limit context to prevent token overflow
+            draftContext = fullContent.slice(0, 2000);
+        }
+
+        // Prepare query with context and instruction for concise responses
+        const conciseInstruction = '[SIDEBAR CONTEXT: You are a quick-reference assistant in a document editor sidebar. Keep responses CONCISE, and TO-THE-POINT. Use bullet points. Fix amount of answer according to query.]\n\n';
+
+        const queryWithContext = draftContext
+            ? `${conciseInstruction}[DRAFT CONTEXT: ${draftContext.slice(0, 500)}...]\n\nUser Question: ${userMessage}`
+            : `${conciseInstruction}User Question: ${userMessage}`;
+
+        try {
+            let aiResponse = '';
+
+            await api.chatStream(queryWithContext, aiSessionId, {
+                onStatus: (message) => {
+                    // Optional: Show status in UI
+                },
+                onToken: (chunk, accumulated) => {
+                    aiResponse = accumulated;
+                    // Update message progressively
+                    setChatMessages(prev => {
+                        const lastMsg = prev[prev.length - 1];
+                        if (lastMsg?.role === 'ai' && lastMsg?.isStreaming) {
+                            return [...prev.slice(0, -1), { role: 'ai', content: accumulated, isStreaming: true }];
+                        } else {
+                            return [...prev, { role: 'ai', content: accumulated, isStreaming: true }];
+                        }
+                    });
+                },
+                onAnswer: (content) => {
+                    aiResponse = content;
+                    setChatMessages(prev => {
+                        const filtered = prev.filter(m => !m.isStreaming);
+                        return [...filtered, { role: 'ai', content: content }];
+                    });
+                },
+                onDone: () => {
+                    setIsAiTyping(false);
+                },
+                onError: (error) => {
+                    console.error('AI Chat Error:', error);
+                    setChatMessages(prev => {
+                        const filtered = prev.filter(m => !m.isStreaming);
+                        return [...filtered, { role: 'ai', content: 'Sorry, I encountered an error. Please try again.' }];
+                    });
+                    setIsAiTyping(false);
+                }
+            });
+        } catch (error) {
+            console.error('Chat error:', error);
+            setChatMessages(prev => [...prev, {
+                role: 'ai',
+                content: 'Sorry, I could not connect to the AI service. Please ensure the backend is running.'
+            }]);
+            setIsAiTyping(false);
+        }
     };
 
     const execCommand = (command, value = null) => {
@@ -1378,10 +1455,12 @@ const Editor = () => {
 
                         if (!selection.isCollapsed) {
                             savedSelectionRef.current = range.cloneRange();
+                            activeRangeRef.current = range.cloneRange(); // Also save for Enhance
                         } else {
                             // If table mode and collapsed, we don't necessarily save selection for "text actions",
                             // but we might need it for table actions.
                             savedSelectionRef.current = range.cloneRange();
+                            activeRangeRef.current = range.cloneRange();
                         }
                     } else {
                         setShowFloatingToolbar(false);
@@ -1427,6 +1506,8 @@ const Editor = () => {
     }, [showFloatingToolbar]);
 
     const handleEnhance = async (userPrompt = '') => {
+        console.log('handleEnhance called with prompt:', userPrompt);
+
         // Use stored range if available (prioritize logic) or fall back to current selection
         let range = activeRangeRef.current;
         let selectedText = '';
@@ -1438,69 +1519,91 @@ const Editor = () => {
             }
         }
 
-        if (!range) return;
+        if (!range) {
+            toast.error('Please select some text first');
+            return;
+        }
 
         selectedText = range.toString();
-        if (!selectedText) return; // Double check
+        if (!selectedText) {
+            toast.error('No text selected');
+            return;
+        }
+
+        console.log('Selected text:', selectedText.substring(0, 50));
+
+        // Show immediate feedback
+        toast.loading('Enhancing selected text...', { id: 'enhance-toast' });
 
         // 1. Get Context (approx 50 chars before and after)
-        // We clone the range and expand it
-        const PreRange = range.cloneRange();
-        PreRange.setStart(mainContainerRef.current, 0); // Start from beginning of editor
-        PreRange.setEnd(range.startContainer, range.startOffset);
-        const preText = PreRange.toString().slice(-50); // Last 50 chars
+        let context = '';
+        try {
+            const PreRange = range.cloneRange();
+            PreRange.setStart(mainContainerRef.current, 0);
+            PreRange.setEnd(range.startContainer, range.startOffset);
+            const preText = PreRange.toString().slice(-50);
 
-        const PostRange = range.cloneRange();
-        PostRange.setStart(range.endContainer, range.endOffset);
-        PostRange.setEndAfter(mainContainerRef.current.lastChild || mainContainerRef.current);
-        const postText = PostRange.toString().slice(0, 50); // First 50 chars
+            const PostRange = range.cloneRange();
+            PostRange.setStart(range.endContainer, range.endOffset);
+            PostRange.setEndAfter(mainContainerRef.current.lastChild || mainContainerRef.current);
+            const postText = PostRange.toString().slice(0, 50);
 
-        const context = `${preText} ... [TARGET] ... ${postText}`;
+            context = `${preText} ... [TARGET] ... ${postText}`;
+        } catch (e) {
+            console.error('Context extraction error:', e);
+            context = '';
+        }
 
         console.log("Enhance Context:", context);
         console.log("User Prompt:", userPrompt);
 
-        const promise = fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_clause`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                selected_text: selectedText,
-                case_context: context, // Sending surrounding text as context per user request
-                user_prompt: userPrompt
-            })
-        }).then(async (res) => {
-            if (!res.ok) throw new Error('Enhancement failed');
+        try {
+            const res = await fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_clause`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    selected_text: selectedText,
+                    case_context: context,
+                    user_prompt: userPrompt
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                if (res.status === 429) {
+                    toast.error('API Quota Exceeded. Please wait a moment.', { id: 'enhance-toast' });
+                } else {
+                    toast.error(errorData.detail || 'Enhancement failed', { id: 'enhance-toast' });
+                }
+                return;
+            }
+
             const data = await res.json();
-            return data.enhanced_text;
-        });
+            const enhancedText = data.enhanced_text;
 
-        toast.promise(promise, {
-            loading: 'Enhancing text with AI...',
-            success: (enhancedText) => {
-                // Check for no-op responses
-                if (!enhancedText || enhancedText === 'No significant suggestions') {
-                    return 'No suggestions available.';
-                }
+            if (!enhancedText || enhancedText === 'No significant suggestions') {
+                toast.info('No suggestions available.', { id: 'enhance-toast' });
+                return;
+            }
 
-                // Restore selection to ensure insertText works
-                if (range) {
-                    const selection = window.getSelection();
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                }
+            // Restore selection and replace
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
 
-                document.execCommand('insertText', false, enhancedText);
-                return 'Text enhanced successfully!';
-            },
-            error: 'Failed to enhance text.'
-        });
+            document.execCommand('insertText', false, enhancedText);
+            toast.success('Text enhanced! Press Ctrl+Z to undo.', { id: 'enhance-toast' });
+
+        } catch (error) {
+            console.error('Enhance error:', error);
+            toast.error('Failed to enhance text. Check console for details.', { id: 'enhance-toast' });
+        }
     };
 
     const handleModifyDraft = async (context) => {
         if (!pagesContainerRef.current) return;
 
         // 1. Gather content from ALL pages
-        // documentRef only points to the first page's editor, but we might have multiple pages.
         const allEditors = Array.from(pagesContainerRef.current.querySelectorAll('.editor-root'));
         const fullContent = allEditors.map(ed => ed.innerHTML).join('');
 
@@ -1508,6 +1611,12 @@ const Editor = () => {
             toast.error("Document is empty.");
             return;
         }
+
+        // 2. Store original content and show preview modal
+        setEnhancementData(prev => ({ ...prev, originalContent: fullContent }));
+        setShowModifyModal(false);
+        setShowEnhancementPreview(true);
+        setIsEnhancing(true);
 
         try {
             const res = await fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_content`, {
@@ -1521,6 +1630,8 @@ const Editor = () => {
 
             if (!res.ok) {
                 const errorData = await res.json();
+                setShowEnhancementPreview(false);
+                setIsEnhancing(false);
                 if (res.status === 429) {
                     toast.error('API Quota Exceeded. Please try again later.');
                 } else {
@@ -1531,31 +1642,86 @@ const Editor = () => {
 
             const data = await res.json();
 
-            // 2. Update Content
-            // Strategy: Put everything in the first page, remove other pages, and let pagination flow
-            if (documentRef.current) {
-                // Clear other pages first to prevent duplication
-                const pages = Array.from(pagesContainerRef.current.querySelectorAll('.document-page'));
-                for (let i = 1; i < pages.length; i++) {
-                    pages[i].remove();
-                }
-
-                // Update first page
-                documentRef.current.innerHTML = data.enhanced_text;
-
-                // Trigger pagination
-                // Reset page count to 1 temporarily so React knows? 
-                // Actually paginateAll calculates final count.
-                setPageCount(1);
-                setTimeout(paginateAll, 100);
-            }
-            toast.success('Draft modified successfully!');
-            setShowModifyModal(false);
+            // 3. Store enhanced content and show in preview (user can accept/reject)
+            setEnhancementData(prev => ({ ...prev, enhancedContent: data.enhanced_text }));
+            setIsEnhancing(false);
 
         } catch (error) {
             console.error(error);
+            setShowEnhancementPreview(false);
+            setIsEnhancing(false);
             toast.error('An error occurred while modifying the draft.');
         }
+    };
+
+    // Accept enhancement - apply the enhanced content
+    const handleAcceptEnhancement = () => {
+        console.log('Accept Enhancement clicked');
+        console.log('documentRef.current:', documentRef.current);
+        console.log('enhancementData:', enhancementData);
+
+        // Store the content before we reset state
+        const contentToApply = enhancementData.enhancedContent;
+
+        if (!contentToApply) {
+            toast.error('No enhanced content available');
+            setShowEnhancementPreview(false);
+            return;
+        }
+
+        if (!documentRef.current) {
+            toast.error('Editor not ready');
+            setShowEnhancementPreview(false);
+            return;
+        }
+
+        // Close modal FIRST
+        setShowEnhancementPreview(false);
+        setEnhancementData({ originalContent: '', enhancedContent: '' });
+
+        // Apply content after a small delay to ensure modal is closed
+        setTimeout(() => {
+            try {
+                // Clear other pages first
+                if (pagesContainerRef.current) {
+                    const pages = Array.from(pagesContainerRef.current.querySelectorAll('.document-page'));
+                    for (let i = 1; i < pages.length; i++) {
+                        pages[i].remove();
+                    }
+                }
+
+                // Focus the editor first
+                documentRef.current.focus();
+
+                // Select all content in the editor
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(documentRef.current);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                // Use insertHTML to enable Ctrl+Z undo
+                document.execCommand('insertHTML', false, contentToApply);
+
+                console.log('Content applied successfully with undo support');
+
+                // Trigger pagination
+                setPageCount(1);
+                setTimeout(paginateAll, 100);
+
+                toast.success('Enhancement applied! Press Ctrl+Z to undo.');
+            } catch (error) {
+                console.error('Error applying enhancement:', error);
+                toast.error('Failed to apply enhancement');
+            }
+        }, 50);
+    };
+
+    // Reject enhancement - keep original content
+    const handleRejectEnhancement = () => {
+        toast.info('Enhancement rejected. Original content preserved.');
+        setShowEnhancementPreview(false);
+        setEnhancementData({ originalContent: '', enhancedContent: '' });
     };
 
     return (
@@ -1572,6 +1738,18 @@ const Editor = () => {
                 isOpen={showModifyModal}
                 onClose={() => setShowModifyModal(false)}
                 onConfirm={handleModifyDraft}
+            />
+            <EnhancementPreviewModal
+                isOpen={showEnhancementPreview}
+                isLoading={isEnhancing}
+                originalContent={enhancementData.originalContent}
+                enhancedContent={enhancementData.enhancedContent}
+                onAccept={handleAcceptEnhancement}
+                onReject={handleRejectEnhancement}
+                onClose={() => {
+                    setShowEnhancementPreview(false);
+                    setIsEnhancing(false);
+                }}
             />
             <EditorToolbar
                 execCommand={execCommand}
@@ -1692,6 +1870,7 @@ const Editor = () => {
                     handleSendMessage={handleSendMessage}
                     notes={notes}
                     setNotes={setNotes}
+                    isTyping={isAiTyping}
                 />
             </div>
 
