@@ -3,6 +3,8 @@ import json
 import logging
 import google.generativeai as genai
 from google.generativeai import types
+from google.api_core import exceptions
+import time
 from dotenv import load_dotenv
 from web_search import web_search_tool
 
@@ -335,19 +337,46 @@ Input Clause: {selected_text}"""
             system_instruction=system_instruction
         )
 
-        response = model.generate_content(
-            contents=[contents],
-            generation_config={
-                "temperature": 0.1,
-                "max_output_tokens": 512 * 4
-            },
-            safety_settings={
-                types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
-            }
-        )
+        # Retry logic for 504/Timeout errors
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(
+                    contents=[contents],
+                    generation_config={
+                        "temperature": 0.1,
+                        "max_output_tokens": 512 * 4
+                    },
+                    safety_settings={
+                        types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
+                        types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
+                        types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
+                        types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
+                    },
+                    request_options={"timeout": 60}  # Explicit 60s timeout
+                )
+                break # Success
+            except exceptions.DeadlineExceeded:
+                if attempt < max_retries - 1:
+                    print(f"Gemini 504 Deadline Exceeded. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2 # Exponential backoff
+                else:
+                    raise # Re-raise on last attempt
+            except Exception as e:
+                # For other errors, we might not want to retry or handle differently
+                # But for now, let's just re-raise to be safe unless it's clearly transient
+                if "504" in str(e) or "deadline" in str(e).lower():
+                     if attempt < max_retries - 1:
+                        print(f"Gemini Error {e}. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                     else:
+                        raise
+                else:
+                    raise
         
         try:
             result = response.text.strip()
@@ -422,19 +451,44 @@ def enhance_content(selected_text: str, user_context: str) -> str:
         print(f"DEBUG: Calling enhance_content with context: {user_context}")
         print(f"DEBUG: Input text length: {len(selected_text)}")
 
-        response = model.generate_content(
-            contents=[contents],
-            generation_config={
-                "temperature": 0.3, 
-                "max_output_tokens": 8192 # Max for Flash to ensure full document return
-            },
-            safety_settings={
-                types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
-            }
-        )
+        # Retry logic for enhance_content
+        max_retries = 3
+        retry_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(
+                    contents=[contents],
+                    generation_config={
+                        "temperature": 0.3, 
+                        "max_output_tokens": 8192 
+                    },
+                    safety_settings={
+                        types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
+                        types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
+                        types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
+                        types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
+                    },
+                    request_options={"timeout": 90} # Longer timeout for full content
+                )
+                break
+            except exceptions.DeadlineExceeded:
+                if attempt < max_retries - 1:
+                    print(f"Gemini 504 (Content). Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    raise
+            except Exception as e:
+                if "504" in str(e) or "deadline" in str(e).lower():
+                     if attempt < max_retries - 1:
+                        print(f"Gemini Error {e}. Retrying in {retry_delay}s... (Attempt {attempt+1}/{max_retries})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                     else:
+                        raise
+                else:
+                    raise
         try:
             res_text = response.text.strip()
             print(f"DEBUG: Enhance Response (First 500 chars): {res_text[:500]}")

@@ -37,9 +37,22 @@ RUN apt-get update && apt-get install -y \
     wkhtmltopdf \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip to minimize connection issues
+RUN pip install --upgrade pip
+
+# Install heavy dependencies first with increased retries and timeout
+RUN pip install --default-timeout=3000 --no-cache-dir --retries 10 \
+    numpy \
+    grpcio \
+    grpcio-status \
+    opencv-python-headless \
+    faiss-cpu \
+    sqlalchemy \
+    psycopg2-binary
+
 # Install Base Python dependencies (Cached Layer)
 COPY requirements_base.txt .
-RUN pip install --default-timeout=3000 --no-cache-dir -r requirements_base.txt
+RUN pip install --default-timeout=3000 --no-cache-dir --retries 10 -r requirements_base.txt
 
 # Install CPU-only PyTorch and heavy ML libraries
 # We install torch first from the CPU index, then easyocr/sentence-transformers
