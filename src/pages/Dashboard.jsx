@@ -137,7 +137,9 @@ const Dashboard = () => {
                     {/* Welcome Section */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                         <div>
-                            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Hello, {userProfile.name} !</h2>
+                            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                Hello, {userProfile.firstName || userProfile.name || (userProfile.email ? userProfile.email.split('@')[0] : "User")}!
+                            </h2>
                             <p className="text-slate-500 dark:text-slate-400 mt-1">Here is your daily overview for <span className="font-medium text-slate-700 dark:text-slate-300">{dateStr}</span>.</p>
                         </div>
                         <div className="flex items-center gap-3">

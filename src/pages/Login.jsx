@@ -35,8 +35,19 @@ const Login = () => {
             // Save session
             localStorage.setItem('session_id', data.session_id);
             localStorage.setItem('user_id', data.user_id);
-            // Also store a profile object for App.jsx RequireAuth check
-            localStorage.setItem('user_profile', JSON.stringify({ email: email, id: data.user_id }));
+
+            // CACHING IMPROVEMENT: Store the full profile if available
+            if (data.profile && Object.keys(data.profile).length > 0) {
+                const fullProfile = {
+                    ...data.profile,
+                    id: data.user_id,
+                    email: email
+                };
+                localStorage.setItem('user_profile', JSON.stringify(fullProfile));
+            } else {
+                // Fallback to basic info if profile hasn't been set up yet
+                localStorage.setItem('user_profile', JSON.stringify({ email: email, id: data.user_id }));
+            }
 
             toast.dismiss(loadingToast);
             toast.success("Welcome back!");
@@ -71,15 +82,28 @@ const Login = () => {
                 localStorage.setItem('user_id', data.user_id);
 
                 // Save profile from backend response
-                const profileData = {
-                    id: data.user_id,
-                    email: data.email,
-                    name: data.name,
-                    image: data.picture,
-                    firstName: data.name ? data.name.split(' ')[0] : '',
-                    lastName: data.name ? data.name.split(' ').slice(1).join(' ') : '',
-                    google: true
-                };
+                let profileData = {};
+
+                if (data.profile && Object.keys(data.profile).length > 0) {
+                    // Use rich profile from DB
+                    profileData = {
+                        ...data.profile,
+                        id: data.user_id,
+                        email: data.email,
+                        google: true
+                    };
+                } else {
+                    // Fallback to Google data if DB profile is empty
+                    profileData = {
+                        id: data.user_id,
+                        email: data.email,
+                        name: data.name,
+                        image: data.picture,
+                        firstName: data.name ? data.name.split(' ')[0] : '',
+                        lastName: data.name ? data.name.split(' ').slice(1).join(' ') : '',
+                        google: true
+                    };
+                }
                 localStorage.setItem('user_profile', JSON.stringify(profileData));
 
                 toast.dismiss(loadingToast);
@@ -162,7 +186,7 @@ const Login = () => {
                                     <input className="rounded border-slate-300 text-blue-600 focus:ring-blue-600/20 w-4 h-4" type="checkbox" />
                                     <span className="text-sm text-slate-500 dark:text-slate-400 font-normal">Remember me</span>
                                 </label>
-                                <a className="text-blue-600 hover:text-blue-700 text-sm font-normal underline underline-offset-4 decoration-blue-600/30 hover:decoration-blue-600 transition-all" href="#">Forgot Password?</a>
+                                <Link className="text-blue-600 hover:text-blue-700 text-sm font-normal underline underline-offset-4 decoration-blue-600/30 hover:decoration-blue-600 transition-all" to="/forgot-password">Forgot Password?</Link>
                             </div>
 
                             {/* Login Button */}

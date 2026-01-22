@@ -7,9 +7,11 @@ from typing import Optional
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import bcrypt
-from datetime import datetime
+import jwt
+import requests
+from datetime import datetime, timedelta
 from google.oauth2 import id_token
-from google.auth.transport import requests
+from google.auth.transport import requests as google_requests
 
 # Load environment variables from the root .env file
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
@@ -45,6 +47,8 @@ SSH_KEY_PATH = os.getenv("SSH_KEY_PATH")
 RDS_ENDPOINT = os.getenv("RDS_ENDPOINT")
 SSH_USER = os.getenv("SSH_USER", "ec2-user")
 LOCAL_BIND_PORT = 5432
+SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-change-this")
+ALGORITHM = "HS256"
 
 # Global tunnel reference to keep it alive
 _tunnel = None
@@ -110,6 +114,13 @@ class UserSignup(BaseModel):
 class GoogleLoginModel(BaseModel):
     token: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
 class ProfileUpdate(BaseModel):
     user_id: str
     firstName: Optional[str] = None
@@ -118,6 +129,26 @@ class ProfileUpdate(BaseModel):
     workplace: Optional[str] = None
     bio: Optional[str] = None
     image: Optional[str] = None
+
+def get_profile_internal(cur, user_id):
+    cur.execute("""
+        SELECT first_name, last_name, role, workplace, bio, profile_image_url 
+        FROM profiles 
+        WHERE user_id = %s
+    """, (user_id,))
+    result = cur.fetchone()
+    
+    if not result:
+        return {}
+        
+    return {
+        "firstName": result[0],
+        "lastName": result[1],
+        "role": result[2],
+        "workplace": result[3],
+        "bio": result[4],
+        "image": result[5]
+    }
 
 # Helper Functions
 def hash_password(password: str) -> str:
@@ -270,11 +301,13 @@ def login(user: UserLogin):
         )
         conn.commit()
         
+
         return {
             "message": "Login successful", 
             "session_id": session_id, 
             "user_id": user_id,
-            "email": user.email
+            "email": user.email,
+            "profile": get_profile_internal(cur, user_id)
         }
         
     except HTTPException as he:
@@ -299,7 +332,7 @@ def google_login(model: GoogleLoginModel):
         # 1. Try checking if it's a valid ID Token (JWT)
         try:
             CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
-            id_info = id_token.verify_oauth2_token(token, requests.Request(), CLIENT_ID)
+            id_info = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
             email = id_info.get('email')
             google_id = id_info.get('sub')
         except ValueError:
@@ -349,7 +382,9 @@ def google_login(model: GoogleLoginModel):
             "user_id": user_id,
             "email": email,
             "name": id_info.get('name') if 'id_info' in locals() else user_info.get('name'),
-            "picture": id_info.get('picture') if 'id_info' in locals() else user_info.get('picture')
+            "picture": id_info.get('picture') if 'id_info' in locals() else user_info.get('picture'),
+            # Fetch full profile from DB for caching
+            "profile": get_profile_internal(cur, user_id)
         }
         
     except ValueError as e:
@@ -384,6 +419,116 @@ def logout(model: LogoutModel):
     except Exception as e:
         conn.rollback()
         print(f"Logout error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/forgot-password")
+def forgot_password(request: ForgotPasswordRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 1. Check if user exists
+        cur.execute("SELECT id FROM users WHERE email = %s", (request.email,))
+        user = cur.fetchone()
+        
+        if not user:
+            # Security: Always return success to prevent email enumeration
+            return {"message": "If this email is registered, a password reset link has been sent."}
+            
+        user_id = user[0]
+        
+        # 2. Generate JWT Token (Stateless)
+        expiration = datetime.utcnow() + timedelta(hours=1)
+        payload = {
+            "sub": user_id,
+            "type": "reset_password",
+            "exp": expiration
+        }
+        token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+        # 3. Create Reset Link
+        
+        # Safety: Default to 'development' if env var is missing to prevent crash on .strip()
+        env_mode = os.getenv("ENVIRONMENT", "development").strip().lower()
+        
+        if env_mode == "production":
+             frontend_url = os.getenv("FRONTEND_URL_PROD").strip()
+        elif env_mode == "development":
+             frontend_url = os.getenv("FRONTEND_URL_DEV").strip()
+             
+        reset_link = f"{frontend_url}/reset-password?token={token}"
+        
+        # 4. Send Email via Notification Service
+        try:
+            notification_payload = {
+                "to_email": request.email,
+                "subject": "Reset Your DraftMate Password",
+                "body": f"Click the link below to reset your password. This link expires in 1 hour.\n\n{reset_link}"
+            }
+            # Add timeout to prevent hanging
+            requests.post("http://notification_service:8015/send-email", json=notification_payload, timeout=5)
+        except Exception as e:
+            print(f"Failed to call Notification Service: {e}")
+            # We still return success to the user, but maybe log this error
+            
+        # Return link for dev/testing convenience (Remove in production!)
+        response= {"message": "Reset link sent"}
+        if os.getenv("ENVIRONMENT") == "development":
+            response["dev_link"] = reset_link
+
+        return response
+        
+    except Exception as e:
+        print(f"Forgot password error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/reset-password")
+def reset_password(request: ResetPasswordRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 1. Verify Token
+        try:
+            payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+            token_type = payload.get("type")
+            
+            if not user_id or token_type != "reset_password":
+                raise HTTPException(status_code=400, detail="Invalid token content")
+                
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=400, detail="Token has expired. Please request a new one.")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=400, detail="Invalid token")
+
+        # 2. Update Password
+        hashed_pwd = hash_password(request.new_password)
+        
+        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (hashed_pwd, user_id))
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        conn.commit()
+        
+        # Optional: Revoke existing sessions?
+        # cur.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))
+        # conn.commit()
+        
+        return {"message": "Password updated successfully"}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        conn.rollback()
+        print(f"Reset password error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         cur.close()

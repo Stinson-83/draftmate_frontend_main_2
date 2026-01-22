@@ -106,6 +106,8 @@ export const API_CONFIG = {
             VERIFY_SESSION: '/verify_session', // GET
             GET_PROFILE: (userId) => `/profile/${userId}`, // GET
             UPDATE_PROFILE: '/profile/update', // POST
+            FORGOT_PASSWORD: '/forgot-password', // POST
+            RESET_PASSWORD: '/reset-password', // POST
         }
     },
 

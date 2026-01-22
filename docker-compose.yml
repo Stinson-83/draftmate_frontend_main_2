@@ -87,6 +87,9 @@ services:
       - SSH_USER=${SSH_USER}
       - POSTGRES_DSN=${POSTGRES_DSN}
       - AUTH_SERVICE_URL=http://127.0.0.1:8009
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - FRONTEND_URL_DEV=${FRONTEND_URL_DEV}
+      - FRONTEND_URL_PROD=${FRONTEND_URL_PROD}
     depends_on:
       - db
       - notification_service
