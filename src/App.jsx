@@ -9,6 +9,7 @@ import MyDrafts from './pages/MyDrafts';
 
 import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
+import ChatWithPDF from './pages/ChatWithPDF';
 
 import Settings from './pages/Settings';
 import HelpCenter from './pages/HelpCenter';
@@ -95,6 +96,7 @@ function App() {
               <Route path="tools" element={<Tools />} />
               <Route path="drafts" element={<MyDrafts />} />
               <Route path="research" element={<ResearchChat />} />
+              <Route path="chat-pdf" element={<ChatWithPDF />} />
               <Route path="settings" element={<Settings />} />
               <Route path="help" element={<HelpCenter />} />
               <Route path="notifications" element={<Notifications />} />

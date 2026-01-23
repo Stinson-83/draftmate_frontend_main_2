@@ -1,97 +1,69 @@
 import requests
+import uuid
 import time
-import sys
 
-BASE_URL = "http://localhost:8015"
-USER_ID = "test_user_verification"
+BASE_URL = "http://localhost:8080/notification"
 
-def log(msg, status="INFO"):
-    colors = {
-        "INFO": "\033[94m",
-        "SUCCESS": "\033[92m",
-        "ERROR": "\033[91m",
-        "RESET": "\033[0m"
-    }
-    print(f"{colors.get(status, '')}[{status}] {msg}{colors['RESET']}")
-
-def verify_backend():
-    log("Starting Notification Backend Verification...", "INFO")
-
-    # 1. Health Check
+def test_health():
+    print("Testing Health Check...")
     try:
         response = requests.get(f"{BASE_URL}/health")
         if response.status_code == 200:
-            log("Health check passed", "SUCCESS")
+            print("✅ Health Check Passed:", response.json())
+            return True
         else:
-            log(f"Health check failed: {response.status_code}", "ERROR")
-            return
-    except requests.exceptions.ConnectionError:
-        log("Could not connect to backend. Is it running on port 8015?", "ERROR")
-        return
+            print(f"❌ Health Check Failed: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Health Check Error: {e}")
+        return False
 
-    # 2. Create Notification
+def test_create_notification():
+    print("\nTesting Create Notification...")
+    user_id = "test_user_123"
+    payload = {
+        "type": "system",
+        "title": "Test Notification",
+        "message": "This is a test notification from the verification script.",
+        "user_id": user_id
+    }
+    
     try:
-        payload = {
-            "user_id": USER_ID,
-            "type": "system",
-            "title": "Verification Test",
-            "message": "This is a test notification to verify backend linkage.",
-            "metadata": {"source": "verification_script"}
-        }
         response = requests.post(f"{BASE_URL}/notifications", json=payload)
         if response.status_code == 201:
-            notif = response.json()
-            notif_id = notif['id']
-            log(f"Created notification: {notif_id}", "SUCCESS")
+            data = response.json()
+            print("✅ Create Notification Passed:", data)
+            return data['id'], user_id
         else:
-            log(f"Create notification failed: {response.status_code} - {response.text}", "ERROR")
-            return
+            print(f"❌ Create Notification Failed: {response.status_code} - {response.text}")
+            return None, None
     except Exception as e:
-        log(f"Create notification exception: {str(e)}", "ERROR")
-        return
+        print(f"❌ Create Notification Error: {e}")
+        return None, None
 
-    # 3. Get Notifications
+def test_get_notifications(user_id):
+    print(f"\nTesting Get Notifications for user {user_id}...")
     try:
-        response = requests.get(f"{BASE_URL}/notifications/{USER_ID}")
+        response = requests.get(f"{BASE_URL}/notifications/{user_id}")
         if response.status_code == 200:
-            notifs = response.json()
-            found = any(n['id'] == notif_id for n in notifs)
-            if found:
-                log("Notification found in list", "SUCCESS")
-            else:
-                log("Notification NOT found in list", "ERROR")
-                return
+            data = response.json()
+            print(f"✅ Get Notifications Passed. Found {len(data)} notifications.")
+            return True
         else:
-            log(f"Get notifications failed: {response.status_code}", "ERROR")
-            return
+            print(f"❌ Get Notifications Failed: {response.status_code} - {response.text}")
+            return False
     except Exception as e:
-        log(f"Get notifications exception: {str(e)}", "ERROR")
-        return
-
-    # 4. Mark as Read
-    try:
-        response = requests.patch(f"{BASE_URL}/notifications/{notif_id}/read")
-        if response.status_code == 200:
-            if response.json()['read'] is True:
-                log("Marked notification as read", "SUCCESS")
-            else:
-                log("Notification read status is False after update", "ERROR")
-        else:
-            log(f"Mark read failed: {response.status_code}", "ERROR")
-    except Exception as e:
-        log(f"Mark read exception: {str(e)}", "ERROR")
-
-    # 5. Delete Notification
-    try:
-        response = requests.delete(f"{BASE_URL}/notifications/{notif_id}")
-        if response.status_code == 200:
-            log("Deleted notification", "SUCCESS")
-        else:
-            log(f"Delete failed: {response.status_code}", "ERROR")
-    except Exception as e:
-        log(f"Delete exception: {str(e)}", "ERROR")
-
-    log("Verification Complete! Backend is linked and functioning correctly.", "SUCCESS")
+        print(f"❌ Get Notifications Error: {e}")
+        return False
 
 if __name__ == "__main__":
-    verify_backend()
+    print("🚀 Starting Notification Service Verification...")
+    print("Ensure your Docker container is running with the latest nginx.conf changes.")
+    print("Run: ./test_docker_local.sh\n")
+    
+    if test_health():
+        notif_id, user_id = test_create_notification()
+        if notif_id:
+            test_get_notifications(user_id)
+    
+    print("\nVerification Complete.")

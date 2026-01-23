@@ -263,6 +263,12 @@ const Tools = () => {
                                         onClick={() => navigate('/dashboard/research')}
                                     />
                                     <ToolCard
+                                        icon="picture_as_pdf"
+                                        title="Chat with PDF"
+                                        description="Upload a PDF and ask questions, summarize, or analyze it."
+                                        onClick={() => navigate('/dashboard/chat-pdf')}
+                                    />
+                                    <ToolCard
                                         icon="calculate"
                                         title="Court Fee Calculator"
                                         description="Calculate Ad-Valorem Court Fees for your jurisdiction."

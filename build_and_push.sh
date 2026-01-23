@@ -3,7 +3,7 @@
 # Configuration
 AWS_REGION="us-east-1"
 ECR_REPO_NAME="draftmate-app" # Updated from screenshot
-IMAGE_TAG="v33"
+IMAGE_TAG="v34"
 # Load VITE_CLIENT_ID from .env safely
 if [ -f .env ]; then
   VITE_CLIENT_ID=$(grep "^VITE_CLIENT_ID=" .env | cut -d '=' -f2- | tr -d '"' | tr -d "'")
@@ -25,6 +25,7 @@ ECR_URI="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME"
 # 2. Build the Image
 echo "🏗️ Building Docker Image..."
 docker build \
+  --platform linux/amd64 \
   --build-arg VITE_CLIENT_ID=$VITE_CLIENT_ID \
   -t $ECR_REPO_NAME \
   .

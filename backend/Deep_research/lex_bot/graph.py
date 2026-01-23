@@ -214,8 +214,8 @@ def define_graph():
     # Simple path: Research -> Memory Store
     workflow.add_edge("research_agent", "memory_store")
     
-    # Document Agent -> Router (to decide next steps with new context)
-    workflow.add_edge("document_agent", "router")
+    # Document Agent -> Memory Store (End)
+    workflow.add_edge("document_agent", "memory_store")
     
     # Aggregate -> Memory Store -> END
     workflow.add_edge("manager_aggregate", "memory_store")

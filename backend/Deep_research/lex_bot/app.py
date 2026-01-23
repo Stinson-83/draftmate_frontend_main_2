@@ -18,6 +18,7 @@ import time
 import json
 import asyncio
 import logging
+import httpx
 from typing import Optional, List
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -127,6 +128,7 @@ async def lifespan(app: FastAPI):
         
     yield
     logger.info("👋 Lex Bot v2 shutting down...")
+    await http_client.aclose()
 
 
 # ============ FastAPI App ============
@@ -136,6 +138,9 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+
+# Global HTTP Client
+http_client = httpx.AsyncClient()
 
 # CORS middleware
 app.add_middleware(
@@ -306,12 +311,11 @@ async def verify_token(request: Request):
 
     try:
         url = f"{AUTH_SERVICE_URL}/verify_session/{session_id}"
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url)
-            if resp.status_code != 200:
-                logger.warning(f"Auth check failed for {session_id}: {resp.status_code} {resp.text}")
-                raise HTTPException(status_code=401, detail="Invalid session")
-            return resp.json().get("user_id")
+        resp = await http_client.get(url)
+        if resp.status_code != 200:
+            logger.warning(f"Auth check failed for {session_id}: {resp.status_code} {resp.text}")
+            raise HTTPException(status_code=401, detail="Invalid session")
+        return resp.json().get("user_id")
     except httpx.RequestError as e:
         logger.error(f"Auth service connection failed to {url}: {repr(e)}")
         raise HTTPException(status_code=500, detail="Auth service unavailable")

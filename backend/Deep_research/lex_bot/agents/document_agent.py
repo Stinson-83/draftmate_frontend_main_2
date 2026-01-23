@@ -121,12 +121,19 @@ class DocumentAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Web search failed: {e}")
         
-        # 3. Return Context (Skip Final Answer)
-        # We pass the extracted context back to the graph so the Manager/Router 
-        # can decide whether to use LawAgent, CaseAgent, or just answer directly.
+        # 3. Generate Answer
+        prompt_template = DOC_AGENT_COT_PROMPT if llm_mode == "reasoning" else DOC_AGENT_PROMPT
+        prompt = ChatPromptTemplate.from_template(prompt_template)
+        chain = prompt | self.llm | StrOutputParser()
+        
+        response = chain.invoke({
+            "query": query,
+            "doc_context": doc_context_str,
+            "web_context": web_context_str
+        })
         
         return {
-            # "final_answer": ... # No answer yet
+            "final_answer": response,
             "selected_agents": ["document_agent"],
             "document_context": doc_chunks,
             "tool_results": [{
