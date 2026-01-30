@@ -2,6 +2,33 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import fullLogo from '../assets/FULL_LOGO.svg';
 
+import inshortsLogo from '../assets/india_shorts.png';
+import Business_UpurnLogo from '../assets/Business_Upurn.png';
+import Karo_StraupLogo from '../assets/Karo_Straup.webp';
+import Vie_SoriesLogo from '../assets/Vie_Sories.webp';
+import Karnataka_News_NetworkLogo from '../assets/Karnataka_News_Network.png';
+import India_Wire_NewsLogo from '../assets/India_Wire_News.png';
+import Business_News_Logo from '../assets/businessnewsthisweek.png';
+
+import Abhiniti_Vats from '../assets/avatars/Abhiniti_Vats.png';
+import Prathana_Prakash from '../assets/avatars/Prathana_Prakash.png';
+import Nidhi_Sharma from '../assets/avatars/Nidhi_Sharma.png';
+import Palak_Roy from '../assets/avatars/Palak_Roy.png';
+import Jaineesh_V_Maharajwala from '../assets/avatars/Jaineesh_V_Maharajwala.png';
+import Ananya_Sharma from '../assets/avatars/Ananya_Sharma.png';
+import Yashaswi_Agrawal from '../assets/avatars/Yashaswi_Agrawal.png';
+import Aastha_Verma from '../assets/avatars/Aastha_Verma.png';
+import Pratyush_Sharma from '../assets/avatars/Pratyush_Sharma.png';
+import Abhinav_Jain from '../assets/avatars/Abhinav_Jain.png';
+import Kumar_Abhishek from '../assets/avatars/Kumar_Abhishek.png';
+import Rohil_Rai from '../assets/avatars/Rohil_Rai.png';
+import Subhradeep_Das from '../assets/avatars/Subhradeep_Das.png';
+import Manvi_Priya from '../assets/avatars/Manvi_Priya.png';
+import Shubham_Ranjan_Sharma from '../assets/avatars/Shubham_Ranjan_Sharma.png';
+import Pavan_Kumar from '../assets/avatars/Pavan_Kumar.png';
+import Kushagra_Sahi from '../assets/avatars/Kushagra_Sahi.png';
+import P_Mahima from '../assets/avatars/P_Mahima.png';
+
 const Landing = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -16,6 +43,117 @@ const Landing = () => {
         }
         setMobileMenuOpen(false);
     };
+
+    const testimonials = [
+        {
+            text: "\"I’ve been using Draftmate.in as my go-to legal drafting assistant, and it has genuinely changed how I work. It isn’t just another generic AI tool. It understands Indian law context, legal formats, citation norms, and courtroom standards, and delivers clear, structured, court-ready drafts that are actually workable in practice. It significantly cuts down drafting time and allows me to focus more on arguments and strategy rather than repetitive paperwork. A very practical tool for everyday legal practice..\"",
+            name: "Abhiniti Vats",
+            role: "Advocate, Patna High Court",
+            image: Abhiniti_Vats
+        },
+        {
+            text: "\"DraftMate offers a well-structured and practical legal-tech solution tailored for advocates and legal professionals. The AI-powered drafting and Lex Bot research assistant are particularly useful, providing relevant content with authentic case law references. Features like personalised drafting style, Chat with PDF, built-in PDF editing tools, and legal calculators enhance efficiency in day-to-day legal work.\"",
+            name: "Prathana Prakash",
+            role: "Associate at Deepak kohli & associates",
+            image: Prathana_Prakash
+        },
+        {
+            text: "\"I have been using DraftMate for the past few weeks, and it has significantly improved my drafting and research workflow. The AI-powered drafting feature and case law summarisation are extremely helpful and save a lot of time. Lex Bot provides quick and relevant legal research support, making day-to-day legal work much more efficient. Overall, DraftMate is a reliable and well-designed tool for legal professionals.\"",
+            name: "Nidhi Sharma",
+            role: "Advocate,  District court Hapur",
+            image: Nidhi_Sharma
+        },
+        {
+            text: "\"This app is a highly useful and time-saving app, especially for law students, fresh advocates, and legal professionals. The app offers well-structured legal drafts that help simplify complex legal work and make drafting more efficient. What stands out most is its user-friendly interface and clear formatting, which makes it easy to understand and customize drafts as per individual requirements. Whether you’re preparing notices, applications, or basic pleadings, Draftmade acts as a reliable guide and boosts confidence in legal drafting.\"",
+            name: "Palak Roy",
+            role: "Advocate,  Patna High Court",
+            image: Palak_Roy
+        },
+        {
+            text: "\"DraftMate makes legal research and drafting much easier. It pulls up relevant case laws quickly and helps with clean, usable drafts, which saves a lot of time in day-to-day legal work. The platform is simple to use and feels genuinely helpful for practical legal work.\"",
+            name: "Jaineesh V Maharajwala",
+            role: "Advocate,  Surat District Court   ",
+            image: Jaineesh_V_Maharajwala
+        },
+        {
+            text: "\"As a fresh law graduate now practicing independently before the Punjab and Haryana High Court with a senior Advocate, DraftMate.in has been my secret weapon for creating professional legal drafts. Its AI-powered templates, tailored to Indian laws, especially the new criminal laws let me produce  pleadings quickly and confidently. This platform is perfect for building client base on a tight budget, with an intuitive interface that feels like having a senior mentor.\"",
+            name: "Ananya Sharma",
+            role: "Advocate,  Punjab & Haryana High Court",
+            image: Ananya_Sharma
+        },
+        {
+            text: "\"Draftmate is a very helpful tool. Have used the legal calculator, drafting and pdf editor feature. Till Now, I am highly impressed with the results it provides and am going to use it further for my aid. It's a reliable tool.\"",
+            name: "Yashaswi Agrawal",
+            role: "Advocate,  Supreme Court",
+            image: Yashaswi_Agrawal
+        },
+        {
+            text: "\"As an Advocate, I have found DraftMate to be really helpful for legal research and reference work. It provides relevant case laws with correct citations and is also very effective in giving clear case summaries. It can also help with drafting by offering clean templates and a basic framework, which makes things easier. Overall, it’s a handy tool to have in the legal field.\"",
+            name: "Aastha Verma",
+            role: "Advocate, Delhi High Court",
+            image: Aastha_Verma
+        },
+        {
+            text: "\"Draft mate is an impressive AI-powered platform that significantly enhances efficiency in legal work. It assists in drafting, reviewing, and structuring legal documents with remarkable accuracy and clarity, saving valuable time for legal professionals. The platform understands legal language and context well, making it a reliable support tool for research, pleadings, agreements, and routine drafting tasks. Draftmade is especially useful for advocates, law firms, and law students who want to streamline their workflow without compromising on quality. Overall, it is a smart, practical, and time-saving AI solution for the modern legal ecosystem. \"",
+            name: "Pratyush Sharma",
+            role: "Advocate,    Patna High Court",
+            image: Pratyush_Sharma
+        },
+        {
+            text: "\"I have been using Draftmate for some time now and found it insightfully helpfull.\"",
+            name: "Abhinav Jain",
+            role: "Advocate,  Supreme Court of India",
+            image: Abhinav_Jain
+        },
+        {
+            text: "\"I have been using Draftmate consistently for the past five weeks, and I find it efficient, reliable, easy to use, and highly recommended.\"",
+            name: "Kumar Abhishek",
+            role: "Advocate,   Delhi High Court",
+            image: Kumar_Abhishek
+        },
+        {
+            text: "\"What stands out is how the software recognizes jurisdictional nuances. It doesn't just suggest standard clauses; it flags when a provision might be unenforceable under specific state or regional laws, which feels less like a 'search tool' and more like a seasoned peer review.\"",
+            name: "Rohil Rai",
+            role: "Advocate, Delhi High Court",
+            image: Rohil_Rai
+        },
+        {
+            text: "\"DraftMate is an extremely useful tool, especially when working with limited time and resources. The drafts it generates are high quality, well-structured, and supported by real legal precedents. It also provides accurate and practical responses to queries related to legal procedures and laws. Overall, it is a reliable time-saver that significantly improves efficiency.\"",
+            name: "Subhradeep Das",
+            role: "Associate, Alphastream ai",
+            image: Subhradeep_Das
+        },
+        {
+            text: "\"I’ve been using this for over a month now, and I’m genuinely impressed by how effectively it handles summarisation along with its seamless automatic drafting capabilities.\"",
+            name: "Manvi Priya",
+            role: "Advocate,  Delhi High Court",
+            image: Manvi_Priya
+        },
+        {
+            text: "\"Draftmate is proving to be a quintessential tool in my legal endeavours, genuinely a life saver.\"",
+            name: "Shubham Ranjan Sharma",
+            role: "Advocate, Delhi High Court",
+            image: Shubham_Ranjan_Sharma
+        },
+        {
+            text: "\"The website is very helpful for daily work and keeps a tab on events. Overall great experience and hope to see many new features being added in\"",
+            name: "Pavan Kumar",
+            role: "Advocate,  Delhi High Court ",
+            image: Pavan_Kumar
+        },
+        {
+            text: "\"DraftMate is a practical and dependable platform for legal research and drafting. It provides streamlined access to relevant legal judgments, enabling quick and effective case law analysis. The drafting features are thoughtfully structured and aligned with real-world legal practice, making document preparation efficient and accurate. Overall, DraftMate is a well-designed tool that meaningfully supports the day-to-day needs of legal professionals and students.\"",
+            name: "Kushagra Sahi",
+            role: "Advocate Patna High Court",
+            image: Kushagra_Sahi
+        },
+        {
+            text: "\"DraftMate has been really helpful in my day-to-day legal work and studies. The drafting is quick and accurate, case law citations are reliable, and Lex Bot makes research much easier. Features like chat with PDF and personalised formats save a lot of time. Overall, it’s a practical tool for busy advocates as well as law students.\"",
+            name: "P Mahima",
+            role: " Advocate, High Court of Karnataka",
+            image: P_Mahima
+        }
+    ];
 
     return (
         <div className="bg-slate-50 dark:bg-[#101622] text-[#111318] font-sans overflow-x-hidden">
@@ -172,37 +310,17 @@ const Landing = () => {
                                 <div className="w-3 h-3 rounded-full bg-red-400"></div>
                                 <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                                 <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                                <div className="ml-4 h-6 w-64 bg-slate-100 rounded text-xs flex items-center px-2 text-slate-400">draftmate.ai/editor/petition-102</div>
+                                <div className="ml-4 h-6 w-64 bg-slate-100 rounded text-xs flex items-center px-2 text-slate-400">draftmate.in/editor/</div>
                             </div>
-                            <div className="flex-1 flex overflow-hidden">
-                                <div className="w-64 border-r bg-white p-4 hidden md:flex flex-col gap-3">
-                                    <div className="h-4 w-3/4 bg-slate-200 rounded animate-pulse"></div>
-                                    <div className="h-4 w-1/2 bg-slate-200 rounded animate-pulse delay-75"></div>
-                                    <div className="h-4 w-2/3 bg-slate-200 rounded animate-pulse delay-150"></div>
-                                    <div className="mt-4 h-32 bg-primary/5 rounded border border-primary/10 p-3">
-                                        <div className="text-primary text-xs font-bold mb-2 flex items-center gap-1"><span className="material-symbols-outlined text-sm">smart_toy</span> AI Suggestion</div>
-                                        <div className="h-2 w-full bg-primary/10 rounded mb-1"></div>
-                                        <div className="h-2 w-full bg-primary/10 rounded mb-1"></div>
-                                        <div className="h-2 w-3/4 bg-primary/10 rounded"></div>
-                                    </div>
-                                </div>
-                                <div className="flex-1 p-8 md:p-12 relative bg-white">
-                                    <div className="max-w-2xl mx-auto shadow-sm border border-slate-100 min-h-full bg-white p-8">
-                                        <div className="h-6 w-48 bg-slate-800 rounded mb-8"></div>
-                                        <div className="space-y-3">
-                                            <div className="h-3 w-full bg-slate-200 rounded"></div>
-                                            <div className="h-3 w-full bg-slate-200 rounded"></div>
-                                            <div className="h-3 w-11/12 bg-slate-200 rounded"></div>
-                                            <div className="h-3 w-full bg-slate-200 rounded"></div>
-                                            <div className="h-3 w-4/5 bg-slate-200 rounded"></div>
-                                        </div>
-                                        <div className="mt-8 space-y-3">
-                                            <div className="h-3 w-full bg-slate-200 rounded"></div>
-                                            <div className="h-3 w-full bg-slate-200 rounded"></div>
-                                            <div className="h-3 w-3/4 bg-slate-200 rounded"></div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="flex-1 flex overflow-hidden bg-white">
+                                <video
+                                    src="/video.mp4"
+                                    className="w-full h-full object-cover"
+                                    autoPlay
+                                    loop
+                                    muted
+                                    playsInline
+                                />
                             </div>
                         </div>
                     </div>
@@ -215,9 +333,28 @@ const Landing = () => {
                     <h3 className="text-[#616f89] text-xl font-serif text-center">We've been featured in</h3>
                     <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 w-full opacity-70">
                         <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
-                            <span className="material-symbols-outlined text-3xl">balance</span>
-                            <span className="text-xl font-bold font-serif">Bar & Bench</span>
+                            <img src={inshortsLogo} alt="Inshorts" className="h-full object-contain" />
                         </div>
+                        <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
+                            <img src={Business_UpurnLogo} alt="Business Uppurn" className="h-full object-contain" />
+                        </div>
+                        <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
+                            <img src={Karo_StraupLogo} alt="Karo Startup" className="h-full object-contain" />
+                        </div>
+                        <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
+                            <img src={Vie_SoriesLogo} alt="Vie Stories" className="h-full object-contain" />
+                        </div>
+                        <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
+                            <img src={Karnataka_News_NetworkLogo} alt="Karnataka News Network" className="h-full object-contain" />
+                        </div>
+                        <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
+                            <img src={India_Wire_NewsLogo} alt="India Wire News" className="h-full object-contain" />
+                        </div>
+                        <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
+                            <img src={Business_News_Logo} alt="Business News This Week" className="h-full object-contain" />
+                        </div>
+
+                        {/* 
                         <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
                             <span className="material-symbols-outlined text-3xl">school</span>
                             <span className="text-xl font-bold text-blue-600">shiksha</span>
@@ -233,7 +370,7 @@ const Landing = () => {
                         <div className="h-8 md:h-10 grayscale hover:grayscale-0 transition-all duration-300 cursor-pointer flex items-center gap-2">
                             <span className="material-symbols-outlined text-3xl">rss_feed</span>
                             <span className="text-xl font-bold bg-black text-white px-1 rounded-sm">Bb</span>
-                        </div>
+                        </div> */}
                     </div>
                 </div>
             </section>
@@ -504,9 +641,9 @@ const Landing = () => {
             </section>
 
             {/* Testimonials */}
-            <section id="testimonials" className="py-20 px-4 lg:px-40 bg-background-light dark:bg-background-dark border-t border-[#f0f2f4]">
-                <div className="layout-content-container flex flex-col max-w-[960px] mx-auto gap-12">
-                    <div className="flex flex-col gap-4 text-center">
+            <section id="testimonials" className="py-20 bg-background-light dark:bg-background-dark border-t border-[#f0f2f4] overflow-hidden">
+                <div className="flex flex-col gap-12">
+                    <div className="layout-content-container flex flex-col max-w-[960px] mx-auto gap-4 text-center px-4 lg:px-40">
                         <div className="inline-flex items-center justify-center gap-2 text-primary font-bold uppercase tracking-wider text-sm">
                             <span className="w-8 h-[2px] bg-primary"></span>
                             User Feedback
@@ -515,64 +652,32 @@ const Landing = () => {
                         <h2 className="text-[#111318] text-3xl font-black leading-tight lg:text-4xl">Trusted by Advocates Across India</h2>
                         <p className="text-[#616f89] text-lg max-w-[600px] mx-auto">See how DraftMate is transforming legal practices from District Courts to the Supreme Court.</p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div className="flex flex-col p-6 bg-white rounded-xl border border-[#f0f2f4] shadow-sm">
-                            <div className="flex gap-1 text-yellow-400 mb-4">
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                            </div>
-                            <p className="text-[#111318] text-sm leading-relaxed mb-6">"DraftMate cut my drafting time by 60%. The case law finder is surprisingly accurate for Indian judgments. It's like having a senior associate available 24/7."</p>
-                            <div className="mt-auto flex items-center gap-3">
-                                <div className="size-10 rounded-full bg-blue-100 flex items-center justify-center text-primary font-bold">AS</div>
-                                <div>
-                                    <h4 className="text-[#111318] text-sm font-bold">Adv. Amit Sharma</h4>
-                                    <p className="text-[#616f89] text-xs">High Court, Delhi</p>
+                    <div className="w-full relative mask-linear-fade">
+                        <div className="animate-scroll flex w-max hover:pause pl-4">
+                            {[...testimonials, ...testimonials].map((testimonial, idx) => (
+                                <div key={idx} className="flex flex-row bg-white rounded-xl border border-[#f0f2f4] shadow-sm w-[500px] h-[360px] mr-6 overflow-hidden group hover:shadow-md transition-all duration-300">
+                                    <div className="flex-1 p-6 flex flex-col relative">
+                                        <div className="mb-4 text-left">
+                                            <h4 className="text-[#111318] text-lg font-bold">{testimonial.name}</h4>
+                                            <p className="text-[#616f89] text-sm font-medium">{testimonial.role}</p>
+                                        </div>
+                                        <div className="flex-1 flex items-center">
+                                            <p className="text-[#111318] text-sm leading-relaxed italic text-left line-clamp-[10]">"{testimonial.text}"</p>
+                                        </div>
+                                    </div>
+                                    <div className="w-[180px] h-full relative">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent z-10"></div>
+                                        <img src={testimonial.image} alt={testimonial.name} className="w-full h-full object-cover object-top" />
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-col p-6 bg-white rounded-xl border border-[#f0f2f4] shadow-sm">
-                            <div className="flex gap-1 text-yellow-400 mb-4">
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star_half</span>
-                            </div>
-                            <p className="text-[#111318] text-sm leading-relaxed mb-6">"The regional translation feature is a lifesaver for my practice in lower courts. Drafting in English and converting to Marathi instantly has been a game changer."</p>
-                            <div className="mt-auto flex items-center gap-3">
-                                <div className="size-10 rounded-full bg-pink-100 flex items-center justify-center text-pink-600 font-bold">PP</div>
-                                <div>
-                                    <h4 className="text-[#111318] text-sm font-bold">Adv. Priya Patel</h4>
-                                    <p className="text-[#616f89] text-xs">District Court, Pune</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-col p-6 bg-white rounded-xl border border-[#f0f2f4] shadow-sm">
-                            <div className="flex gap-1 text-yellow-400 mb-4">
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                                <span className="material-symbols-outlined text-lg fill-current">star</span>
-                            </div>
-                            <p className="text-[#111318] text-sm leading-relaxed mb-6">"I was skeptical about AI in law, but the hallucination guardrails are real. It cites cases that actually exist. The 'Digital Profile' also helped me land two new corporate clients."</p>
-                            <div className="mt-auto flex items-center gap-3">
-                                <div className="size-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">VR</div>
-                                <div>
-                                    <h4 className="text-[#111318] text-sm font-bold">Adv. Vikram Rao</h4>
-                                    <p className="text-[#616f89] text-xs">Supreme Court of India</p>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
                 </div>
             </section>
 
             {/* Trusted Partners */}
-            <section className="py-20 px-4 lg:px-40 bg-white border-t border-[#f0f2f4]">
+            < section className="py-20 px-4 lg:px-40 bg-white border-t border-[#f0f2f4]" >
                 <div className="layout-content-container flex flex-col max-w-[960px] mx-auto gap-8 items-center">
                     <h3 className="text-[#616f89] text-sm font-bold uppercase tracking-wider text-center">Our Trusted Partners</h3>
                     <div className="flex flex-wrap justify-center items-center gap-12 lg:gap-16 opacity-60">
@@ -594,15 +699,15 @@ const Landing = () => {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section >
 
             {/* Future Roadmap / Coming Soon */}
-            <section className="py-24 px-4 lg:px-40 bg-slate-900 overflow-hidden relative">
+            < section className="py-24 px-4 lg:px-40 bg-slate-900 overflow-hidden relative" >
                 {/* Background Effects */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                < div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none" >
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
                     <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3"></div>
-                </div>
+                </div >
 
                 <div className="layout-content-container flex flex-col max-w-[1200px] mx-auto gap-16 relative z-10">
                     <div className="flex flex-col gap-4 text-center items-center">
@@ -735,10 +840,10 @@ const Landing = () => {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section >
 
             {/* CTA Section */}
-            <section className="py-24 px-4 bg-primary relative overflow-hidden">
+            < section className="py-24 px-4 bg-primary relative overflow-hidden" >
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                 <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
                 <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
@@ -755,10 +860,10 @@ const Landing = () => {
                     </div>
                     <p className="text-blue-200 text-xs mt-4">No credit card required for trial. 100% Secure & Confidential.</p>
                 </div>
-            </section>
+            </section >
 
             {/* Footer */}
-            <footer className="bg-[#101622] text-white py-12 px-4 lg:px-40 border-t border-gray-800">
+            < footer className="bg-[#101622] text-white py-12 px-4 lg:px-40 border-t border-gray-800" >
                 <div className="layout-content-container max-w-[960px] mx-auto flex flex-col gap-8">
                     <div className="flex flex-col md:flex-row justify-between gap-8">
                         <div className="flex flex-col gap-4 max-w-xs">
@@ -799,8 +904,8 @@ const Landing = () => {
                         </div>
                     </div>
                 </div>
-            </footer>
-        </div>
+            </footer >
+        </div >
     );
 };
 
