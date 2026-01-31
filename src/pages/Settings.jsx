@@ -690,6 +690,103 @@ const DocumentSettings = () => {
 };
 
 
+const BillingSettings = () => {
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2 pb-6 border-b border-slate-200 dark:border-slate-800">
+                <h1 className="text-slate-900 dark:text-white text-3xl font-bold leading-tight tracking-tight">Billing & Plans</h1>
+                <p className="text-slate-500 dark:text-slate-400 text-base">Manage your subscription and billing details.</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl">
+                {/* PRO Plan */}
+                <div className="flex flex-col p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
+                        <span className="material-symbols-outlined text-6xl text-slate-100 dark:text-slate-800">rocket_launch</span>
+                    </div>
+                    <div className="relative z-10 flex flex-col h-full">
+                        <div className="mb-4">
+                            <span className="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary text-xs font-bold uppercase tracking-wider">Most Popular</span>
+                        </div>
+                        <h2 className="text-slate-900 dark:text-white text-2xl font-bold mb-2">PRO</h2>
+                        <div className="flex items-baseline gap-1 mb-6">
+                            <span className="text-4xl font-black text-slate-900 dark:text-white">₹599</span>
+                            <span className="text-slate-500 font-medium">/month</span>
+                        </div>
+                        <ul className="flex flex-col gap-4 mb-8 flex-1">
+                            {[
+                                "AI-Powered Drafting (Basic)",
+                                "Access to Case Law Database",
+                                "Standard Support",
+                                "5GB Document Storage",
+                                "PDF Tools (Basic)"
+                            ].map((feature, idx) => (
+                                <li key={idx} className="flex items-center gap-3 text-slate-600 dark:text-slate-300">
+                                    <span className="material-symbols-outlined text-green-500 text-[20px]">check_circle</span>
+                                    <span className="text-sm font-medium">{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <button className="w-full py-3 rounded-xl bg-white dark:bg-slate-800 border-2 border-primary text-primary font-bold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                            Upgrade to Pro
+                        </button>
+                    </div>
+                </div>
+
+                {/* ULTRA Plan */}
+                <div className="flex flex-col p-6 bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 z-0"></div>
+                    <div className="absolute top-0 right-0 p-4 opacity-30 group-hover:opacity-60 transition-opacity z-0">
+                        <span className="material-symbols-outlined text-6xl text-amber-500">diamond</span>
+                    </div>
+                    <div className="relative z-10 flex flex-col h-full">
+                        <div className="mb-4">
+                            <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider border border-amber-500/20">Best Value</span>
+                        </div>
+                        <h2 className="text-white text-2xl font-bold mb-2">ULTRA</h2>
+                        <div className="flex items-baseline gap-1 mb-6">
+                            <span className="text-4xl font-black text-white">₹899</span>
+                            <span className="text-slate-400 font-medium">/month</span>
+                        </div>
+                        <ul className="flex flex-col gap-4 mb-8 flex-1">
+                            {[
+                                "Advanced AI Drafting & Analysis",
+                                "National & International Laws",
+                                "Priority 24/7 Support",
+                                "Unlimited Document Storage",
+                                "Advanced PDF & OCR Tools",
+                                "Custom Templates"
+                            ].map((feature, idx) => (
+                                <li key={idx} className="flex items-center gap-3 text-slate-300">
+                                    <span className="material-symbols-outlined text-amber-400 text-[20px]">check_circle</span>
+                                    <span className="text-sm font-medium">{feature}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <button className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold hover:shadow-lg hover:shadow-amber-500/30 transition-all border border-transparent">
+                            Upgrade to Ultra
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-8 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 max-w-4xl">
+                <div className="flex items-center gap-4">
+                    <span className="material-symbols-outlined text-4xl text-slate-400">help</span>
+                    <div>
+                        <h3 className="text-slate-900 dark:text-white font-bold text-lg">Need a Custom Enterprise Plan?</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm">For large law firms requiring multi-user access and API integrations.</p>
+                    </div>
+                    <button className="ml-auto px-6 py-2 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 font-semibold text-slate-700 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
+                        Contact Sales
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const Settings = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('personal');
@@ -782,13 +879,7 @@ const Settings = () => {
 
                     {activeTab === 'personal' && <PersonalSettings />}
                     {activeTab === 'document' && <DocumentSettings />}
-                    {activeTab === 'billing' && (
-                        <div className="flex flex-col items-center justify-center h-64 text-center">
-                            <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">credit_card</span>
-                            <h2 className="text-xl font-bold text-slate-700">Billing & Plans</h2>
-                            <p className="text-slate-500">This section is coming soon.</p>
-                        </div>
-                    )}
+                    {activeTab === 'billing' && <BillingSettings />}
                 </div>
             </main>
         </div>
