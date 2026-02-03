@@ -258,7 +258,7 @@ const Tools = () => {
                                 <div className="grid grid-cols-1 gap-6">
                                     <ToolCard
                                         icon="balance"
-                                        title="AI Legal Research"
+                                        title="Lex Bot"
                                         description="Do accurate legal research by talking to our AI."
                                         onClick={() => navigate('/dashboard/research')}
                                     />

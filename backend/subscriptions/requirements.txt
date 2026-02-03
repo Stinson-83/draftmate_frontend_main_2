@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+cashfree-pg==3.1.2
+psycopg2-binary
+python-dotenv
+sshtunnel
+paramiko
+python-dateutil

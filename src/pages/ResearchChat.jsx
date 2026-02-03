@@ -639,11 +639,11 @@ const ResearchChat = () => {
         <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
 
             {/* Sidebar */}
-            <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} flex-none bg-slate-900 text-slate-300 flex flex-col transition-all duration-300 overflow-hidden border-r border-slate-800`}>
+            <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} flex-none bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 flex flex-col transition-all duration-300 overflow-hidden border-r border-slate-200 dark:border-slate-800`}>
                 <div className="p-4 flex-none">
                     <button
                         onClick={startNewChat}
-                        className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
+                        className="w-full flex items-center gap-2 px-3 py-2 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg transition-colors border border-transparent shadow-sm"
                     >
                         <span className="material-symbols-outlined text-xl">add</span>
                         <span className="text-sm font-medium">New Chat</span>
@@ -653,21 +653,21 @@ const ResearchChat = () => {
                 <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-6">
                     {isLoadingSessions ? (
                         <div className="flex justify-center py-4">
-                            <span className="material-symbols-outlined animate-spin text-slate-500">progress_activity</span>
+                            <span className="material-symbols-outlined animate-spin text-slate-400">progress_activity</span>
                         </div>
                     ) : (
                         Object.entries(sessionGroups).map(([group, groupSessions]) => (
                             groupSessions.length > 0 && (
                                 <div key={group}>
-                                    <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group}</h3>
+                                    <h3 className="px-3 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{group}</h3>
                                     <div className="space-y-1">
                                         {groupSessions.map(session => (
                                             <button
                                                 key={session.session_id}
                                                 onClick={() => loadSession(session.session_id)}
                                                 className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${sessionId === session.session_id
-                                                    ? 'bg-slate-800 text-white'
-                                                    : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
+                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                                                     }`}
                                                 title={session.title}
                                             >
@@ -709,7 +709,7 @@ const ResearchChat = () => {
                             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md">
                                 <span className="material-symbols-outlined text-white text-lg">auto_awesome</span>
                             </div>
-                            <h1 className="text-base font-semibold text-slate-900 dark:text-white hidden sm:block">AI Legal Research</h1>
+                            <h1 className="text-base font-semibold text-slate-900 dark:text-white hidden sm:block">Lex Bot</h1>
                         </div>
                     </div>
 

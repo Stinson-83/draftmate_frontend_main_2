@@ -13,6 +13,7 @@ import ChatWithPDF from './pages/ChatWithPDF';
 
 import Settings from './pages/Settings';
 import HelpCenter from './pages/HelpCenter';
+import PaymentStatus from './pages/PaymentStatus';
 
 
 // Placeholder for other routes
@@ -104,6 +105,9 @@ function App() {
               {/* Catch-all relative to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
             </Route>
+
+            {/* Payment Verification Route */}
+            <Route path="/payment-status" element={<PaymentStatus />} />
 
             {/* Global catch-all redirect to Landing */}
             <Route path="*" element={<Navigate to="/" replace />} />

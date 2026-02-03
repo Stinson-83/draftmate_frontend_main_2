@@ -51,3 +51,4 @@ pydeck
 watchdog
 PyJWT==2.8.0
 email-validator
+cashfree-pg

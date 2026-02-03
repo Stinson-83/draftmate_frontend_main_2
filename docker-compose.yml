@@ -94,11 +94,10 @@ services:
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USERNAME=${SMTP_USERNAME}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - CASHFREE_APP_ID=${CASHFREE_APP_ID}
+      - CASHFREE_SECRET_KEY=${CASHFREE_SECRET_KEY}
     depends_on:
       - db
-
-
-
 
 volumes:
   postgres_data:

@@ -116,6 +116,66 @@ def init_db():
         
         conn.commit()
         print("✅ Profiles table created successfully.")
+
+        # Create subscription_plans table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS subscription_plans (
+            id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            price DECIMAL(10, 2) NOT NULL,
+            currency VARCHAR(10) DEFAULT 'INR',
+            interval VARCHAR(20) DEFAULT 'monthly', -- 'monthly', 'yearly'
+            features JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Create user_subscriptions table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_subscriptions (
+            subscription_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID REFERENCES users(id),
+            plan_id VARCHAR(50) REFERENCES subscription_plans(id),
+            status VARCHAR(20) DEFAULT 'inactive', -- 'active', 'inactive', 'expired'
+            start_date TIMESTAMP,
+            end_date TIMESTAMP,
+            auto_renew BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Create payments table
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID REFERENCES users(id),
+            order_id VARCHAR(255) UNIQUE NOT NULL, -- Cashfree Order ID
+            reference_id VARCHAR(255), -- Cashfree Reference ID
+            amount DECIMAL(10, 2) NOT NULL,
+            currency VARCHAR(10) DEFAULT 'INR',
+            status VARCHAR(50) DEFAULT 'PENDING',
+            payment_method VARCHAR(100),
+            payment_time TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        conn.commit()
+        print("✅ Subscription tables created successfully.")
+
+        # Insert Default Plans (Manual Renewal Model)
+        print("Checking default plans...")
+        cur.execute("SELECT id FROM subscription_plans WHERE id = 'PRO_MONTHLY'")
+        if not cur.fetchone():
+            print("Inserting PRO_MONTHLY plan...")
+            cur.execute("""
+                INSERT INTO subscription_plans (id, name, price, interval, features)
+                VALUES (%s, %s, %s, %s, %s)
+            """, ('PRO_MONTHLY', 'PRO', 599.00, 'monthly', '["AI-Powered Drafting", "Case Law Database", "Standard Support", "5GB Storage"]'))
+            conn.commit()
+        else:
+            print("PRO_MONTHLY plan already exists.")
         
         cur.close()
         

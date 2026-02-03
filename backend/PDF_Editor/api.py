@@ -682,6 +682,24 @@ async def watermark_pdf_endpoint(
         if not apply_text and not apply_image:
             raise HTTPException(status_code=400, detail="No watermark content provided. Please provide text or upload an image.")
         
+        # Validation
+        print(f"File size: {len(content)} bytes")
+        print(f"File header: {content[:20]}")
+        
+        if not content.startswith(b'%PDF-'):
+             print("Error: File does not start with %PDF-")
+             # Try to be helpful: if it looks like an image, suggest converting
+             from PIL import Image
+             try:
+                 img = Image.open(io.BytesIO(content))
+                 raise HTTPException(status_code=400, detail=f"The uploaded file is an Image ({img.format}), not a PDF. Please convert it to PDF first.")
+             except:
+                 pass
+             raise HTTPException(status_code=400, detail="The uploaded file is not a valid PDF.")
+
+        if not validate_pdf(content):
+             raise HTTPException(status_code=400, detail="PDF Validation failed (file may be empty or corrupted).")
+
         result = watermark_pdf_logic_enhanced(
             content, 
             text=text if apply_text else None,
