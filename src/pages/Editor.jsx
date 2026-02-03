@@ -314,6 +314,7 @@ const Editor = () => {
 
         try {
             let aiResponse = '';
+            let currentSources = [];
 
             await api.chatStream(queryWithContext, aiSessionId, {
                 onStatus: (message) => {
@@ -325,17 +326,28 @@ const Editor = () => {
                     setChatMessages(prev => {
                         const lastMsg = prev[prev.length - 1];
                         if (lastMsg?.role === 'ai' && lastMsg?.isStreaming) {
-                            return [...prev.slice(0, -1), { role: 'ai', content: accumulated, isStreaming: true }];
+                            return [...prev.slice(0, -1), { role: 'ai', content: accumulated, isStreaming: true, sources: currentSources }];
                         } else {
-                            return [...prev, { role: 'ai', content: accumulated, isStreaming: true }];
+                            return [...prev, { role: 'ai', content: accumulated, isStreaming: true, sources: currentSources }];
                         }
+                    });
+                },
+                onSources: (sources) => {
+                    currentSources = sources;
+                    // Update current streaming message with sources
+                    setChatMessages(prev => {
+                        const lastMsg = prev[prev.length - 1];
+                        if (lastMsg?.role === 'ai') {
+                            return [...prev.slice(0, -1), { ...lastMsg, sources: sources }];
+                        }
+                        return prev;
                     });
                 },
                 onAnswer: (content) => {
                     aiResponse = content;
                     setChatMessages(prev => {
                         const filtered = prev.filter(m => !m.isStreaming);
-                        return [...filtered, { role: 'ai', content: content }];
+                        return [...filtered, { role: 'ai', content: content, sources: currentSources }];
                     });
                 },
                 onDone: () => {
