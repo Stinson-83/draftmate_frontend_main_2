@@ -109,8 +109,8 @@ const Editor = () => {
     }, []);
 
     const finishProcessing = useCallback((content) => {
-        // Regex Pattern: Text inside square brackets, e.g., [Name] or [Client Name]
-        const bracketPattern = /\[([^\]]+)\]/g;
+        // Regex Pattern: Text inside square brackets using safe matching (no angle brackets)
+        const bracketPattern = /\[([^\]<>]+)\]/g;
         const detectedPlaceholders = [];
 
         // Helper to add placeholder if not exists

@@ -558,8 +558,9 @@ def create_placeholders(html_content: str) -> str:
         STRICT RULES:
         1. ONLY change the specific entity values or blank lines to placeholders. Leave all legal boilerplate, grammar, and structure EXACTLY as is.
         2. Use placeholders like: [DATE], [NAME], [AMOUNT], [ADDRESS], [COMPANY NAME].
-        3. Return the output in the EXACT format: "ID_{i}: {processed_text}"
-        4. Do not merge lines. Maintain 1-to-1 mapping.
+        3. Placeholders MUST NOT contain angle brackets (< or >) or HTML tags.
+        4. Return the output in the EXACT format: "ID_{i}: {processed_text}"
+        5. Do not merge lines. Maintain 1-to-1 mapping.
         """
 
         model = genai.GenerativeModel(

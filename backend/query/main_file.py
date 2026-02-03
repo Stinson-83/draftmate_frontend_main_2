@@ -22,7 +22,21 @@ load_dotenv()
 # Load Model
 EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
-model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+try:
+    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    # Sanity check
+    model.encode("warmup")
+    print("✅ Embedding model loaded successfully.")
+except Exception as e:
+    print(f"⚠️ Failed to load model from {EMBEDDING_MODEL_NAME}: {e}")
+    print("🔄 Attempting fallback download from HuggingFace...")
+    try:
+        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        model.encode("warmup")
+        print("✅ Fallback model loaded successfully.")
+    except Exception as e2:
+        print(f"❌ CRITICAL: Could not load embedding model: {e2}")
+        model = None
 
 s3_client = boto3.client(
     "s3",

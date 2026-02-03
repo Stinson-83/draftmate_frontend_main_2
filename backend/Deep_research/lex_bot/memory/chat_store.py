@@ -63,9 +63,32 @@ class ChatStore:
         
         # Use provided URL or fallback to config
         self.db_url = db_url or DATABASE_URL
+
+        # Initialize Cache
+        try:
+            from cachetools import TTLCache
+            # Cache up to 100 active sessions for 5 minutes
+            self._history_cache = TTLCache(maxsize=100, ttl=300)
+        except ImportError:
+            logger.warning("cachetools not found. Caching disabled.")
+            self._history_cache = None
         
         if self.db_url:
             self._init_db()
+    
+    def _invalidate_session_cache(self, session_id: str):
+        """Invalidate all cache entries for a specific session."""
+        if self._history_cache is None:
+            return
+            
+        # Keys are formatted as f"{session_id}:{limit}"
+        # Since maxsize is small (100), iteration is fast enough
+        keys_to_remove = [k for k in self._history_cache.keys() if k.startswith(f"{session_id}:")]
+        for k in keys_to_remove:
+            try:
+                del self._history_cache[k]
+            except KeyError:
+                pass
     
     def _init_db(self):
         """Initialize database engine and create tables."""
@@ -172,6 +195,10 @@ class ChatStore:
                     session.add(chat_session)
                 
                 session.commit()
+                
+                # Invalidate cache for this session
+                self._invalidate_session_cache(session_id)
+                
                 return True
         except Exception as e:
             logger.error(f"Failed to add message: {e}")
@@ -225,6 +252,10 @@ class ChatStore:
                     session.add(chat_session)
 
                 session.commit()
+                
+                # Invalidate cache
+                self._invalidate_session_cache(session_id)
+
                 return True
         except Exception as e:
             logger.error(f"Failed to add conversation: {e}")
@@ -249,6 +280,13 @@ class ChatStore:
         """
         if not self._initialized:
             return []
+            
+        # Check Cache
+        if self._history_cache is not None:
+            cache_key = f"{session_id}:{limit}"
+            if cache_key in self._history_cache:
+                logger.debug(f"⚡ Cache HIT for session {session_id}")
+                return self._history_cache[cache_key]
         
         try:
             with self.SessionLocal() as session:
@@ -257,7 +295,7 @@ class ChatStore:
                     ChatMessage.session_id == session_id
                 ).order_by(ChatMessage.timestamp.desc()).limit(limit).all()
                 
-                return [
+                result = [
                     {
                         "id": msg.id,
                         "role": msg.role,
@@ -267,6 +305,13 @@ class ChatStore:
                     }
                     for msg in reversed(messages)  # Return in chronological order
                 ]
+                
+                # Update Cache
+                if self._history_cache is not None:
+                    cache_key = f"{session_id}:{limit}"
+                    self._history_cache[cache_key] = result
+
+                return result
         except Exception as e:
             logger.error(f"Failed to get session history: {e}")
             return []
@@ -320,6 +365,10 @@ class ChatStore:
                 ).delete()
                 
                 session.commit()
+                
+                # Invalidate cache
+                self._invalidate_session_cache(session_id)
+
                 return True
         except Exception as e:
             logger.error(f"Failed to delete session: {e}")
@@ -376,10 +425,13 @@ class ChatStore:
 
                 session.commit()
                 
+                # Clear all cache to be safe or ignore (expired sessions likely not in cache)
+                if self._history_cache:
+                    self._history_cache.clear()
+                
                 if result > 0:
                     logger.info(f"🧹 Cleaned up {result} messages older than {retention_days} days")
                 return result
         except Exception as e:
             logger.error(f"Failed to cleanup old sessions: {e}")
             return 0
-

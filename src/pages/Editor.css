@@ -323,7 +323,7 @@
 /* Editor root inside each page */
 .editor-root {
     outline: none;
-    white-space: normal;
+    white-space: pre-wrap;
     line-height: 1.6;
     word-break: break-word;
     overflow-wrap: anywhere;
