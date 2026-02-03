@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Use the DSN from env or fallback to the one provided
-DSN = os.getenv("POSTGRES_DSN", "postgresql://lawuser:Siddchick2506@free-lawdb-useast1.cqrmc40e80ow.us-east-1.rds.amazonaws.com:5432/postgres")
+DSN = os.getenv("POSTGRES_DSN")
 
 print(f"Connecting to DB...")
 
