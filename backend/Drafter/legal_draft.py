@@ -133,11 +133,13 @@ Provide the complete legal draft as valid HTML following the strict structure ab
 
 api_key= os.getenv("GOOGLE_API_KEY")
 
+
 def generate_legal_draft(
     case_context: str,
     legal_documents: Optional[str] = None,
     document_type: Optional[str] = None
 ) -> str:
+    print(f"DEBUG: Starting legal draft generation for type: {document_type}")
     
     # Configure API key - Priority: parameter > DEFAULT_API_KEY > environment variable
     if api_key:
@@ -206,6 +208,7 @@ def generate_legal_draft(
             if html_content.endswith("```"):
                 html_content = html_content[:-3]
             
+            print("DEBUG: Legal draft generated successfully")
             return html_content.strip()
         else:
             raise Exception(

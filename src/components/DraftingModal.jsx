@@ -415,7 +415,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
                         </div>
 
                         <div className="modal-actions">
-                            <button className="btn btn-ghost" onClick={() => setStep(1)}>Back</button>
+                            {/* <button className="btn btn-ghost" onClick={() => setStep(1)}>Back</button> Back button removed as Step 1 is skipped */}
                             <button className="btn btn-primary" onClick={handleSubmit}>Submit</button>
                         </div>
                     </div>
