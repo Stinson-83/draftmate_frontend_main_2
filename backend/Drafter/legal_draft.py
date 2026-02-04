@@ -93,42 +93,67 @@ insert a placeholder in the following exact format:
 5. Include all material facts
 ## CRITICAL HTML OUTPUT FORMAT:
 
-You MUST output strictly plain HTML structure using <p> and <span> tags. Follow these rules EXACTLY:
+You MUST output strictly HTML structure compatible with the editor. Follow these rules:
 
 1. **STRUCTURE**:
-   - Every distinct line or paragraph MUST be wrapped in a `<p>` tag.
-   - Inside the `<p>` tag, wrap the text content in a `<span>` tag.
-   - Example: `<p><span>This is a paragraph of text.</span></p>`
+   - Wrap paragraphs in `<p>` tags.
+   - You MAY use headings `<h2>`, `<h3>` etc. for section titles if appropriate, or `<p style="text-align: center"><b>...</b></p>`.
+   - Lists (`<ul>`, `<ol>`, `<li>`) are permitted and encouraged for numbering facts.
 
-2. **NO SPECIAL CLASSES**: 
-   - Do NOT use classes like "content-element" or "text-span".
-   - Do NOT use "absolute" positioning or style attributes.
-   - Keep the HTML clean and semantic.
+2. **RICH FORMATTING (REQUIRED)**:
+   - **BOLD**: Use `<b>` or `<strong>` for:
+     - Party names (e.g., **PETITIONER**, **RESPONDENT**)
+     - Key legal terms (e.g., **PROVIDED THAT**, **WHEREFORE**)
+     - Section Headers
+   - **ALIGNMENT**: Use `style="text-align: center;"` for document titles and main headers.
+   - **ITALICS**: Use with `<i>` or `<em>` for Latin terms or emphasis.
+   - **Underline**: Use `<u>` where legally conventional.
 
-3. **FORMATTING**:
-   - NO bold, italics, or other styling tags.
-   - Use <br> only if strictly necessary within a paragraph, but prefer closing and opening new `<p>` tags for new lines.
+3. **CLEANLINESS**:
+   - Do NOT use custom CSS classes unknown to standard HTML.
+   - Keep styles inline if needed (e.g. `style="text-align: justify;"` is good for body text).
 
-4. **EMPTY LINES**:
-   - For vertical spacing, use an empty paragraph: `<p><br></p>` or `<p><span>&nbsp;</span></p>`
+4. **FLAT STRUCTURE (CRITICAL FOR PAGINATION)**:
+   - **NO LIST TAGS**: Do NOT use `<ul>`, `<ol>`, or `<li>` tags. The editor cannot split these across pages.
+   - **Use Paragraphs for Lists**: Instead, use separate `<p>` tags with manual numbering/bullets.
+     - Example: `<p>1. First point...</p>`
+     - Example: `<p>2. Second point...</p>`
+   - **Short Layout**: Break any text longer than 8 lines into a new `<p>`.
 
-5. **PLACEHOLDERS**:
-   - Keep the `[description]` placeholders as plain text inside the spans.
+5. **Placeholders**:
+   - Keep the `[description]` placeholders as plain text.
+
+## PAGINATION & SPACING RULES (CRITICAL):
+
+1. **Short Paragraphs**: To ensure proper page breaking, paragraphs MUST NOT exceed 8-10 lines. Break longer text into multiple shorter paragraphs.
+2. **No Extra Spacing**: Do NOT use empty paragraphs (`<p>&nbsp;</p>` or `<br>`) for spacing. The editor handles spacing automatically.
+3. **Closing**: Ensure the document has a proper closing.
 
 ## OUTPUT EXAMPLE:
 
-<p><span>LEGAL NOTICE</span></p>
-<p><span>&nbsp;</span></p>
-<p><span>REF. NO.: _(Reference Number)_</span></p>
-<p><span>DATE: 20th December 2024</span></p>
-<p><span>&nbsp;</span></p>
-<p><span>To,</span></p>
-<p><span>The Managing Director,</span></p>
-...
+<p style="text-align: center;"><b><u>LEGAL NOTICE</u></b></p>
+<p>&nbsp;</p>
+<p><b>REF. NO.:</b> [Reference Number]</p>
+<p><b>DATE:</b> 20th December 2024</p>
+<p>&nbsp;</p>
+<p><b>To,</b></p>
+<p><b>The Managing Director,</b></p>
+<p>[Company Address]</p>
+<p>&nbsp;</p>
+<p><b>SUBJECT: NOTICE FOR [Subject Matter]</b></p>
+<p>&nbsp;</p>
+<p>Sir/Madam,</p>
+<p style="text-align: justify;">Under instruction from my client <b>[Client Name]</b>, resident of [Address], I hereby serve you with the following legal notice:</p>
+<p>1. That my client is a law-abiding citizen...</p>
+<p>2. That on [Date], you agreed to the terms...</p>
+<p>3. That despite repeated reminders...</p>
+<p>&nbsp;</p>
+<p style="text-align: right;"><b>(Signature)</b></p>
+<p style="text-align: right;"><b>[Advocate Name]</b></p>
 
 ## OUTPUT:
 
-Provide the complete legal draft as valid HTML following the strict structure above. output ONLY the HTML.
+Provide the complete legal draft as valid HTML following the structure above. Output ONLY the HTML.
 """
 
 api_key= os.getenv("GOOGLE_API_KEY")
@@ -156,7 +181,11 @@ def generate_legal_draft(
     # Initialize the Gemini model (using gemini-1.5-flash)
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash",
-        system_instruction=LEGAL_DRAFT_SYSTEM_PROMPT
+        system_instruction=LEGAL_DRAFT_SYSTEM_PROMPT,
+        generation_config=genai.GenerationConfig(
+            max_output_tokens=8192,
+            temperature=0.7,
+        )
     )
     
     # Construct the user prompt
