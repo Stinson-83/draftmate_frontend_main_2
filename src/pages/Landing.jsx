@@ -9,6 +9,15 @@ import Vie_SoriesLogo from '../assets/Vie_Sories.webp';
 import Karnataka_News_NetworkLogo from '../assets/Karnataka_News_Network.png';
 import India_Wire_NewsLogo from '../assets/India_Wire_News.png';
 import Business_News_Logo from '../assets/businessnewsthisweek.png';
+import SecurityDraftmate from '../components/SecurityDraftmate';
+
+// Partner Logos
+import LawJuristLogo from '../assets/partner_logos/LAW_JURIST.webp';
+import ChristUniversityLogo from '../assets/partner_logos/christ_university.png';
+import ImsUnisonLogo from '../assets/partner_logos/ims_unison.png';
+import KesjpLawCollegeLogo from '../assets/partner_logos/kesjplaw_college.png';
+import LegalVidyaLogo from '../assets/partner_logos/legal_vidya.webp';
+import SxccalLogo from '../assets/partner_logos/sxccal.png';
 
 import Abhiniti_Vats from '../assets/avatars/Abhiniti_Vats.png';
 import Prathana_Prakash from '../assets/avatars/Prathana_Prakash.png';
@@ -678,25 +687,16 @@ const Landing = () => {
 
             {/* Trusted Partners */}
             < section className="py-20 px-4 lg:px-40 bg-white border-t border-[#f0f2f4]" >
-                <div className="layout-content-container flex flex-col max-w-[960px] mx-auto gap-8 items-center">
+                <div className="layout-content-container flex flex-col max-w-7xl mx-auto gap-8 items-center">
                     <h3 className="text-[#616f89] text-sm font-bold uppercase tracking-wider text-center">Our Trusted Partners</h3>
-                    <div className="flex flex-wrap justify-center items-center gap-12 lg:gap-16 opacity-60">
-                        <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-4xl">gavel</span>
-                            <span className="text-2xl font-black text-slate-800">Legal<span className="text-primary">Tech</span></span>
-                        </div>
-                        <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-4xl">account_balance</span>
-                            <span className="text-2xl font-serif font-bold text-slate-800">LawTimes</span>
-                        </div>
-                        <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-4xl">policy</span>
-                            <span className="text-2xl font-bold text-slate-800">INDIA<span className="font-light">JURIS</span></span>
-                        </div>
-                        <div className="flex items-center gap-2 grayscale hover:grayscale-0 transition-all cursor-pointer">
-                            <span className="material-symbols-outlined text-4xl">library_books</span>
-                            <span className="text-2xl font-bold text-slate-800">SCC<span className="text-red-600">Online</span></span>
-                        </div>
+                    <SecurityDraftmate />
+                    <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 opacity-60">
+                        <img src={LawJuristLogo} alt="Law Jurist" className="h-12 w-auto grayscale hover:grayscale-0 transition-all cursor-pointer object-contain" />
+                        <img src={ChristUniversityLogo} alt="Christ University" className="h-16 w-auto grayscale hover:grayscale-0 transition-all cursor-pointer object-contain" />
+                        <img src={ImsUnisonLogo} alt="IMS Unison University" className="h-16 w-auto grayscale hover:grayscale-0 transition-all cursor-pointer object-contain" />
+                        <img src={KesjpLawCollegeLogo} alt="KES' Shri Jayantilal H. Patel Law College" className="h-16 w-auto grayscale hover:grayscale-0 transition-all cursor-pointer object-contain" />
+                        <img src={LegalVidyaLogo} alt="Legal Vidya" className="h-12 w-auto grayscale hover:grayscale-0 transition-all cursor-pointer object-contain" />
+                        <img src={SxccalLogo} alt="St. Xavier's College" className="h-16 w-auto grayscale hover:grayscale-0 transition-all cursor-pointer object-contain" />
                     </div>
                 </div>
             </section >
