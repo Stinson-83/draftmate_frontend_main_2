@@ -48,7 +48,8 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContex
     };
 
     const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
             handleSubmitEnhance();
         } else if (e.key === 'Escape') {
             setShowInput(false);
@@ -186,14 +187,14 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContex
                     ) : (
                         /* AI Assist Mode */
                         <div className="flex items-center gap-2 p-1">
-                            <input
-                                type="text"
-                                className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-80"
+                            <textarea
+                                className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-[500px] resize-none"
                                 placeholder="How should I change this?"
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 autoFocus
+                                rows={3}
                             />
                             <button
                                 className="btn-enhance px-3 py-1 text-xs"
