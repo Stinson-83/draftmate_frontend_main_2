@@ -188,7 +188,7 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContex
                         <div className="flex items-center gap-2 p-1">
                             <input
                                 type="text"
-                                className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-48"
+                                className="text-sm bg-transparent border-none outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 w-80"
                                 placeholder="How should I change this?"
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}

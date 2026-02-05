@@ -89,6 +89,8 @@
     overflow: hidden;
     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     max-height: 100%;
+    user-select: text !important;
+    -webkit-user-select: text !important;
 }
 
 .editor-sidebar.left {
@@ -304,13 +306,18 @@
 
 /* Individual A4 page - matches DocumentPreview.tsx exactly */
 .document-page {
-    position: relative; /* REQUIRED: Anchor for all absolute text fragments */
-    width: 816px;       /* 8.5in at 96 DPI */
-    height: 1056px;      /* 11in at 96 DPI */
+    position: relative;
+    /* REQUIRED: Anchor for all absolute text fragments */
+    width: 816px;
+    /* 8.5in at 96 DPI */
+    height: 1056px;
+    /* 11in at 96 DPI */
     background: white;
-    padding: 72px;      /* Standard Margins */
+    padding: 72px;
+    /* Standard Margins */
     overflow: hidden;
-    display: block;     /* Disable flex to respect coordinates */
+    display: block;
+    /* Disable flex to respect coordinates */
     margin: 0 auto 24px;
     box-sizing: content-box;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -324,7 +331,8 @@
     right: 72px;
     bottom: 72px;
     outline: none;
-    white-space: pre;   /* Preserve multiple spaces from PDF layout */
+    white-space: pre;
+    /* Preserve multiple spaces from PDF layout */
 }
 
 .editor-root p {
@@ -415,7 +423,8 @@
     white-space: pre;
     cursor: text;
     line-height: 1.2;
-    transition: top 0.1s ease-out; /* Smooth shifting when typing */
+    transition: top 0.1s ease-out;
+    /* Smooth shifting when typing */
     z-index: 1;
 }
 

@@ -23,6 +23,9 @@ const AiSidebar = ({
                 borderLeft: '1px solid rgba(203, 213, 225, 0.5)',
                 boxShadow: isOpen ? '-4px 0 20px rgba(0, 0, 0, 0.03)' : 'none',
             }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
         >
             {/* Header with tabs */}
             <div className="chat-header" style={{
@@ -138,6 +141,8 @@ const AiSidebar = ({
                                                     ? '0 2px 8px rgba(59, 130, 246, 0.25)'
                                                     : '0 1px 3px rgba(0, 0, 0, 0.05)',
                                                 border: msg.role === 'user' ? 'none' : '1px solid rgba(226, 232, 240, 0.8)',
+                                                userSelect: 'text',
+                                                cursor: 'text',
                                             }}
                                         >
                                             {msg.role === 'ai' ? (

@@ -1118,55 +1118,7 @@ const Editor = () => {
 
 
 
-    // Helper: Save and Restore Selection
-    const saveSelection = (containerEl) => {
-        const selection = window.getSelection();
-        if (!selection || selection.rangeCount === 0) return null;
-        const range = selection.getRangeAt(0);
-        const preSelectionRange = range.cloneRange();
-        preSelectionRange.selectNodeContents(containerEl);
-        preSelectionRange.setEnd(range.startContainer, range.startOffset);
-        const start = preSelectionRange.toString().length;
 
-        return {
-            start: start,
-            end: start + range.toString().length
-        };
-    };
-
-    const restoreSelection = (containerEl, savedSelection) => {
-        if (!savedSelection) return;
-        let charIndex = 0;
-        const range = document.createRange();
-        range.setStart(containerEl, 0);
-        range.collapse(true);
-        const nodeStack = [containerEl];
-        let node, foundStart = false, stop = false;
-
-        while (!stop && (node = nodeStack.pop())) {
-            if (node.nodeType === 3) {
-                const nextCharIndex = charIndex + node.length;
-                if (!foundStart && savedSelection.start >= charIndex && savedSelection.start <= nextCharIndex) {
-                    range.setStart(node, savedSelection.start - charIndex);
-                    foundStart = true;
-                }
-                if (foundStart && savedSelection.end >= charIndex && savedSelection.end <= nextCharIndex) {
-                    range.setEnd(node, savedSelection.end - charIndex);
-                    stop = true;
-                }
-                charIndex = nextCharIndex;
-            } else {
-                let i = node.childNodes.length;
-                while (i--) {
-                    nodeStack.push(node.childNodes[i]);
-                }
-            }
-        }
-
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-    };
     // Link Interaction Handlers
     useEffect(() => {
         const handleEditorClick = (e) => {
@@ -1421,21 +1373,26 @@ const Editor = () => {
             // Restore scroll/cursor logic...
             // (Existing logic kept same)
             const selection = window.getSelection();
-            try {
-                const range = document.createRange();
-                const firstEl = movedToNextPage.firstChild;
-                if (firstEl.nodeType === Node.TEXT_NODE) {
-                    range.setStart(firstEl, Math.min(firstEl.textContent.length, 0));
-                } else if (firstEl.lastChild) {
-                    range.setStartAfter(firstEl.lastChild);
-                } else {
-                    range.setStart(firstEl, 0);
-                }
-                range.collapse(true);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                movedToNextPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } catch (e) { console.error("Cursor restore failed", e); }
+
+            // Safety Check: Only restore cursor if it's actually inside the editor pages
+            // This prevents clearing selection from Sidebar or other areas
+            if (selection.rangeCount > 0 && container.contains(selection.anchorNode)) {
+                try {
+                    const range = document.createRange();
+                    const firstEl = movedToNextPage.firstChild;
+                    if (firstEl.nodeType === Node.TEXT_NODE) {
+                        range.setStart(firstEl, Math.min(firstEl.textContent.length, 0));
+                    } else if (firstEl.lastChild) {
+                        range.setStartAfter(firstEl.lastChild);
+                    } else {
+                        range.setStart(firstEl, 0);
+                    }
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    movedToNextPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (e) { console.error("Cursor restore failed", e); }
+            }
         }
 
         const finalCount = container.querySelectorAll('.document-page').length;
@@ -1541,6 +1498,14 @@ const Editor = () => {
 
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) {
+                // Ignore if selection is in Sidebar
+                if (selection.anchorNode &&
+                    selection.anchorNode.parentElement &&
+                    (selection.anchorNode.parentElement.closest('.editor-sidebar') ||
+                        selection.anchorNode.parentElement.closest('.floating-toolbar'))) {
+                    return;
+                }
+
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
                 const container = range.commonAncestorContainer;
