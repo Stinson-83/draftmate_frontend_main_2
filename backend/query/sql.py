@@ -141,7 +141,10 @@ def stop_tunnel_and_pool():
 
 def get_db_connection():
     if connection_pool:
-        return connection_pool.getconn()
+        logger.info("DEBUG: Requesting connection from pool...")
+        conn = connection_pool.getconn()
+        logger.info("DEBUG: Connection acquired from pool.")
+        return conn
     else:
         # Fallback if pool wasn't initialized
         logger.warning("Connection pool not initialized. Attempting direct connection.")
@@ -149,7 +152,9 @@ def get_db_connection():
 
 def release_db_connection(conn):
     if connection_pool:
+        logger.info("DEBUG: Releasing connection to pool...")
         connection_pool.putconn(conn)
+        logger.info("DEBUG: Connection released.")
     else:
         conn.close()
 
@@ -168,6 +173,18 @@ def search_documents(search_terms, query_embedding=None, raw_query=None, languag
             vector_results = []
             if query_embedding:
                 try:
+                    # --- DIAGNOSTICS START ---
+                    logger.info(f"DEBUG: Embedding size: {len(query_embedding)} dimensions")
+                    
+                    logger.info("DEBUG: Running Warmup (SELECT 1)...")
+                    cur.execute("SELECT 1")
+                    logger.info("DEBUG: Warmup complete.")
+
+                    logger.info("DEBUG: Setting statement_timeout to 10s...")
+                    cur.execute("SET statement_timeout = 10000") # 10s
+                    # --- DIAGNOSTICS END ---
+
+                    logger.info("DEBUG: Executing Vector Search query...")
                     cur.execute("""
                         SELECT doc_id, title, canonical_title, tags, snippet, s3_path,
                                (1 - (embedding <=> %s::vector)) as raw_score,
@@ -177,6 +194,7 @@ def search_documents(search_terms, query_embedding=None, raw_query=None, languag
                         ORDER BY raw_score DESC
                         LIMIT 25
                     """, (query_embedding, query_embedding))
+                    logger.info("DEBUG: Vector Search query finished.")
                     vector_results = cur.fetchall()
                 except Exception as e:
                     print(f"[WARN] Vector search failed: {e}")
@@ -186,6 +204,7 @@ def search_documents(search_terms, query_embedding=None, raw_query=None, languag
             text_results = []
             if raw_query:
                 try:
+                    logger.info("DEBUG: Executing Text Search query...")
                     cur.execute("""
                         SELECT doc_id, title, canonical_title, tags, snippet, s3_path,
                                LEAST(ts_rank(search_vector, websearch_to_tsquery('english', %s)) * 1.5, 1.0) as raw_score,
@@ -195,6 +214,7 @@ def search_documents(search_terms, query_embedding=None, raw_query=None, languag
                         ORDER BY raw_score DESC
                         LIMIT 20
                     """, (raw_query, raw_query))
+                    logger.info("DEBUG: Text Search query finished.")
                     text_results = cur.fetchall()
                 except Exception as e:
                     print(f"[WARN] Text search failed: {e}")

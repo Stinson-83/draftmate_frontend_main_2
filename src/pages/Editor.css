@@ -304,36 +304,27 @@
 
 /* Individual A4 page - matches DocumentPreview.tsx exactly */
 .document-page {
-    position: relative;
-    box-sizing: border-box;
-    width: 816px;
-    height: 1056px;
-    /* FIXED height, not min-height */
-    padding: 72px;
-    overflow: hidden;
-    /* Critical: hide overflow so content moves to next page */
+    position: relative; /* REQUIRED: Anchor for all absolute text fragments */
+    width: 816px;       /* 8.5in at 96 DPI */
+    height: 1056px;      /* 11in at 96 DPI */
     background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
-
-    /* Flex layout for Header/Editor/Footer */
-    display: flex;
-    flex-direction: column;
+    padding: 72px;      /* Standard Margins */
+    overflow: hidden;
+    display: block;     /* Disable flex to respect coordinates */
+    margin: 0 auto 24px;
+    box-sizing: content-box;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* Editor root inside each page */
+/* The Absolute Editor Layer */
 .editor-root {
+    position: absolute;
+    top: 72px;
+    left: 72px;
+    right: 72px;
+    bottom: 72px;
     outline: none;
-    white-space: pre-wrap;
-    line-height: 1.6;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    width: 100%;
-    max-width: 100%;
-    /* Flex grow to fill space */
-    flex: 1;
-    min-height: 0;
-    font-size: 12pt;
-    color: black;
+    white-space: pre;   /* Preserve multiple spaces from PDF layout */
 }
 
 .editor-root p {
@@ -418,24 +409,43 @@
     margin-bottom: 0.5em;
 }
 
-.variable {
-    background-color: transparent;
-    color: inherit;
-    border-bottom: none;
-    padding: 0;
-    border-radius: 0;
-    font-weight: normal;
-    /* Or inherit */
+/* Coordinate-aware text fragments */
+.content-element {
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    line-height: 1.2;
+    transition: top 0.1s ease-out; /* Smooth shifting when typing */
+    z-index: 1;
 }
 
+.content-element:focus {
+    z-index: 10;
+    outline: 1px dashed var(--primary);
+}
+
+/* AI Highlighted Variables */
 .variable {
-    background-color: transparent;
-    color: inherit;
-    border-bottom: none;
-    padding: 0;
-    border-radius: 0;
-    font-weight: normal;
-    /* Or inherit */
+    background-color: rgba(79, 70, 229, 0.1) !important;
+    border-bottom: 2px solid #4f46e5;
+    color: #4f46e5;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: #4f46e5;
 }
 
 /* Tables */

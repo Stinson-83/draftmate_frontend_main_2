@@ -1100,8 +1100,6 @@ const Editor = () => {
             ed.style.lineHeight = '1.6';
             ed.style.wordBreak = 'break-word';
             ed.style.overflowWrap = 'anywhere';
-            ed.style.width = '100%';
-            ed.style.maxWidth = '100%';
             pageEl.appendChild(ed);
         }
         return ed;
@@ -1226,23 +1224,107 @@ const Editor = () => {
     }, []);
 
     // Pagination Logic
+    // Pagination Logic
     const paginateAll = useCallback(() => {
         const container = pagesContainerRef.current;
         if (!container) return;
-
-        // Save cursor position relative to the WHOLE container (primitive but helps)
-        // Better strategy: Don't touch DOM unless absolutely necessary.
-        // And if we do, try to rely on browser's stability or simple restoration.
-
-        // NOTE: Full exact restoration across pages is complex. 
-        // For the "cursor jumps to start" bug, usually preventing React re-renders is key, 
-        // and ensuring we don't swap nodes under the cursor.
 
         let safety = 0;
         let changed = true;
         let movedToNextPage = null;
 
-        while (changed && safety < 20) {
+        const splitNode = (node, targetParent) => {
+            // Helper to split a node into targetParent
+            // Returns true if something was moved
+
+            // 1. If Text Node
+            if (node.nodeType === Node.TEXT_NODE) {
+                const text = node.textContent;
+                if (text.length < 2) return false;
+
+                // Simple binary split heuristic
+                const midpoint = Math.floor(text.length / 2);
+                const firstHalf = text.substring(0, midpoint);
+                const secondHalf = text.substring(midpoint);
+
+                node.textContent = firstHalf;
+
+                const newTextNode = document.createTextNode(secondHalf);
+                if (targetParent.firstChild) targetParent.insertBefore(newTextNode, targetParent.firstChild);
+                else targetParent.appendChild(newTextNode);
+
+                return true;
+            }
+
+            // 2. If Element Node
+            const clone = node.cloneNode(false);
+            clone.removeAttribute('id'); // Prevent ID dupes
+
+            // RESET STYLES: Critical to prevent infinite loops with fixed-height containers (e.g. from PDF extract)
+            // If the original had height: 912px, we don't want the clone (or original) to keep forcing that size.
+            // Let the content dictate height now that we are breaking it up.
+            if (clone.style) {
+                clone.style.height = 'auto';
+                clone.style.minHeight = 'auto';
+            }
+            if (node.style) {
+                node.style.height = 'auto';
+                node.style.minHeight = 'auto';
+            }
+
+            // We append clone proactively, but we might remove it if empty
+            if (targetParent.firstChild) targetParent.insertBefore(clone, targetParent.firstChild);
+            else targetParent.appendChild(clone);
+
+            // OPTIMIZATION: Move HALF the children (Binary Split) for O(log n) convergence
+            if (node.hasChildNodes()) {
+                const children = Array.from(node.childNodes);
+                if (children.length > 0) {
+                    let midpoint = Math.floor(children.length / 2);
+
+                    // Ensure we move at least one if it exists
+                    if (midpoint === children.length) midpoint--;
+                    if (midpoint < 0) midpoint = 0;
+
+                    // If only 1 child, recurse
+                    if (children.length === 1) {
+                        const singleChild = children[0];
+                        const result = splitNode(singleChild, clone);
+
+                        // CLEANUP: If original node is now empty, remove it
+                        if (!node.hasChildNodes() && node.parentNode) {
+                            node.remove();
+                        }
+
+                        // CLEANUP: If clone is empty, remove it
+                        if (!clone.hasChildNodes() && clone.parentNode) {
+                            clone.remove();
+                            return false;
+                        }
+                        return result;
+                    }
+
+                    // Standard Binary Split
+                    const childrenToMove = children.slice(midpoint);
+                    childrenToMove.forEach(child => clone.appendChild(child));
+
+                    // Cleanup empty original if we moved everything (unlikely with midpoint logic but possible)
+                    if (!node.hasChildNodes() && node.parentNode) {
+                        node.remove();
+                    }
+
+                    return true;
+                }
+            }
+
+            // If we got here, node had no children? Remove empty clone
+            if (!clone.hasChildNodes() && clone.parentNode) {
+                clone.remove();
+            }
+            return false;
+        };
+
+        while (changed && safety < 15) { // Reduced safety to prevent freeze
             changed = false;
             safety++;
             const pages = Array.from(container.querySelectorAll('.document-page'));
@@ -1252,6 +1334,7 @@ const Editor = () => {
                 const pageEl = pages[i];
                 const editor = initEmptyEditor(pageEl);
 
+                // While overflowing...
                 while (editor.scrollHeight > editor.clientHeight + 1 && editor.lastChild) {
                     const next = ensureNextPage(pageEl);
                     const nextEditor = initEmptyEditor(next);
@@ -1261,7 +1344,19 @@ const Editor = () => {
                     const cursorInMovingEl = selection && selection.rangeCount > 0 &&
                         movingEl.contains(selection.getRangeAt(0).startContainer);
 
-                    nextEditor.insertBefore(movingEl, nextEditor.firstChild);
+                    // LOGIC: If we only have ONE child and it's overflowing, we MUST split it.
+                    // Otherwise, we move the whole child (or checks if it's very tall).
+                    if (editor.children.length === 1) {
+                        const wasSplit = splitNode(movingEl, nextEditor);
+                        if (!wasSplit) {
+                            // Fallback: Just move it if splitting failed/was impossible
+                            nextEditor.insertBefore(movingEl, nextEditor.firstChild);
+                        }
+                    } else {
+                        // Standard move
+                        nextEditor.insertBefore(movingEl, nextEditor.firstChild);
+                    }
+
                     changed = true;
 
                     if (cursorInMovingEl) {
@@ -1270,12 +1365,15 @@ const Editor = () => {
                 }
             }
 
-            // 2. Backward Pass
+            // 2. Backward Pass - Pull content back if space exists
             for (let i = pages.length - 2; i >= 0; i--) {
                 const pageEl = pages[i];
                 const nextEl = pages[i + 1];
                 const editor = initEmptyEditor(pageEl);
                 const nextEditor = initEmptyEditor(nextEl);
+
+                // Optimization: Don't pull back if next page is explicitly a "forced" new page? 
+                // For now, simple standard flow.
 
                 while (nextEditor.firstChild) {
                     const node = nextEditor.firstChild;
@@ -1296,28 +1394,48 @@ const Editor = () => {
                     changed = true;
                 }
 
-                if (i === pages.length - 2 && !nextEditor.firstChild) {
-                    nextEl.remove();
-                    changed = true;
+                // Remove empty pages
+                // Condition: If we are not at the first page, and the *next* page is effectively empty
+                if (i < pages.length - 1) {
+                    const targetPage = pages[i + 1];
+                    const targetEditor = targetPage.querySelector('.editor-root') || targetPage;
+
+                    const rawText = targetPage.textContent.trim();
+                    const hasMedia = targetPage.querySelector('img, table, hr, .variable');
+
+                    // If page is completely empty or just has an empty paragraph
+                    const isEffectivelyEmpty =
+                        (!rawText && !hasMedia) &&
+                        (!targetEditor.firstChild ||
+                            (targetEditor.children.length === 1 && targetEditor.firstChild.tagName === 'P' && !targetEditor.firstChild.textContent.trim()));
+
+                    if (isEffectivelyEmpty) {
+                        targetPage.remove();
+                        changed = true;
+                    }
                 }
             }
         }
 
         if (movedToNextPage && movedToNextPage.firstChild) {
+            // Restore scroll/cursor logic...
+            // (Existing logic kept same)
             const selection = window.getSelection();
-            const range = document.createRange();
-            const firstEl = movedToNextPage.firstChild;
-            if (firstEl.nodeType === Node.TEXT_NODE) {
-                range.setStart(firstEl, firstEl.textContent.length);
-            } else if (firstEl.lastChild) {
-                range.setStartAfter(firstEl.lastChild);
-            } else {
-                range.setStart(firstEl, 0);
-            }
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            movedToNextPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            try {
+                const range = document.createRange();
+                const firstEl = movedToNextPage.firstChild;
+                if (firstEl.nodeType === Node.TEXT_NODE) {
+                    range.setStart(firstEl, Math.min(firstEl.textContent.length, 0));
+                } else if (firstEl.lastChild) {
+                    range.setStartAfter(firstEl.lastChild);
+                } else {
+                    range.setStart(firstEl, 0);
+                }
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                movedToNextPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) { console.error("Cursor restore failed", e); }
         }
 
         const finalCount = container.querySelectorAll('.document-page').length;
@@ -1325,22 +1443,13 @@ const Editor = () => {
             setPageCount(finalCount);
         }
 
-        // DEBOUNCE / THROTTLE Word Count update to prevent frequent Re-renders
-        // This is the most likely cause of cursor jumping on every character typed.
         if (!window._wordCountTimer) {
             window._wordCountTimer = setTimeout(() => {
                 const allText = container.textContent || '';
                 const words = allText.trim().split(/\s+/).filter(w => w.length > 0).length;
                 setWordCount(words);
                 window._wordCountTimer = null;
-            }, 1000); // Update word count max once per second
-        }
-
-        // Logic for current page detection remains but let's check it less often or rely on scroll/click/caret
-        // Removing it from here to reduce render stress. Moved to separate listener or simplified.
-        if (safety === 1 && !changed) {
-            // If nothing changed, we can safely check current page without risk
-            // But let's skip state updates strictly inside the tight input loop
+            }, 1000);
         }
 
     }, [pageCount]);
@@ -1516,6 +1625,64 @@ const Editor = () => {
             window.removeEventListener('scroll', handleScroll, true);
         };
     }, [showFloatingToolbar]);
+
+
+
+    // --- BLUEPRINT LAYOUT ENGINE ---
+    // Handles collisions: if you type in a span, it pushes subsequent spans down.
+    useEffect(() => {
+        const container = documentRef.current;
+        if (!container) return;
+
+        const updateBlueprintLayout = () => {
+            const elements = Array.from(container.querySelectorAll('.content-element'));
+            if (elements.length === 0) return;
+
+            let cumulativeYShift = 0;
+            const rows = new Map();
+
+            // 1. Snapshot original coordinates if not already present
+            elements.forEach(el => {
+                if (!el.dataset.origTop) el.dataset.origTop = el.style.top;
+                if (!el.dataset.origLeft) el.dataset.origLeft = el.style.left;
+                const topKey = el.dataset.origTop;
+                if (!rows.has(topKey)) rows.set(topKey, []);
+                rows.get(topKey).push(el);
+            });
+
+            // 2. Sort rows by vertical position and calculate shifts
+            const sortedTops = Array.from(rows.keys()).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+            sortedTops.forEach(top => {
+                const rowItems = rows.get(top).sort((a, b) => parseFloat(a.dataset.origLeft) - parseFloat(b.dataset.origLeft));
+                let intraRowShift = 0;
+
+                rowItems.forEach((el, i) => {
+                    const originalTop = parseFloat(el.dataset.origTop);
+                    el.style.top = `${originalTop + cumulativeYShift + intraRowShift}px`;
+
+                    // Horizontal collision check: if this span grows into the next one
+                    if (i < rowItems.length - 1) {
+                        const nextEl = rowItems[i + 1];
+                        const currentRight = el.offsetLeft + el.offsetWidth;
+                        if (currentRight > nextEl.offsetLeft) {
+                            intraRowShift += el.offsetHeight;
+                        }
+                    }
+                });
+                cumulativeYShift += intraRowShift;
+            });
+        };
+
+        container.addEventListener('input', updateBlueprintLayout);
+        updateBlueprintLayout(); // Initial pass
+
+        return () => container.removeEventListener('input', updateBlueprintLayout);
+    }, [location.state?.htmlContent]);
+
+
+
+
 
     const handleEnhance = async (userPrompt = '') => {
         console.log('handleEnhance called with prompt:', userPrompt);
@@ -1719,7 +1886,7 @@ const Editor = () => {
 
                 // Trigger pagination
                 setPageCount(1);
-                setTimeout(paginateAll, 100);
+                setTimeout(paginateAll, 500);
 
                 toast.success('Enhancement applied! Press Ctrl+Z to undo.');
             } catch (error) {
@@ -1841,6 +2008,12 @@ const Editor = () => {
                                         contentEditable
                                         suppressContentEditableWarning
                                         ref={documentRef}
+                                        style={{
+                                            whiteSpace: 'normal',
+                                            wordBreak: 'break-word',
+                                            overflowWrap: 'anywhere',
+                                            outline: 'none'
+                                        }}
                                     >
                                         {!location.state?.htmlContent && !location.state?.isEmpty && (
                                             <p><br /></p>

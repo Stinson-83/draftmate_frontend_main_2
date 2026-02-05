@@ -502,65 +502,73 @@ def enhance_content(selected_text: str, user_context: str) -> str:
             f.write(f"Enhance Content Error: {str(e)}\n")
         return f"Error: {e}"
 
+from bs4 import BeautifulSoup
+
 def create_placeholders(html_content: str) -> str:
     """
-    Parses HTML, finds content spans, and uses LLM to replace specific entity details with [Placeholders].
+    Identifies legal variables using Gemini and prepares spans 
+    for the React Blueprint Layout Engine.
     """
     if not GEMINI_API_KEY:
-        return html_content # Mock mode: return as is or implement simple regex mock
+        return html_content
 
     try:
-        from bs4 import BeautifulSoup
-        # User requested strictly preserving style/attributes. 'lxml' is robust for this.
-        soup = BeautifulSoup(html_content, 'lxml')
+        # Use html.parser to avoid forced <html>/<body> wrapping
+        soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Target spans based on user description and common PDF-to-HTML output
-        # Targeting 'content-element', 'text-span', or spans with absolute positioning
-        spans = soup.find_all('span', class_=lambda x: x and ('content-element' in x or 'text-span' in x))
+        # Target spans with absolute positioning (standard PDF-to-HTML fragments)
+        spans = [s for s in soup.find_all('span') if s.get('style') and 'absolute' in s.get('style', '')]
         
-        print(f"DEBUG: Found {len(spans)} spans with class filter.")
-
         if not spans:
-             # Fallback: try finding any span with styles (generic) if class not found
-            spans = [s for s in soup.find_all('span') if s.get('style') and 'absolute' in s.get('style', '')]
-            print(f"DEBUG: Found {len(spans)} spans with style fallback.")
-
-        if not spans:
-            print("DEBUG: No spans found. Returning original HTML.")
             return html_content
 
-        # Extract text to send to LLM
-        texts = [s.get_text() for s in spans]
-        print(f"DEBUG: Sample extracted text: {texts[:5]}")
+        # 1. Prepare JSON payload for the LLM
+        payload = [{"id": i, "text": s.get_text()} for i, s in enumerate(spans)]
         
-        # We can't send infinite text, so we might need to batch if huge, 
-        # but for typical docs, sending a list of strings is efficient.
-        # We format it as a numbered list to keep track.
-        
-        input_text_block = "\n".join([f"ID_{i}: {text}" for i, text in enumerate(texts)])
-
         system_instruction = """
-        You are a Legal Document Formatter. 
-        Task: Identify specific variable details in the provided text segments. These can be:
-        1. Specific entity values (Names, Dates, Locations, Amounts).
-        2. Visual placeholders like long underscores (_______) or dots (.........) representing missing info.
+        You are a Legal Document Formatter specialized in creating placeholder templates.
 
-        Replace them with standard UPPERCASE placeholders in square brackets.
-        
-        Example 1 (Values): 
-        Input: "This Agreement is made on 12th January 2024 between John Doe and Jane Smith."
-        Output: "This Agreement is made on [DATE] between [PARTY 1 NAME] and [PARTY 2 NAME]."
+        TASK: Replace specific entity values and visual blanks with standardized placeholders while preserving ALL other content EXACTLY as written.
 
-        Example 2 (Blanks):
-        Input: "I pay a sum of Rs........................./- to Mr.........................."
-        Output: "I pay a sum of Rs [AMOUNT] /- to Mr [NAME]"
+        ENTITIES TO REPLACE:
+        - Names (people, companies, parties)
+        - Dates (any format)
+        - Monetary amounts
+        - Addresses and locations
+        - Contact info (email, phone)
+        - ID numbers (registration, license, etc.)
+        - Visual blanks: _______ or ......... or similar
 
-        STRICT RULES:
-        1. ONLY change the specific entity values or blank lines to placeholders. Leave all legal boilerplate, grammar, and structure EXACTLY as is.
-        2. Use placeholders like: [DATE], [NAME], [AMOUNT], [ADDRESS], [COMPANY NAME].
-        3. Placeholders MUST NOT contain angle brackets (< or >) or HTML tags.
-        4. Return the output in the EXACT format: "ID_{i}: {processed_text}"
-        5. Do not merge lines. Maintain 1-to-1 mapping.
+        PLACEHOLDER FORMAT:
+        Use descriptive UPPERCASE labels in square brackets:
+        [PARTY 1 NAME], [PARTY 2 NAME], [DATE], [AMOUNT], [ADDRESS], [COMPANY NAME], [EMAIL], [PHONE], [ID NUMBER], etc.
+
+        EXAMPLES:
+
+        Input: "Agreement dated 15th March 2024 between Acme Corp and John Smith for Rs. 50,000/-"
+        Output: "Agreement dated [DATE] between [COMPANY NAME] and [PARTY NAME] for Rs. [AMOUNT]/-"
+
+        Input: "Signed at _________________ on _________________"
+        Output: "Signed at [LOCATION] on [DATE]"
+
+        Input: "Contact: john.doe@email.com or call 555-123-4567"
+        Output: "Contact: [EMAIL] or call [PHONE]"
+
+        CRITICAL RULES:
+        1. Return EXACTLY in format: "ID_{number}: {processed_text}"
+        2. Each ID must appear exactly once
+        3. Maintain 1-to-1 mapping - do NOT merge or skip lines
+        4. If a line has no entities, return it UNCHANGED
+        5. Preserve ALL: grammar, punctuation, spacing, line breaks, formatting, boilerplate text
+        6. NEVER use angle brackets < > or HTML tags
+        7. NEVER rephrase or "fix" the original text
+        8. Only the entity values themselves should become placeholders - nothing else
+
+        OUTPUT FORMAT (JSON ARRAY):
+        [
+            {"id": 0, "text": "Agreement dated [DATE]..."},
+            {"id": 1, "text": "Signed at [LOCATION]..."}
+        ]
         """
 
         model = genai.GenerativeModel(
@@ -568,46 +576,53 @@ def create_placeholders(html_content: str) -> str:
             system_instruction=system_instruction
         )
 
+        # 2. Generate placeholders
         response = model.generate_content(
-            contents=[input_text_block],
-            generation_config={"temperature": 0.1},
-            safety_settings={
-                types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_HARASSMENT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: types.HarmBlockThreshold.BLOCK_NONE,
-                types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: types.HarmBlockThreshold.BLOCK_NONE,
+            contents=[json.dumps(payload)],
+            generation_config={
+                "temperature": 0.1,
+                "response_mime_type": "application/json"
             }
         )
         
         try:
-            result_text = response.text.strip()
-            print(f"DEBUG: LLM Response (First 200 chars): {result_text[:200]}")
-            # Parse results
+            processed_data = json.loads(response.text)
+            
+            # Robust parsing: Handle List vs Dict usage
             param_map = {}
-            for line in result_text.split('\n'):
-                if line.startswith("ID_") and ":" in line:
-                    parts = line.split(":", 1)
-                    idx_str = parts[0].replace("ID_", "").strip()
-                    content = parts[1].strip()
-                    if idx_str.isdigit():
-                        param_map[int(idx_str)] = content
-            
-            # Update HTML
-            for i, span in enumerate(spans):
-                if i in param_map:
-                    # Only update if the LLM returned a valid mapping, otherwise keep original
-                    span.string = param_map[i]
-            
-            return str(soup)
+            if isinstance(processed_data, list):
+                # Expected format: [{"id": 0, "text": "Code"}, ...]
+                for item in processed_data:
+                    if isinstance(item, dict) and 'id' in item and 'text' in item:
+                        param_map[item['id']] = item['text']
+            elif isinstance(processed_data, dict):
+                # Fallback format: {"0": "Text", "1": "Text"} or {"ID_0": "Text"}
+                for key, val in processed_data.items():
+                    # extract numeric ID
+                    clean_key = key.lower().replace('id_', '').replace('id', '')
+                    if clean_key.isdigit():
+                        param_map[int(clean_key)] = val
+        except Exception as e:
+            print(f"JSON Parsing Error in placeholders: {e}")
+            return html_content
 
-        except ValueError:
-            print("DEBUG: ValueError processing LLM response (possibly blocked).")
-            return html_content # Fail safe
+        # 3. Re-inject and add Layout Engine metadata
+        for i, span in enumerate(spans):
+            if i in param_map:
+                span.string = param_map[i]
+            
+            # CRITICAL: Add class for the React collision engine
+            classes = span.get('class', [])
+            if 'content-element' not in classes:
+                span['class'] = classes + ['content-element']
+            
+            # Ensure the browser treats absolute spans as editable blocks
+            span['contenteditable'] = 'true'
+
+        return str(soup)
 
     except Exception as e:
         print(f"Error in create_placeholders: {e}")
-        import traceback
-        traceback.print_exc()
         return html_content
 
 # def get_legal_context_from_web(case_context: str) -> str:
