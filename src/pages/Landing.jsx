@@ -926,8 +926,9 @@ const Landing = () => {
                                 </a>
                             </div>
 
-                            <div className="flex items-center gap-4 mt-2">
-                                <img src={startupIndiaLogo} alt="Recognized by Startup India" className="h-10 object-contain opacity-80 hover:opacity-100 transition-opacity" />
+                            <div className="flex flex-col gap-1 mt-4">
+                                <span className="text-[10px] text-gray-500 font-medium">Registered with</span>
+                                <img src={startupIndiaLogo} alt="Recognized by Startup India" className="h-10 w-fit object-contain opacity-80 hover:opacity-100 transition-opacity" />
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-12">
