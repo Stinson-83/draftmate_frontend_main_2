@@ -38,6 +38,7 @@ import Onboarding from './pages/Onboarding';
 import Landing from './pages/Landing';
 import Features from './pages/Features';
 import HowItWorks from './pages/HowItWorks';
+import FAQs from './pages/FAQs';
 import ComingSoon from './pages/ComingSoon';
 import Notifications from './pages/Notifications';
 import { NotificationProvider } from './context/NotificationContext';
@@ -86,6 +87,7 @@ function App() {
             {/* Public pages */}
             <Route path="/features" element={<Features />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/faqs" element={<FAQs />} />
             <Route path="/blogs" element={<ComingSoon title="Blog" />} />
 
             <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
