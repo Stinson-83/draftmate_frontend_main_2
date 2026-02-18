@@ -3,6 +3,7 @@ import { X, Upload, PenTool, Lock, Eye, EyeOff, FileText, Loader2, Check, ZoomIn
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
+import PromptQualityBar from './PromptQualityBar';
 import './DraftingModal.css';
 
 const DraftingModal = ({ onClose, initialPrompt }) => {
@@ -391,6 +392,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
                                 onChange={(e) => setPrompt(e.target.value)}
                                 rows={6}
                             />
+                            <PromptQualityBar prompt={prompt} />
                         </div>
 
                         <div className="modal-controls">
