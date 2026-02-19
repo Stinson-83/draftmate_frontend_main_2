@@ -45,7 +45,7 @@ const AiSidebar = ({
                                 background: activeTab === 'ai' ? 'white' : 'transparent',
                                 color: activeTab === 'ai' ? '#3b82f6' : '#64748b',
                                 fontWeight: activeTab === 'ai' ? '600' : '500',
-                                fontSize: '12px',
+                                fontSize: '13px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -67,7 +67,7 @@ const AiSidebar = ({
                                 background: activeTab === 'notes' ? 'white' : 'transparent',
                                 color: activeTab === 'notes' ? '#3b82f6' : '#64748b',
                                 fontWeight: activeTab === 'notes' ? '600' : '500',
-                                fontSize: '12px',
+                                fontSize: '13px',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
                             }}
@@ -146,7 +146,7 @@ const AiSidebar = ({
                                             }}
                                         >
                                             {msg.role === 'ai' ? (
-                                                <div className="markdown-content" style={{ fontSize: '12px', lineHeight: '1.6' }}>
+                                                <div className="markdown-content" style={{ fontSize: '13px', lineHeight: '1.6' }}>
                                                     <ReactMarkdown
                                                         components={{
                                                             p: ({ node, ...props }) => <p style={{ margin: '0 0 8px 0' }} {...props} />,
@@ -155,17 +155,17 @@ const AiSidebar = ({
                                                             li: ({ node, ...props }) => <li style={{ marginBottom: '3px' }} {...props} />,
                                                             code: ({ node, inline, ...props }) =>
                                                                 inline
-                                                                    ? <code style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', padding: '1px 4px', borderRadius: '3px', fontSize: '11px', color: '#3b82f6' }} {...props} />
-                                                                    : <code style={{ display: 'block', backgroundColor: 'rgba(15, 23, 42, 0.04)', padding: '8px', borderRadius: '6px', fontSize: '11px', overflowX: 'auto' }} {...props} />,
+                                                                    ? <code style={{ backgroundColor: 'rgba(59, 130, 246, 0.08)', padding: '1px 4px', borderRadius: '3px', fontSize: '12px', color: '#3b82f6' }} {...props} />
+                                                                    : <code style={{ display: 'block', backgroundColor: 'rgba(15, 23, 42, 0.04)', padding: '8px', borderRadius: '6px', fontSize: '12px', overflowX: 'auto' }} {...props} />,
                                                             strong: ({ node, ...props }) => <strong style={{ fontWeight: 600, color: '#0f172a' }} {...props} />,
                                                             a: ({ node, href, children, ...props }) => (
                                                                 <CitationLink href={href} sources={msg.sources} compact={true}>
                                                                     {children}
                                                                 </CitationLink>
                                                             ),
-                                                            h1: ({ node, ...props }) => <h1 style={{ fontSize: '14px', fontWeight: 700, margin: '12px 0 6px' }} {...props} />,
-                                                            h2: ({ node, ...props }) => <h2 style={{ fontSize: '13px', fontWeight: 600, margin: '10px 0 5px' }} {...props} />,
-                                                            h3: ({ node, ...props }) => <h3 style={{ fontSize: '12px', fontWeight: 600, margin: '8px 0 4px' }} {...props} />,
+                                                            h1: ({ node, ...props }) => <h1 style={{ fontSize: '16px', fontWeight: 700, margin: '12px 0 6px' }} {...props} />,
+                                                            h2: ({ node, ...props }) => <h2 style={{ fontSize: '15px', fontWeight: 600, margin: '10px 0 5px' }} {...props} />,
+                                                            h3: ({ node, ...props }) => <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '8px 0 4px' }} {...props} />,
                                                             blockquote: ({ node, ...props }) => (
                                                                 <blockquote style={{
                                                                     borderLeft: '3px solid #3b82f6',
@@ -181,7 +181,7 @@ const AiSidebar = ({
                                                     </ReactMarkdown>
                                                 </div>
                                             ) : (
-                                                <span style={{ fontSize: '12px' }}>{msg.content}</span>
+                                                <span style={{ fontSize: '13px' }}>{msg.content}</span>
                                             )}
                                         </div>
 
@@ -272,7 +272,7 @@ const AiSidebar = ({
                                             padding: '10px 14px',
                                             border: '1px solid rgba(203, 213, 225, 0.6)',
                                             borderRadius: '10px',
-                                            fontSize: '12px',
+                                            fontSize: '13px',
                                             outline: 'none',
                                             background: 'white',
                                             transition: 'all 0.2s ease',
@@ -324,7 +324,7 @@ const AiSidebar = ({
                             <h4 style={{
                                 padding: '12px 14px 8px',
                                 margin: 0,
-                                fontSize: '12px',
+                                fontSize: '13px',
                                 fontWeight: 600,
                                 color: '#475569',
                                 borderBottom: '1px solid rgba(226, 232, 240, 0.5)',
@@ -344,7 +344,7 @@ const AiSidebar = ({
                                     padding: '12px 14px',
                                     backgroundColor: 'transparent',
                                     fontFamily: 'inherit',
-                                    fontSize: '12px',
+                                    fontSize: '13px',
                                     lineHeight: '1.6',
                                     outline: 'none',
                                     color: '#334155',

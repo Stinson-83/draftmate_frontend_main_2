@@ -27,7 +27,7 @@ const ChatWithPDF = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState(''); // Streaming status
-    const [selectedFile, setSelectedFile] = useState(null);
+    const [selectedFiles, setSelectedFiles] = useState([]);
     const [sessionId, setSessionId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
@@ -141,11 +141,11 @@ const ChatWithPDF = () => {
             {
                 id: 1,
                 role: 'ai',
-                content: 'Hello! I am your PDF Assistant. Please upload a PDF document to get started. I can answer questions, summarize content, and help you analyze the document.'
+                content: 'Hello! I am your PDF Assistant. Please upload up to 5 PDF documents to get started. I can answer questions, summarize content, and help you analyze them.'
             }
         ]);
         localStorage.setItem('last_pdf_chat_session_id', newId);
-        setSelectedFile(null);
+        setSelectedFiles([]);
         window.history.replaceState({}, '', '/dashboard/chat-pdf');
     };
 
@@ -192,14 +192,14 @@ const ChatWithPDF = () => {
             id: Date.now(),
             role: 'user',
             content: currentInput,
-            file: selectedFile
+            file: selectedFiles
         };
 
         setMessages(prev => [...prev, userMsg]);
         setInput('');
-        // Don't clear selectedFile here, as we might want to keep showing it as "active context"
+        // Don't clear selectedFiles here — keep showing them as "active context"
         // But for the chat message logic, we pass it once.
-        // Actually, let's keep it selected in UI to show what we are chatting about.
+        // Actually, let's keep them selected in UI to show what we are chatting about.
 
         setIsTyping(true);
         setStatusMessage('');
@@ -272,33 +272,66 @@ const ChatWithPDF = () => {
         }
     };
 
+    const MAX_PDF_FILES = 5;
+
     const handleFileSelect = async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (!sessionId) {
-                toast.error("Session not initialized. Please try again.");
-                return;
-            }
-            setSelectedFile(file);
-            setIsUploading(true);
-            try {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        if (!sessionId) {
+            toast.error("Session not initialized. Please try again.");
+            return;
+        }
+
+        // Filter only PDF files
+        const pdfFiles = files.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+        if (pdfFiles.length < files.length) {
+            toast.error('Only PDF files are allowed.');
+        }
+        if (!pdfFiles.length) return;
+
+        // Enforce max 5 total
+        const remaining = MAX_PDF_FILES - selectedFiles.length;
+        if (remaining <= 0) {
+            toast.error(`You can upload a maximum of ${MAX_PDF_FILES} PDFs per session.`);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+        const filesToUpload = pdfFiles.slice(0, remaining);
+        if (pdfFiles.length > remaining) {
+            toast.warning(`Only ${remaining} more file(s) can be added. Extra files were skipped.`);
+        }
+
+        setIsUploading(true);
+        const newlyUploaded = [];
+        try {
+            for (const file of filesToUpload) {
                 await api.uploadFile(file, sessionId);
-                toast.success("File uploaded successfully!");
-                // Add system message
+                newlyUploaded.push(file);
+                // Add system message per file
                 setMessages(prev => [...prev, {
-                    id: Date.now(),
+                    id: Date.now() + newlyUploaded.length,
                     role: 'system',
                     content: `File uploaded: ${file.name}`
                 }]);
-            } catch (error) {
-                console.error("Upload error:", error);
-                toast.error(`Failed to upload file: ${error.message}`);
-                setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            } finally {
-                setIsUploading(false);
             }
+            setSelectedFiles(prev => [...prev, ...newlyUploaded]);
+            toast.success(`${newlyUploaded.length} file(s) uploaded successfully!`);
+        } catch (error) {
+            console.error("Upload error:", error);
+            toast.error(`Failed to upload file: ${error.message}`);
+            // Keep any files that were successfully uploaded before the error
+            if (newlyUploaded.length > 0) {
+                setSelectedFiles(prev => [...prev, ...newlyUploaded]);
+            }
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
+    };
+
+    const removeFile = (index) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     const triggerFileSelect = () => {
@@ -527,21 +560,21 @@ const ChatWithPDF = () => {
                         )}
 
                         {/* Empty State / Upload Prompt */}
-                        {messages.length === 1 && !isTyping && !selectedFile && (
+                        {messages.length === 1 && !isTyping && selectedFiles.length === 0 && (
                             <div className="mt-8 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/50">
                                 <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
                                     <span className="material-symbols-outlined text-blue-600 text-3xl">upload_file</span>
                                 </div>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Upload a PDF to Chat</h3>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Upload PDFs to Chat</h3>
                                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mb-6">
-                                    Upload a legal document, contract, or case file to ask questions, summarize, or analyze its content.
+                                    Upload up to 5 legal documents, contracts, or case files to ask questions, summarize, or analyze their content.
                                 </p>
                                 <button
                                     onClick={triggerFileSelect}
                                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 shadow-lg shadow-blue-500/20"
                                 >
                                     <span className="material-symbols-outlined">add</span>
-                                    Select PDF File
+                                    Select PDF Files
                                 </button>
                             </div>
                         )}
@@ -554,13 +587,18 @@ const ChatWithPDF = () => {
                 <footer className="flex-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 pb-6 pt-4 px-4 z-20">
                     <div className="max-w-3xl mx-auto w-full space-y-3">
                         {/* File Preview */}
-                        {selectedFile && (
-                            <div className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 w-fit shadow-sm animate-slide-up">
-                                <span className="material-symbols-outlined text-red-500">picture_as_pdf</span>
-                                <span className="text-sm text-slate-700 dark:text-slate-200">{selectedFile.name}</span>
-                                <button onClick={() => setSelectedFile(null)} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                    <span className="material-symbols-outlined text-base">close</span>
-                                </button>
+                        {selectedFiles.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {selectedFiles.map((file, idx) => (
+                                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 shadow-sm animate-slide-up">
+                                        <span className="material-symbols-outlined text-red-500 text-base">picture_as_pdf</span>
+                                        <span className="text-sm text-slate-700 dark:text-slate-200 max-w-[150px] truncate" title={file.name}>{file.name}</span>
+                                        <button onClick={() => removeFile(idx)} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                            <span className="material-symbols-outlined text-base">close</span>
+                                        </button>
+                                    </div>
+                                ))}
+
                             </div>
                         )}
 
@@ -570,6 +608,7 @@ const ChatWithPDF = () => {
                                 ref={fileInputRef}
                                 onChange={handleFileSelect}
                                 accept=".pdf,application/pdf"
+                                multiple
                                 className="hidden"
                             />
                             <button
@@ -584,7 +623,7 @@ const ChatWithPDF = () => {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder={selectedFile ? "Ask questions about this document..." : "Upload a file to start chatting..."}
+                                placeholder={selectedFiles.length > 0 ? "Ask questions about your documents..." : "Upload a file to start chatting..."}
                                 rows={1}
                                 className="flex-1 bg-transparent border-0 focus:ring-0 p-3 text-slate-900 dark:text-white placeholder-slate-400 resize-none max-h-48 overflow-y-auto outline-none shadow-none text-sm"
                                 style={{ minHeight: '44px' }}
@@ -592,13 +631,13 @@ const ChatWithPDF = () => {
                                     e.target.style.height = 'auto';
                                     e.target.style.height = e.target.scrollHeight + 'px';
                                 }}
-                                disabled={!selectedFile && messages.length <= 1} // Disable input until file is uploaded (unless continuing session)
+                                disabled={selectedFiles.length === 0 && messages.length <= 1} // Disable input until file is uploaded (unless continuing session)
                             />
 
                             <button
                                 onClick={handleSend}
-                                disabled={!input.trim() || (!selectedFile && messages.length <= 1)}
-                                className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() && (selectedFile || messages.length > 1)
+                                disabled={!input.trim() || (selectedFiles.length === 0 && messages.length <= 1)}
+                                className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() && (selectedFiles.length > 0 || messages.length > 1)
                                     ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                     }`}

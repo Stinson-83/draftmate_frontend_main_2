@@ -946,9 +946,8 @@ const Landing = () => {
                             </div>
                             <div className="flex flex-col gap-3">
                                 <h4 className="font-bold text-sm uppercase tracking-wider text-gray-500">Legal</h4>
-                                <a className="text-sm text-gray-300 hover:text-white cursor-pointer">Privacy Policy</a>
-                                <a className="text-sm text-gray-300 hover:text-white cursor-pointer">Terms of Service</a>
-                                <a className="text-sm text-gray-300 hover:text-white cursor-pointer">Disclaimer</a>
+                                <Link to="/privacy-policy" className="text-sm text-gray-300 hover:text-white cursor-pointer">Privacy Policy</Link>
+                                <Link to="/disclaimer" className="text-sm text-gray-300 hover:text-white cursor-pointer">Disclaimer</Link>
                             </div>
                         </div>
                     </div>

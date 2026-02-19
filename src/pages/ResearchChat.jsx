@@ -31,7 +31,7 @@ const ResearchChat = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState(''); // Streaming status
-    const [selectedFile, setSelectedFile] = useState(null);
+    const [selectedFiles, setSelectedFiles] = useState([]);
     const [sessionId, setSessionId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef(null);
@@ -189,19 +189,19 @@ const ResearchChat = () => {
     };
 
     const handleSend = async () => {
-        if (!input.trim() && !selectedFile) return;
+        if (!input.trim() && selectedFiles.length === 0) return;
 
         const currentInput = input;
         const userMsg = {
             id: Date.now(),
             role: 'user',
             content: currentInput,
-            file: selectedFile
+            file: selectedFiles
         };
 
         setMessages(prev => [...prev, userMsg]);
         setInput('');
-        setSelectedFile(null);
+        setSelectedFiles([]);
         setIsTyping(true);
         setStatusMessage('');
 
@@ -316,26 +316,54 @@ const ResearchChat = () => {
         }
     };
 
+    const MAX_DOC_FILES = 5;
+
     const handleFileSelect = async (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (!sessionId) {
-                toast.error("Session not initialized. Please try again.");
-                return;
-            }
-            setSelectedFile(file);
-            setIsUploading(true);
-            try {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        if (!sessionId) {
+            toast.error("Session not initialized. Please try again.");
+            return;
+        }
+
+        // Filter only PDF files
+        const pdfFiles = files.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+        if (pdfFiles.length < files.length) {
+            toast.error('Only PDF files are allowed.');
+        }
+        if (!pdfFiles.length) return;
+
+        // Enforce max 5 total
+        const remaining = MAX_DOC_FILES - selectedFiles.length;
+        if (remaining <= 0) {
+            toast.error(`You can upload a maximum of ${MAX_DOC_FILES} documents per session.`);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+        const filesToUpload = pdfFiles.slice(0, remaining);
+        if (pdfFiles.length > remaining) {
+            toast.warning(`Only ${remaining} more file(s) can be added. Extra files were skipped.`);
+        }
+
+        setIsUploading(true);
+        const newlyUploaded = [];
+        try {
+            for (const file of filesToUpload) {
                 await api.uploadFile(file, sessionId);
-                toast.success("File uploaded successfully!");
-            } catch (error) {
-                console.error("Upload error:", error);
-                toast.error(`Failed to upload file: ${error.message}`);
-                setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            } finally {
-                setIsUploading(false);
+                newlyUploaded.push(file);
             }
+            setSelectedFiles(prev => [...prev, ...newlyUploaded]);
+            toast.success(`${newlyUploaded.length} file(s) uploaded successfully!`);
+        } catch (error) {
+            console.error("Upload error:", error);
+            toast.error(`Failed to upload file: ${error.message}`);
+            if (newlyUploaded.length > 0) {
+                setSelectedFiles(prev => [...prev, ...newlyUploaded]);
+            }
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -343,11 +371,8 @@ const ResearchChat = () => {
         fileInputRef.current.click();
     };
 
-    const removeFile = () => {
-        setSelectedFile(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+    const removeFile = (index) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     // Handle LLM change
@@ -708,13 +733,17 @@ const ResearchChat = () => {
                 <footer className="flex-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 pb-6 pt-4 px-4 z-20">
                     <div className="max-w-3xl mx-auto w-full space-y-3">
                         {/* File Preview */}
-                        {selectedFile && (
-                            <div className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 w-fit shadow-sm animate-slide-up">
-                                <span className="material-symbols-outlined text-red-500">picture_as_pdf</span>
-                                <span className="text-sm text-slate-700 dark:text-slate-200">{selectedFile.name}</span>
-                                <button onClick={removeFile} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                    <span className="material-symbols-outlined text-base">close</span>
-                                </button>
+                        {selectedFiles.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {selectedFiles.map((file, idx) => (
+                                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 shadow-sm animate-slide-up">
+                                        <span className="material-symbols-outlined text-red-500 text-base">picture_as_pdf</span>
+                                        <span className="text-sm text-slate-700 dark:text-slate-200 max-w-[150px] truncate" title={file.name}>{file.name}</span>
+                                        <button onClick={() => removeFile(idx)} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                            <span className="material-symbols-outlined text-base">close</span>
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         )}
 
@@ -724,6 +753,7 @@ const ResearchChat = () => {
                                 ref={fileInputRef}
                                 onChange={handleFileSelect}
                                 accept=".pdf,application/pdf"
+                                multiple
                                 className="hidden"
                             />
                             <button
@@ -765,8 +795,8 @@ const ResearchChat = () => {
 
                             <button
                                 onClick={handleSend}
-                                disabled={!input.trim() && !selectedFile}
-                                className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() || selectedFile
+                                disabled={!input.trim() && selectedFiles.length === 0}
+                                className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() || selectedFiles.length > 0
                                     ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                                     }`}
