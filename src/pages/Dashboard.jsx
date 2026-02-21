@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CalendarWidget from '../components/CalendarWidget';
 import ProfileCompletionCard from '../components/ProfileCompletionCard';
+import SubscriptionModal from '../components/SubscriptionModal';
 
 const ActionButton = ({ onClick }) => (
     <button onClick={onClick} className="text-slate-400 hover:text-primary transition-colors">
@@ -11,6 +12,7 @@ const ActionButton = ({ onClick }) => (
 
 const Dashboard = () => {
     const navigate = useNavigate();
+    const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
     // Dynamic User Data
     const [userProfile, setUserProfile] = useState(() => {
@@ -22,6 +24,13 @@ const Dashboard = () => {
 
     React.useEffect(() => {
         document.title = 'Dashboard | DraftMate';
+
+        // Check if we should show the subscription popup
+        const hasSeenPopup = sessionStorage.getItem('has_seen_subscription_popup_this_session');
+        if (!hasSeenPopup) {
+            setIsSubscriptionModalOpen(true);
+            sessionStorage.setItem('has_seen_subscription_popup_this_session', 'true');
+        }
 
         const handleProfileUpdate = () => {
             const saved = localStorage.getItem('user_profile');
@@ -205,6 +214,8 @@ const Dashboard = () => {
                     </div>
                 </div>
             </div>
+
+            <SubscriptionModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} />
         </div>
     );
 };

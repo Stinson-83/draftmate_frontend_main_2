@@ -15,6 +15,6 @@ fi
 echo "🏗️ Building and Running with Docker Compose..."
 echo "This ensures the database and other services are running, mimicking production."
 
-# Use docker-compose to build and run the backend service (and its dependencies like db)
-# We use --build to ensure the image is up to date
-docker compose up --build backend
+# Use docker-compose to build and run all services (frontend, backend, db)
+# We use --build to ensure the images are up to date
+docker compose up --build

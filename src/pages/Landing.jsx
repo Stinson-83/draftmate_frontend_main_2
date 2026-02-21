@@ -12,6 +12,7 @@ import Karnataka_News_NetworkLogo from '../assets/Karnataka_News_Network.png';
 import India_Wire_NewsLogo from '../assets/India_Wire_News.png';
 import Business_News_Logo from '../assets/businessnewsthisweek.png';
 import SecurityDraftmate from '../components/SecurityDraftmate';
+import SubscriptionModal from '../components/SubscriptionModal';
 
 // Partner Logos
 import LawJuristLogo from '../assets/partner_logos/LAW_JURIST.webp';
@@ -42,6 +43,7 @@ import P_Mahima from '../assets/avatars/P_Mahima.png';
 
 const Landing = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
     useEffect(() => {
         document.title = 'DraftMate';
@@ -181,7 +183,7 @@ const Landing = () => {
                         <Link to="/features" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">Features</Link>
                         <Link to="/blogs" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">Blogs</Link>
                         <button onClick={() => scrollToSection('testimonials')} className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">About</button>
-                        <a className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Pricing</a>
+                        <a onClick={() => setIsSubscriptionModalOpen(true)} className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors cursor-pointer">Pricing</a>
                         <Link to="/faqs" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">FAQs</Link>
                         <Link to="/how-it-works" className="text-[#111318] text-sm font-medium leading-normal hover:text-primary transition-colors">How it Works</Link>
                     </div>
@@ -255,7 +257,7 @@ const Landing = () => {
                                     <span className="material-symbols-outlined">info</span>
                                     About
                                 </button>
-                                <a className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors cursor-pointer">
+                                <a onClick={() => { setIsSubscriptionModalOpen(true); setMobileMenuOpen(false); }} className="flex items-center gap-3 p-3 text-[#111318] font-medium hover:bg-primary/5 hover:text-primary rounded-lg transition-colors cursor-pointer">
                                     <span className="material-symbols-outlined">sell</span>
                                     Pricing
                                 </a>
@@ -935,7 +937,7 @@ const Landing = () => {
                             <div className="flex flex-col gap-3">
                                 <h4 className="font-bold text-sm uppercase tracking-wider text-gray-500">Platform</h4>
                                 <a className="text-sm text-gray-300 hover:text-white cursor-pointer">Features</a>
-                                <a className="text-sm text-gray-300 hover:text-white cursor-pointer">Pricing</a>
+                                <a onClick={() => setIsSubscriptionModalOpen(true)} className="text-sm text-gray-300 hover:text-white cursor-pointer">Pricing</a>
                                 <a className="text-sm text-gray-300 hover:text-white cursor-pointer">Testimonials</a>
                             </div>
                             <div className="flex flex-col gap-3">
@@ -956,6 +958,8 @@ const Landing = () => {
                     </div>
                 </div>
             </footer >
+
+            <SubscriptionModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} />
         </div >
     );
 };
