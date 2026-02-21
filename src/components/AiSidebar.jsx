@@ -260,13 +260,22 @@ const AiSidebar = ({
                                     gap: '8px',
                                     alignItems: 'center',
                                 }}>
-                                    <input
-                                        type="text"
+                                    <textarea
                                         placeholder="Ask about your draft..."
                                         value={chatInput}
-                                        onChange={(e) => setChatInput(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && !isTyping && handleSendMessage()}
+                                        onChange={(e) => {
+                                            setChatInput(e.target.value);
+                                            e.target.style.height = 'auto';
+                                            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                if (!isTyping) handleSendMessage();
+                                            }
+                                        }}
                                         disabled={isTyping}
+                                        rows={1}
                                         style={{
                                             flex: 1,
                                             padding: '10px 14px',
@@ -277,6 +286,12 @@ const AiSidebar = ({
                                             background: 'white',
                                             transition: 'all 0.2s ease',
                                             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                                            resize: 'none',
+                                            minHeight: '44px',
+                                            maxHeight: '120px',
+                                            overflowY: 'auto',
+                                            fontFamily: 'inherit',
+                                            lineHeight: '1.5',
                                         }}
                                         onFocus={(e) => {
                                             e.target.style.borderColor = '#3b82f6';

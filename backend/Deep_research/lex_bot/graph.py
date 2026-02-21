@@ -148,7 +148,7 @@ def define_graph():
     def route_by_complexity(state: AgentState) -> Literal["research_agent", "check_clarification", "document_agent"]:
         """Route based on query complexity."""
         # Only route to document agent if we haven't processed it yet
-        if state.get("uploaded_file_path") and not state.get("document_context"):
+        if state.get("uploaded_file_paths") and not state.get("document_context"):
             return "document_agent"
             
         complexity = state.get("complexity", "simple")
@@ -252,16 +252,26 @@ def run_query(
     print(f"🔄 run_query called with: {query}")
     
     # Auto-detect file path from session cache if not provided
-    if not file_path and session_id:
+    uploaded_file_paths = []
+    if session_id:
         try:
             from lex_bot.tools.session_cache import get_session_cache
             cache = get_session_cache()
-            cached_path = cache.get_file_path(session_id)
-            if cached_path:
-                print(f"📂 Found uploaded file in cache: {cached_path}")
-                file_path = cached_path
+            
+            # Get all paths
+            paths = cache.get_file_paths(session_id)
+            if paths:
+                uploaded_file_paths = paths
+                print(f"📂 Found {len(paths)} uploaded files in cache: {paths}")
+                
+            # If explicit path provided, ensure it's in list (unlikely in normal flow but good for safety)
+            if file_path and file_path not in uploaded_file_paths:
+                uploaded_file_paths.append(file_path)
+                
         except Exception as e:
-            print(f"⚠️ Failed to check session cache for file: {e}")
+            print(f"⚠️ Failed to check session cache for files: {e}")
+    elif file_path:
+        uploaded_file_paths = [file_path]
 
     from lex_bot.core.query_rewriter import rewrite_query
     print("🔄 Calling rewrite_query...")
@@ -289,7 +299,7 @@ def run_query(
         "user_id": user_id,
         "session_id": session_id,
         "llm_mode": llm_mode,
-        "uploaded_file_path": file_path,
+        "uploaded_file_paths": uploaded_file_paths,
         "complexity": None,
         "selected_agents": [],
         "law_context": [],

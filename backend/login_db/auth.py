@@ -81,21 +81,35 @@ def get_db_connection():
                 port=_tunnel.local_bind_port,
                 user=os.getenv("POSTGRES_USER", "lawuser"),
                 password=os.getenv("POSTGRES_PASSWORD", "Siddchick2506"),
-                dbname=os.getenv("POSTGRES_DB", "postgres")
+                dbname=os.getenv("POSTGRES_DB", "postgres"),
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5
             )
             return conn
         else:
             # Direct connection
             dsn = os.getenv("POSTGRES_DSN")
             if dsn:
-                conn = psycopg2.connect(dsn)
+                conn = psycopg2.connect(
+                    dsn,
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5
+                )
             else:
                 conn = psycopg2.connect(
                     host=os.getenv("POSTGRES_HOST", "db"),
                     dbname=os.getenv("POSTGRES_DB", "lex_bot_db"),
                     user=os.getenv("POSTGRES_USER", "postgres"),
                     password=os.getenv("POSTGRES_PASSWORD", "password"),
-                    port=os.getenv("POSTGRES_PORT", "5432")
+                    port=os.getenv("POSTGRES_PORT", "5432"),
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5
                 )
             return conn
     except Exception as e:

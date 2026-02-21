@@ -376,41 +376,43 @@ const Editor = () => {
         // Ensure we use CSS styles (spans) instead of legacy tags (font) where possible
         document.execCommand('styleWithCSS', false, true);
 
+        if (command === 'fontName') {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+
+                if (!selection.isCollapsed) {
+                    // Use insertHTML to preserve undo history
+                    const div = document.createElement('div');
+                    div.appendChild(range.cloneContents());
+                    const htmlContent = div.innerHTML;
+                    const newHtml = `<span style="font-family: ${value}">${htmlContent}</span>`;
+                    document.execCommand('insertHTML', false, newHtml);
+                } else {
+                    // Handle Caret (No selection)
+                    const newHtml = `<span style="font-family: ${value}">&#8203;</span>`;
+                    document.execCommand('insertHTML', false, newHtml);
+                }
+            }
+            return;
+        }
+
         if (command === 'customFontSize') {
             const selection = window.getSelection();
             if (selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
 
                 if (!selection.isCollapsed) {
-                    const span = document.createElement('span');
-                    span.style.fontSize = `${value}pt`;
-
-                    try {
-                        const content = range.extractContents();
-                        span.appendChild(content);
-                        range.insertNode(span);
-
-                        // Reselect to keep focus
-                        selection.removeAllRanges();
-                        const newRange = document.createRange();
-                        newRange.selectNode(span);
-                        selection.addRange(newRange);
-                    } catch (e) {
-                        console.error('Error applying font size:', e);
-                    }
+                    // Use insertHTML to preserve undo history
+                    const div = document.createElement('div');
+                    div.appendChild(range.cloneContents());
+                    const htmlContent = div.innerHTML;
+                    const newHtml = `<span style="font-size: ${value}pt">${htmlContent}</span>`;
+                    document.execCommand('insertHTML', false, newHtml);
                 } else {
-                    // Handle Caret (No selection): Insert styled span with Zero-Width Space
-                    const span = document.createElement('span');
-                    span.style.fontSize = `${value}pt`;
-                    span.innerHTML = '&#8203;'; // Zero Width Space
-
-                    range.insertNode(span);
-
-                    // Move caret INSIDE the span, after the ZWSP
-                    range.setStart(span, 1);
-                    range.setEnd(span, 1);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
+                    // Handle Caret (No selection)
+                    const newHtml = `<span style="font-size: ${value}pt">&#8203;</span>`;
+                    document.execCommand('insertHTML', false, newHtml);
                 }
             }
             return;

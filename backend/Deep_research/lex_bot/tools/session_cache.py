@@ -39,7 +39,7 @@ class SessionCache:
         
         self._init_dependencies()
         
-        self._file_paths: Dict[str, str] = {}
+        self._file_paths: Dict[str, List[str]] = {}
         self._file_chunks: Dict[str, List[str]] = {}
     
     def _init_dependencies(self):
@@ -201,15 +201,26 @@ class SessionCache:
             return []
         return self._sessions[session_id]["documents"]
 
-    def set_file_path(self, session_id: str, file_path: str):
-        """Store the uploaded file path for a session."""
+    def add_file_path(self, session_id: str, file_path: str):
+        """Add an uploaded file path for a session."""
         self._get_or_create_session(session_id) # Ensure session exists
-        self._file_paths[session_id] = file_path
-        logger.info(f"Stored file path for session {session_id}: {file_path}")
+        if session_id not in self._file_paths:
+            self._file_paths[session_id] = []
+        
+        # Avoid duplicates
+        if file_path not in self._file_paths[session_id]:
+            self._file_paths[session_id].append(file_path)
+            
+        logger.info(f"Added file path for session {session_id}: {file_path}")
+
+    def get_file_paths(self, session_id: str) -> List[str]:
+        """Retrieve all uploaded file paths for a session."""
+        return self._file_paths.get(session_id, [])
 
     def get_file_path(self, session_id: str) -> Optional[str]:
-        """Retrieve the uploaded file path for a session."""
-        return self._file_paths.get(session_id)
+        """Retrieve the last uploaded file path for a session (for backward compatibility)."""
+        paths = self.get_file_paths(session_id)
+        return paths[-1] if paths else None
     
     def set_file_chunks(self, file_path: str, chunks: List[str]):
         """Cache extracted text chunks for a file."""
@@ -235,9 +246,10 @@ class SessionCache:
             
         # Cleanup file chunks if associated with this session
         if session_id in self._file_paths:
-            file_path = self._file_paths[session_id]
-            if file_path in self._file_chunks:
-                del self._file_chunks[file_path]
+            file_paths = self._file_paths[session_id]
+            for file_path in file_paths:
+                if file_path in self._file_chunks:
+                    del self._file_chunks[file_path]
             del self._file_paths[session_id]
             
         logger.info(f"Cleared session cache: {session_id}")

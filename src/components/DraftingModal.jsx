@@ -529,14 +529,6 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
                                         >
                                             Generate via AI
                                         </button>
-
-                                        <button
-                                            className="btn btn-primary"
-                                            onClick={handleContinue}
-                                            disabled={!selectedFormat}
-                                        >
-                                            Continue
-                                        </button>
                                     </div>
                                 </div>
                             </>

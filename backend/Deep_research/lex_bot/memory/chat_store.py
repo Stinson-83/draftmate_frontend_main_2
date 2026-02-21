@@ -93,7 +93,15 @@ class ChatStore:
     def _init_db(self):
         """Initialize database engine and create tables."""
         try:
-            self.engine = create_engine(self.db_url)
+            self.engine = create_engine(
+                self.db_url,
+                connect_args={
+                    "keepalives": 1,
+                    "keepalives_idle": 30,
+                    "keepalives_interval": 10,
+                    "keepalives_count": 5,
+                }
+            )
             Base.metadata.create_all(self.engine)
             self.SessionLocal = sessionmaker(bind=self.engine)
             self._initialized = True

@@ -98,7 +98,15 @@ async def lifespan(app: FastAPI):
         if not db_url:
             raise ValueError("DATABASE_URL not set in .env")
             
-        engine = create_engine(db_url)
+        engine = create_engine(
+            db_url,
+            connect_args={
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 5,
+            }
+        )
         with engine.connect() as conn:
             # Check connection
             conn.execute(text("SELECT 1"))
@@ -178,7 +186,7 @@ async def upload_file(
             
         # Store in session cache
         session_cache = get_session_cache()
-        session_cache.set_file_path(session_id, file_path)
+        session_cache.add_file_path(session_id, file_path)
             
         print(f"📂 File uploaded for session {session_id}: {file_path}")
         return {

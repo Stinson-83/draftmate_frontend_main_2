@@ -23,7 +23,7 @@ class AgentState(TypedDict):
     user_id: Optional[str]
     user_id: Optional[str]
     session_id: Optional[str]
-    uploaded_file_path: Optional[str]
+    uploaded_file_paths: Optional[List[str]]
     
     # LLM mode for this query
     llm_mode: Literal["fast", "reasoning"]

@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown, Link as LinkIcon, Trash2, Plus, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Wand2, X, Highlighter, ChevronDown, Link as LinkIcon, Trash2, Plus, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Type, Hash } from 'lucide-react';
 
 const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContext }) => {
     const toolbarRef = useRef(null);
     const [showInput, setShowInput] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [showHighlightMenu, setShowHighlightMenu] = useState(false);
+    const [showFontMenu, setShowFontMenu] = useState(false);
+    const [showSizeMenu, setShowSizeMenu] = useState(false);
     const [showLinkInput, setShowLinkInput] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
 
@@ -14,6 +16,8 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContex
             setShowInput(false);
             setInputValue('');
             setShowHighlightMenu(false);
+            setShowFontMenu(false);
+            setShowSizeMenu(false);
             setShowLinkInput(false);
             setLinkUrl('');
         }
@@ -84,6 +88,70 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContex
                         </>
                     )}
                     <div className="toolbar-group">
+                        {/* Font Family */}
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="tool-btn"
+                                onClick={() => {
+                                    setShowFontMenu(!showFontMenu);
+                                    setShowSizeMenu(false);
+                                    setShowHighlightMenu(false);
+                                }}
+                                title="Font Family"
+                                style={{ display: 'flex', alignItems: 'center' }}
+                            >
+                                <Type size={16} />
+                                <ChevronDown size={10} style={{ marginLeft: 2, opacity: 0.7 }} />
+                            </button>
+                            {showFontMenu && (
+                                <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, padding: 4, zIndex: 60, minWidth: 140, maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                                    {['Inter', 'Times New Roman', 'Arial', 'Calisto MT', 'Book Antiqua', 'Bookman Old Style', 'Angsana New', 'Calibri', 'Californian FB', 'Roboto', 'Open Sans', 'Lato', 'Georgia'].map(font => (
+                                        <button
+                                            key={font}
+                                            onClick={() => { onFormat('fontName', font); setShowFontMenu(false); }}
+                                            style={{ padding: '6px 12px', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', fontFamily: font }}
+                                            className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm"
+                                        >
+                                            {font}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Font Size */}
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="tool-btn"
+                                onClick={() => {
+                                    setShowSizeMenu(!showSizeMenu);
+                                    setShowFontMenu(false);
+                                    setShowHighlightMenu(false);
+                                }}
+                                title="Font Size"
+                                style={{ display: 'flex', alignItems: 'center' }}
+                            >
+                                <Hash size={16} />
+                                <ChevronDown size={10} style={{ marginLeft: 2, opacity: 0.7 }} />
+                            </button>
+                            {showSizeMenu && (
+                                <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, padding: 4, zIndex: 60, minWidth: 60, maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                                    {[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72].map(size => (
+                                        <button
+                                            key={size}
+                                            onClick={() => { onFormat('customFontSize', size); setShowSizeMenu(false); }}
+                                            style={{ padding: '6px 12px', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px' }}
+                                            className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm"
+                                        >
+                                            {size}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="toolbar-divider"></div>
+
                         <button className="tool-btn" onClick={() => onFormat('bold')} title="Bold"><Bold size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('italic')} title="Italic"><Italic size={16} /></button>
                         <button className="tool-btn" onClick={() => onFormat('underline')} title="Underline"><Underline size={16} /></button>
@@ -103,7 +171,11 @@ const FloatingToolbar = ({ position, onFormat, onEnhance, visible, isTableContex
                         <div style={{ position: 'relative' }}>
                             <button
                                 className="tool-btn"
-                                onClick={() => setShowHighlightMenu(!showHighlightMenu)}
+                                onClick={() => {
+                                    setShowHighlightMenu(!showHighlightMenu);
+                                    setShowFontMenu(false);
+                                    setShowSizeMenu(false);
+                                }}
                                 title="Highlight Color"
                                 style={{ display: 'flex', alignItems: 'center', width: 'auto', padding: '0 4px' }}
                             >
