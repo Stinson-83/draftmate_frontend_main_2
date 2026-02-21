@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import fullLogo from '../assets/FULL_LOGO.svg';
 import draftMateIcon from '../assets/draftmate_logo.png';
 import startupIndiaLogo from '../assets/startup_india_logo.png';
+import { faqs } from '../data/faqs';
 
 import inshortsLogo from '../assets/india_shorts.png';
 import Business_UpurnLogo from '../assets/Business_Upurn.png';
@@ -842,6 +843,41 @@ const Landing = () => {
                     </div>
                 </div>
             </section >
+
+            {/*  docker run -d -p 5173:5173 --env VITE_API_BASE_URL=http://localhost:8080 draftmate_frontend_main_2-frontend
+dce0dc9dfa88c83b2e21b2f95a81fdfd66529b942010dc218a7f9c1837cd360b
+docker: Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint trusting_banzai (3ce2a123e2cce5dd24a502351db67e594d962d1e35a4fab93631bca9c1188b6d): Bind for 0.0.0.0:5173 failed: port is already allocated
+
+Run 'docker run --help' for more information Section */}
+            <section className="py-20 px-4 bg-background-light dark:bg-background-dark border-t border-[#f0f2f4]">
+                <div className="max-w-[800px] mx-auto">
+                    <div className="flex flex-col gap-4 text-center mb-12">
+                        <div className="inline-flex items-center justify-center gap-2 text-primary font-bold uppercase tracking-wider text-sm mx-auto">
+                            <span className="w-8 h-[2px] bg-primary"></span>
+                            Help Center
+                            <span className="w-8 h-[2px] bg-primary"></span>
+                        </div>
+                        <h2 className="text-[#111318] text-3xl font-black leading-tight lg:text-4xl">Frequently Asked Questions</h2>
+                        <p className="text-[#616f89] text-lg">Find answers to common questions about DraftMate.</p>
+                    </div>
+
+                    <div className="flex flex-col space-y-4">
+                        {faqs.map((faq, index) => (
+                            <details key={index} className="group border border-[#f0f2f4] bg-white rounded-xl shadow-sm overflow-hidden">
+                                <summary className="flex items-center justify-between p-5 md:p-6 cursor-pointer hover:bg-slate-50 transition-colors list-none">
+                                    <span className="text-base md:text-lg font-bold text-[#111318] pr-4">{faq.question}</span>
+                                    <span className="material-symbols-outlined text-[#616f89] transition-transform duration-200 group-open:rotate-180">expand_more</span>
+                                </summary>
+                                <div className="px-5 md:px-6 pb-6 pt-1">
+                                    <p className="text-[#616f89] leading-relaxed text-sm md:text-base whitespace-pre-line">
+                                        {faq.answer}
+                                    </p>
+                                </div>
+                            </details>
+                        ))}
+                    </div>
+                </div>
+            </section>
 
             {/* CTA Section */}
             < section className="py-24 px-4 bg-primary relative overflow-hidden" >

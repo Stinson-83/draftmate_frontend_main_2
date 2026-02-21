@@ -11,7 +11,7 @@ const SecurityDraftmate = () => {
           }
         `}
             </style>
-            <div className="mb-16 lg:mb-24 text-center lg:text-left">
+            <div className="mt-12 lg:mt-20 mb-16 lg:mb-24 text-center">
                 <h1 className="font-serif text-4xl lg:text-5xl font-bold mb-4 tracking-tight text-[#1a2b4b] dark:text-slate-100">
                     What Powers the DraftMate Movement
                 </h1>
