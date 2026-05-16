@@ -1,124 +1,198 @@
-# DraftMate - AI Legal Document Drafting Platform
+# ⚖️ DraftMate - AI Legal Document Drafting Platform
 
 DraftMate is an advanced AI-powered platform tailored for legal professionals. It streamlines the legal workflow by providing tools for document drafting, deep case law research, PDF analysis, and case file management.
 
----
-
-## ⚡ Quick Start (The Easiest Way)
-
-You can get the entire DraftMate application (Frontend, Backend, and Database) running with just a few commands using Docker. 
-
-### Step 1: Install Prerequisites
-If you haven't already, install **[Docker Desktop](https://www.docker.com/products/docker-desktop)** and ensure it is running.
-
-### Step 2: Set up Environment Variables
-Create a `.env` file in the root directory. You can copy the template:
-```bash
-cp .env.example .env
-```
-*(Open the `.env` file and fill in your API keys for OpenAI, Google, AWS, etc., if you want AI features to work).*
-
-### Step 3: Run the Application
-Run this single command in your terminal from the project root:
-```bash
-docker compose up --build
-```
-
-**That's it!** Docker will automatically download everything, build the application, and start the servers. 
-*   Wait for the terminal logs to settle, then open your browser and go to: **[http://localhost:8080](http://localhost:8080)**
+This single `README.md` serves as the ultimate source of truth for developing locally, managing the AWS EC2 server, updating code/credentials, and eventually migrating to your live `draftmate.in` domain.
 
 ---
 
 ## 🏗 Architecture Overview
 
-DraftMate is structured around a React (Vite) frontend and multiple Python-based backend microservices, unified behind an Nginx reverse proxy. 
-
-Currently, the application is packaged into a **Monolithic Docker Image** (`draftmate_frontend_main_2-frontend:latest`) for ease of deployment, managed by `supervisord` which runs Nginx and all backend services concurrently.
-
-### Core Services:
-*   **Frontend**: React SPA built with Vite and Tailwind CSS.
-*   **Converter (8000)**: Document conversion.
-*   **Query (8001)**: Template management.
-*   **Enhance Bot (8002)**: AI clause enhancement.
-*   **Drafter (8003)**: Legal document generation.
-*   **Lex Bot (8004)**: Deep research assistant with SSE streaming.
-*   **PDF Editor (8005)**: PDF manipulation (merge, split, OCR).
-*   **Auth Service (8009)**: User authentication and sessions.
+DraftMate uses a decoupled architecture:
+*   **Frontend**: React SPA built with Vite, served via an ultra-fast Nginx container.
+*   **Backend**: Multiple Python microservices (FastAPI/Uvicorn) handling Auth, Conversion, Querying, AI Enhancement, Drafting, and PDF Editing.
+*   **Databases**: PostgreSQL (Relational) and Qdrant (Vector AI Search).
+*   **Infrastructure**: Hosted on a single AWS EC2 `t3a.xlarge` instance running a full Kubernetes (`Kind`) cluster.
 
 ---
 
-## 💻 Manual Local Development (For UI Developers)
+## 💻 1. Local Development (On Your PC)
 
-If you are only working on the React UI and want instant hot-reloading without rebuilding Docker images:
+If you are developing features locally on your machine, you have two options:
 
-1. **Install Node.js**: Ensure you have [Node.js](https://nodejs.org/) installed.
-2. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
-3. **Start the Frontend**:
-   ```bash
-   npm run dev
-   ```
-*Note: The frontend expects the backend API to be running. You should run `docker compose up` in the background to provide the backend services.*
+### Option A: Full Stack (Docker Compose)
+To run the Frontend, Backend, Postgres, and Qdrant all at once on your computer:
+1. Create a `.env` file from the example: `cp .env.example .env`
+2. Add your API keys to the `.env` file.
+3. Run: `docker compose up --build`
+4. Access the app at: `http://localhost:8080`
 
----
-
-## ☸️ Kubernetes Deployment (Helm)
-
-For production or cluster testing, DraftMate includes a Helm chart in the `./draftmate-chart` directory.
-
-### Prerequisites
-*   A running Kubernetes cluster (e.g., `kind`, `minikube`).
-*   [Helm 3](https://helm.sh/) installed.
-*   An Ingress Controller installed on your cluster.
-
-### 1-Click Cluster Setup (Advanced)
-If you have `kind` and `helm` installed, follow these steps to deploy:
-
-1. **Build the Image** (Make sure your `.env` has `VITE_CLIENT_ID`):
-   ```bash
-   VITE_CLIENT_ID=$(grep "^VITE_CLIENT_ID=" .env | cut -d '=' -f2- | tr -d '"' | tr -d "'")
-   docker build --build-arg VITE_CLIENT_ID=$VITE_CLIENT_ID -t draftmate_frontend_main_2-frontend:latest -f Dockerfile .
-   ```
-
-2. **Load Image into Kind**:
-   ```bash
-   kind load docker-image draftmate_frontend_main_2-frontend:latest --name your-cluster-name
-   ```
-
-3. **Deploy with Helm**:
-   ```bash
-   helm upgrade --install draftmate ./draftmate-chart -n draftmate --create-namespace
-   ```
-
-Ensure your `/etc/hosts` file maps `draftmate.test` to your local ingress IP (e.g., `127.0.0.1`), then visit `http://draftmate.test`.
+### Option B: Frontend UI Only (Node.js)
+If you only want to edit React code with instant hot-reloading:
+1. Run `npm install`
+2. Run `npm run dev`
 
 ---
 
-## 📝 Troubleshooting
+## ☁️ 2. AWS Server Management (How it Works Right Now)
 
-*   **Blank Blue Screen on Load**: This indicates an Ingress routing issue or an insecure context. Ensure your ingress points correctly to the root path without `rewrite-target: /`. Access the site via `http://localhost` or set up HTTPS, as some React features (like `crypto`) require secure contexts to run.
-*   **OOMKilled Pods**: The monolithic application requires significant memory for ML models. Ensure Docker Desktop is allocated at least `4GB` of RAM, or update your Kubernetes node resources.
+Your AWS EC2 server is currently 100% automated. 
+You **DO NOT** need to run any local scripts (like `start_draftmate.ps1`) anymore.
 
+**What happens when you boot the AWS Server:**
+1. Docker starts the Kubernetes (`Kind`) cluster automatically.
+2. Kubernetes boots up all your microservices and databases automatically.
+3. A background service (`draftmate-tunnel.service`) opens the networking tunnel automatically.
+
+Within 60 seconds of pressing "Start Instance" in AWS, your app is live at:
+👉 **`http://<YOUR_EC2_PUBLIC_IP>:8080`**
 
 ---
 
-## Vite Default Documentation
+## 🛠️ 3. How to Update Code & Credentials on AWS
 
-# React + Vite
+When you make changes to your code, or if you need to update an API key, you must apply those changes to the EC2 server. 
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+First, SSH into your server:
+```bash
+ssh -i "~/.ssh/jenkins-v2.pem" ubuntu@<YOUR_EC2_PUBLIC_IP>
+```
 
-Currently, two official plugins are available:
+### 👉 Scenario A: Changing API Keys (OpenAI, Cashfree, Postgres, etc.)
+1. Edit the `.env` file on the server:
+   ```bash
+   nano ~/draftmate_frontend_main_2/.env
+   ```
+2. Run the update script to inject the new keys into Kubernetes:
+   ```bash
+   python3 ~/update_creds.py
+   ```
+3. Restart the backend pods to apply the new keys:
+   ```bash
+   kubectl rollout restart deploy/backend
+   ```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 👉 Scenario B: Updating the Frontend Code (React/Vite)
+If you change frontend code, you must rebuild the frontend Docker image and reload it into the cluster.
 
-## React Compiler
+```bash
+cd ~/draftmate_frontend_main_2
+git pull  # (Or however you transfer your new code)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# 1. Grab your Google Client ID from the .env file
+export VITE_CLIENT_ID=$(grep VITE_CLIENT_ID .env | cut -d '=' -f2)
 
-## Expanding the ESLint configuration
+# 2. Build the production image
+docker build --build-arg VITE_CLIENT_ID="$VITE_CLIENT_ID" --build-arg VITE_API_BASE_URL='/api' -t draftmate_frontend_main_2-frontend:prod -f Dockerfile.frontend.prod .
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [	ypescript-eslint](https://typescript-eslint.io) in your project.
+# 3. Load it into the cluster
+kind load docker-image draftmate_frontend_main_2-frontend:prod --name draftmate-cluster
+
+# 4. Restart the frontend pods
+kubectl rollout restart deploy/frontend
+```
+
+### 👉 Scenario C: Updating the Backend Code (Python)
+If you change Python code in the backend:
+```bash
+cd ~/draftmate_frontend_main_2
+
+# 1. Build the backend image
+docker build -t draftmate_frontend_main_2-backend:latest -f Dockerfile .
+
+# 2. Load it into the cluster
+kind load docker-image draftmate_frontend_main_2-backend:latest --name draftmate-cluster
+
+# 3. Restart the backend pods
+kubectl rollout restart deploy/backend
+```
+
+---
+
+## 🌐 4. Custom Domain Setup (`draftmate.in`)
+
+When you are ready to stop using the raw `ec2-...amazonaws.com:8080` URL and officially launch `https://draftmate.in`, follow these exact steps:
+
+### Step 1: Assign an Elastic IP in AWS
+1. Go to AWS EC2 Console > **Elastic IPs**.
+2. Click **Allocate Elastic IP address**.
+3. Select the IP, click **Actions > Associate**, and attach it to your EC2 instance.
+*(Your server IP will now NEVER change).*
+
+### Step 2: Configure your DNS Records
+Go to your Domain Registrar (GoDaddy/Hostinger) and create an **A Record**:
+*   **Host/Name:** `@`
+*   **Points to:** `<YOUR_NEW_ELASTIC_IP>`
+
+### Step 3: Enable Web Traffic (NGINX Ingress)
+SSH into your server and run these commands to turn off the port 8080 tunnel and turn on standard web traffic (Ports 80/443):
+```bash
+# 1. Install Kubernetes NGINX Ingress
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# 2. Disable the old background tunnel
+sudo systemctl disable --now draftmate-tunnel.service
+```
+
+### Step 4: Tell Kubernetes about your Domain
+Edit your Kubernetes configuration:
+```bash
+nano ~/draftmate_frontend_main_2/draftmate-chart/values.yaml
+```
+Find `ingress:` and change `draftmate.test` to your real domain:
+```yaml
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: draftmate.in       # <--- CHANGE THIS
+      paths:
+        - path: /
+          pathType: Prefix
+```
+Apply the changes:
+```bash
+helm upgrade draftmate ./draftmate-chart
+```
+*(Your site is now live at `http://draftmate.in`!)*
+
+### Step 5: Update Google Login (CRITICAL)
+If you don't do this, Google Login will throw a `redirect_uri_mismatch` error.
+1. Open `.env` on your server and change `FRONTEND_URL_PROD` to `https://draftmate.in`. Run `python3 ~/update_creds.py` and `helm upgrade draftmate ./draftmate-chart`.
+2. Go to Google Cloud Console > APIs & Services > Credentials.
+3. Edit your OAuth Client ID and add `https://draftmate.in` to the **Authorized JavaScript origins**.
+
+### Step 6: Enable HTTPS (SSL Certificates)
+To make your site "Secure", run these commands on the server to install Cert-Manager:
+```bash
+# Install Cert Manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+```
+Create a file called `issuer.yaml`:
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: admin@draftmate.in  # <-- Change to your email
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+```
+Run `kubectl apply -f issuer.yaml`. Then edit your `values.yaml` ingress block to enable TLS:
+```yaml
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  tls:
+    - secretName: draftmate-tls
+      hosts:
+        - draftmate.in
+```
+Run `helm upgrade draftmate ./draftmate-chart` one last time. Your site is now officially secure!
