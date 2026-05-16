@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: draftmate-qdrant
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6333
+      targetPort: 6333
+      protocol: TCP
+  selector:
+    app: draftmate-qdrant

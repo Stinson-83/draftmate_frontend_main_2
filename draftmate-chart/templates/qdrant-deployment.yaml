@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant-deployment
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: draftmate-qdrant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: draftmate-qdrant
+  template:
+    metadata:
+      labels:
+        app: draftmate-qdrant
+    spec:
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6333
+          volumeMounts:
+            - name: qdrant-data
+              mountPath: /qdrant/storage
+      volumes:
+        - name: qdrant-data
+          persistentVolumeClaim:
+            claimName: qdrant-pvc
