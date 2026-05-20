@@ -29,6 +29,10 @@ pipeline {
         
         stage('OWASP: Dependency check') {
             steps {
+                script {
+                    // This forces Jenkins to actually download the tool if it's not installed yet
+                    tool 'DP-Check'
+                }
                 // Requires OWASP plugin installed in Jenkins
                 dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
