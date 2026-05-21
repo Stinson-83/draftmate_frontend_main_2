@@ -7,7 +7,7 @@ frontend:
   service:
     type: ClusterIP
     port: 80
-    targetPort: 8080
+    targetPort: 5173
   env:
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
     # CHANGE_THIS_FOR_AWS: Update URLs to match your production domain
