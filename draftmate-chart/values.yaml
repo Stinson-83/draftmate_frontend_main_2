@@ -1,7 +1,7 @@
 frontend:
   replicaCount: 1
   image:
-    repository: draftmate_frontend_main_2-frontend
+    repository: preetkakdiya/draftmate-frontend
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -71,7 +71,7 @@ frontend:
 backend:
   replicaCount: 1
   image:
-    repository: draftmate_frontend_main_2-frontend
+    repository: preetkakdiya/draftmate-backend
     tag: latest
     pullPolicy: IfNotPresent
   service:

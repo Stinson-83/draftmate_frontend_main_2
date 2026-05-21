@@ -4,8 +4,8 @@ pipeline {
     environment {
         // We will configure these credentials in Jenkins
         DOCKER_CREDENTIALS = credentials('docker-hub-creds')
-        FRONTEND_IMAGE = 'draftmate-frontend'
-        BACKEND_IMAGE = 'draftmate-backend'
+        FRONTEND_IMAGE = 'preetkakdiya/draftmate-frontend'
+        BACKEND_IMAGE = 'preetkakdiya/draftmate-backend'
     }
 
     stages {
