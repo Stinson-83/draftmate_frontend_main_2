@@ -101,7 +101,7 @@ backend:
     POSTGRES_PORT: "5432"
     POSTGRES_DSN: "YOUR_POSTGRES_DSN"
     DATABASE_URL: "YOUR_DATABASE_URL"
-    QDRANT_HOST: "YOUR_QDRANT_HOST"
+    QDRANT_HOST: "qdrant"
     QDRANT_PORT: "6333"
     GOOGLE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
     GOOGLE_CLIENT_SECRET: "YOUR_GOOGLE_CLIENT_SECRET"
@@ -153,6 +153,46 @@ ingress:
     # CHANGE_THIS_FOR_AWS: Replace 'draftmate.test' with your actual production domain (e.g., 'draftmate.in')
     - host: 54.221.83.201
       paths:
+        - path: /auth
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /converter
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /drafter
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /query
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /enhance
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /lexbot
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /pdf
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /notification
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /subscriptions
+          pathType: Prefix
+          service: backend-service
+          port: 8080
+        - path: /case_search
+          pathType: Prefix
+          service: backend-service
+          port: 8080
         - path: /
           pathType: Prefix
   # CHANGE_THIS_FOR_AWS: To enable HTTPS, replace 'tls: []' with the block below:
@@ -167,6 +207,6 @@ resources:
     cpu: 1000m
     memory: 4Gi
   requests:
-    cpu: 200m
-    memory: 2Gi
+    cpu: 100m
+    memory: 1Gi
 # Live Demo for  Testing automated CI/CD Pipeline!
