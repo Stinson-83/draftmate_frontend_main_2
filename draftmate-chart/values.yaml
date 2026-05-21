@@ -150,7 +150,7 @@ ingress:
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
     # CHANGE_THIS_FOR_AWS: Replace 'draftmate.test' with your actual production domain (e.g., 'draftmate.in')
-    - host: draftmate.test
+    - host: 54.221.83.201
       paths:
         - path: /
           pathType: Prefix
