@@ -73,6 +73,19 @@ pipeline {
                 sh "docker push ${BACKEND_IMAGE}:latest"
             }
         }
+        
+        stage('Helm: Deploy to Kubernetes') {
+            steps {
+                sh """
+                    ssh -o StrictHostKeyChecking=no -i /var/lib/jenkins/.ssh/k8s.pem ubuntu@54.221.83.201 '
+                        cd /home/ubuntu/draftmate_frontend_main_2
+                        git stash
+                        git pull origin preet/k8s-setup
+                        helm upgrade --install draftmate ./draftmate-chart --namespace default --create-namespace
+                    '
+                """
+            }
+        }
     }
     
     post {
