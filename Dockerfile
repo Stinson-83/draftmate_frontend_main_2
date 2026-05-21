@@ -60,13 +60,14 @@ RUN pip install --default-timeout=3000 --no-cache-dir torch torchvision --index-
 
 RUN pip install --default-timeout=3000 --no-cache-dir easyocr sentence-transformers
 
-# Install Remaining Python dependencies
-COPY requirements.txt .
-RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
-
-# Pre-download models to bake them into the image
+# Pre-download models to bake them into the image (CACHED)
+# We do this BEFORE requirements.txt so adding new features won't trigger a re-download!
 COPY backend/download_models.py .
 RUN python download_models.py
+
+# Install Remaining Python dependencies (Changes Frequently)
+COPY requirements.txt .
+RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
 
 # Copy all backend code
 COPY backend/ backend/
