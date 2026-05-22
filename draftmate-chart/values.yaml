@@ -10,10 +10,10 @@ frontend:
     targetPort: 5173
   env:
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
-    VITE_API_BASE_URL: "http://draftde.free.nf:8080"
+    VITE_API_BASE_URL: "http://app.draftde.free.nf:8080"
     # CHANGE_THIS_FOR_AWS: Update URLs to match your production domain
-    FRONTEND_URL_DEV: "http://draftde.free.nf:8080"
-    FRONTEND_URL_PROD: "http://draftde.free.nf"
+    FRONTEND_URL_DEV: "http://app.draftde.free.nf:8080"
+    FRONTEND_URL_PROD: "http://app.draftde.free.nf"
     VITE_CASHFREE_MODE: "sandbox"
     CASHFREE_APP_ID: "YOUR_CASHFREE_APP_ID"
     CASHFREE_SECRET_KEY: "YOUR_CASHFREE_SECRET_KEY"
@@ -82,8 +82,8 @@ backend:
   env:
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
     # CHANGE_THIS_FOR_AWS: Update URLs to match your production domain
-    FRONTEND_URL_DEV: "http://draftde.free.nf:8080"
-    FRONTEND_URL_PROD: "http://draftde.free.nf"
+    FRONTEND_URL_DEV: "http://app.draftde.free.nf:8080"
+    FRONTEND_URL_PROD: "http://app.draftde.free.nf"
     VITE_CASHFREE_MODE: "sandbox"
     CASHFREE_APP_ID: "YOUR_CASHFREE_APP_ID"
     CASHFREE_SECRET_KEY: "YOUR_CASHFREE_SECRET_KEY"
@@ -151,7 +151,7 @@ ingress:
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
     # CHANGE_THIS_FOR_AWS: Replace 'draftmate.test' with your actual production domain (e.g., 'draftmate.in')
-    - host: draftde.free.nf
+    - host: app.draftde.free.nf
       paths:
         - path: /
           pathType: Prefix
