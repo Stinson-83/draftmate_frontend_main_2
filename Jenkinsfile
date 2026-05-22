@@ -83,13 +83,13 @@ pipeline {
                         git stash
                         git pull origin preet/k8s-setup
                         # Deploy using the ubuntu user's default kubeconfig for Kind
-                        helm upgrade --install draftmate ./draftmate-chart \\
+                        /usr/local/bin/helm upgrade --install draftmate ./draftmate-chart \\
                             -f ./draftmate-chart/values.yaml \\
                             -f ./draftmate-chart/values-secrets.yaml \\
                             --namespace default --create-namespace
                         
                         # Force Kubernetes to pull the newly built latest image
-                        kubectl rollout restart deployment frontend backend --namespace default
+                        /usr/local/bin/kubectl rollout restart deployment frontend backend --namespace default
                     '
                 """
             }
