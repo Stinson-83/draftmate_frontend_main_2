@@ -82,14 +82,14 @@ pipeline {
                         cd /home/ubuntu/draftmate_frontend_main_2
                         git stash
                         git pull origin preet/k8s-setup
-                        # Deploy using sudo and pointing to the root kubeconfig for Kind
-                        sudo KUBECONFIG=/root/.kube/config /usr/local/bin/helm upgrade --install draftmate ./draftmate-chart \\
+                        # Deploy using the ubuntu user's default kubeconfig for Kind
+                        helm upgrade --install draftmate ./draftmate-chart \\
                             -f ./draftmate-chart/values.yaml \\
                             -f ./draftmate-chart/values-secrets.yaml \\
                             --namespace default --create-namespace
                         
                         # Force Kubernetes to pull the newly built latest image
-                        sudo KUBECONFIG=/root/.kube/config /usr/local/bin/kubectl rollout restart deployment frontend backend --namespace default
+                        kubectl rollout restart deployment frontend backend --namespace default
                     '
                 """
             }
