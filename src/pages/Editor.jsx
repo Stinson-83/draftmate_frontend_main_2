@@ -1997,6 +1997,7 @@ const Editor = () => {
                                     </div>
                                     {/* Footer handled by updateFooters logic (Last Page Only) */}
                                 </div>
+                                {/* Footer handled by updateFooters logic (Last Page Only) */}
                             </div>
                         ), [zoomLevel, showHeader, isHeaderEditing, editorSettings.headerText, location.state])}
                     </div>

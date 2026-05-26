@@ -101,7 +101,8 @@ class SearchTool:
         logger.info(f"🔎 SearchTool called for: {query}")
         
         # 1. Try DB Search
-        db_results = self._hybrid_db_search(query)
+        # db_results = self._hybrid_db_search(query)
+        db_results = [] # Force empty to skip local DB as it is currently empty
         
         if db_results:
             logger.info(f"✅ DB Search returned {len(db_results)} results.")
