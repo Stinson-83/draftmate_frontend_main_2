@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowRight, Download, FileSearch, FileText, Languages, Loader2, Sparkles, Upload } from 'lucide-react';
+import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -19,17 +19,43 @@ const LANGUAGE_OPTIONS = [
 
 const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.html', '.htm'];
 
+const getCurrentUserId = () => {
+  try {
+    const userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+    return userProfile.id || userProfile.email || localStorage.getItem('user_id') || null;
+  } catch {
+    return localStorage.getItem('user_id');
+  }
+};
+
+const formatJobDate = (value) => {
+  if (!value) return 'Unknown';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString([], {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
 const TranslateDocumentPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [targetLanguage, setTargetLanguage] = useState('hi');
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [jobId, setJobId] = useState(null);
+  const [activeJobId, setActiveJobId] = useState(null);
+  const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Choose a document to start translation.');
+  const userId = useMemo(() => getCurrentUserId(), []);
 
   const uploadMutation = useMutation({
     mutationFn: ({ file, targetLanguageValue }) => api.submitTranslationJob({
       file,
       targetLanguage: targetLanguageValue,
+      userId,
       onUploadProgress: (event) => {
         if (!event.total) return;
         const progress = Math.round((event.loaded * 100) / event.total);
@@ -39,26 +65,40 @@ const TranslateDocumentPage = () => {
     }),
     onMutate: () => {
       setUploadProgress(0);
-      setJobId(null);
+      setActiveJobId(null);
+      setIsCreatingJob(true);
       setStatusMessage('Uploading document...');
     },
     onSuccess: (data) => {
-      setJobId(data.job_id);
+      setActiveJobId(data.job_id);
       setUploadProgress(100);
       setStatusMessage(`Job #${data.job_id} queued. Translation will begin shortly.`);
+      setIsCreatingJob(false);
       toast.success('Translation job created');
     },
     onError: (error) => {
       console.error(error);
       toast.error(error?.message || 'Failed to submit translation job');
       setStatusMessage('Upload failed. Please try again.');
+      setIsCreatingJob(false);
     },
   });
 
+  const translationHistoryQuery = useQuery({
+    queryKey: ['translation-job-history', userId],
+    queryFn: () => api.listTranslationJobs({ userId, limit: 12 }),
+    enabled: Boolean(userId),
+    refetchInterval: 6000,
+    refetchOnWindowFocus: false,
+  });
+
+  const historyJobs = translationHistoryQuery.data?.jobs ?? [];
+  const selectedJobId = activeJobId ?? (!isCreatingJob ? historyJobs[0]?.job_id ?? null : null);
+
   const translationJobQuery = useQuery({
-    queryKey: ['translation-job', jobId],
-    queryFn: () => api.getTranslationJob(jobId),
-    enabled: Boolean(jobId),
+    queryKey: ['translation-job', selectedJobId],
+    queryFn: () => api.getTranslationJob(selectedJobId, userId),
+    enabled: Boolean(selectedJobId),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === 'completed' || status === 'failed' ? false : 3000;
@@ -69,7 +109,7 @@ const TranslateDocumentPage = () => {
   const job = translationJobQuery.data;
   const isCompleted = job?.status === 'completed';
   const isFailed = job?.status === 'failed';
-  const displayProgress = jobId ? Math.max(uploadProgress, job?.progress ?? 0) : uploadProgress;
+  const displayProgress = selectedJobId ? Math.max(uploadProgress, job?.progress ?? 0) : uploadProgress;
 
   const liveStatusMessage = useMemo(() => {
     if (!job) return statusMessage;
@@ -86,15 +126,15 @@ const TranslateDocumentPage = () => {
   }, [job, statusMessage]);
 
   const downloadUrl = useMemo(() => {
-    if (!jobId) return null;
-    return api.getTranslationDownloadUrl(jobId);
-  }, [jobId]);
+    if (!selectedJobId) return null;
+    return api.getTranslationDownloadUrl(selectedJobId);
+  }, [selectedJobId]);
 
   const previewAllowed = useMemo(() => {
-    if (!selectedFile) return false;
-    const name = selectedFile.name.toLowerCase();
+    const name = (job?.file_name || selectedFile?.name || '').toLowerCase();
+    if (!name) return false;
     return name.endsWith('.pdf') || name.endsWith('.html') || name.endsWith('.htm');
-  }, [selectedFile]);
+  }, [job?.file_name, selectedFile]);
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -109,7 +149,7 @@ const TranslateDocumentPage = () => {
     }
 
     setSelectedFile(file);
-    setJobId(null);
+    setActiveJobId(null);
     setUploadProgress(0);
     setStatusMessage(`Selected ${file.name}`);
   };
@@ -199,7 +239,7 @@ const TranslateDocumentPage = () => {
               <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
                 <span>{liveStatusMessage}</span>
                 <span className="shrink-0 font-semibold text-indigo-600 dark:text-indigo-400">
-                  {jobId ? `Job #${jobId}` : uploadMutation.isPending ? 'Submitting…' : 'Ready'}
+                  {selectedJobId ? `Job #${selectedJobId}` : uploadMutation.isPending ? 'Submitting…' : 'Ready'}
                 </span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
@@ -245,10 +285,12 @@ const TranslateDocumentPage = () => {
             </h2>
 
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+              <StatusRow label="File" value={job?.file_name || selectedFile?.name || 'Waiting for a document'} />
               <StatusRow label="Status" value={job?.status || (uploadMutation.isPending ? 'uploading' : 'idle')} />
               <StatusRow label="Stage" value={job?.stage || 'waiting'} />
               <StatusRow label="Progress" value={`${job?.progress ?? Math.round(uploadProgress)}%`} />
               <StatusRow label="Target" value={targetLanguage.toUpperCase()} />
+              <StatusRow label="Created" value={formatJobDate(job?.created_at)} />
             </div>
 
             {translationJobQuery.isError && (
@@ -273,6 +315,104 @@ const TranslateDocumentPage = () => {
                   Try a different document or submit the same file again.
                 </p>
               </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-white">
+                <Clock3 className="h-5 w-5 text-indigo-600" />
+                History
+              </h2>
+              {historyJobs.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {historyJobs.length}
+                </span>
+              )}
+            </div>
+
+            {!userId ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                Sign in to see your previous translation jobs.
+              </div>
+            ) : translationHistoryQuery.isError ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                {translationHistoryQuery.error?.message || 'Unable to load translation history.'}
+              </div>
+            ) : historyJobs.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                Your previous translation jobs will appear here.
+              </div>
+            ) : (
+              <div className="mt-4 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+                {historyJobs.map((historyJob) => {
+                  const isActive = historyJob.job_id === activeJobId;
+                  return (
+                    <div
+                      key={historyJob.job_id}
+                      className={`rounded-2xl border p-4 transition ${isActive
+                        ? 'border-indigo-200 bg-indigo-50 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-500/10'
+                        : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/50'
+                        }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                            {historyJob.file_name}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span>{historyJob.target_language?.toUpperCase()}</span>
+                            <span>•</span>
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarDays className="h-3.5 w-3.5" />
+                              {formatJobDate(historyJob.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${historyJob.status === 'completed'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                          : historyJob.status === 'failed'
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                          }`}
+                        >
+                          {historyJob.status}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveJobId(historyJob.job_id)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={!historyJob.download_available}
+                          onClick={() => {
+                            if (!historyJob.download_available) return;
+                            window.open(api.getTranslationDownloadUrl(historyJob.job_id), '_blank', 'noopener,noreferrer');
+                          }}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          {historyJob.download_available ? 'Download' : 'Pending'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {translationHistoryQuery.isFetching && historyJobs.length > 0 && (
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                Refreshing history...
+              </p>
             )}
           </div>
 

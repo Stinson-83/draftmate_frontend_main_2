@@ -1,5 +1,6 @@
 """CRUD helpers for translation jobs."""
 
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,18 @@ from backend.translator.models.translation_job import TranslationJob
 class TranslationJobNotFoundError(Exception):
     """Raised when a translation job cannot be found."""
 
+
+def serialize_translation_job(job: TranslationJob) -> dict[str, str | int | bool | None]:
+    return {
+        "job_id": job.id,
+        "file_name": Path(job.source_file).name,
+        "status": job.status,
+        "stage": job.stage,
+        "progress": job.progress,
+        "target_language": job.target_language,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "download_available": job.status == "completed" and bool(job.translated_file),
+    }
 
 
 def create_translation_job(
@@ -36,6 +49,24 @@ def create_translation_job(
 
 def get_translation_job(session: Session, job_id: int) -> TranslationJob | None:
     return session.query(TranslationJob).filter(TranslationJob.id == job_id).first()
+
+
+def list_translation_jobs(
+    session: Session,
+    *,
+    user_id: Optional[str],
+    limit: int = 20,
+) -> list[TranslationJob]:
+    query = session.query(TranslationJob)
+    if user_id is None:
+        return []
+
+    return (
+        query.filter(TranslationJob.user_id == user_id)
+        .order_by(TranslationJob.created_at.desc(), TranslationJob.id.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 def delete_translation_job(session: Session, job_id: int) -> TranslationJob:

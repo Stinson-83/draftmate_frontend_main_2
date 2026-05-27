@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Generator
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,8 @@ from backend.translator.crud import (
     create_translation_job as create_job_record,
     delete_translation_job as delete_job_record,
     get_translation_job,
+    list_translation_jobs,
+    serialize_translation_job,
     TranslationJobNotFoundError,
 )
 from backend.translator.database import DATABASE_URL, SessionLocal, engine
@@ -74,12 +76,19 @@ def get_translation_job_status(job_id: int, db: Session = Depends(get_db)) -> di
     if job is None:
         raise HTTPException(status_code=404, detail="Translation job not found")
 
+    return serialize_translation_job(job)
+
+
+@app.get("/translation-jobs")
+def list_translation_jobs_view(
+    user_id: str | None = Header(default=None, alias="X-User-Id"),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict[str, list[dict[str, str | int | bool | None]] | int]:
+    jobs = list_translation_jobs(db, user_id=user_id, limit=limit)
     return {
-        "job_id": job.id,
-        "status": job.status,
-        "progress": job.progress,
-        "stage": job.stage,
-        "target_language": job.target_language,
+        "jobs": [serialize_translation_job(job) for job in jobs],
+        "total": len(jobs),
     }
 
 
