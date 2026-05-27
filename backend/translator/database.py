@@ -5,9 +5,6 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.translator.models import Base
-
-
 def _get_database_url() -> str:
     return (
         os.getenv("TRANSLATOR_DATABASE_URL")
@@ -19,14 +16,31 @@ def _get_database_url() -> str:
 
 DATABASE_URL = _get_database_url()
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args={
-        "keepalives": 1,
-        "keepalives_idle": 30,
-        "keepalives_interval": 10,
-        "keepalives_count": 5,
-    },
-)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+engine = None
+SessionLocal = None
+
+
+def init_engine():
+    """Create the SQLAlchemy engine and session factory once a database URL is available."""
+    global engine, SessionLocal
+
+    if not DATABASE_URL:
+        return None
+
+    if engine is None:
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            connect_args={
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 5,
+            },
+        )
+        SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+    return engine
+
+
+init_engine()

@@ -1,24 +1,26 @@
 """Minimal FastAPI app for translation job creation."""
 
-from pathlib import Path
 from typing import Generator
-from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from backend.translator.crud import create_translation_job as create_job_record
-from backend.translator.database import SessionLocal
+from backend.translator.database import DATABASE_URL, SessionLocal, engine
 from backend.translator.models import Base
-from backend.translator.models.translation_job import TranslationJob
-from backend.translator.database import engine
+from backend.translator.storage import get_original_upload_path
+from backend.translator.tasks import process_translation_job
 
 app = FastAPI(title="Translator Service", version="0.1.0")
 
-Base.metadata.create_all(bind=engine)
+if engine is not None:
+    Base.metadata.create_all(bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:
+    if SessionLocal is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+
     db = SessionLocal()
     try:
         yield db
@@ -38,11 +40,7 @@ async def create_translation_job(
     user_id: str | None = Header(default=None, alias="X-User-Id"),
     db: Session = Depends(get_db),
 ) -> dict[str, str | int | None]:
-    uploads_dir = Path(__file__).resolve().parent.parent / "data" / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-
-    unique_name = f"{uuid4()}_{file.filename or 'document'}"
-    file_path = uploads_dir / unique_name
+    file_path = get_original_upload_path(file.filename)
     contents = await file.read()
     file_path.write_bytes(contents)
 
@@ -52,6 +50,8 @@ async def create_translation_job(
         source_file=str(file_path),
         target_language=target_language,
     )
+
+    process_translation_job.delay(job.id, str(file_path), target_language)
 
     return {
         "job_id": job.id,

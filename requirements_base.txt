@@ -30,6 +30,8 @@ sqlalchemy
 psycopg2-binary
 pgvector
 alembic
+celery
+redis
 boto3
 s3transfer
 
