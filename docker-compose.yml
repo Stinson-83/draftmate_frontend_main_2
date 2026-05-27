@@ -39,6 +39,33 @@ services:
     ports:
       - "6379:6379"
 
+  translator-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+    command: ["uvicorn", "backend.translator.app:app", "--host", "0.0.0.0", "--port", "8012"]
+    ports:
+      - "8012:8012"
+    environment:
+      - TRANSLATOR_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_DSN=${POSTGRES_DSN}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - TRANSLATOR_SOURCE_LANGUAGE=${TRANSLATOR_SOURCE_LANGUAGE:-auto}
+      - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY}
+      - GOOGLE_TRANSLATE_API_URL=${GOOGLE_TRANSLATE_API_URL}
+      - GOOGLE_TRANSLATE_BATCH_SIZE=${GOOGLE_TRANSLATE_BATCH_SIZE:-50}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - translator_original_data:/app/backend/translator/storage/original
+      - translator_translated_data:/app/backend/translator/storage/translated
+    depends_on:
+      - db
+      - redis
+
   backend:
     build:
       context: .
@@ -110,6 +137,9 @@ services:
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - QDRANT_HOST=qdrant
+    volumes:
+      - translator_original_data:/app/backend/translator/storage/original
+      - translator_translated_data:/app/backend/translator/storage/translated
     depends_on:
       - db
       - qdrant
@@ -129,7 +159,14 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - CELERY_LOG_LEVEL=INFO
+      - TRANSLATOR_SOURCE_LANGUAGE=${TRANSLATOR_SOURCE_LANGUAGE:-auto}
+      - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY}
+      - GOOGLE_TRANSLATE_API_URL=${GOOGLE_TRANSLATE_API_URL}
+      - GOOGLE_TRANSLATE_BATCH_SIZE=${GOOGLE_TRANSLATE_BATCH_SIZE:-50}
       - PYTHONUNBUFFERED=1
+    volumes:
+      - translator_original_data:/app/backend/translator/storage/original
+      - translator_translated_data:/app/backend/translator/storage/translated
     depends_on:
       - db
       - redis
@@ -137,3 +174,5 @@ services:
 volumes:
   postgres_data:
   qdrant_data:
+  translator_original_data:
+  translator_translated_data:
