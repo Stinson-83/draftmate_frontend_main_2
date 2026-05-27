@@ -1,5 +1,6 @@
 """Minimal FastAPI app for translation job creation."""
 
+import os
 from pathlib import Path
 from typing import Generator
 
@@ -18,7 +19,17 @@ from backend.translator.crud import (
 from backend.translator.database import DATABASE_URL, SessionLocal, engine
 from backend.translator.models import Base
 from backend.translator.storage import delete_local_file, get_original_upload_path
+from backend.translator.security import (
+    VirusScanError,
+    UploadValidationError,
+    build_download_response,
+    scan_bytes_with_clamav,
+    store_bytes_at_rest,
+    validate_upload,
+)
 from backend.translator.tasks import process_translation_job
+
+MAX_UPLOAD_BYTES = int(os.getenv("TRANSLATOR_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
 app = FastAPI(title="Translator Service", version="0.1.0")
 
@@ -49,9 +60,16 @@ async def create_translation_job(
     user_id: str | None = Header(default=None, alias="X-User-Id"),
     db: Session = Depends(get_db),
 ) -> dict[str, str | int | None]:
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+
+    try:
+        validate_upload(file.filename, file.content_type, contents)
+        scan_bytes_with_clamav(contents, filename=file.filename)
+    except (UploadValidationError, VirusScanError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
     file_path = get_original_upload_path(file.filename)
-    contents = await file.read()
-    file_path.write_bytes(contents)
+    store_bytes_at_rest(file_path, contents)
 
     job = create_job_record(
         db,
@@ -105,7 +123,8 @@ def download_translated_file(job_id: int, db: Session = Depends(get_db)):
     if not translated_path.exists():
         raise HTTPException(status_code=404, detail="Translated file not found")
 
-    return FileResponse(path=translated_path, filename=translated_path.name)
+    download_name = translated_path.name.removesuffix(".enc")
+    return build_download_response(translated_path, download_name=download_name)
 
 
 @app.delete("/translation-jobs/{job_id}")

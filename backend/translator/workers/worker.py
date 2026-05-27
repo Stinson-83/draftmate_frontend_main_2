@@ -15,6 +15,7 @@ from backend.translator.models import Base
 from backend.translator.models.translation_job import TranslationJob
 from backend.translator.rebuilders import rebuild_docx_document, rebuild_html_document, rebuild_pdf_document
 from backend.translator.storage.paths import get_translated_upload_path
+from backend.translator.security import open_secure_storage_file, store_bytes_at_rest
 from backend.translator.translators import translate_blocks
 from backend.translator.tasks import celery_app
 
@@ -54,32 +55,34 @@ def _set_job_state(session, job_id: int, *, status: str, stage: str, progress: i
 
 
 def _run_pipeline(session, job: TranslationJob) -> None:
-    source_path = Path(job.source_file)
-    blocks, output_ext, rebuilder = _extract_blocks(source_path)
-    _set_job_state(session, job.id, status="processing", stage="extracted", progress=20)
+    with open_secure_storage_file(job.source_file) as source_path:
+        blocks, output_ext, rebuilder = _extract_blocks(source_path)
+        _set_job_state(session, job.id, status="processing", stage="extracted", progress=20)
 
-    translated_blocks = translate_blocks(
-        blocks,
-        source_language=_source_language(),
-        target_language=job.target_language,
-    )
-    _set_job_state(session, job.id, status="processing", stage="translated", progress=60)
+        translated_blocks = translate_blocks(
+            blocks,
+            source_language=_source_language(),
+            target_language=job.target_language,
+        )
+        _set_job_state(session, job.id, status="processing", stage="translated", progress=60)
 
-    translated_filename = f"{source_path.stem}_{job.target_language}{'.' + output_ext}"
-    output_path = get_translated_upload_path(translated_filename)
-    _set_job_state(session, job.id, status="processing", stage="rebuilding", progress=85)
+        translated_filename = f"{source_path.stem}_{job.target_language}{'.' + output_ext}"
+        output_path = get_translated_upload_path(translated_filename)
+        _set_job_state(session, job.id, status="processing", stage="rebuilding", progress=85)
 
-    rebuilt_path = rebuilder(translated_blocks, output_path)
-    _set_job_state(session, job.id, status="processing", stage="storing", progress=95)
+        rebuilt_path = rebuilder(translated_blocks, output_path)
+        _set_job_state(session, job.id, status="processing", stage="storing", progress=95)
 
-    update_translation_job(
-        session,
-        job.id,
-        status="completed",
-        stage="completed",
-        progress=100,
-        translated_file=str(rebuilt_path),
-    )
+        store_bytes_at_rest(rebuilt_path, rebuilt_path.read_bytes())
+
+        update_translation_job(
+            session,
+            job.id,
+            status="completed",
+            stage="completed",
+            progress=100,
+            translated_file=str(rebuilt_path),
+        )
 
 
 def _process_next_job() -> None:
