@@ -24,6 +24,7 @@ pipeline {
         stage('Trivy: Filesystem scan') {
             steps {
                 sh "trivy fs --format table -o trivy-fs-report.html ."
+                archiveArtifacts artifacts: 'trivy-fs-report.html', allowEmptyArchive: true
             }
         }
         
