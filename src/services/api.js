@@ -1,7 +1,9 @@
+import axios from 'axios';
 import { API_CONFIG } from './endpoints';
 
 const API_BASE_URL = API_CONFIG.LEX_BOT.BASE_URL;
 const NOTIFICATION_BASE_URL = 'http://localhost:8015';
+const TRANSLATOR_BASE_URL = API_CONFIG.TRANSLATOR.BASE_URL;
 
 export const api = {
     /**
@@ -165,7 +167,7 @@ export const api = {
                                     onError?.(new Error(event.message));
                                     break;
                             }
-                        } catch (parseError) {
+                        } catch {
                             console.warn('Failed to parse SSE event:', line);
                         }
                     }
@@ -214,6 +216,41 @@ export const api = {
 
         return response.json();
     },
+
+    submitTranslationJob: async ({ file, targetLanguage, sourceLanguage = 'auto', onUploadProgress }) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('target_language', targetLanguage);
+        if (sourceLanguage) {
+            formData.append('source_language', sourceLanguage);
+        }
+
+        const response = await axios.post(
+            `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.CREATE_JOB}`,
+            formData,
+            {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                onUploadProgress,
+            }
+        );
+
+        return response.data;
+    },
+
+    getTranslationJob: async (jobId) => {
+        const response = await fetch(`${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.GET_JOB(jobId)}`, {
+            method: 'GET',
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `Failed to fetch translation job: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    getTranslationDownloadUrl: (jobId) => `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.DOWNLOAD_JOB(jobId)}`,
 
     /**
      * Send email notification for calendar event.
