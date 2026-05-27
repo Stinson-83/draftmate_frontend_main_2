@@ -10,7 +10,7 @@ frontend:
     targetPort: 80
   env:
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
-    VITE_API_BASE_URL: "http://app.draftde.free.nf:8080"
+    VITE_API_BASE_URL: "http://app.draftde.free.nf/api"
     # CHANGE_THIS_FOR_AWS: Update URLs to match your production domain
     FRONTEND_URL_DEV: "http://app.draftde.free.nf:8080"
     FRONTEND_URL_PROD: "http://app.draftde.free.nf"
@@ -76,10 +76,9 @@ backend:
     tag: latest
     pullPolicy: Always
   service:
-    type: NodePort
+    type: ClusterIP
     port: 8080
     targetPort: 8080
-    nodePort: 30080
   env:
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
     # CHANGE_THIS_FOR_AWS: Update URLs to match your production domain
@@ -148,14 +147,22 @@ ingress:
   className: "nginx"
   annotations:
     kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
     # CHANGE_THIS_FOR_AWS: If using HTTPS via cert-manager, uncomment the line below
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
   hosts:
     # CHANGE_THIS_FOR_AWS: Replace 'draftmate.test' with your actual production domain (e.g., 'draftmate.in')
     - host: app.draftde.free.nf
       paths:
-        - path: /
-          pathType: Prefix
+        - path: /api(/|$)(.*)
+          pathType: ImplementationSpecific
+          serviceName: backend-service
+          servicePort: 8080
+        - path: /()(.*)
+          pathType: ImplementationSpecific
+          serviceName: frontend-service
+          servicePort: 80
   # CHANGE_THIS_FOR_AWS: To enable HTTPS, replace 'tls: []' with the block below:
   # tls:
   #   - hosts:

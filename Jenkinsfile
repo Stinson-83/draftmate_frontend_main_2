@@ -74,7 +74,7 @@ pipeline {
                 sh """
                     docker build \\
                         --build-arg VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com \\
-                        --build-arg VITE_API_BASE_URL=http://app.draftde.free.nf:8080 \\
+                        --build-arg VITE_API_BASE_URL=http://app.draftde.free.nf/api \\
                         --build-arg VITE_CASHFREE_MODE=sandbox \\
                         -t ${FRONTEND_IMAGE}:${BUILD_NUMBER} -f Dockerfile.frontend .
                 """
