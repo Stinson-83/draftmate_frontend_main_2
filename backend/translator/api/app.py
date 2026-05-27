@@ -11,6 +11,7 @@ from backend.translator.crud import (
     create_translation_job as create_job_record,
     delete_translation_job as delete_job_record,
     get_translation_job,
+    TranslationJobNotFoundError,
 )
 from backend.translator.database import DATABASE_URL, SessionLocal, engine
 from backend.translator.models import Base
@@ -106,6 +107,9 @@ def delete_translation_job(job_id: int, db: Session = Depends(get_db)) -> dict[s
 
     delete_local_file(job.source_file)
     delete_local_file(job.translated_file)
-    delete_job_record(db, job_id)
+    try:
+        delete_job_record(db, job_id)
+    except TranslationJobNotFoundError:
+        raise HTTPException(status_code=404, detail="Translation job not found")
 
     return {"job_id": job_id, "status": "deleted"}

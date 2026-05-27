@@ -58,19 +58,28 @@ class GoogleTranslateClient:
         if not self.api_key:
             raise ValueError("GOOGLE_TRANSLATE_API_KEY is not configured")
 
-    def translate_texts(self, texts: list[str], source_language: str, target_language: str) -> list[str]:
+    def translate_texts(
+        self,
+        texts: list[str],
+        source_language: str | None,
+        target_language: str,
+    ) -> list[str]:
         if not texts:
             return []
+
+        request_data: dict[str, object] = {
+            "q": texts,
+            "target": target_language,
+            "format": "text",
+        }
+        normalized_source = (source_language or "").strip().lower()
+        if normalized_source and normalized_source != "auto":
+            request_data["source"] = normalized_source
 
         response = self.session.post(
             self.api_url,
             params={"key": self.api_key},
-            data={
-                "q": texts,
-                "source": source_language,
-                "target": target_language,
-                "format": "text",
-            },
+            data=request_data,
             timeout=self.timeout_seconds,
         )
         response.raise_for_status()
@@ -84,7 +93,12 @@ class GoogleTranslateClient:
 
         return translated_texts
 
-    def translate_blocks(self, blocks: Sequence[Block], source_language: str, target_language: str) -> list[Block]:
+    def translate_blocks(
+        self,
+        blocks: Sequence[Block],
+        source_language: str | None,
+        target_language: str,
+    ) -> list[Block]:
         translated_blocks: list[Block] = []
 
         for batch in _chunked(list(blocks), self.batch_size):

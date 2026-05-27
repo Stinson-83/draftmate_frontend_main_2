@@ -2,10 +2,14 @@
 
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from backend.translator.models.translation_job import TranslationJob
+
+
+class TranslationJobNotFoundError(Exception):
+    """Raised when a translation job cannot be found."""
+
 
 
 def create_translation_job(
@@ -37,9 +41,36 @@ def get_translation_job(session: Session, job_id: int) -> TranslationJob | None:
 def delete_translation_job(session: Session, job_id: int) -> TranslationJob:
     job = get_translation_job(session, job_id)
     if job is None:
-        raise HTTPException(status_code=404, detail="Translation job not found")
+        raise TranslationJobNotFoundError("Translation job not found")
 
     session.delete(job)
     session.commit()
+    return job
+
+
+def update_translation_job(
+    session: Session,
+    job_id: int,
+    *,
+    status: str | None = None,
+    stage: str | None = None,
+    progress: int | None = None,
+    translated_file: str | None = None,
+) -> TranslationJob:
+    job = get_translation_job(session, job_id)
+    if job is None:
+        raise TranslationJobNotFoundError("Translation job not found")
+
+    if status is not None:
+        job.status = status
+    if stage is not None:
+        job.stage = stage
+    if progress is not None:
+        job.progress = progress
+    if translated_file is not None:
+        job.translated_file = translated_file
+
+    session.commit()
+    session.refresh(job)
     return job
 
