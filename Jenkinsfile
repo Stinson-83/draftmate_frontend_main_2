@@ -23,8 +23,13 @@ pipeline {
         
         stage('Trivy: Filesystem scan') {
             steps {
-                sh "trivy fs --format table -o trivy-fs-report.txt ."
-                archiveArtifacts artifacts: 'trivy-fs-report.txt', allowEmptyArchive: true
+                sh """
+                    trivy fs --format table -o trivy-raw.txt .
+                    echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Trivy Report</title></head><body style="background:#1e1e1e;color:#d4d4d4;"><pre>' > trivy-fs-report.html
+                    cat trivy-raw.txt >> trivy-fs-report.html
+                    echo '</pre></body></html>' >> trivy-fs-report.html
+                """
+                archiveArtifacts artifacts: 'trivy-fs-report.html', allowEmptyArchive: true
             }
         }
         
