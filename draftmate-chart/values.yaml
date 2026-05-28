@@ -78,7 +78,7 @@ backend:
   service:
     type: NodePort
     port: 8080
-    targetPort: 8080
+    targetPort: 8004
     nodePort: 30080
   env:
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"

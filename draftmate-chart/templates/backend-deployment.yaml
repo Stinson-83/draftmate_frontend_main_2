@@ -20,7 +20,7 @@ spec:
         image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
         imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
         ports:
-        - containerPort: 8080
+        - containerPort: 8004
         env:
         {{- range $key, $value := .Values.backend.env }}
         - name: {{ $key }}
