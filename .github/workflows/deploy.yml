@@ -62,10 +62,11 @@ jobs:
       - name: Download Trivy HTML Template
         run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
-      - name: Run Trivy vulnerability scanner on Frontend
+      - name: Run Trivy vulnerability scanner on Source Code
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.run_number }}
+          scan-type: 'fs'
+          scan-ref: '.'
           format: 'template'
           template: '@html.tpl'
           output: 'trivy-report.html'
@@ -77,14 +78,6 @@ jobs:
         with:
           name: Trivy-Vulnerability-Report
           path: trivy-report.html
-
-      - name: Run Trivy vulnerability scanner on Backend
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.run_number }}
-          format: 'table'
-          exit-code: '0'
-          severity: 'HIGH,CRITICAL'
           
       - name: Deploy to Kubernetes Server via SSH
         uses: appleboy/ssh-action@v1.0.0
