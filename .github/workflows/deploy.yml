@@ -1,0 +1,77 @@
+name: DraftMate CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - preet/k8s-setup
+
+env:
+  FRONTEND_IMAGE: preetkakdiya/draftmate-frontend
+  BACKEND_IMAGE: preetkakdiya/draftmate-backend
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    # Prevents OOM by not running multiple deployments concurrently
+    concurrency: 
+      group: production-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # SonarQube and OWASP are commented out to save resources for the unfunded startup!
+      # We can re-enable these once you have funding for a larger Kubernetes server.
+      #
+      # - name: SonarQube Analysis
+      #   uses: sonarsource/sonarqube-scan-action@master
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      #
+      # - name: OWASP Dependency Check
+      #   uses: dependency-check/Dependency-Check_Action@main
+      #   with:
+      #     project: 'draftmate'
+      #     path: '.'
+      #     format: 'HTML'
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Frontend
+        run: |
+          docker build \
+            --build-arg VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com \
+            --build-arg VITE_API_BASE_URL=http://app.draftde.free.nf/api \
+            --build-arg VITE_CASHFREE_MODE=sandbox \
+            -t $FRONTEND_IMAGE:${{ github.run_number }} -f Dockerfile.frontend .
+          docker push $FRONTEND_IMAGE:${{ github.run_number }}
+
+      - name: Build and Push Backend
+        run: |
+          docker build -t $BACKEND_IMAGE:${{ github.run_number }} -f Dockerfile .
+          docker push $BACKEND_IMAGE:${{ github.run_number }}
+          
+      - name: Deploy to Kubernetes Server via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.K8S_SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/ubuntu/draftmate_frontend_main_2
+            git stash
+            git pull origin preet/k8s-setup
+            /usr/local/bin/helm upgrade --install draftmate ./draftmate-chart \
+                -f ./draftmate-chart/values.yaml \
+                -f ./draftmate-chart/values-secrets.yaml \
+                --set frontend.image.tag=${{ github.run_number }} \
+                --set backend.image.tag=${{ github.run_number }}
