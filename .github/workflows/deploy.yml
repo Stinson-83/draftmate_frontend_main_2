@@ -59,19 +59,31 @@ jobs:
           docker build -t $BACKEND_IMAGE:${{ github.run_number }} -f Dockerfile .
           docker push $BACKEND_IMAGE:${{ github.run_number }}
 
-      - name: Download Trivy HTML Template
-        run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
-
-      - name: Run Trivy vulnerability scanner on Source Code
+      - name: Run Trivy scan on Frontend image
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'template'
-          template: '@html.tpl'
-          output: 'trivy-report.html'
-          exit-code: '0'
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.run_number }}
+          format: 'json'
+          output: 'trivy-frontend-report.json'
           severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+      - name: Run Trivy scan on Backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.run_number }}
+          format: 'json'
+          output: 'trivy-backend-report.json'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+      - name: Upload Trivy reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trivy-Reports
+          path: |
+            trivy-frontend-report.json
+            trivy-backend-report.json
 
       - name: Upload Trivy Report
         uses: actions/upload-artifact@v4
