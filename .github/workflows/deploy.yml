@@ -63,8 +63,8 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.run_number }}
-          format: 'json'
-          output: 'trivy-frontend-report.json'
+          format: 'table'
+          output: 'frontend-trivy.txt'
           severity: 'HIGH,CRITICAL'
           exit-code: '0'
 
@@ -72,24 +72,28 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.run_number }}
-          format: 'json'
-          output: 'trivy-backend-report.json'
+          format: 'table'
+          output: 'backend-trivy.txt'
           severity: 'HIGH,CRITICAL'
           exit-code: '0'
 
-      - name: Upload Trivy reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: Trivy-Reports
-          path: |
-            trivy-frontend-report.json
-            trivy-backend-report.json
+      - name: Combine Trivy Reports
+        run: |
+          echo "=========================================" > combined-trivy-report.txt
+          echo "      FRONTEND IMAGE VULNERABILITIES     " >> combined-trivy-report.txt
+          echo "=========================================" >> combined-trivy-report.txt
+          cat frontend-trivy.txt >> combined-trivy-report.txt
+          echo "" >> combined-trivy-report.txt
+          echo "=========================================" >> combined-trivy-report.txt
+          echo "      BACKEND IMAGE VULNERABILITIES      " >> combined-trivy-report.txt
+          echo "=========================================" >> combined-trivy-report.txt
+          cat backend-trivy.txt >> combined-trivy-report.txt
 
-      - name: Upload Trivy Report
+      - name: Upload Combined Trivy Report
         uses: actions/upload-artifact@v4
         with:
-          name: Trivy-Vulnerability-Report
-          path: trivy-report.html
+          name: Trivy-Combined-Report
+          path: combined-trivy-report.txt
           
       - name: Deploy to Kubernetes Server via SSH
         uses: appleboy/ssh-action@v1.0.0
