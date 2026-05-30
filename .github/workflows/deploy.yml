@@ -40,36 +40,11 @@ jobs:
           name: OWASP-Report
           path: reports/dependency-check-report.html
 
-      # 1. Turn on SonarQube server automatically
-      - name: Start SonarQube via SSH
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.K8S_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
-          script: |
-            sudo docker start sonarqube || true
-            echo "Waiting for SonarQube to boot up..."
-            sleep 45
-
-      # 2. Run the actual code analysis
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      # 3. Turn off SonarQube server automatically to free up 2.5GB RAM
-      - name: Stop SonarQube via SSH
-        if: always() # Ensure it stops even if the scan fails
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.K8S_SERVER_IP }}
-          username: ubuntu
-          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
-          script: |
-            sudo docker stop sonarqube || true
-
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
