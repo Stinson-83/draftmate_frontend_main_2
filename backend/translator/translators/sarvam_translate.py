@@ -20,38 +20,14 @@ from backend.translator.settings import (
     SARVAM_TRANSLATE_BATCH_SIZE as TRANSLATOR_SARVAM_TRANSLATE_BATCH_SIZE,
     SARVAM_TRANSLATE_MODEL as TRANSLATOR_SARVAM_TRANSLATE_MODEL,
     SARVAM_TRANSLATE_TIMEOUT_SECONDS as TRANSLATOR_SARVAM_TRANSLATE_TIMEOUT_SECONDS,
+    SARVAM_LANGUAGE_CODES,
+    SARVAM_MAYURA_LANGUAGE_CODES,
 )
 
 SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/v1/translate"
 SARVAM_MAYURA_MODEL = "mayura:v1"
-_SUPPORTED_MAYURA_LANGS = {
-    "bn-IN",
-    "en-IN",
-    "gu-IN",
-    "hi-IN",
-    "kn-IN",
-    "ml-IN",
-    "mr-IN",
-    "od-IN",
-    "pa-IN",
-    "ta-IN",
-    "te-IN",
-}
-_SUPPORTED_SARVAM_TRANSLATE_LANGS = {
-    *_SUPPORTED_MAYURA_LANGS,
-    "as-IN",
-    "brx-IN",
-    "doi-IN",
-    "kok-IN",
-    "ks-IN",
-    "mai-IN",
-    "mni-IN",
-    "ne-IN",
-    "sa-IN",
-    "sat-IN",
-    "sd-IN",
-    "ur-IN",
-}
+_SUPPORTED_MAYURA_LANGS = set(SARVAM_MAYURA_LANGUAGE_CODES)
+_SUPPORTED_SARVAM_TRANSLATE_LANGS = set(SARVAM_LANGUAGE_CODES)
 _COMMON_LANGUAGE_MAP = {
     "bn": "bn-IN",
     "brx": "brx-IN",
@@ -107,6 +83,9 @@ def _normalize_language_code(language_code: str) -> str:
 
     if normalized.lower() == "auto":
         return "auto"
+
+    if normalized in _SUPPORTED_SARVAM_TRANSLATE_LANGS:
+        return normalized
 
     lowered = normalized.lower()
     if lowered in _COMMON_LANGUAGE_MAP:
@@ -300,6 +279,17 @@ def sarvam_translate(texts: list[str], src_lang: str, tgt_lang: str) -> list[str
 
     client = SarvamTranslateClient()
     return client.translate_texts(texts, source_language=src_lang, target_language=tgt_lang)
+
+
+def get_supported_source_language_codes() -> tuple[str, ...]:
+    return ("auto", *SARVAM_LANGUAGE_CODES)
+
+
+def get_supported_target_language_codes(source_language: str) -> tuple[str, ...]:
+    normalized_source = (source_language or "").strip().lower()
+    if normalized_source == "auto":
+        return SARVAM_MAYURA_LANGUAGE_CODES
+    return SARVAM_LANGUAGE_CODES
 
 
 def translate_block_texts(blocks: Sequence[Block], source_language: str, target_language: str) -> list[Block]:

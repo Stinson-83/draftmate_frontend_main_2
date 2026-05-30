@@ -69,6 +69,7 @@ def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path) -> None:
         stage="queued",
         progress=0,
         source_file=str(source_file),
+        source_language="en-IN",
         translated_file=None,
         target_language="es",
     )
@@ -109,6 +110,7 @@ def test_worker_marks_job_failed_when_translation_fails(monkeypatch, tmp_path: P
         stage="queued",
         progress=0,
         source_file=str(source_file),
+        source_language="en-IN",
         translated_file=None,
         target_language="hi",
     )

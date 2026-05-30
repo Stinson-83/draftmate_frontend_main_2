@@ -28,6 +28,10 @@ from backend.translator.security import (
     validate_upload,
 )
 from backend.translator.tasks import process_translation_job
+from backend.translator.translators.sarvam_translate import (
+    get_supported_source_language_codes,
+    get_supported_target_language_codes,
+)
 
 MAX_UPLOAD_BYTES = int(os.getenv("TRANSLATOR_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
@@ -57,6 +61,7 @@ def healthcheck() -> dict[str, str]:
 async def create_translation_job(
     file: UploadFile = File(...),
     target_language: str = Form(...),
+    source_language: str = Form(default="auto"),
     user_id: str | None = Header(default=None, alias="X-User-Id"),
     db: Session = Depends(get_db),
 ) -> dict[str, str | int | None]:
@@ -68,6 +73,16 @@ async def create_translation_job(
     except (UploadValidationError, VirusScanError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+    normalized_source_language = source_language.strip() or "auto"
+    normalized_target_language = target_language.strip()
+    valid_sources = get_supported_source_language_codes()
+    valid_targets = get_supported_target_language_codes(normalized_source_language)
+
+    if normalized_source_language not in valid_sources:
+        raise HTTPException(status_code=400, detail="Unsupported source language for Sarvam AI")
+    if normalized_target_language not in valid_targets:
+        raise HTTPException(status_code=400, detail="Unsupported target language for Sarvam AI")
+
     file_path = get_original_upload_path(file.filename)
     store_bytes_at_rest(file_path, contents)
 
@@ -75,15 +90,17 @@ async def create_translation_job(
         db,
         user_id=user_id,
         source_file=str(file_path),
-        target_language=target_language,
+        source_language=normalized_source_language,
+        target_language=normalized_target_language,
     )
 
-    process_translation_job.delay(job.id, str(file_path), target_language)
+    process_translation_job.delay(job.id, str(file_path), normalized_target_language)
 
     return {
         "job_id": job.id,
         "status": job.status,
         "stage": job.stage,
+        "source_language": job.source_language,
         "target_language": job.target_language,
     }
 

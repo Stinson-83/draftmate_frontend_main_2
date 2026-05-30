@@ -90,7 +90,7 @@ def _run_pipeline(session, job: TranslationJob) -> None:
 
         translated_blocks = _translate_blocks(
             blocks,
-            source_language=_source_language(),
+            source_language=job.source_language or _source_language(),
             target_language=job.target_language,
         )
         _set_job_state(session, job.id, status="processing", stage="translated", progress=60)

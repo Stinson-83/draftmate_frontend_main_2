@@ -4,18 +4,67 @@ import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, 
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
-const LANGUAGE_OPTIONS = [
-  { value: 'hi', label: 'Hindi' },
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Spanish' },
-  { value: 'fr', label: 'French' },
-  { value: 'de', label: 'German' },
-  { value: 'pt', label: 'Portuguese' },
-  { value: 'ar', label: 'Arabic' },
-  { value: 'ja', label: 'Japanese' },
-  { value: 'ko', label: 'Korean' },
-  { value: 'zh', label: 'Chinese' },
+const SOURCE_LANGUAGE_OPTIONS = [
+  { value: 'auto', label: 'Auto-detect' },
+  { value: 'en-IN', label: 'English' },
+  { value: 'hi-IN', label: 'Hindi' },
+  { value: 'bn-IN', label: 'Bengali' },
+  { value: 'gu-IN', label: 'Gujarati' },
+  { value: 'kn-IN', label: 'Kannada' },
+  { value: 'ml-IN', label: 'Malayalam' },
+  { value: 'mr-IN', label: 'Marathi' },
+  { value: 'od-IN', label: 'Odia' },
+  { value: 'pa-IN', label: 'Punjabi' },
+  { value: 'ta-IN', label: 'Tamil' },
+  { value: 'te-IN', label: 'Telugu' },
+  { value: 'as-IN', label: 'Assamese' },
+  { value: 'brx-IN', label: 'Bodo' },
+  { value: 'doi-IN', label: 'Dogri' },
+  { value: 'kok-IN', label: 'Konkani' },
+  { value: 'ks-IN', label: 'Kashmiri' },
+  { value: 'mai-IN', label: 'Maithili' },
+  { value: 'mni-IN', label: 'Manipuri' },
+  { value: 'ne-IN', label: 'Nepali' },
+  { value: 'sa-IN', label: 'Sanskrit' },
+  { value: 'sat-IN', label: 'Santali' },
+  { value: 'sd-IN', label: 'Sindhi' },
+  { value: 'ur-IN', label: 'Urdu' },
 ];
+
+const SARVAM_TARGET_OPTIONS = [
+  { value: 'en-IN', label: 'English' },
+  { value: 'hi-IN', label: 'Hindi' },
+  { value: 'bn-IN', label: 'Bengali' },
+  { value: 'gu-IN', label: 'Gujarati' },
+  { value: 'kn-IN', label: 'Kannada' },
+  { value: 'ml-IN', label: 'Malayalam' },
+  { value: 'mr-IN', label: 'Marathi' },
+  { value: 'od-IN', label: 'Odia' },
+  { value: 'pa-IN', label: 'Punjabi' },
+  { value: 'ta-IN', label: 'Tamil' },
+  { value: 'te-IN', label: 'Telugu' },
+  { value: 'as-IN', label: 'Assamese' },
+  { value: 'brx-IN', label: 'Bodo' },
+  { value: 'doi-IN', label: 'Dogri' },
+  { value: 'kok-IN', label: 'Konkani' },
+  { value: 'ks-IN', label: 'Kashmiri' },
+  { value: 'mai-IN', label: 'Maithili' },
+  { value: 'mni-IN', label: 'Manipuri' },
+  { value: 'ne-IN', label: 'Nepali' },
+  { value: 'sa-IN', label: 'Sanskrit' },
+  { value: 'sat-IN', label: 'Santali' },
+  { value: 'sd-IN', label: 'Sindhi' },
+  { value: 'ur-IN', label: 'Urdu' },
+];
+
+const MAYURA_TARGET_OPTIONS = SARVAM_TARGET_OPTIONS.filter((option) => {
+  return ['en-IN', 'hi-IN', 'bn-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'od-IN', 'pa-IN', 'ta-IN', 'te-IN'].includes(option.value);
+});
+
+const getLanguageLabel = (value) => {
+  const option = [...SOURCE_LANGUAGE_OPTIONS, ...SARVAM_TARGET_OPTIONS].find((item) => item.value === value);
+  return option?.label || value;
+};
 
 const SUPPORTED_EXTENSIONS = ['.pdf', '.docx', '.html', '.htm'];
 
@@ -44,16 +93,23 @@ const formatJobDate = (value) => {
 
 const TranslateDocumentPage = () => {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [targetLanguage, setTargetLanguage] = useState('hi');
+  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [targetLanguage, setTargetLanguage] = useState('hi-IN');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [activeJobId, setActiveJobId] = useState(null);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Choose a document to start translation.');
   const userId = useMemo(() => getCurrentUserId(), []);
 
+  const targetLanguageOptions = useMemo(
+    () => (sourceLanguage === 'auto' ? MAYURA_TARGET_OPTIONS : SARVAM_TARGET_OPTIONS),
+    [sourceLanguage],
+  );
+
   const uploadMutation = useMutation({
-    mutationFn: ({ file, targetLanguageValue }) => api.submitTranslationJob({
+    mutationFn: ({ file, sourceLanguageValue, targetLanguageValue }) => api.submitTranslationJob({
       file,
+      sourceLanguage: sourceLanguageValue,
       targetLanguage: targetLanguageValue,
       userId,
       onUploadProgress: (event) => {
@@ -164,8 +220,17 @@ const TranslateDocumentPage = () => {
 
     uploadMutation.mutate({
       file: selectedFile,
+      sourceLanguageValue: sourceLanguage,
       targetLanguageValue: targetLanguage,
     });
+  };
+
+  const handleSourceLanguageChange = (nextSourceLanguage) => {
+    setSourceLanguage(nextSourceLanguage);
+    const nextTargetOptions = nextSourceLanguage === 'auto' ? MAYURA_TARGET_OPTIONS : SARVAM_TARGET_OPTIONS;
+    if (!nextTargetOptions.some((option) => option.value === targetLanguage)) {
+      setTargetLanguage(nextTargetOptions[0]?.value || 'hi-IN');
+    }
   };
 
   return (
@@ -219,6 +284,24 @@ const TranslateDocumentPage = () => {
               <label className="space-y-2">
                 <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                   <Languages className="h-4 w-4 text-indigo-600" />
+                  Source language
+                </span>
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => handleSourceLanguageChange(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                >
+                  {SOURCE_LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  <Languages className="h-4 w-4 text-indigo-600" />
                   Target language
                 </span>
                 <select
@@ -226,7 +309,7 @@ const TranslateDocumentPage = () => {
                   onChange={(e) => setTargetLanguage(e.target.value)}
                   className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 >
-                  {LANGUAGE_OPTIONS.map((option) => (
+                  {targetLanguageOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -286,10 +369,11 @@ const TranslateDocumentPage = () => {
 
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <StatusRow label="File" value={job?.file_name || selectedFile?.name || 'Waiting for a document'} />
+              <StatusRow label="Source" value={getLanguageLabel(job?.source_language || sourceLanguage)} />
               <StatusRow label="Status" value={job?.status || (uploadMutation.isPending ? 'uploading' : 'idle')} />
               <StatusRow label="Stage" value={job?.stage || 'waiting'} />
               <StatusRow label="Progress" value={`${job?.progress ?? Math.round(uploadProgress)}%`} />
-              <StatusRow label="Target" value={targetLanguage.toUpperCase()} />
+              <StatusRow label="Target" value={getLanguageLabel(job?.target_language || targetLanguage)} />
               <StatusRow label="Created" value={formatJobDate(job?.created_at)} />
             </div>
 
@@ -361,6 +445,8 @@ const TranslateDocumentPage = () => {
                             {historyJob.file_name}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span>{getLanguageLabel(historyJob.source_language || 'auto')}</span>
+                            <span>→</span>
                             <span>{historyJob.target_language?.toUpperCase()}</span>
                             <span>•</span>
                             <span className="inline-flex items-center gap-1">
