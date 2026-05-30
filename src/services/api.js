@@ -227,19 +227,27 @@ export const api = {
             formData.append('source_language', sourceLanguage);
         }
 
-        const response = await axios.post(
-            `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.CREATE_JOB}`,
-            formData,
-            {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    ...getTranslatorUserHeader(userId),
-                },
-                onUploadProgress,
-            }
-        );
+        try {
+            const response = await axios.post(
+                `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.CREATE_JOB}`,
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        ...getTranslatorUserHeader(userId),
+                    },
+                    onUploadProgress,
+                }
+            );
 
-        return response.data;
+            return response.data;
+        } catch (error) {
+            const detail = error?.response?.data?.detail;
+            const message = Array.isArray(detail)
+                ? detail.map((item) => item?.msg || item?.detail || String(item)).join(', ')
+                : detail || error?.response?.data?.message || error?.message;
+            throw new Error(message || 'Failed to submit translation job');
+        }
     },
 
     getTranslationJob: async (jobId, userId) => {

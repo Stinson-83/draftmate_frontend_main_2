@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from backend.translator.extractors.models import Block
-from backend.translator.translators.sarvam_translate import SarvamQuotaExceededError, SarvamTranslateClient
+from backend.translator.translators.sarvam_translate import SarvamQuotaExceededError, SarvamTranslateClient, SarvamTranslateError
 
 
 class _FakeResponse:
@@ -26,6 +26,36 @@ class _FakeSession:
     def post(self, url: str, *, headers: dict[str, object], json: dict[str, object], timeout: int):
         self.calls.append({"url": url, "headers": headers, "json": json, "timeout": timeout})
         return self.responses.pop(0)
+
+
+@pytest.mark.parametrize(
+    ("source_language", "target_language", "expected_source_code", "expected_target_code", "translated_text"),
+    [
+        ("hi", "en", "hi-IN", "en-IN", "hello"),
+        ("en", "hi", "en-IN", "hi-IN", "नमस्ते"),
+        ("mr", "gu", "mr-IN", "gu-IN", "નમસ્તે"),
+        ("gu", "mr", "gu-IN", "mr-IN", "नमस्कार"),
+    ],
+)
+def test_sarvam_translate_supports_indian_language_pairs(
+    monkeypatch: pytest.MonkeyPatch,
+    source_language: str,
+    target_language: str,
+    expected_source_code: str,
+    expected_target_code: str,
+    translated_text: str,
+) -> None:
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+    session = _FakeSession([
+        _FakeResponse(200, {"request_id": "1", "translated_text": translated_text, "source_language_code": expected_source_code}),
+    ])
+
+    client = SarvamTranslateClient(api_key="test-key", session=session)
+    translated = client.translate_texts(["hello"], source_language=source_language, target_language=target_language)
+
+    assert translated == [translated_text]
+    assert session.calls[0]["json"]["source_language_code"] == expected_source_code
+    assert session.calls[0]["json"]["target_language_code"] == expected_target_code
 
 
 def test_sarvam_translate_batches_requests_and_preserves_order(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,3 +102,21 @@ def test_sarvam_translate_raises_quota_error(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(SarvamQuotaExceededError, match="Quota exceeded"):
         client.translate_texts(["hello"], source_language="en", target_language="hi")
+
+
+def test_sarvam_translate_raises_clear_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+    session = _FakeSession([_FakeResponse(503, {"message": "Service unavailable"}, text="Service unavailable")])
+
+    client = SarvamTranslateClient(api_key="test-key", session=session)
+
+    with pytest.raises(SarvamTranslateError, match="Sarvam translation failed with status 503: Service unavailable"):
+        client.translate_texts(["hello"], source_language="en", target_language="hi")
+
+
+def test_sarvam_translate_rejects_unsupported_language_codes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+    client = SarvamTranslateClient(api_key="test-key", session=_FakeSession([]))
+
+    with pytest.raises(ValueError, match="Unsupported source language for Sarvam Translate: xx-IN"):
+        client.translate_texts(["hello"], source_language="xx-IN", target_language="hi")

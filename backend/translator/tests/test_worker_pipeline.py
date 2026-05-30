@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from backend.translator.extractors.models import Block
 from backend.translator.models.translation_job import TranslationJob
 from backend.translator.workers import worker
@@ -58,7 +60,16 @@ class _SessionContext:
         return False
 
 
-def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("source_language", "target_language", "translated_text"),
+    [
+        ("hi-IN", "en-IN", "hello"),
+        ("en-IN", "hi-IN", "नमस्ते"),
+        ("mr-IN", "gu-IN", "નમસ્તે"),
+        ("gu-IN", "mr-IN", "नमस्कार"),
+    ],
+)
+def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path, source_language: str, target_language: str, translated_text: str) -> None:
     source_file = tmp_path / "input.pdf"
     source_file.write_text("stub", encoding="utf-8")
 
@@ -69,21 +80,21 @@ def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path) -> None:
         stage="queued",
         progress=0,
         source_file=str(source_file),
-        source_language="en-IN",
+        source_language=source_language,
         translated_file=None,
-        target_language="es",
+        target_language=target_language,
     )
 
     session = _Session(job)
 
     monkeypatch.setattr(worker, "SessionLocal", _SessionFactory(session))
-    monkeypatch.setattr(worker, "_source_language", lambda: "en")
+    monkeypatch.setattr(worker, "_source_language", lambda: "auto")
     monkeypatch.setattr(worker, "extract_pdf_blocks", lambda path: [Block(id=1, type="paragraph", text="hello", bounding_box=(0.0, 0.0, 1.0, 1.0), style={})])
-    monkeypatch.setattr(worker, "sarvam_translate", lambda texts, src_lang, tgt_lang: ["hola"])
+    monkeypatch.setattr(worker, "sarvam_translate", lambda texts, src_lang, tgt_lang: [translated_text])
 
     def _rebuilder(blocks, output_path):
         output_path = Path(output_path)
-        output_path.write_text("translated content", encoding="utf-8")
+        output_path.write_text(" | ".join(block.text for block in blocks), encoding="utf-8")
         return output_path
 
     monkeypatch.setattr(worker, "rebuild_pdf_document", _rebuilder)
@@ -97,6 +108,7 @@ def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path) -> None:
     assert job.progress == 100
     assert job.translated_file is not None
     assert Path(job.translated_file).exists()
+    assert Path(job.translated_file).read_text(encoding="utf-8") == translated_text
 
 
 def test_worker_marks_job_failed_when_translation_fails(monkeypatch, tmp_path: Path) -> None:
