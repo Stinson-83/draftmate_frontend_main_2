@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
+from backend.translator.extractors.models import Block
 from backend.translator.models.translation_job import TranslationJob
 from backend.translator.workers import worker
 
@@ -77,8 +77,8 @@ def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(worker, "SessionLocal", _SessionFactory(session))
     monkeypatch.setattr(worker, "_source_language", lambda: "en")
-    monkeypatch.setattr(worker, "extract_pdf_blocks", lambda path: [SimpleNamespace(text="hello", type="paragraph", bounding_box=(0.0, 0.0, 1.0, 1.0), style={})])
-    monkeypatch.setattr(worker, "translate_blocks", lambda blocks, source_language, target_language: [SimpleNamespace(text="hola", type=blocks[0].type, bounding_box=blocks[0].bounding_box, style=blocks[0].style)])
+    monkeypatch.setattr(worker, "extract_pdf_blocks", lambda path: [Block(id=1, type="paragraph", text="hello", bounding_box=(0.0, 0.0, 1.0, 1.0), style={})])
+    monkeypatch.setattr(worker, "sarvam_translate", lambda texts, src_lang, tgt_lang: ["hola"])
 
     def _rebuilder(blocks, output_path):
         output_path = Path(output_path)
@@ -96,6 +96,39 @@ def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path) -> None:
     assert job.progress == 100
     assert job.translated_file is not None
     assert Path(job.translated_file).exists()
+
+
+def test_worker_marks_job_failed_when_translation_fails(monkeypatch, tmp_path: Path) -> None:
+    source_file = tmp_path / "input.pdf"
+    source_file.write_text("stub", encoding="utf-8")
+
+    job = TranslationJob(
+        id=2,
+        user_id="user-1",
+        status="queued",
+        stage="queued",
+        progress=0,
+        source_file=str(source_file),
+        translated_file=None,
+        target_language="hi",
+    )
+
+    session = _Session(job)
+
+    monkeypatch.setattr(worker, "SessionLocal", _SessionFactory(session))
+    monkeypatch.setattr(worker, "_source_language", lambda: "en")
+    monkeypatch.setattr(worker, "extract_pdf_blocks", lambda path: [Block(id=1, type="paragraph", text="hello", bounding_box=(0.0, 0.0, 1.0, 1.0), style={})])
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError("Sarvam translation unavailable")
+
+    monkeypatch.setattr(worker, "sarvam_translate", _raise)
+
+    worker._process_next_job()
+
+    assert job.status == "failed"
+    assert job.stage == "failed"
+    assert job.progress == 0
 
 
 def _apply_update(job: TranslationJob, kwargs: dict[str, object]) -> TranslationJob:
