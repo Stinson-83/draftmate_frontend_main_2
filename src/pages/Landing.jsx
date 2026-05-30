@@ -902,7 +902,7 @@ Run 'docker run --help' for more information Section */}
             </section >
 
             {/* Footer */}
-            < footer className="bg-[#101622] text-white py-12 px-4 lg:px-40 border-t border-gray-800" >
+            < footer className="bg-[#ff0000] text-white py-12 px-4 lg:px-40 border-t border-gray-800" >
                 <div className="layout-content-container max-w-[960px] mx-auto flex flex-col gap-8">
                     <div className="flex flex-col md:flex-row justify-between gap-8">
                         <div className="flex flex-col gap-4 max-w-xs">
