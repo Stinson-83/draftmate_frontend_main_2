@@ -1,0 +1,41 @@
+name: Nightly SonarQube Code Analysis
+
+on:
+  schedule:
+    - cron: '0 2 * * *' 
+
+jobs:
+  nightly-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start SonarQube via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.K8S_SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+          script: |
+            sudo docker start sonarqube || true
+            echo "Waiting for SonarQube to boot up..."
+            sleep 45
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Stop SonarQube via SSH
+        if: always()
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.K8S_SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
+          script: |
+            sudo docker stop sonarqube || true
