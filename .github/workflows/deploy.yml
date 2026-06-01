@@ -105,4 +105,8 @@ jobs:
                 -f ./draftmate-chart/values.yaml \
                 -f ./draftmate-chart/values-secrets.yaml \
                 --set frontend.image.tag=${{ github.run_number }} \
-                --set backend.image.tag=${{ github.run_number }}
+                --set backend.image.tag=${{ github.run_number }} \
+                --history-max 3
+            
+            # Prune old unused docker images to save disk space
+            sudo k3s crictl rmi --prune
