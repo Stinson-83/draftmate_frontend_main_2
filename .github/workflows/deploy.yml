@@ -111,7 +111,5 @@ jobs:
             # Prune old unused docker images to save disk space
             sudo docker system prune -f
             
-            # Prune old unused images inside Kind node containers to keep only last 3 versions
-            sudo docker exec kind-control-plane crictl rmi --prune || true
-            sudo docker exec kind-worker crictl rmi --prune || true
-            sudo docker exec kind-worker2 crictl rmi --prune || true
+            # Prune old unused images inside Kind node containers, keeping only the last 3 versions
+            python3 prune_images.py
