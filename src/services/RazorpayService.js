@@ -75,7 +75,7 @@ export const doPayment = async (orderData, onSuccess, onError) => {
                     razorpay_payment_id: response.razorpay_payment_id,
                     razorpay_signature: response.razorpay_signature
                 });
-
+                
                 if (verifyResult.status === 'SUCCESS') {
                     if (onSuccess) onSuccess(verifyResult);
                 } else {
@@ -89,7 +89,7 @@ export const doPayment = async (orderData, onSuccess, onError) => {
             color: "#3b82f6" // matches primary color
         },
         modal: {
-            ondismiss: function () {
+            ondismiss: function() {
                 if (onError) onError(new Error("Payment cancelled by user"));
             }
         }

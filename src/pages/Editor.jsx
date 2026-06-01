@@ -47,13 +47,7 @@ const Editor = () => {
     });
 
     // AI Sidebar Chat State
-    const [aiSessionId, setAiSessionId] = useState(() => {
-        if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    });
+    const [aiSessionId, setAiSessionId] = useState(() => crypto.randomUUID());
     const [isAiTyping, setIsAiTyping] = useState(false);
 
     // Settings State
@@ -2000,7 +1994,6 @@ const Editor = () => {
                                     </div>
                                     {/* Footer handled by updateFooters logic (Last Page Only) */}
                                 </div>
-                                {/* Footer handled by updateFooters logic (Last Page Only) */}
                             </div>
                         ), [zoomLevel, showHeader, isHeaderEditing, editorSettings.headerText, location.state])}
                     </div>

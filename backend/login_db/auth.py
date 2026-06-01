@@ -83,7 +83,7 @@ def get_db_connection():
                     host='127.0.0.1',
                     port=_tunnel.local_bind_port,
                     user=os.getenv("POSTGRES_USER", "lawuser"),
-                    password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+                    password=os.getenv("POSTGRES_PASSWORD", "Siddchick2506"),
                     dbname=os.getenv("POSTGRES_DB", "postgres"),
                     keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5
                 )

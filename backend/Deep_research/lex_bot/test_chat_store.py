@@ -28,7 +28,7 @@ def test_chat_store():
     
     # First, create the session (required due to foreign key)
     import psycopg2
-    chat_dsn = "postgresql://lawuser:YOUR_POSTGRES_PASSWORD@127.0.0.1:5432/lexbot_chat"
+    chat_dsn = "postgresql://lawuser:Siddchick2506@127.0.0.1:5432/lexbot_chat"
     conn = psycopg2.connect(chat_dsn)
     cur = conn.cursor()
     cur.execute(
