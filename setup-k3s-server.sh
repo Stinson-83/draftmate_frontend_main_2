@@ -51,8 +51,21 @@ echo "⚙️ 6. Waiting for K3s to be ready..."
 sleep 15
 sudo k3s kubectl wait --for=condition=Ready nodes --all --timeout=60s
 
+echo "🛠️ 6.5. Configuring Kubernetes Access for Ubuntu User..."
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown ubuntu:ubuntu ~/.kube/config
+sudo chmod 600 ~/.kube/config
+export KUBECONFIG=~/.kube/config
+
+echo "🔄 6.6. Installing and Configuring Port Forwarding (8080 -> 30080)..."
+sudo apt-get install -y socat
+# Kill any existing kubectl port-forward or socat on 8080
+sudo fuser -k 8080/tcp || true
+sudo nohup socat TCP-LISTEN:8080,fork TCP:127.0.0.1:30080 > /dev/null 2>&1 &
+
 echo "🚦 7. Installing NGINX Ingress Controller..."
-sudo k3s kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 
 # echo "🔍 8. Setting up Self-Hosted SonarQube Server..."
 # SonarQube requires this specific system setting
@@ -91,16 +104,15 @@ EOF
 fi
 
 echo "🚢 10. Deploying Application via Helm..."
-sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml /usr/local/bin/helm upgrade --install draftmate ./draftmate-chart \
+helm upgrade --install draftmate ./draftmate-chart \
   -f ./draftmate-chart/values.yaml \
   -f ./draftmate-chart/values-secrets.yaml
 
 echo "✅ Deployment Automation Complete!"
 echo "------------------------------------------------"
 echo "⚠️ IMPORTANT FINAL STEPS FOR THE NEW SERVER:"
-echo "1. Run 'sudo k3s kubectl get pods' to check your new production pods."
-echo "2. Edit 'draftmate-chart/values-secrets.yaml' and enter your REAL passwords and API keys."
-echo "3. Re-run Helm to apply the real secrets: "
-echo "   sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade draftmate ./draftmate-chart -f ./draftmate-chart/values.yaml -f ./draftmate-chart/values-secrets.yaml"
-echo "4. Remember to open Port 80, 443, 8080, and 9000 on your NEW AWS Security Group!"
+echo "1. Edit 'draftmate-chart/values-secrets.yaml' and enter your REAL passwords and API keys."
+echo "2. Re-run Helm to apply the real secrets: "
+echo "   helm upgrade draftmate ./draftmate-chart -f ./draftmate-chart/values.yaml -f ./draftmate-chart/values-secrets.yaml"
+echo "3. Remember to open Port 80, 443, 8080, and 9000 on your NEW AWS Security Group!"
 echo "------------------------------------------------"
