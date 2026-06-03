@@ -56,7 +56,7 @@ jobs:
             fi
 
             echo "Waiting for SonarQube to boot up..."
-            sleep 45
+            sleep 60
 
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -67,7 +67,8 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_HOST_URL: http://ec2-54-221-83-201.compute-1.amazonaws.com:9000
+
 
       - name: Stop SonarQube via SSH
         if: always()
