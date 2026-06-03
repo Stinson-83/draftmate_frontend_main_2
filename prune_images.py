@@ -83,14 +83,14 @@ def prune_node_images(node):
         for num_tag, repo_tag, image_id in items:
             print(f"  - {repo_tag} (ID: {image_id[:12]})")
         
-        if len(items) <= 3:
+        if len(items) <= 2:
             print(f"  Only {len(items)} versions found. No pruning needed for {category}.")
             continue
             
-        keep = items[:3]
-        to_prune = items[3:]
+        keep = items[:2]
+        to_prune = items[2:]
         
-        print(f"  Keeping last 3 versions:")
+        print(f"  Keeping last 2 versions:")
         for num_tag, repo_tag, image_id in keep:
             print(f"    * {repo_tag}")
             
@@ -107,9 +107,21 @@ def prune_node_images(node):
             else:
                 print(f"      Successfully removed {repo_tag}")
 
+    # Additionally run crictl rmi --prune to remove any other untagged/unused images
+    print(f"\nRunning crictl rmi --prune on {node} to clean all other unused images...")
+    prune_stdout, prune_stderr, prune_code = run_command([
+        "sudo", "docker", "exec", node,
+        "crictl", "--timeout", "60s", "rmi", "--prune"
+    ])
+    if prune_code != 0:
+        print(f"  Failed to prune unused images on {node}: {prune_stderr.strip()}")
+    else:
+        print(f"  Successfully pruned unused images on {node}")
+
 if __name__ == "__main__":
     for node in NODES:
         try:
             prune_node_images(node)
         except Exception as e:
             print(f"Error processing node {node}: {e}", file=sys.stderr)
+
