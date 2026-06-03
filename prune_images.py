@@ -83,14 +83,14 @@ def prune_node_images(node):
         for num_tag, repo_tag, image_id in items:
             print(f"  - {repo_tag} (ID: {image_id[:12]})")
         
-        if len(items) <= 2:
+        if len(items) <= 1:
             print(f"  Only {len(items)} versions found. No pruning needed for {category}.")
             continue
             
-        keep = items[:2]
-        to_prune = items[2:]
+        keep = items[:1]
+        to_prune = items[1:]
         
-        print(f"  Keeping last 2 versions:")
+        print(f"  Keeping last 1 version:")
         for num_tag, repo_tag, image_id in keep:
             print(f"    * {repo_tag}")
             

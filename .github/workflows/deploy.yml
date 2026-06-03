@@ -114,6 +114,15 @@ jobs:
             cd /home/ubuntu/draftmate_frontend_main_2
             git stash
             git pull origin preet/k8s-setup
+            # --- PRE-DEPLOY CLEANUP: Free up disk space before pulling new images ---
+            echo "🧹 Running pre-deploy cleanup..."
+            sudo docker system prune -af
+            sudo journalctl --vacuum-time=1d
+            sudo apt-get clean
+            python3 prune_images.py
+            
+            # --- DEPLOYMENT ---
+            echo "🚀 Upgrading Helm release..."
             KUBECONFIG=/home/ubuntu/.kube/config /usr/local/bin/helm upgrade --install draftmate ./draftmate-chart \
                 -f ./draftmate-chart/values.yaml \
                 -f ./draftmate-chart/values-secrets.yaml \
@@ -121,8 +130,7 @@ jobs:
                 --set backend.image.tag=${{ github.run_number }} \
                 --history-max 3
             
-            # Prune old unused docker images to save disk space
+            # --- POST-DEPLOY CLEANUP: Clean up the old version that is now replaced ---
+            echo "🧹 Running post-deploy cleanup..."
             sudo docker system prune -f
-            
-            # Prune old unused images inside Kind node containers, keeping only the last 3 versions
             python3 prune_images.py
