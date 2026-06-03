@@ -43,7 +43,7 @@ jobs:
                 sudo docker start sonarqube
             else
                 echo "Creating and starting new SonarQube container..."
-                sudo docker run -d --name sonarqube --cpus="1.0" -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true -p 127.0.0.1:9001:9000 sonarqube:community
+                sudo docker run -d --name sonarqube --cpus="1.0" -e SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true -v /home/ubuntu/sonar_data:/opt/sonarqube/data -p 127.0.0.1:9001:9000 sonarqube:community
             fi
 
             # Start or run Nginx proxy on public port 9000
@@ -78,4 +78,6 @@ jobs:
           username: ubuntu
           key: ${{ secrets.K8S_SSH_PRIVATE_KEY }}
           script: |
-            sudo docker stop sonarqube sonarqube-proxy || true
+            sudo docker stop -t 60 sonarqube || true
+            sudo docker stop sonarqube-proxy || true
+
