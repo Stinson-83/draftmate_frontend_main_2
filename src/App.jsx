@@ -12,6 +12,7 @@ import Tools from './pages/Tools';
 import ChatWithPDF from './pages/ChatWithPDF';
 import CaseSearch from './pages/CaseSearch';
 import TranslateDocumentPage from './pages/TranslateDocumentPage';
+import TranslateComparePage from './backend/translator/api/TranslateComparePage';
 
 import Settings from './pages/Settings';
 import HelpCenter from './pages/HelpCenter';
@@ -108,6 +109,7 @@ function App() {
               <Route path="chat-pdf" element={<ChatWithPDF />} />
               <Route path="case-search" element={<CaseSearch />} />
               <Route path="translate-document" element={<TranslateDocumentPage />} />
+              <Route path="translate/compare/:jobId" element={<TranslateComparePage />} />
               <Route path="settings" element={<Settings />} />
               <Route path="help" element={<HelpCenter />} />
               <Route path="notifications" element={<Notifications />} />

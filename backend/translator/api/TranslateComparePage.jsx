@@ -50,6 +50,38 @@ const TranslateComparePage = () => {
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 10, 50));
     const handleResetZoom = () => setZoomLevel(100);
 
+    // Implementation of Synchronized Scrolling
+    React.useEffect(() => {
+        if (!synchronizedScrolling) return;
+
+        const left = leftPanelRef.current;
+        const right = rightPanelRef.current;
+        if (!left || !right) return;
+
+        let isSyncing = false;
+
+        const handleScroll = (source, target) => {
+            if (isSyncing) {
+                isSyncing = false;
+                return;
+            }
+            isSyncing = true;
+            const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
+            target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
+        };
+
+        const onLeftScroll = () => handleScroll(left, right);
+        const onRightScroll = () => handleScroll(right, left);
+
+        left.addEventListener('scroll', onLeftScroll);
+        right.addEventListener('scroll', onRightScroll);
+
+        return () => {
+            left.removeEventListener('scroll', onLeftScroll);
+            right.removeEventListener('scroll', onRightScroll);
+        };
+    }, [synchronizedScrolling, isLoading]);
+
     return (
         <div className="h-screen w-screen overflow-hidden flex flex-col bg-slate-900 text-slate-200">
             {/* Sticky Top Header Bar */}
