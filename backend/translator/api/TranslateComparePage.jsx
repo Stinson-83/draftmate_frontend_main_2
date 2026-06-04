@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query'; // Assuming React Query is set up
-import { ArrowLeft, ZoomIn, ZoomOut, Maximize } from 'lucide-react'; // Assuming lucide-react for icons
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ZoomIn, ZoomOut, Maximize, Loader2 } from 'lucide-react';
 
 // Placeholder for API call to fetch job details
 // In a real app, this would be in a services file or a dedicated API hook
@@ -17,55 +17,88 @@ const fetchTranslationJobDetails = async (jobId) => {
 const TranslateComparePage = () => {
     const { jobId } = useParams();
     const navigate = useNavigate();
+
+    // Split-view and UI state
+    const [leftWidth, setLeftWidth] = useState(50);
+    const [isDragging, setIsDragging] = useState(false);
     const [synchronizedScrolling, setSynchronizedScrolling] = useState(false);
-    const [zoomLevel, setZoomLevel] = useState(100); // Placeholder for zoom state
+    const [zoomLevel, setZoomLevel] = useState(100);
+
+    // DOM Refs for panels and sync control
+    const leftPanelRef = useRef(null);
+    const rightPanelRef = useRef(null);
+    const isSyncing = useRef(false);
 
     const { data: jobDetails, isLoading, isError } = useQuery({
         queryKey: ['translationJob', jobId],
         queryFn: () => fetchTranslationJobDetails(jobId),
         enabled: !!jobId,
+        refetchOnWindowFocus: false
     });
 
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen w-screen bg-slate-900 text-slate-200">
-                Loading translation job details...
-            </div>
-        );
-    }
-
-    if (isError || !jobDetails) {
-        return (
-            <div className="flex items-center justify-center h-screen w-screen bg-slate-900 text-red-400">
-                Error loading translation job details or job not found.
-            </div>
-        );
-    }
-
-    const handleBack = () => {
-        navigate(-1); // Go back to the previous page
-    };
-
+    // Handlers
+    const handleBack = () => navigate(-1);
     const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 10, 200));
     const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 10, 50));
     const handleResetZoom = () => setZoomLevel(100);
 
+    // Draggable Divider Handlers
+    const startResizing = () => setIsDragging(true);
+    const stopResizing = () => setIsDragging(false);
+
+    useEffect(() => {
+        const onResize = (e) => {
+            if (!isDragging) return;
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const newLeftWidth = (clientX / window.innerWidth) * 100;
+            // Constrain width between 20% and 80% for usability
+            if (newLeftWidth > 20 && newLeftWidth < 80) {
+                setLeftWidth(newLeftWidth);
+            }
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', onResize);
+            window.addEventListener('mouseup', stopResizing);
+            window.addEventListener('touchmove', onResize);
+            window.addEventListener('touchend', stopResizing);
+            document.body.classList.add('cursor-col-resize', 'select-none');
+        } else {
+            window.removeEventListener('mousemove', onResize);
+            window.removeEventListener('mouseup', stopResizing);
+            window.removeEventListener('touchmove', onResize);
+            window.removeEventListener('touchend', stopResizing);
+            document.body.classList.remove('cursor-col-resize', 'select-none');
+        }
+        return () => {
+            window.removeEventListener('mousemove', onResize);
+            window.removeEventListener('mouseup', stopResizing);
+            window.removeEventListener('touchmove', onResize);
+            window.removeEventListener('touchend', stopResizing);
+            document.body.classList.remove('cursor-col-resize', 'select-none');
+        };
+    }, [isDragging]);
+
     // Implementation of Synchronized Scrolling
-    React.useEffect(() => {
+    useEffect(() => {
         if (!synchronizedScrolling) return;
 
         const left = leftPanelRef.current;
         const right = rightPanelRef.current;
         if (!left || !right) return;
 
-        let isSyncing = false;
-
         const handleScroll = (source, target) => {
-            if (isSyncing) {
-                isSyncing = false;
+            if (isSyncing.current) {
+                isSyncing.current = false;
                 return;
             }
-            isSyncing = true;
+            isSyncing.current = true;
+            
+            const maxSource = source.scrollHeight - source.clientHeight;
+            const maxTarget = target.scrollHeight - target.clientHeight;
+            
+            if (maxSource <= 0 || maxTarget <= 0) return;
+            
             const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
             target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
         };
@@ -81,6 +114,29 @@ const TranslateComparePage = () => {
             right.removeEventListener('scroll', onRightScroll);
         };
     }, [synchronizedScrolling, isLoading]);
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen w-screen bg-slate-900 text-slate-200">
+                <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+                <p className="text-xl font-semibold tracking-wide animate-pulse">
+                    Preparing comparison workspace...
+                </p>
+            </div>
+        );
+    }
+
+    if (isError || !jobDetails) {
+        return (
+            <div className="flex items-center justify-center h-screen w-screen bg-slate-900 text-red-400 p-6">
+                <div className="max-w-md text-center space-y-4">
+                    <h1 className="text-3xl font-black">Retrieval Error</h1>
+                    <p className="text-slate-400">The translation job data could not be loaded. It may still be processing or has been deleted.</p>
+                    <button onClick={handleBack} className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl border border-slate-700 transition-all">Return to Dashboard</button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-screen w-screen overflow-hidden flex flex-col bg-slate-900 text-slate-200">
@@ -149,20 +205,46 @@ const TranslateComparePage = () => {
             </header>
 
             {/* Dual-Pane Split Container */}
-            <div className="flex-grow flex overflow-hidden">
+            <div className="flex-grow flex overflow-hidden relative">
                 {/* Left Panel (Source Document) */}
-                <div className="w-1/2 h-full border-r border-slate-700 flex flex-col">
-                    <div className="flex-shrink-0 bg-slate-700 p-2 text-center text-sm font-medium">Source Document ({jobDetails.source_language})</div>
-                    <div className="flex-grow overflow-auto p-4 bg-slate-900">
-                        <iframe src={jobDetails.source_file_url} title="Source Document" className="w-full h-full border-none bg-white"></iframe>
+                <div 
+                    style={{ width: `${leftWidth}%` }}
+                    className="h-full flex flex-col border-r border-slate-800"
+                >
+                    <div className="flex-shrink-0 bg-slate-800/50 p-2 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Original ({jobDetails.source_language})
+                    </div>
+                    <div ref={leftPanelRef} className="flex-grow overflow-auto p-4 bg-slate-900 scroll-smooth">
+                        <iframe 
+                            src={jobDetails.source_file_url} 
+                            title="Source Document" 
+                            className="w-full h-full border-none bg-white shadow-2xl transition-transform duration-300"
+                            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }}
+                        ></iframe>
                     </div>
                 </div>
 
+                {/* Vertical Drag Bar Divider */}
+                <div 
+                    onMouseDown={startResizing}
+                    className={`w-1.5 h-full cursor-col-resize z-20 transition-colors ${isDragging ? 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'bg-slate-800 hover:bg-slate-700'}`}
+                />
+
                 {/* Right Panel (Translated Document) */}
-                <div className="w-1/2 h-full flex flex-col">
-                    <div className="flex-shrink-0 bg-slate-700 p-2 text-center text-sm font-medium">Translated Document ({jobDetails.target_language})</div>
-                    <div className="flex-grow overflow-auto p-4 bg-slate-900">
-                        <iframe src={jobDetails.translated_file_url} title="Translated Document" className="w-full h-full border-none bg-white"></iframe>
+                <div 
+                    style={{ width: `${100 - leftWidth}%` }}
+                    className="h-full flex flex-col"
+                >
+                    <div className="flex-shrink-0 bg-slate-800/50 p-2 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Translation ({jobDetails.target_language})
+                    </div>
+                    <div ref={rightPanelRef} className="flex-grow overflow-auto p-4 bg-slate-900 scroll-smooth">
+                        <iframe 
+                            src={jobDetails.translated_file_url} 
+                            title="Translated Document" 
+                            className="w-full h-full border-none bg-white shadow-2xl transition-transform duration-300"
+                            style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }}
+                        ></iframe>
                     </div>
                 </div>
             </div>
