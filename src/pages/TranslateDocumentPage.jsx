@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload, Split } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -92,6 +93,7 @@ const formatJobDate = (value) => {
 };
 
 const TranslateDocumentPage = () => {
+  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState(null);
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [targetLanguage, setTargetLanguage] = useState('hi-IN');
@@ -348,13 +350,23 @@ const TranslateDocumentPage = () => {
               </button>
 
               {downloadUrl && isCompleted && (
-                <a
-                  href={downloadUrl}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
-                >
-                  <Download className="h-4 w-4" />
-                  Download translated file
-                </a>
+                <>
+                  <a
+                    href={downloadUrl}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download translated file
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/dashboard/translate/compare/${selectedJobId}`)}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
+                  >
+                    <Split className="h-4 w-4" />
+                    Open Side-by-Side Comparison View
+                  </button>
+                </>
               )}
             </div>
           </form>
