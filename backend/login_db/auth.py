@@ -154,24 +154,27 @@ class ProfileUpdate(BaseModel):
     image: Optional[str] = None
 
 def get_profile_internal(cur, user_id):
-    cur.execute("""
-        SELECT first_name, last_name, role, workplace, bio, profile_image_url 
-        FROM profiles 
-        WHERE user_id = %s
-    """, (user_id,))
-    result = cur.fetchone()
-    
-    if not result:
-        return {}
+    try:
+        cur.execute("""
+            SELECT first_name, last_name, role, workplace, bio, profile_image_url 
+            FROM profiles 
+            WHERE user_id = %s
+        """, (user_id,))
+        result = cur.fetchone()
         
-    return {
-        "firstName": result[0],
-        "lastName": result[1],
-        "role": result[2],
-        "workplace": result[3],
-        "bio": result[4],
-        "image": result[5]
-    }
+        if not result:
+            return {}
+            
+        return {
+            "firstName": result[0],
+            "lastName": result[1],
+            "role": result[2],
+            "workplace": result[3],
+            "bio": result[4],
+            "image": result[5]
+        }
+    except Exception:
+        return {}
 
 # Helper Functions
 def hash_password(password: str) -> str:
@@ -180,6 +183,63 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+
+def build_display_name(email: str) -> str:
+    local_part = email.split("@", 1)[0].strip()
+    return local_part or "New User"
+
+
+def ensure_auth_schema():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)
+        """)
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id UUID PRIMARY KEY,
+                user_id UUID REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS profiles (
+                profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+                first_name VARCHAR(100),
+                last_name VARCHAR(100),
+                role VARCHAR(100),
+                workplace VARCHAR(100),
+                bio TEXT,
+                profile_image_url TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Schema sync error: {e}")
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.on_event("startup")
+def startup_schema_sync():
+    ensure_auth_schema()
 
 @app.get("/")
 def read_root():
@@ -283,14 +343,18 @@ def register(user: UserSignup):
         # Create new user
         user_id = str(uuid.uuid4())
         hashed_pwd = hash_password(user.password)
+        display_name = build_display_name(user.email)
         
         cur.execute(
-            "INSERT INTO users (id, email, password_hash) VALUES (%s, %s, %s)",
-            (user_id, user.email, hashed_pwd)
+            "INSERT INTO users (id, name, email, password, password_hash) VALUES (%s, %s, %s, %s, %s)",
+            (user_id, display_name, user.email, hashed_pwd, hashed_pwd)
         )
         conn.commit()
         return {"message": "User registered successfully", "user_id": user_id}
         
+    except HTTPException as he:
+        conn.rollback()
+        raise he
     except Exception as e:
         conn.rollback()
         print(f"Registration error: {e}")
@@ -305,7 +369,7 @@ def login(user: UserLogin):
     cur = conn.cursor()
     
     try:
-        cur.execute("SELECT id, password_hash FROM users WHERE email = %s", (user.email,))
+        cur.execute("SELECT id, COALESCE(password_hash, password) FROM users WHERE email = %s", (user.email,))
         result = cur.fetchone()
         
         if not result:
@@ -386,9 +450,11 @@ def google_login(model: GoogleLoginModel):
         else:
             # Create new user
             user_id = str(uuid.uuid4())
+            display_name = user_info.get('name') if 'user_info' in locals() else id_info.get('name') if 'id_info' in locals() else build_display_name(email)
+            placeholder_password = hash_password(str(uuid.uuid4()))
             cur.execute(
-                "INSERT INTO users (id, email, google_id) VALUES (%s, %s, %s)",
-                (user_id, email, google_id)
+                "INSERT INTO users (id, name, email, password, password_hash, google_id) VALUES (%s, %s, %s, %s, %s, %s)",
+                (user_id, display_name, email, placeholder_password, placeholder_password, google_id)
             )
         
         # Create Session
@@ -535,7 +601,7 @@ def reset_password(request: ResetPasswordRequest):
         # 2. Update Password
         hashed_pwd = hash_password(request.new_password)
         
-        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (hashed_pwd, user_id))
+        cur.execute("UPDATE users SET password = %s, password_hash = %s WHERE id = %s", (hashed_pwd, hashed_pwd, user_id))
         
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="User not found")

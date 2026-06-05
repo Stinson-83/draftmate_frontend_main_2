@@ -11,6 +11,8 @@ import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
 import ChatWithPDF from './pages/ChatWithPDF';
 import CaseSearch from './pages/CaseSearch';
+import TranslateDocumentPage from './pages/TranslateDocumentPage';
+import TranslateComparePage from './backend/translator/api/TranslateComparePage';
 
 import Settings from './pages/Settings';
 import HelpCenter from './pages/HelpCenter';
@@ -46,16 +48,16 @@ import ComingSoon from './pages/ComingSoon';
 import Notifications from './pages/Notifications';
 import { NotificationProvider } from './context/NotificationContext';
 
+const RequireAuth = ({ children }) => {
+  const profile = localStorage.getItem('user_profile');
+  if (!profile) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
 function App() {
   // Check if user has onboarded (simple check)
-  const RequireAuth = ({ children }) => {
-    const profile = localStorage.getItem('user_profile');
-    if (!profile) {
-      return <Navigate to="/login" replace />;
-    }
-    return children;
-  };
-
   if (!import.meta.env.VITE_CLIENT_ID) {
     return (
       <div className="flex h-screen items-center justify-center bg-red-50 text-red-800 p-4">
@@ -106,6 +108,8 @@ function App() {
               <Route path="research" element={<ResearchChat />} />
               <Route path="chat-pdf" element={<ChatWithPDF />} />
               <Route path="case-search" element={<CaseSearch />} />
+              <Route path="translate-document" element={<TranslateDocumentPage />} />
+              <Route path="translate/compare/:jobId" element={<TranslateComparePage />} />
               <Route path="settings" element={<Settings />} />
               <Route path="help" element={<HelpCenter />} />
               <Route path="notifications" element={<Notifications />} />

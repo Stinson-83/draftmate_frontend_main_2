@@ -53,3 +53,4 @@ PyJWT==2.8.0
 email-validator
 razorpay
 fastembed
+cryptography

@@ -132,5 +132,16 @@ export const API_CONFIG = {
             SEARCH: '/search', // GET
             DOC: (docId) => `/doc/${docId}`, // GET
         }
+    },
+
+    // Service: backend/translator (Port 8012)
+    TRANSLATOR: {
+        BASE_URL: import.meta.env.VITE_TRANSLATOR_API_BASE_URL || 'http://localhost:8012',
+        ENDPOINTS: {
+            CREATE_JOB: '/translation-jobs',
+            LIST_JOBS: '/translation-jobs',
+            GET_JOB: (jobId) => `/translation-jobs/${jobId}`,
+            DOWNLOAD_JOB: (jobId) => `/translation-jobs/${jobId}/download`,
+        }
     }
 };

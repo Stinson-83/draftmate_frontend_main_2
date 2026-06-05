@@ -29,6 +29,10 @@ numpy
 sqlalchemy
 psycopg2-binary
 pgvector
+alembic
+celery
+redis
+pdfplumber
 boto3
 s3transfer
 

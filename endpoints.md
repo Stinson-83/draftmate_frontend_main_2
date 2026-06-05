@@ -2,6 +2,16 @@
 
 This document outlines how to run the frontend and all backend services required for the application.
 
+## Translator Service
+
+Document translation is handled by Sarvam AI through `backend/translator`.
+
+- **Port**: `8009`
+- **API**: FastAPI translation jobs, status, download, and delete endpoints
+- **Worker**: Celery worker processes queued translation jobs
+- **Environment**: `SARVAM_API_KEY`, `SARVAM_API_URL`, and the translator upload/security settings
+- **Language support**: Sarvam-compatible source and target codes only
+
 ## 1. Frontend
 The main user interface.
 
