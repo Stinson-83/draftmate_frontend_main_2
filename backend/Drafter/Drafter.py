@@ -15,6 +15,7 @@ from docx.shared import Inches, Mm, Pt
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from legal_draft import generate_legal_draft
@@ -78,6 +79,14 @@ def _safe_basename_from_url(url: str) -> str:
     name = name.replace("\\", "/")
     name = os.path.basename(name)
     return name
+
+
+def _normalize_download_url(download_source_url: str) -> str:
+    if "localhost" in download_source_url:
+        return download_source_url.replace("localhost", "onlyoffice-server")
+    if "127.0.0.1" in download_source_url:
+        return download_source_url.replace("127.0.0.1", "onlyoffice-server")
+    return download_source_url
 
 def create_content_control_run(paragraph, placeholder_tag: str, default_text: str):
     sdt = OxmlElement("w:sdt")
@@ -245,6 +254,27 @@ def root():
     return {"service": "drafter-service", "status": "ok"}
 
 
+@app.get("/v2/draft/serve/{filename}")
+def serve_draft_file(filename: str):
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+    if not shared_storage_path:
+        raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+
+    safe_name = os.path.basename((filename or "").replace("\\", "/"))
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    file_path = os.path.join(shared_storage_path, safe_name)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=safe_name,
+    )
+
+
 @app.post("/v2/draft/compile")
 async def compile_draft(request: DraftCompileRequest, authorization: Optional[str] = Header(default=None)):
     try:
@@ -281,7 +311,7 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"http://onlyoffice-server/Data/shared/{file_name}",
+                "url": f"http://drafter-service:8003/v2/draft/serve/{file_name}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
@@ -343,6 +373,8 @@ async def onlyoffice_callback(event: Dict[str, Any]):
                 url = url.get("url")
             if not isinstance(url, str) or not url.strip():
                 return {"error": 0}
+
+            url = _normalize_download_url(url.strip())
 
             shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
             if not shared_storage_path:

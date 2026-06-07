@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import PDFEditor from './pages/PDFEditor';
 import MyDrafts from './pages/MyDrafts';
+import OnlyOfficeWorkspace from './pages/OnlyOfficeWorkspace';
 
 import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
@@ -100,6 +101,7 @@ function App() {
             <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route path="home" element={<Dashboard />} />
               <Route path="editor" element={<Editor />} />
+              <Route path="workspace" element={<OnlyOfficeWorkspace />} />
               <Route path="pdf-editor" element={<PDFEditor />} />
               <Route path="tools" element={<Tools />} />
               <Route path="drafts" element={<MyDrafts />} />
