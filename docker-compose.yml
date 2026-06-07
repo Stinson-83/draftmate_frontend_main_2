@@ -1,112 +1,72 @@
-version: '3.8'
+version: "3.8"
 
 services:
+  gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - drafter-service
+      - onlyoffice-server
+    networks:
+      - draftmate-network
+    restart: unless-stopped
+
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    ports:
-      - "5173:5173"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8080
-      - VITE_CLIENT_ID=${VITE_CLIENT_ID}
-    depends_on:
-      - backend
-
-  db:
-    image: ankane/pgvector:latest
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - VITE_API_BASE_URL=http://localhost/api
+      - VITE_ONLYOFFICE_URL=http://localhost/onlyoffice
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+    expose:
+      - "3000"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ./:/app
+      - /app/node_modules
+    networks:
+      - draftmate-network
+    restart: unless-stopped
 
-  qdrant:
-    image: qdrant/qdrant:latest
-    volumes:
-      - qdrant_data:/qdrant/storage
-
-  backend:
+  drafter-service:
     build:
-      context: .
+      context: ./backend/Drafter
       dockerfile: Dockerfile
-      args:
-        - VITE_CLIENT_ID=${VITE_CLIENT_ID}
-    ports:
-      - "8080:8080"
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
-      - POSTGRES_DB=${POSTGRES_DB:-lex_bot_db}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
-      - TAVILY_API_KEY=${TAVILY_API_KEY}
-      - SERPER_API_KEY=${SERPER_API_KEY}
-      - GOOGLE_SERP_API_KEY=${GOOGLE_SERP_API_KEY}
-      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
-      - FIRECRAWLER_API_KEY=${FIRECRAWLER_API_KEY}
-      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - IKApi=${IKApi}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION=${AWS_REGION}
-      - S3_BUCKET=${S3_BUCKET}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - PSQL_PASSWD=${PSQL_PASSWD}
-      - LLM_MODE=${LLM_MODE}
-      - LLM_PROVIDER=${LLM_PROVIDER}
-      - EMBED_MODEL=${EMBED_MODEL}
-      - RERANK_MODEL=${RERANK_MODEL}
-      - MEM0_ENABLED=${MEM0_ENABLED}
-      - SESSION_CACHE_TTL=${SESSION_CACHE_TTL}
-      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
-      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT}
-      - SCRAPE_DELAY=${SCRAPE_DELAY}
-      - MAX_TOKENS_PER_QUERY=${MAX_TOKENS_PER_QUERY}
-      - MAX_TOKENS_PER_USER_DAILY=${MAX_TOKENS_PER_USER_DAILY}
-      - AGENT_TIMEOUT=${AGENT_TIMEOUT}
-      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
-      - MAX_QUERY_LENGTH=${MAX_QUERY_LENGTH}
-      - RATE_LIMIT_RPM=${RATE_LIMIT_RPM}
-      - CHAT_RETENTION_DAYS=${CHAT_RETENTION_DAYS}
-      - MEM0_RETENTION_DAYS=${MEM0_RETENTION_DAYS}
-      - TEST_MODE=${TEST_MODE}
-      - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS}
-      - PREFERRED_DOMAINS=${PREFERRED_DOMAINS}
-      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
-      - INPUT_JSON=${INPUT_JSON}
-      - INTERACTIVE=${INTERACTIVE}
-      - SSH_KEY_PATH=/app/bastion.key.pem
-      - BASTION_IP=${BASTION_IP}
-      - SSH_USER=${SSH_USER}
-      - POSTGRES_DSN=${POSTGRES_DSN}
-      - AUTH_SERVICE_URL=http://127.0.0.1:8009
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - FRONTEND_URL_DEV=${FRONTEND_URL_DEV}
-      - FRONTEND_URL_PROD=${FRONTEND_URL_PROD}
-      - SMTP_SERVER=${SMTP_SERVER}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USERNAME=${SMTP_USERNAME}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
-      - QDRANT_HOST=qdrant
-    depends_on:
-      - db
-      - qdrant
+      - JWT_SECRET=draftmate_jwt_production_signing_key_2026
+      - SHARED_STORAGE_PATH=/var/shared/drafts
+    volumes:
+      - draftmate_storage_shared:/var/shared/drafts
+    expose:
+      - "8003"
+    networks:
+      - draftmate-network
+    restart: unless-stopped
+
+  onlyoffice-server:
+    image: onlyoffice/documentserver:latest
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=draftmate_jwt_production_signing_key_2026
+      - JWT_HEADER=Authorization
+      - JWT_IN_BODY=true
+    volumes:
+      - draftmate_storage_shared:/var/www/onlyoffice/Data/shared
+    expose:
+      - "80"
+    networks:
+      - draftmate-network
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
-  qdrant_data:
+  draftmate_storage_shared:
+    driver: local
+
+networks:
+  draftmate-network:
+    driver: bridge

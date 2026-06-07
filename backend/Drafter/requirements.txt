@@ -3,4 +3,7 @@ uvicorn
 pydantic
 python-dotenv
 google-generativeai
+httpx
+PyJWT
+python-docx
 requests
