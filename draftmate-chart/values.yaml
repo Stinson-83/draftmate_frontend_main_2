@@ -6,7 +6,7 @@ frontend:
   replicaCount: 2
   image:
     repository: preetkakdiya/draftmate-frontend
-    tag: latest
+    tag: "110"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -64,7 +64,7 @@ backend:
   replicaCount: 1
   image:
     repository: preetkakdiya/draftmate-backend
-    tag: latest
+    tag: "110"
     pullPolicy: IfNotPresent
   service:
     type: NodePort
