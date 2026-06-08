@@ -299,16 +299,16 @@ qdrant:
       cpu: 500m
       memory: 1Gi
   persistence:
-    storageClass: "gp3"
+    storageClass: ""
     size: 10Gi
 
 affinity:
   ai:
-    enabled: true
+    enabled: false
     nodeLabelKey: workload
     nodeLabelValue: ai
   web:
-    enabled: true
+    enabled: false
     nodeLabelKey: workload
     nodeLabelValue: web
 
