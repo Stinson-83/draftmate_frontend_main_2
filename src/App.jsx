@@ -11,6 +11,7 @@ import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
 import ChatWithPDF from './pages/ChatWithPDF';
 import CaseSearch from './pages/CaseSearch';
+import LegalWorkflow from './pages/LegalWorkflow';
 
 import Settings from './pages/Settings';
 import HelpCenter from './pages/HelpCenter';
@@ -106,6 +107,7 @@ function App() {
               <Route path="research" element={<ResearchChat />} />
               <Route path="chat-pdf" element={<ChatWithPDF />} />
               <Route path="case-search" element={<CaseSearch />} />
+              <Route path="legal-workflow" element={<LegalWorkflow />} />
               <Route path="settings" element={<Settings />} />
               <Route path="help" element={<HelpCenter />} />
               <Route path="notifications" element={<Notifications />} />

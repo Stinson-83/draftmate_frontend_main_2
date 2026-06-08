@@ -182,9 +182,31 @@ const Editor = () => {
     // Handle uploaded content and details - enhanced variable detection
     useEffect(() => {
         const processContent = async () => {
-            if (location.state?.htmlContent) {
+            let initialHtml = location.state?.htmlContent;
+            
+            // Check for draft in URL
+            const searchParams = new URLSearchParams(location.search);
+            const draftId = searchParams.get('draft');
+            
+            if (draftId && !initialHtml) {
                 setIsProcessing(true);
-                let initialHtml = location.state.htmlContent;
+                try {
+                    // Fallback to localhost if config fails
+                    const baseUrl = API_CONFIG.LEGAL_WORKFLOW?.BASE_URL || 'http://localhost:8010/workflow';
+                    const res = await fetch(`${baseUrl}/api/workflow/draft/${draftId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        initialHtml = data.html_content;
+                        setDraftName(data.metadata?.type_name || 'Legal Draft');
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch draft from Legal Assistant", e);
+                    toast.error("Failed to load draft from Legal Assistant");
+                }
+            }
+
+            if (initialHtml) {
+                setIsProcessing(true);
                 console.log('Editor received content length:', initialHtml.length);
 
                 // Call API to generate placeholders automatically
