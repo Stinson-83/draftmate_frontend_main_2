@@ -18,7 +18,7 @@ frontend:
   env:
     # Non-sensitive variables
     VITE_CLIENT_ID: "YOUR_GOOGLE_CLIENT_ID"
-    VITE_API_BASE_URL: "http://app.draftde.free.nf:8080"
+    VITE_API_BASE_URL: "http://app.draftde.free.nf/api"
     FRONTEND_URL_DEV: "http://app.draftde.free.nf:8080"
     FRONTEND_URL_PROD: "http://app.draftde.free.nf"
     VITE_CASHFREE_MODE: "sandbox"
