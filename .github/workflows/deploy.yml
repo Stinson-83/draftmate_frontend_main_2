@@ -3,7 +3,7 @@ name: DraftMate CI/CD Pipeline
 on:
   push:
     branches:
-      - preet/k8s-setup
+      - DockerAuto
 
 env:
   FRONTEND_IMAGE: preetkakdiya/draftmate-frontend
