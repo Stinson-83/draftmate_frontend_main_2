@@ -18,15 +18,8 @@ RUN npm run build
 # Stage 2: Serve the static files using NGINX
 FROM nginx:alpine
 
-# Create a custom NGINX configuration for React Router
-RUN echo "server { \
-    listen 80; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html index.htm; \
-        try_files \$uri \$uri/ /index.html; \
-    } \
-}" > /etc/nginx/conf.d/default.conf
+# Copy the Nginx configuration file
+COPY nginx.frontend.conf /etc/nginx/conf.d/default.conf
 
 # Copy the built files from Stage 1 into the NGINX web root
 COPY --from=builder /app/dist /usr/share/nginx/html
