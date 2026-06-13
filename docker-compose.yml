@@ -36,9 +36,12 @@ services:
     build:
       context: ./backend/Drafter
       dockerfile: Dockerfile
+    env_file:
+      - .env
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - JWT_SECRET=draftmate_jwt_production_signing_key_2026
+      - JWT_SECRET=${JWT_SECRET}
+      - DEV_BYPASS_AUTH=true
       - SHARED_STORAGE_PATH=/var/shared/drafts
     volumes:
       - draftmate_storage_shared:/var/shared/drafts
@@ -50,9 +53,12 @@ services:
 
   onlyoffice-server:
     image: onlyoffice/documentserver:latest
+    env_file:
+      - .env
     environment:
       - JWT_ENABLED=true
-      - JWT_SECRET=draftmate_jwt_production_signing_key_2026
+      - JWT_SECRET=${JWT_SECRET}
+      - DEV_BYPASS_AUTH=true
       - JWT_HEADER=Authorization
       - JWT_IN_BODY=true
     volumes:
