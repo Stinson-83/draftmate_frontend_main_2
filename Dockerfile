@@ -1,16 +1,4 @@
-# Stage 1: Build Frontend
-FROM node:20-slim AS frontend-builder
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY index.html vite.config.js eslint.config.js ./
-COPY src/ src/
-COPY public/ public/
-ARG VITE_CLIENT_ID
-ENV VITE_CLIENT_ID=$VITE_CLIENT_ID
-RUN VITE_BASE_PATH=/ VITE_API_BASE_URL=/ VITE_CLIENT_ID=$VITE_CLIENT_ID npm run build
-
-# Stage 2: Backend & Runtime
+# Stage: Backend & Runtime
 FROM python:3.11-slim-bookworm
 
 # Set environment variables
@@ -60,13 +48,14 @@ RUN pip install --default-timeout=3000 --no-cache-dir torch torchvision --index-
 
 RUN pip install --default-timeout=3000 --no-cache-dir easyocr sentence-transformers
 
-# Install Remaining Python dependencies
-COPY requirements.txt .
-RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
-
-# Pre-download models to bake them into the image
+# Pre-download models to bake them into the image (CACHED)
+# We do this BEFORE requirements.txt so adding new features won't trigger a re-download!
 COPY backend/download_models.py .
 RUN python download_models.py
+
+# Install Remaining Python dependencies (Changes Frequently)
+COPY requirements.txt .
+RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
 
 # Copy all backend code
 COPY backend/ backend/
@@ -77,8 +66,6 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Copy Nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy Frontend Build Artifacts from Stage 1
-COPY --from=frontend-builder /app/dist /var/www/html
 
 # Create directory for uploads (used by lex_bot)
 RUN mkdir -p backend/Deep_research/lex_bot/data/uploads

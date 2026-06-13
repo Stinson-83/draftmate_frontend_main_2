@@ -2,11 +2,16 @@ version: '3.8'
 
 services:
   frontend:
+    image: ${FRONTEND_IMAGE:-preetkakdiya/draftmate-frontend:latest}
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+        - VITE_API_BASE_URL=http://localhost:8080
+        - VITE_CASHFREE_MODE=${VITE_CASHFREE_MODE:-sandbox}
     ports:
-      - "5173:5173"
+      - "5173:80"
     environment:
       - VITE_API_BASE_URL=http://localhost:8080
       - VITE_CLIENT_ID=${VITE_CLIENT_ID}
@@ -48,6 +53,7 @@ services:
       - qdrant_data:/qdrant/storage
 
   backend:
+    image: ${BACKEND_IMAGE:-preetkakdiya/draftmate-backend:latest}
     build:
       context: .
       dockerfile: Dockerfile

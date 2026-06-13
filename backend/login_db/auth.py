@@ -49,6 +49,7 @@ SSH_USER = os.getenv("SSH_USER", "ec2-user")
 LOCAL_BIND_PORT = 5432
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key-change-this")
 ALGORITHM = "HS256"
+NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8015")
 
 # Global tunnel reference to keep it alive
 _tunnel = None
@@ -492,8 +493,7 @@ def forgot_password(request: ForgotPasswordRequest):
                 "body": f"Click the link below to reset your password. This link expires in 1 hour.\n\n{reset_link}"
             }
             # Add timeout to prevent hanging
-            # Use localhost since notification service runs in the same container (via supervisord)
-            requests.post("http://localhost:8015/send-email", json=notification_payload, timeout=5)
+            requests.post(f"{NOTIFICATION_SERVICE_URL}/send-email", json=notification_payload, timeout=5)
         except Exception as e:
             print(f"Failed to call Notification Service: {e}")
             # We still return success to the user, but maybe log this error

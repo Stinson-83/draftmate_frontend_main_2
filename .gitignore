@@ -29,3 +29,6 @@ apprunner_config.json
 
 LEXBOT_LATENCY_ANALYSIS.md
 UPGRADE_PLAN.md
+credentials.txt
+draftmate-chart/values-secrets.yaml
+files_to_merge.txt
