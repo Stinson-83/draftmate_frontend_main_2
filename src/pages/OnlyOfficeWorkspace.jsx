@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-const ONLYOFFICE_API_SRC = 'http://localhost/onlyoffice/web-apps/apps/api/documents/api.js';
+const ONLYOFFICE_API_SRC = `${window.location.protocol}//${window.location.hostname}/onlyoffice/web-apps/apps/api/documents/api.js`;
 
 const OnlyOfficeWorkspace = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const editorInstanceRef = useRef(null);
   const [docsApiReady, setDocsApiReady] = useState(false);
+  const [isCanvasLoading, setIsCanvasLoading] = useState(true);
 
   const { documentKey, filename, onlyofficeConfig, variablesDetected } = useMemo(() => {
     const state = location?.state || {};
@@ -69,6 +70,7 @@ const OnlyOfficeWorkspace = () => {
     const mount = document.getElementById('onlyoffice-canvas-target-node');
     if (!mount) return;
 
+    setIsCanvasLoading(true);
     mount.innerHTML = '';
 
     if (!window?.DocsAPI?.DocEditor) {
@@ -77,10 +79,25 @@ const OnlyOfficeWorkspace = () => {
       return;
     }
 
-    editorInstanceRef.current = new window.DocsAPI.DocEditor('onlyoffice-canvas-target-node', {
+    const nextConfig = {
       ...onlyofficeConfig,
+      events: {
+        ...(onlyofficeConfig?.events || {}),
+        onDocumentReady: (...args) => {
+          try {
+            const existing = onlyofficeConfig?.events?.onDocumentReady;
+            if (typeof existing === 'function') existing(...args);
+          } finally {
+            setIsCanvasLoading(false);
+          }
+        },
+      },
       width: '100%',
       height: '100%',
+    };
+
+    editorInstanceRef.current = new window.DocsAPI.DocEditor('onlyoffice-canvas-target-node', {
+      ...nextConfig,
     });
   }, [docsApiReady, onlyofficeConfig, navigate]);
 
@@ -139,13 +156,36 @@ const OnlyOfficeWorkspace = () => {
                 >
                   Synchronize Matrix Changes
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(`http://localhost/api/v2/draft/serve/${filename || documentKey + '.docx'}`, '_blank');
+                  }}
+                  className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition-colors"
+                >
+                  Force Emergency Backup Download
+                </button>
               </div>
             </div>
           </div>
 
           <div className="flex-1 min-h-0">
-            <div className="h-full w-full">
+            <div className="h-full w-full relative">
               <div id="onlyoffice-canvas-target-node" className="h-full w-full bg-white dark:bg-slate-900" />
+              {isCanvasLoading ? (
+                <div className="absolute inset-0 bg-slate-950/90">
+                  <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-[min(680px,90%)] space-y-4">
+                      <div className="h-6 rounded-lg bg-slate-800/70" />
+                      <div className="h-4 rounded-lg bg-slate-800/60 w-5/6" />
+                      <div className="h-4 rounded-lg bg-slate-800/60 w-4/6" />
+                      <div className="h-4 rounded-lg bg-slate-800/60 w-3/6" />
+                      <div className="h-64 rounded-2xl bg-slate-900/70 border border-slate-800" />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -202,4 +242,3 @@ const OnlyOfficeWorkspace = () => {
 };
 
 export default OnlyOfficeWorkspace;
-
