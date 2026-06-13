@@ -97,7 +97,7 @@ def get_db_connection():
                 else:
                     _db_pool = psycopg2.pool.SimpleConnectionPool(1, 20,
                         host=os.getenv("POSTGRES_HOST", "db"),
-                        dbname=os.getenv("POSTGRES_DB", "lex_bot_db"),
+                        dbname=os.getenv("POSTGRES_DB", "draftmate"),
                         user=os.getenv("POSTGRES_USER", "postgres"),
                         password=os.getenv("POSTGRES_PASSWORD", "password"),
                         port=os.getenv("POSTGRES_PORT", "5432"),

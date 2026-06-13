@@ -8,7 +8,7 @@ load_dotenv()
 # Force local connection parameters for Docker
 DB_HOST = "localhost"
 DB_PORT = "5432"
-DB_NAME = os.getenv("POSTGRES_DB", "lex_bot_db")
+DB_NAME = os.getenv("POSTGRES_DB", "draftmate")
 DB_USER = os.getenv("POSTGRES_USER", "postgres")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "password")
 

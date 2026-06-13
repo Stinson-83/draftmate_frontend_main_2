@@ -1,0 +1,8 @@
+[program:advocate-profile]
+directory=/home/ubuntu/draftmate/backend/Advocate_Profile
+command=docker-compose up --build
+autostart=true
+autorestart=true
+stdout_logfile=/var/log/advocate-profile-stdout.log
+stderr_logfile=/var/log/advocate-profile-stderr.log
+user=ubuntu

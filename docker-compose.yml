@@ -103,6 +103,9 @@ services:
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - QDRANT_HOST=qdrant
+      - JWT_SECRET=${JWT_SECRET}
+      - ADVOCATE_PROFILE_PORT=8007
+      - NOTIFICATION_SERVICE_URL=http://127.0.0.1:8015
     depends_on:
       - db
       - qdrant
