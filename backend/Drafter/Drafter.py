@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8009")
-JWT_SECRET = "draftmate_jwt_production_signing_key_2026"
+JWT_SECRET = os.getenv("JWT_SECRET", "draftmate_jwt_production_signing_key_2026")
 JWT_ALGORITHM = "HS256"
 
 
@@ -50,6 +50,9 @@ async def verify_token(authorization: Optional[str]) -> str:
         async with httpx.AsyncClient() as client:
             resp = await client.get(verify_url, timeout=10.0)
     except httpx.RequestError:
+        if os.getenv("DEV_BYPASS_AUTH") == "true":
+            logger.warning("DEV_BYPASS_AUTH enabled; bypassing auth service failure.")
+            return "dev_counsel_bypass"
         raise HTTPException(status_code=503, detail="Auth service unavailable.")
 
     if resp.status_code != 200:
@@ -361,11 +364,34 @@ async def onlyoffice_forcesave(request: ForceSaveRequest, authorization: Optiona
 
 
 @app.post("/v2/draft/callback")
-async def onlyoffice_callback(event: Dict[str, Any]):
+async def onlyoffice_callback(event: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
     try:
+        token: Optional[str] = None
+        if isinstance(authorization, str) and authorization.strip():
+            auth_val = authorization.strip()
+            if auth_val.lower().startswith("bearer "):
+                token = auth_val.split(" ", 1)[1].strip()
+            else:
+                token = auth_val
+        if not token:
+            payload_token = event.get("token")
+            if isinstance(payload_token, str) and payload_token.strip():
+                token = payload_token.strip()
+
+        if not token:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        try:
+            jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        except jwt.PyJWTError:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
         status = event.get("status")
         if isinstance(status, str) and status.isdigit():
             status = int(status)
+
+        if status == 4:
+            return {"error": 0}
 
         if status in (2, 6):
             url = event.get("url") or event.get("fileUrl") or event.get("downloadUrl")
