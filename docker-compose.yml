@@ -80,8 +80,9 @@ services:
       - PSQL_PASSWD=${PSQL_PASSWD}
       - LLM_MODE=${LLM_MODE}
       - LLM_PROVIDER=${LLM_PROVIDER}
-      - EMBED_MODEL=${EMBED_MODEL}
-      - RERANK_MODEL=${RERANK_MODEL}
+      - EMBED_MODEL=${EMBED_MODEL:-/app/backend/models/embedding}
+      - RERANK_MODEL=${RERANK_MODEL:-/app/backend/models/rerank}
+      - EASYOCR_MODULE_PATH=${EASYOCR_MODULE_PATH:-/app/backend/models/easyocr}
       - MEM0_ENABLED=${MEM0_ENABLED}
       - SESSION_CACHE_TTL=${SESSION_CACHE_TTL}
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}

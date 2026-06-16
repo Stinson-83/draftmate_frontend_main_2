@@ -17,9 +17,9 @@ FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
-ENV EMBED_MODEL=/app/models/embedding
-ENV RERANK_MODEL=/app/models/rerank
-ENV EASYOCR_MODULE_PATH=/app/models/easyocr
+ENV EMBED_MODEL=/app/backend/models/embedding
+ENV RERANK_MODEL=/app/backend/models/rerank
+ENV EASYOCR_MODULE_PATH=/app/backend/models/easyocr
 ENV SKIP_TUNNEL=true
 ENV HF_ENDPOINT=https://hf-mirror.com
 
@@ -65,12 +65,11 @@ RUN pip install --default-timeout=3000 --no-cache-dir easyocr sentence-transform
 COPY requirements.txt .
 RUN pip install --default-timeout=3000 --no-cache-dir -r requirements.txt
 
-# Pre-download models to bake them into the image
-COPY backend/download_models.py .
-RUN python download_models.py
-
-# Copy all backend code
+# Copy all backend code (including pre-downloaded models if present)
 COPY backend/ backend/
+
+# Pre-download models if they are missing (e.g. for local development builds)
+RUN if [ ! -d "backend/models/embedding" ] || [ ! -d "backend/models/rerank" ]; then python backend/download_models.py; fi
 
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf

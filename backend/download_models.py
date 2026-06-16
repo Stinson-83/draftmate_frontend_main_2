@@ -1,37 +1,60 @@
 import os
-from sentence_transformers import SentenceTransformer, CrossEncoder
-import easyocr
+import urllib.request
+import zipfile
+from huggingface_hub import snapshot_download
 
 def download_models():
-    # Define explicit paths
-    base_dir = "/app/models"
-    embed_path = os.path.join(base_dir, "embedding")
-    rerank_path = os.path.join(base_dir, "rerank")
-    easyocr_path = os.path.join(base_dir, "easyocr")
+    # Define paths relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    models_dir = os.path.join(script_dir, "models")
+    embed_path = os.path.join(models_dir, "embedding")
+    rerank_path = os.path.join(models_dir, "rerank")
+    easyocr_path = os.path.join(models_dir, "easyocr")
 
-    os.makedirs(base_dir, exist_ok=True)
+    os.makedirs(models_dir, exist_ok=True)
 
     # 1. Embedding Model
-    # We use the hardcoded HF ID for downloading, but save to the path expected by the app
-    source_embed_model = "sentence-transformers/all-MiniLM-L6-v2"
-    print(f"⬇️ Downloading embedding model: {source_embed_model}")
-    model = SentenceTransformer(source_embed_model)
-    model.save(embed_path)
-    print(f"✅ Embedding model saved to: {embed_path}")
+    print(f"⬇️ Downloading embedding model to: {embed_path}")
+    snapshot_download(
+        repo_id="sentence-transformers/all-MiniLM-L6-v2",
+        local_dir=embed_path,
+        local_dir_use_symlinks=False
+    )
+    print("✅ Embedding model download complete.")
 
     # 2. Rerank Model
-    source_rerank_model = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    print(f"⬇️ Downloading rerank model: {source_rerank_model}")
-    model = CrossEncoder(source_rerank_model)
-    model.save(rerank_path)
-    print(f"✅ Rerank model saved to: {rerank_path}")
+    print(f"⬇️ Downloading rerank model to: {rerank_path}")
+    snapshot_download(
+        repo_id="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        local_dir=rerank_path,
+        local_dir_use_symlinks=False
+    )
+    print("✅ Rerank model download complete.")
 
     # 3. EasyOCR Models
-    print(f"⬇️ Downloading EasyOCR models...")
-    if not os.path.exists(easyocr_path):
-        os.makedirs(easyocr_path, exist_ok=True)
-    easyocr.Reader(['en'], gpu=False, model_storage_directory=easyocr_path)
-    print(f"✅ EasyOCR models saved to: {easyocr_path}")
+    print(f"⬇️ Downloading EasyOCR models to: {easyocr_path}")
+    os.makedirs(easyocr_path, exist_ok=True)
+    
+    # Downloads required files for English OCR
+    easyocr_urls = {
+        "english_g2.zip": "https://github.com/JaidedAI/EasyOCR/releases/download/v1.3/english_g2.zip",
+        "craft_mlt_25.zip": "https://github.com/JaidedAI/EasyOCR/releases/download/pre-release/craft_mlt_25.zip"
+    }
+
+    for filename, url in easyocr_urls.items():
+        dest_zip = os.path.join(easyocr_path, filename)
+        if not os.path.exists(dest_zip.replace(".zip", ".pth")):
+            print(f"Downloading {filename}...")
+            urllib.request.urlretrieve(url, dest_zip)
+            print(f"Extracting {filename}...")
+            with zipfile.ZipFile(dest_zip, 'r') as zip_ref:
+                zip_ref.extractall(easyocr_path)
+            os.remove(dest_zip)
+            print(f"✅ {filename} extracted.")
+        else:
+            print(f"EasyOCR model {filename} already exists.")
+
+    print("✅ All models downloaded successfully.")
 
 if __name__ == "__main__":
     download_models()
