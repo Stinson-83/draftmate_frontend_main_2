@@ -6,14 +6,42 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Sequence
 
+import os
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 from backend.translator.extractors.models import Block
 
+# List of potential Unicode/Devanagari font paths on Windows and Linux
+FONT_PATHS = [
+    str(Path(__file__).resolve().parent.parent / "storage" / "NotoSansDevanagari-Regular.ttf"),
+    "C:/Windows/Fonts/mangal.ttf",      # Standard Windows Devanagari
+    "C:/Windows/Fonts/kokila.ttf",      # Windows Unicode Devanagari
+    "C:/Windows/Fonts/utsaah.ttf",      # Windows Devanagari
+    "C:/Windows/Fonts/arial.ttf",       # Fallback Arial
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",              # Linux fallback
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", # Linux fallback
+    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",              # Linux fallback
+]
+
+UNICODE_FONT = "Helvetica"
+for path in FONT_PATHS:
+    if os.path.exists(path):
+        try:
+            pdfmetrics.registerFont(TTFont("UnicodeFont", path))
+            UNICODE_FONT = "UnicodeFont"
+            break
+        except Exception:
+            continue
+
 
 def _font_name(block: Block) -> str:
+    # Use Unicode font for rendering non-English text scripts
+    if UNICODE_FONT != "Helvetica":
+        return UNICODE_FONT
+
     style = block.style or {}
     font_name = str(style.get("font_name") or "Helvetica")
     bold = bool(style.get("bold"))
