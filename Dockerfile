@@ -21,6 +21,7 @@ ENV EMBED_MODEL=/app/models/embedding
 ENV RERANK_MODEL=/app/models/rerank
 ENV EASYOCR_MODULE_PATH=/app/models/easyocr
 ENV SKIP_TUNNEL=true
+ENV HF_ENDPOINT=https://hf-mirror.com
 
 # Set work directory
 WORKDIR /app
