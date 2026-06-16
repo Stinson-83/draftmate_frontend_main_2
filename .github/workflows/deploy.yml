@@ -90,7 +90,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }}
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:v40
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -105,7 +105,7 @@ jobs:
       - name: Run Trivy scan on Monolith image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:v40
           format: 'template'
           template: '@html.tpl'
           output: 'trivy-report.html'
