@@ -2,6 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ZoomIn, ZoomOut, Maximize, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
+
+const getCurrentUserId = () => {
+    try {
+        const userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+        return userProfile.id || userProfile.email || localStorage.getItem('user_id') || null;
+    } catch {
+        return localStorage.getItem('user_id');
+    }
+};
 
 // Placeholder for API call to fetch job details
 // In a real app, this would be in a services file or a dedicated API hook
@@ -16,12 +26,8 @@ const fetchTranslationJobDetails = async (jobId) => {
             translated_file_url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
         };
     }
-    // This URL should match the backend endpoint for fetching job details
-    const response = await fetch(`/api/translation-jobs/${jobId}`);
-    if (!response.ok) {
-        throw new Error('Network response was not ok');
-    }
-    return response.json();
+    const userId = getCurrentUserId();
+    return api.getTranslationJob(jobId, userId);
 };
 
 const TranslateComparePage = () => {

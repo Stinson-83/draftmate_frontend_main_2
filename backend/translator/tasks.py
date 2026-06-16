@@ -42,38 +42,16 @@ def process_translation_job(job_id: int, source_file: str, target_language: str)
             print(f"[CELERY WORKER ERROR] Job ID {job_id} was not found inside RDS!")
             return {"job_id": job_id, "status": "failed", "error": "Job not found"}
 
-        # 1. Shift database status out of 'queued' to clear up frontend UI tracking loops
-        job.status = "processing"
-        job.stage = "translating"
-        db.commit()
+        # Run the real extraction, Sarvam translation, and document rebuilding pipeline
+        from backend.translator.workers.worker import _run_pipeline
+        _run_pipeline(db, job)
         db.refresh(job)
-
-        # 2. Simulate document parsing & Sarvam engine execution layout tracking delay
-        print(f"[CELERY WORKER] Sending data chunks to Sarvam translation endpoints...")
-        time.sleep(3)
-
-        # 3. Create a valid mock destination document path structure locally
-        storage_dir = Path("backend/translator/storage/translated")
-        storage_dir.mkdir(parents=True, exist_ok=True)
-        
-        original_filename = Path(source_file).name
-        out_file_path = storage_dir / f"translated_{original_filename}"
-        
-        # Write dummy translated binary/text text fallback data context
-        if not out_file_path.exists():
-            out_file_path.write_text("Translated content text component layout sample output.")
-
-        # 4. Finalize the task by committing 'completed' status flags to PostgreSQL
-        job.status = "completed"
-        job.stage = "completed"
-        job.translated_file = str(out_file_path)
-        db.commit()
         
         print(f"[CELERY WORKER SUCCESS] Job ID {job_id} marked as completed!")
         return {
             "job_id": job_id,
             "source_file": source_file,
-            "translated_file": str(out_file_path),
+            "translated_file": job.translated_file,
             "target_language": target_language,
             "status": "completed",
         }

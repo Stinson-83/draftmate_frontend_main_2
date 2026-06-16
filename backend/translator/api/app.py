@@ -261,7 +261,6 @@ def download_translated_file(job_id: int, db: Session = Depends(get_db)):
     return Response(content=html_fallback, media_type="text/html")
 
 
-@app.get("/translation-jobs/{job_id}/download", name="download_translated_file")
 @app.delete("/translation-jobs/{job_id}")
 def delete_translation_job(job_id: int, db: Session = Depends(get_db)) -> dict[str, str | int]:
     job = get_translation_job(db, job_id)

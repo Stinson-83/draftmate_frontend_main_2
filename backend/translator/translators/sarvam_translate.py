@@ -24,7 +24,7 @@ from backend.translator.settings import (
     SARVAM_MAYURA_LANGUAGE_CODES,
 )
 
-SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/v1/translate"
+SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/translate"
 SARVAM_MAYURA_MODEL = "mayura:v1"
 _SUPPORTED_MAYURA_LANGS = set(SARVAM_MAYURA_LANGUAGE_CODES)
 _SUPPORTED_SARVAM_TRANSLATE_LANGS = set(SARVAM_LANGUAGE_CODES)
@@ -161,6 +161,8 @@ class SarvamTranslateClient:
         source_language: str,
         target_language: str,
     ) -> tuple[str, str, str | None]:
+        import time
+        import random
         normalized_source = _normalize_language_code(source_language)
         normalized_target = _normalize_language_code(target_language)
         model = _choose_model(normalized_source, normalized_target)
@@ -173,26 +175,45 @@ class SarvamTranslateClient:
             "mode": "formal",
         }
 
-        response = self.session.post(
-            self.api_url,
-            headers={
-                "api-subscription-key": self.api_key,
-                "Content-Type": "application/json",
-            },
-            json=request_body,
-            timeout=self.timeout_seconds,
-        )
+        max_retries = 6
+        backoff_factor = 2.0
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.session.post(
+                    self.api_url,
+                    headers={
+                        "api-subscription-key": self.api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json=request_body,
+                    timeout=self.timeout_seconds,
+                )
+                
+                response_text = response.text
+                try:
+                    payload = response.json()
+                except ValueError:
+                    payload = None
 
-        response_text = response.text
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = None
+                if response.status_code == 429 or _is_quota_error(response.status_code, payload, response_text):
+                    if attempt == max_retries - 1:
+                        raise SarvamQuotaExceededError(self._format_error_message(response.status_code, payload, response_text))
+                    
+                    sleep_time = (backoff_factor ** attempt) + random.uniform(0.1, 0.5)
+                    print(f"[SARVAM CLIENT] Rate limited (429). Retrying in {sleep_time:.2f} seconds (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(sleep_time)
+                    continue
 
-        if response.status_code >= 400:
-            if _is_quota_error(response.status_code, payload, response_text):
-                raise SarvamQuotaExceededError(self._format_error_message(response.status_code, payload, response_text))
-            raise SarvamTranslateError(self._format_error_message(response.status_code, payload, response_text))
+                if response.status_code >= 400:
+                    raise SarvamTranslateError(self._format_error_message(response.status_code, payload, response_text))
+
+                break
+            except requests.RequestException as error:
+                if attempt == max_retries - 1:
+                    raise SarvamTranslateError(f"Network error during translation request: {error}") from error
+                sleep_time = (backoff_factor ** attempt) + random.uniform(0.1, 0.5)
+                time.sleep(sleep_time)
 
         translated_text, request_id, returned_source = self._parse_response(payload)
         return translated_text, request_id, returned_source
@@ -237,6 +258,7 @@ class SarvamTranslateClient:
         return f"Sarvam translation failed with status {status_code}."
 
     def translate_texts(self, texts: list[str], source_language: str, target_language: str) -> list[str]:
+        import time
         if not texts:
             return []
 
@@ -244,6 +266,7 @@ class SarvamTranslateClient:
         for text in texts:
             translated_text, _, _ = self._translate_text(text, source_language, target_language)
             translated_texts.append(translated_text)
+            time.sleep(0.1) # Smooth out requests to avoid hitting rate limit triggers
 
         return translated_texts
 
