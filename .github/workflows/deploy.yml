@@ -54,23 +54,23 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
 
       - name: Build and Push Monolith
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
-          allow: network.host
-          network: host
-          build-args: |
-            VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com
-            VITE_CASHFREE_MODE=sandbox
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          network: host # Resolves connection issues for model downloading steps
+          build-args: |
+            VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com
+            VITE_CASHFREE_MODE=sandbox
+          secrets: |
+            "github_token=${{ secrets.GITHUB_TOKEN }}"
+          timeout: 3600
 
       - name: Download Trivy HTML Template
         run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
