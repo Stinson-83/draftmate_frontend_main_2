@@ -63,6 +63,7 @@ jobs:
           context: .
           file: Dockerfile
           allow: network.host
+          network: host
           build-args: |
             VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com
             VITE_CASHFREE_MODE=sandbox
