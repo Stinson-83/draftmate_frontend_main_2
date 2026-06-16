@@ -38,7 +38,7 @@ def download_models():
     # Downloads required files for English OCR
     easyocr_urls = {
         "english_g2.zip": "https://github.com/JaidedAI/EasyOCR/releases/download/v1.3/english_g2.zip",
-        "craft_mlt_25.zip": "https://github.com/JaidedAI/EasyOCR/releases/download/pre-release/craft_mlt_25.zip"
+        "craft_mlt_25k.zip": "https://github.com/JaidedAI/EasyOCR/releases/download/pre-v1.1.6/craft_mlt_25k.zip"
     }
 
     for filename, url in easyocr_urls.items():
