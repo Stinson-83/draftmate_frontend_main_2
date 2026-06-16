@@ -54,6 +54,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
 
       - name: Build and Push Monolith
         uses: docker/build-push-action@v5
@@ -65,6 +67,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           network: host # Resolves connection issues for model downloading steps
+          allow: network.host
           build-args: |
             VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com
             VITE_CASHFREE_MODE=sandbox
