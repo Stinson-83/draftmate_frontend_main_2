@@ -53,8 +53,11 @@ jobs:
 
       - name: Create ECR repository if it does not exist
         run: |
-          aws ecr describe-repositories --repository-names ${{ env.ECR_IMAGE_NAME }} || \
-          aws ecr create-repository --repository-name ${{ env.ECR_IMAGE_NAME }}
+          echo "🔍 Listing existing ECR repositories for debug:"
+          aws ecr describe-repositories --region ${{ secrets.AWS_REGION }} || true
+          echo "🛠️ Ensuring ${{ env.ECR_IMAGE_NAME }} exists..."
+          aws ecr describe-repositories --repository-names ${{ env.ECR_IMAGE_NAME }} --region ${{ secrets.AWS_REGION }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_IMAGE_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
