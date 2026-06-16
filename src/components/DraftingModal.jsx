@@ -147,11 +147,6 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
 
         try {
             setIsLoading(true);
-            // Move to step 3 immediately so user sees loading state there if preferred, 
-            // OR keep a loading toast here. 
-            // Current design calls for a loading spinner in step 3... 
-            // BUT existing code showed step 3 -> loading.
-            // Let's set step 3 and reuse the loading state there.
             setStep(3);
 
             const response = await fetch(`${QUERY_API_URL}/search`, {
@@ -182,14 +177,23 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
                 preview: null
             }));
 
-            setFormats([bestMatch, ...alternatives]);
+            const allFormats = [bestMatch, ...alternatives];
+            setFormats(allFormats);
+            if (allFormats.length > 0) {
+                setSelectedFormat(allFormats[0]);
+            }
 
         } catch (error) {
             console.error("Search error:", error);
-            toast.error("Failed to find formats. Please try again.");
-            // Fallback to empty or handle gracefully? 
-            // For now, staying on step 3 but empty formats might be bad.
-            // Maybe go back? or show retry?
+            const fallbackMatch = {
+                id: 'custom-draft',
+                name: 'Custom AI Draft',
+                description: 'A customized draft prepared entirely by AI based on your prompt.',
+                s3_path: null,
+                preview: null
+            };
+            setFormats([fallbackMatch]);
+            setSelectedFormat(fallbackMatch);
         } finally {
             setIsLoading(false);
         }
@@ -286,7 +290,8 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
 
         setIsLoading(true);
         try {
-            const response = await fetch(`${DRAFTER_API_URL}/generate`, {
+            // Call the compile endpoint for OnlyOffice configuration
+            const response = await fetch(`${DRAFTER_API_URL}/v2/draft/compile`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -295,7 +300,7 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
                 body: JSON.stringify({
                     case_context: prompt,
                     document_type: selectedFormat?.name || "Legal Document",
-                    // legal_documents: ... (if we had specific reference docs selected, could pass them here)
+                    file_target_name: `${selectedFormat?.name || 'custom_draft'}.docx`
                 })
             });
 
@@ -306,16 +311,13 @@ const DraftingModal = ({ onClose, initialPrompt }) => {
 
             const data = await response.json();
 
-            // Assume data.draft contains the generated HTML/text
-            navigate('/dashboard/editor', {
+            // Redirect the user to the OnlyOffice workspace route
+            navigate('/dashboard/workspace', {
                 state: {
-                    htmlContent: data.draft, // The API returns markdown/text, Editor might expect HTML. 
-                    // If the Editor expects raw HTML, we might need to convert MD to HTML or ensure API returns what's expected.
-                    // Based on legal_draft.py it returns text. If Editor handles text/html indiscriminately or uses a markdown viewer, great.
-                    // Looking at previous step 41, it passes `htmlContent`.
-                    uploadDetails: `AI Generated Draft: ${selectedFormat?.name || 'Custom'}`,
-                    isEmpty: false,
-                    prompt: prompt
+                    documentKey: data.document.key,
+                    filename: data.document.title,
+                    onlyofficeConfig: data,
+                    variablesDetected: data.variablesDetected || []
                 }
             });
             toast.success("Draft generated successfully!");

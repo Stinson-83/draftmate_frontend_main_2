@@ -66,6 +66,7 @@ logging.basicConfig(
     format='%(asctime)s | %(levelname)s | %(name)s | %(message)s'
 )
 logger = logging.getLogger("lex_bot.api")
+DEV_BYPASS_AUTH = os.getenv("DEV_BYPASS_AUTH", "false").lower() == "true"
 
 try:
     from backend.query.sql import start_tunnel_and_pool, _get_tunneled_dsn
@@ -363,6 +364,8 @@ async def verify_token(request: Request):
     Verify session token with Auth Service.
     Expects 'Authorization: Bearer <session_id>' or 'session_id' in body/query.
     """
+    if DEV_BYPASS_AUTH:
+        return "dev_user"
     # 1. Try Authorization header
     auth_header = request.headers.get("Authorization")
     session_id = None

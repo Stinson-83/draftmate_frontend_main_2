@@ -1,0 +1,17 @@
+{
+  "name": "AI Assistant Helper",
+  "guid": "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}",
+  "version": "1.0.0",
+  "baseUrl": "",
+  "variations": [
+    {
+      "description": "Assistant bridge",
+      "url": "index.html",
+      "icons": ["../../logo.png"],
+      "isViewer": false,
+      "isEdit": true,
+      "type": "system",
+      "EditorsSupport": ["word"]
+    }
+  ]
+}

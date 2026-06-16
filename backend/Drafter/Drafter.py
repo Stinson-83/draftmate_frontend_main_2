@@ -13,10 +13,55 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Mm, Pt
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+import sys
+import re
+import time
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.abspath(os.path.join(current_dir, "../"))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
+try:
+    from Deep_research.lex_bot.tools.pdf_processor import pdf_processor
+    from Deep_research.lex_bot.tools.session_cache import get_session_cache
+except ImportError:
+    pdf_processor = None
+    get_session_cache = None
+
+PLACEHOLDER_REGEX = re.compile(r'\b[A-Z][A-Z0-9_]{3,}\b')
+
+def extract_and_cache_docx(file_path: str):
+    try:
+        from docx import Document
+        doc = Document(file_path)
+        text_parts = []
+        # Extract from paragraphs
+        for p in doc.paragraphs:
+            if p.text.strip():
+                text_parts.append(p.text)
+        # Extract from tables
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        if p.text.strip():
+                            text_parts.append(p.text)
+        full_text = "\n".join(text_parts)
+        
+        if full_text.strip() and pdf_processor and get_session_cache:
+            chunks = pdf_processor.chunk_text(full_text)
+            session_cache = get_session_cache()
+            session_cache.set_file_chunks(file_path, chunks)
+            logger.info(f"Background extraction complete for {file_path}. Chunks cached.")
+    except Exception as e:
+        logger.error(f"Background extraction failed: {e}")
+
 
 from legal_draft import generate_legal_draft
 
@@ -325,11 +370,227 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
             },
         }
         params["token"] = _jwt_encode(params)
+        
+        # Include the detected placeholder variables for the frontend workspace side-panel
+        metadata = ai_data.get("metadata") or {}
+        placeholders_list = metadata.get("placeholders_detected") or []
+        params["variablesDetected"] = placeholders_list
+
         return params
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Draft compilation failed.")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v2/draft/create")
+async def create_empty_draft(authorization: Optional[str] = Header(default=None)):
+    try:
+        await verify_token(authorization)
+
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+        if not shared_storage_path:
+            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+
+        os.makedirs(shared_storage_path, exist_ok=True)
+
+        file_name = f"Empty_Draft_{int(time.time())}.docx"
+        output_path = os.path.join(shared_storage_path, file_name)
+
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph("")
+        doc.save(output_path)
+
+        with open(output_path, "rb") as f:
+            file_bytes = f.read()
+
+        document_key = hashlib.sha256(file_bytes).hexdigest()
+
+        # Copy empty file to lex_bot upload directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+        os.makedirs(lex_bot_upload_dir, exist_ok=True)
+        lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
+        with open(lex_bot_path, "wb") as f:
+            f.write(file_bytes)
+
+        params: Dict[str, Any] = {
+            "document": {
+                "fileType": "docx",
+                "key": document_key,
+                "title": file_name,
+                "url": f"http://drafter-service:8003/v2/draft/serve/{file_name}",
+                "permissions": {"edit": True, "download": True, "print": True},
+            },
+            "documentType": "word",
+            "editorConfig": {
+                "callbackUrl": "http://drafter-service:8003/v2/draft/callback",
+                "mode": "edit",
+                "customization": {"forcesave": True, "chat": False},
+            },
+        }
+        params["token"] = _jwt_encode(params)
+        params["documentKey"] = document_key
+        params["filename"] = file_name
+        params["variablesDetected"] = []
+
+        return params
+    except Exception as e:
+        logger.exception("Failed to create empty draft.")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v2/draft/upload")
+async def upload_draft(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    session_id: Optional[str] = Form(None),
+    authorization: Optional[str] = Header(default=None)
+):
+    try:
+        await verify_token(authorization)
+        
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+        if not shared_storage_path:
+            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+            
+        os.makedirs(shared_storage_path, exist_ok=True)
+        
+        file_name = file.filename or "uploaded_draft.docx"
+        safe_name = file_name.strip()
+        
+        file_bytes = await file.read()
+        is_pdf = safe_name.lower().endswith(".pdf") or file_bytes.startswith(b"%PDF")
+        
+        if is_pdf:
+            if safe_name.lower().endswith(".pdf"):
+                safe_name = safe_name[:-4] + ".docx"
+            else:
+                safe_name = safe_name + ".docx"
+        else:
+            if not safe_name.lower().endswith(".docx"):
+                if "." in safe_name:
+                    parts = safe_name.rsplit(".", 1)
+                    safe_name = f"{parts[0]}_{int(time.time())}.docx"
+                else:
+                    safe_name = f"{safe_name}_{int(time.time())}.docx"
+                
+        output_path = os.path.join(shared_storage_path, safe_name)
+        
+        if is_pdf:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+                temp_pdf.write(file_bytes)
+                temp_pdf_path = temp_pdf.name
+            
+            try:
+                from pdf2docx import Converter
+                cv = Converter(temp_pdf_path)
+                cv.convert(output_path, start=0, end=None)
+                cv.close()
+            except Exception as conv_e:
+                logger.error(f"pdf2docx conversion failed: {conv_e}")
+                # Fallback: simple text extraction via fitz (PyMuPDF)
+                try:
+                    import fitz
+                    from docx import Document
+                    pdf_doc = fitz.open(temp_pdf_path)
+                    doc = Document()
+                    for page_num in range(len(pdf_doc)):
+                        page = pdf_doc[page_num]
+                        text = page.get_text()
+                        if page_num > 0:
+                            doc.add_page_break()
+                        if text.strip():
+                            for para_text in text.split('\n\n'):
+                                if para_text.strip():
+                                    doc.add_paragraph(para_text.strip())
+                    doc.save(output_path)
+                except Exception as fitz_e:
+                    logger.error(f"Fallback fitz conversion also failed: {fitz_e}")
+                    raise HTTPException(status_code=500, detail="Failed to convert PDF to DOCX.")
+            finally:
+                try:
+                    os.unlink(temp_pdf_path)
+                except Exception:
+                    pass
+        else:
+            with open(output_path, "wb") as f:
+                f.write(file_bytes)
+            
+        # Read the DOCX bytes
+        with open(output_path, "rb") as f:
+            docx_bytes = f.read()
+
+        # Copy file to lex_bot upload directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+        os.makedirs(lex_bot_upload_dir, exist_ok=True)
+        lex_bot_path = os.path.join(lex_bot_upload_dir, safe_name)
+        with open(lex_bot_path, "wb") as f:
+            f.write(docx_bytes)
+            
+        # Link to session cache if session_id is provided
+        if session_id and get_session_cache:
+            try:
+                session_cache = get_session_cache()
+                if session_cache:
+                    session_cache.add_file_path(session_id, lex_bot_path)
+            except Exception as cache_e:
+                logger.warning(f"Failed to add path to session cache: {cache_e}")
+                
+        # Scan file for placeholders using python-docx and regex
+        placeholders_detected = []
+        try:
+            from docx import Document
+            doc = Document(output_path)
+            # Scan paragraphs
+            for p in doc.paragraphs:
+                matches = PLACEHOLDER_REGEX.findall(p.text)
+                for m in matches:
+                    if m not in placeholders_detected:
+                        placeholders_detected.append(m)
+            # Scan tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            matches = PLACEHOLDER_REGEX.findall(p.text)
+                            for m in matches:
+                                if m not in placeholders_detected:
+                                    placeholders_detected.append(m)
+        except Exception as docx_e:
+            logger.warning(f"Placeholder parsing failed: {docx_e}")
+            
+        document_key = hashlib.sha256(docx_bytes).hexdigest()
+        
+        params: Dict[str, Any] = {
+            "document": {
+                "fileType": "docx",
+                "key": document_key,
+                "title": safe_name,
+                "url": f"http://drafter-service:8003/v2/draft/serve/{safe_name}",
+                "permissions": {"edit": True, "download": True, "print": True},
+            },
+            "documentType": "word",
+            "editorConfig": {
+                "callbackUrl": "http://drafter-service:8003/v2/draft/callback",
+                "mode": "edit",
+                "customization": {"forcesave": True, "chat": False},
+            },
+        }
+        params["token"] = _jwt_encode(params)
+        params["variablesDetected"] = placeholders_detected
+        params["documentKey"] = document_key
+        params["filename"] = safe_name
+        
+        background_tasks.add_task(extract_and_cache_docx, lex_bot_path)
+        
+        return params
+    except Exception as e:
+        logger.exception("Draft upload failed.")
         raise HTTPException(status_code=500, detail=str(e))
 
 

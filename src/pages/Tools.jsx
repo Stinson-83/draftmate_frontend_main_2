@@ -41,19 +41,59 @@ const Tools = () => {
 
         setUploadedFileName(file.name);
         setIsUploading(true);
+        
+        const sessionId = crypto.randomUUID();
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('session_id', sessionId);
 
         try {
-            const url = `${API_CONFIG.CONVERTER.BASE_URL}${API_CONFIG.CONVERTER.ENDPOINTS.CONVERT}`;
+            const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`;
             const response = await axios.post(url, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${localStorage.getItem('session_id')}`
+                },
             });
-            setHtmlContent(response.data);
-            setIsUploadModalOpen(true);
+            const data = response.data;
+            
+            navigate('/dashboard/workspace', {
+                state: {
+                    documentKey: data.documentKey,
+                    filename: data.filename,
+                    onlyofficeConfig: data,
+                    variablesDetected: data.variablesDetected || []
+                }
+            });
         } catch (error) {
             console.error('Upload failed:', error);
-            alert('Failed to upload and convert document. Please try again.');
+            alert('Failed to upload and open document. Please try again.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleEmptyDocumentClick = async () => {
+        setIsUploading(true);
+        try {
+            const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/create`;
+            const response = await axios.post(url, {}, {
+                headers: { 
+                    'Authorization': `Bearer ${localStorage.getItem('session_id')}`
+                },
+            });
+            const data = response.data;
+            navigate('/dashboard/workspace', {
+                state: {
+                    documentKey: data.documentKey,
+                    filename: data.filename,
+                    onlyofficeConfig: data,
+                    variablesDetected: []
+                }
+            });
+        } catch (error) {
+            console.error('Failed to create empty document:', error);
+            alert('Failed to initialize empty document. Please try again.');
         } finally {
             setIsUploading(false);
         }
@@ -197,7 +237,7 @@ const Tools = () => {
                                     icon="note_add"
                                     title="Empty Document"
                                     description="Start with an empty document without a prompt."
-                                    onClick={() => navigate('/dashboard/editor', { state: { isEmpty: true } })}
+                                    onClick={handleEmptyDocumentClick}
                                 />
                                 <ToolCard
                                     icon="description"

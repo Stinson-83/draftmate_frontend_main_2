@@ -7,46 +7,10 @@ services:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "drafter-service:host-gateway"
     depends_on:
-      - frontend
-      - drafter-service
       - onlyoffice-server
-    networks:
-      - draftmate-network
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    environment:
-      - VITE_API_BASE_URL=http://localhost/api
-      - VITE_ONLYOFFICE_URL=http://localhost/onlyoffice
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
-    expose:
-      - "3000"
-    volumes:
-      - ./:/app
-      - /app/node_modules
-    networks:
-      - draftmate-network
-    restart: unless-stopped
-
-  drafter-service:
-    build:
-      context: ./backend/Drafter
-      dockerfile: Dockerfile
-    env_file:
-      - .env
-    environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - JWT_SECRET=${JWT_SECRET}
-      - DEV_BYPASS_AUTH=true
-      - SHARED_STORAGE_PATH=/var/shared/drafts
-    volumes:
-      - draftmate_storage_shared:/var/shared/drafts
-    expose:
-      - "8003"
     networks:
       - draftmate-network
     restart: unless-stopped
@@ -62,16 +26,14 @@ services:
       - JWT_HEADER=Authorization
       - JWT_IN_BODY=true
     volumes:
-      - draftmate_storage_shared:/var/www/onlyoffice/Data/shared
-    expose:
-      - "80"
+      - ./shared_drafts:/var/www/onlyoffice/Data/shared
+    ports:
+      - "8081:80"
+    extra_hosts:
+      - "drafter-service:host-gateway"
     networks:
       - draftmate-network
     restart: unless-stopped
-
-volumes:
-  draftmate_storage_shared:
-    driver: local
 
 networks:
   draftmate-network:
