@@ -138,7 +138,7 @@ function App() {
             <Route path="/academy" element={<LjAcademy />} />
             <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
 
-            <Route path="/dashboard" element={<MainLayout />}>
+            <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route path="home" element={<Dashboard />} />
               <Route path="editor" element={<Editor />} />
               <Route path="pdf-editor" element={<PDFEditor />} />
