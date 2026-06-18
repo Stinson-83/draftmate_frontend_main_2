@@ -12,6 +12,19 @@ services:
       - VITE_CLIENT_ID=${VITE_CLIENT_ID}
     depends_on:
       - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./public
+          target: /app/public
+        - action: sync
+          path: ./index.html
+          target: /app/index.html
+        - action: rebuild
+          path: package.json
 
   db:
     image: ankane/pgvector:latest
@@ -109,6 +122,18 @@ services:
     depends_on:
       - db
       - qdrant
+    volumes:
+      - ./backend:/app/backend
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app/backend
+          ignore:
+            - backend/__pycache__/
+            - backend/Deep_research/lex_bot/data/
+        - action: rebuild
+          path: requirements.txt
 
 volumes:
   postgres_data:

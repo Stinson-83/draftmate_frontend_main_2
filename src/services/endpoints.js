@@ -95,6 +95,16 @@ export const API_CONFIG = {
         }
     },
 
+    // Service: backend/legal_workflow (Port 8010)
+    LEGAL_WORKFLOW: {
+        BASE_URL: `${BASE_URL}/workflow`,
+        ENDPOINTS: {
+            TURN: '/api/workflow/turn', // POST
+            GET_DRAFT: (draftId) => `/api/workflow/draft/${draftId}`, // GET
+            GET_PDF: (draftId) => `/api/workflow/draft/${draftId}/pdf`, // GET
+        }
+    },
+
     // Service: backend/login_db (Port 8009)
     AUTH: {
         BASE_URL: `${BASE_URL}/auth`,

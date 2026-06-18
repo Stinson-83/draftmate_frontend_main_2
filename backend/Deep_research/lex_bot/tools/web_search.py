@@ -1,5 +1,7 @@
 import logging
 import requests
+import asyncio
+import httpx
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple, Optional
 import trafilatura
@@ -152,8 +154,8 @@ class WebSearchTool:
             logger.error(f"Google SERP Failed: {e}")
             return []
 
-    def _scrape_single(self, url: str) -> str:
-        """Scrape a single URL with caching."""
+    async def _async_scrape_single(self, url: str, client: httpx.AsyncClient) -> str:
+        """Scrape a single URL concurrently with caching."""
         import time
         from lex_bot.config import WEB_CACHE_TTL_SECONDS
         
@@ -170,24 +172,38 @@ class WebSearchTool:
         # --------------------
         
         content = ""
+        html_content = ""
         
-        # 1. Trafilatura
+        # 1. Download HTML using async HTTPX client
         try:
-            downloaded = trafilatura.fetch_url(url)
-            if downloaded:
-                text = trafilatura.extract(downloaded, favor_precision=True)
-                if text:
-                    content = f"\n\n{text}\n\n"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            resp = await client.get(url, headers=headers, timeout=10.0, follow_redirects=True)
+            if resp.status_code == 200:
+                html_content = resp.text
         except Exception as e:
-            logger.error(f"Trafilatura failed for {url}: {e}")
+            logger.error(f"Async download failed for {url}: {e}")
+            
+        # 2. Extract using CPU-bound parser in a thread to prevent blocking
+        if html_content:
+            try:
+                extracted_text = await asyncio.to_thread(
+                    trafilatura.extract, html_content, favor_precision=True
+                )
+                if extracted_text:
+                    content = f"\n\n{extracted_text}\n\n"
+            except Exception as e:
+                logger.error(f"Parsing failed for {url}: {e}")
         
-        # 2. Firecrawl Fallback
+        # 3. Firecrawl Fallback
         if not content and self.firecrawl:
             try:
-                if hasattr(self.firecrawl, 'scrape_url'):
-                    data = self.firecrawl.scrape_url(url, params={"formats": ["markdown"]})
-                    if 'markdown' in data:
-                        content = f"\n\n{data['markdown']}\n\n"
+                def run_firecrawl():
+                    if hasattr(self.firecrawl, 'scrape_url'):
+                        return self.firecrawl.scrape_url(url, params={"formats": ["markdown"]})
+                    return {}
+                data = await asyncio.to_thread(run_firecrawl)
+                if data and 'markdown' in data:
+                    content = f"\n\n{data['markdown']}\n\n"
             except Exception as e:
                 logger.error(f"Firecrawl failed for {url}: {e}")
         
@@ -198,15 +214,26 @@ class WebSearchTool:
         
         return content
 
+    async def _async_scrape_urls(self, urls: List[str]) -> str:
+        limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
+        async with httpx.AsyncClient(limits=limits, follow_redirects=True, timeout=10.0) as client:
+            tasks = [self._async_scrape_single(u, client) for u in set(urls) if u]
+            results = await asyncio.gather(*tasks)
+            return "".join(results)
+
     def scrape_urls(self, urls: List[str]) -> str:
-        context = ""
-        with ThreadPoolExecutor(max_workers=5) as ex:
-            futures = {ex.submit(self._scrape_single, u): u for u in set(urls) if u}
-            for f in as_completed(futures):
-                res = f.result()
-                if res:
-                    context += res
-        return context
+        if not urls:
+            return ""
+        try:
+            return asyncio.run(self._async_scrape_urls(urls))
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    return executor.submit(asyncio.run, self._async_scrape_urls(urls)).result()
+            else:
+                return loop.run_until_complete(self._async_scrape_urls(urls))
 
     def run(self, query: str, domains: List[str] = None) -> Tuple[str, List[Dict]]:
         """
