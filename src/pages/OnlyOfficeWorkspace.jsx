@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Gavel, Loader2, Quote, Sparkles } from 'lucide-react';
 import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 
@@ -11,6 +12,14 @@ const OnlyOfficeWorkspace = () => {
   const navigate = useNavigate();
   const editorInstanceRef = useRef(null);
   const pluginWindowRef = useRef(null);
+  const pendingSelectionActionRef = useRef(null);
+  const activeCaseRequestIdRef = useRef(0);
+  const activeCaseGenerationIdRef = useRef(0);
+  const caseFetchAbortRef = useRef(null);
+  const caseGenerationAbortRef = useRef(null);
+  const caseParagraphTextRef = useRef('');
+  const chatEndRef = useRef(null);
+
   const [docsApiReady, setDocsApiReady] = useState(false);
   const [isCanvasLoading, setIsCanvasLoading] = useState(true);
 
@@ -27,7 +36,13 @@ const OnlyOfficeWorkspace = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
-  const chatEndRef = useRef(null);
+
+  // Case Law Assistant State
+  const [caseCards, setCaseCards] = useState([]);
+  const [caseCardsLoading, setCaseCardsLoading] = useState(false);
+  const [caseCardsError, setCaseCardsError] = useState('');
+  const [caseGeneratingCardId, setCaseGeneratingCardId] = useState(null);
+  const [caseGeneratingText, setCaseGeneratingText] = useState('');
 
   const { documentKey, filename, onlyofficeConfig, variablesDetected } = useMemo(() => {
     const state = location?.state || {};
@@ -108,12 +123,12 @@ const OnlyOfficeWorkspace = () => {
         ...(onlyofficeConfig?.editorConfig || {}),
         plugins: {
           autostart: [
-            "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
+            'asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}',
           ],
           pluginsData: [
-            pluginUrl
-          ]
-        }
+            pluginUrl,
+          ],
+        },
       },
       events: {
         ...(onlyofficeConfig?.events || {}),
@@ -135,27 +150,69 @@ const OnlyOfficeWorkspace = () => {
     });
   }, [docsApiReady, onlyofficeConfig, navigate]);
 
-  // Handle postMessage selection from macro / plugin
+  const clearCaseState = () => {
+    pendingSelectionActionRef.current = null;
+    activeCaseRequestIdRef.current += 1;
+    activeCaseGenerationIdRef.current += 1;
+    caseParagraphTextRef.current = '';
+    setCaseCards([]);
+    setCaseCardsError('');
+    setCaseCardsLoading(false);
+    setCaseGeneratingCardId(null);
+    setCaseGeneratingText('');
+    if (caseFetchAbortRef.current) {
+      caseFetchAbortRef.current.abort();
+      caseFetchAbortRef.current = null;
+    }
+    if (caseGenerationAbortRef.current) {
+      caseGenerationAbortRef.current.abort();
+      caseGenerationAbortRef.current = null;
+    }
+  };
+
   useEffect(() => {
     const handleMessage = (e) => {
       if (!e.data) return;
 
       if (e.data.type === 'ONLYOFFICE_PLUGIN_READY') {
-        console.log("ONLYOFFICE plugin is ready!", e.source);
+        console.log('ONLYOFFICE plugin is ready!', e.source);
         pluginWindowRef.current = e.source;
-      } else if (e.data.type === 'ONLYOFFICE_SELECTION') {
-        const selectedText = e.data.text;
-        if (!selectedText || !selectedText.trim()) {
-          toast.error("Please select some text inside the ONLYOFFICE document first.");
+        return;
+      }
+
+      if (e.data.type === 'ONLYOFFICE_SELECTION') {
+        const selectedText = String(e.data.text || '').trim();
+        if (!selectedText) {
+          toast.error('Please select some text inside the ONLYOFFICE document first.');
           return;
         }
-        handleSendMessage(`Explain this selection: "${selectedText.trim()}"`);
+
+        const pendingAction = pendingSelectionActionRef.current || 'explain';
+        pendingSelectionActionRef.current = null;
+
+        if (pendingAction === 'cases') {
+          fetchRelevantCases(selectedText);
+        } else {
+          handleSendMessage(`Explain this selection: "${selectedText}"`);
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [documentKey, messages]);
+
+  useEffect(() => {
+    if (activeTab !== 'chat') {
+      clearCaseState();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    return () => {
+      clearCaseState();
+    };
+  }, []);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -206,15 +263,13 @@ const OnlyOfficeWorkspace = () => {
 
     if (!customQuery) setInputMessage('');
 
-    // Add user message
     const userMsg = { role: 'user', content: queryText };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     setIsChatLoading(true);
     setStatusMessage('Assistant is thinking...');
 
-    // Add empty assistant response to stream into
     const assistantMsgId = crypto.randomUUID();
-    setMessages(prev => [...prev, { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }]);
+    setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }]);
 
     try {
       const activeSessionId = documentKey || 'workspace-chat-session';
@@ -226,20 +281,20 @@ const OnlyOfficeWorkspace = () => {
         },
         onToken: (chunk, accumulated) => {
           accumulatedResponse = accumulated;
-          setMessages(prev => prev.map(m =>
+          setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, content: accumulated } : m
           ));
         },
         onAnswer: (content) => {
           accumulatedResponse = content;
-          setMessages(prev => prev.map(m =>
+          setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, content: content, isStreaming: false } : m
           ));
         },
         onDone: () => {
           setIsChatLoading(false);
           setStatusMessage('');
-          setMessages(prev => prev.map(m =>
+          setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, isStreaming: false } : m
           ));
         },
@@ -247,18 +302,18 @@ const OnlyOfficeWorkspace = () => {
           console.error('Workspace assistant stream error:', err);
           setIsChatLoading(false);
           setStatusMessage('');
-          setMessages(prev => prev.map(m =>
+          setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId
               ? { ...m, content: accumulatedResponse || 'Sorry, I encountered an error answering your request.', isStreaming: false }
               : m
           ));
-        }
+        },
       });
     } catch (err) {
       console.error('Workspace assistant error:', err);
       setIsChatLoading(false);
       setStatusMessage('');
-      setMessages(prev => prev.map(m =>
+      setMessages((prev) => prev.map((m) =>
         m.id === assistantMsgId
           ? { ...m, content: 'Failed to connect to AI Assistant service.', isStreaming: false }
           : m
@@ -266,17 +321,112 @@ const OnlyOfficeWorkspace = () => {
     }
   };
 
-  // Request selection from ONLYOFFICE via plugin postMessage
+  const normalizeCaseItem = (item, idx, requestId) => ({
+    id: item.id || item.case_id || item.doc_id || `${requestId}-${idx}`,
+    name: item.name || item.case_name || item.title || 'Untitled Case',
+    court: item.court || item.court_hierarchy || item.court_name || item.hierarchy || 'Court metadata unavailable',
+    citation: item.citation || item.suggested_citation || item.reporter_citation || '',
+    whyRelevant: item.whyRelevant || item.why_relevant || item.relevance || item.snippet || item.context || '',
+    holding: item.holding || item.ratio || item.ratio_decidendi || item.summary || '',
+    generatedParagraph: item.generatedParagraph || '',
+    raw: item,
+  });
+
+  const fetchRelevantCases = async (selectedText) => {
+    const requestId = ++activeCaseRequestIdRef.current;
+    setCaseCardsLoading(true);
+    setCaseCardsError('');
+    setCaseCards([]);
+    setCaseGeneratingCardId(null);
+    setCaseGeneratingText('');
+    caseParagraphTextRef.current = '';
+
+    if (caseFetchAbortRef.current) {
+      caseFetchAbortRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    caseFetchAbortRef.current = abortController;
+
+    try {
+      const sessionId = localStorage.getItem('session_id');
+      const headers = { 'Content-Type': 'application/json' };
+      if (sessionId) headers.Authorization = `Bearer ${sessionId}`;
+
+      const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/research/cases`, {
+        method: 'POST',
+        headers,
+        signal: abortController.signal,
+        body: JSON.stringify({
+          query: selectedText,
+          selection: selectedText,
+          document_key: documentKey,
+          filename,
+        }),
+      });
+
+      if (requestId !== activeCaseRequestIdRef.current || abortController.signal.aborted) return;
+
+      if (!response.ok) {
+        let detail = 'Failed to retrieve relevant cases.';
+        try {
+          const data = await response.json();
+          detail = data?.detail || detail;
+        } catch {
+          detail = response.statusText || detail;
+        }
+        throw new Error(detail);
+      }
+
+      const data = await response.json();
+      const rawCases = Array.isArray(data.cases)
+        ? data.cases
+        : Array.isArray(data.results)
+          ? data.results
+          : Array.isArray(data.items)
+            ? data.items
+            : [];
+      const normalized = rawCases.slice(0, 10).map((item, idx) => normalizeCaseItem(item, idx, requestId));
+
+      setCaseCards(normalized);
+      if (!normalized.length) {
+        setCaseCardsError('No relevant cases were returned for this selection.');
+      }
+    } catch (error) {
+      if (abortController.signal.aborted || requestId !== activeCaseRequestIdRef.current) return;
+      console.error('Case retrieval failed:', error);
+      setCaseCardsError(error.message || 'Case retrieval failed.');
+      toast.error(error.message || 'Unable to fetch relevant cases.');
+    } finally {
+      if (requestId === activeCaseRequestIdRef.current) {
+        setCaseCardsLoading(false);
+      }
+      if (caseFetchAbortRef.current === abortController) {
+        caseFetchAbortRef.current = null;
+      }
+    }
+  };
+
   const handleExplainSelection = () => {
     if (!pluginWindowRef.current) {
       toast.error('AI Assistant plugin is not ready. Please make sure the ONLYOFFICE document is fully loaded.');
       return;
     }
 
+    pendingSelectionActionRef.current = 'explain';
     pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, '*');
   };
 
-  // Request insert text into ONLYOFFICE via plugin postMessage
+  const handleFindRelevantCases = () => {
+    if (!pluginWindowRef.current) {
+      toast.error('The canvas connection is warming up. Please wait a moment and try again.');
+      return;
+    }
+
+    pendingSelectionActionRef.current = 'cases';
+    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, '*');
+  };
+
   const handleInsertText = (textToInsert) => {
     if (!pluginWindowRef.current) {
       toast.error('AI Assistant plugin is not ready. Please make sure the ONLYOFFICE document is fully loaded.');
@@ -285,6 +435,190 @@ const OnlyOfficeWorkspace = () => {
 
     pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_INSERT_TEXT', text: textToInsert }, '*');
     toast.success('Inserted content into ONLYOFFICE document!');
+  };
+
+  const handleGenerateCaseParagraph = async (caseItem) => {
+    if (!caseItem) return;
+
+    if (caseGenerationAbortRef.current) {
+      caseGenerationAbortRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    caseGenerationAbortRef.current = abortController;
+    const generationId = ++activeCaseGenerationIdRef.current;
+
+    setCaseGeneratingCardId(caseItem.id);
+    setCaseGeneratingText('');
+    caseParagraphTextRef.current = '';
+
+    const prompt = [
+      "Write a professional paragraph applying the following case to the user's highlighted argument.",
+      `Case Name: ${caseItem.name}`,
+      `Court: ${caseItem.court}`,
+      caseItem.citation ? `Citation: ${caseItem.citation}` : null,
+      caseItem.holding ? `Holding: ${caseItem.holding}` : null,
+      caseItem.whyRelevant ? `Why Relevant: ${caseItem.whyRelevant}` : null,
+      'Keep the paragraph concise, formal, and legally grounded. Do not invent facts. Focus on the legal principle and its application.',
+    ].filter(Boolean).join('\n');
+
+    try {
+      await api.chatStream(prompt, documentKey || 'workspace-case-assistant', {
+        onToken: (chunk, accumulated) => {
+          if (abortController.signal.aborted || generationId !== activeCaseGenerationIdRef.current) return;
+          caseParagraphTextRef.current = accumulated;
+          setCaseGeneratingText(accumulated);
+          setCaseCards((prev) => prev.map((card) => (
+            card.id === caseItem.id ? { ...card, generatedParagraph: accumulated, generating: true } : card
+          )));
+        },
+        onAnswer: (content) => {
+          if (abortController.signal.aborted || generationId !== activeCaseGenerationIdRef.current) return;
+          caseParagraphTextRef.current = content || '';
+          setCaseGeneratingText(content || '');
+          setCaseCards((prev) => prev.map((card) => (
+            card.id === caseItem.id ? { ...card, generatedParagraph: content || '', generating: false } : card
+          )));
+        },
+        onDone: () => {
+          if (abortController.signal.aborted || generationId !== activeCaseGenerationIdRef.current) return;
+          const finalText = (caseParagraphTextRef.current || '').trim();
+          if (finalText) {
+            handleInsertText(finalText);
+          }
+          setCaseGeneratingCardId(null);
+          setCaseGeneratingText('');
+        },
+        onError: (err) => {
+          if (abortController.signal.aborted || generationId !== activeCaseGenerationIdRef.current) return;
+          console.error('Case paragraph generation failed:', err);
+          toast.error(err?.message || 'Failed to generate paragraph for this case.');
+          setCaseGeneratingCardId(null);
+          setCaseGeneratingText('');
+        },
+      });
+    } catch (error) {
+      if (abortController.signal.aborted) return;
+      console.error('Case paragraph generation error:', error);
+      toast.error(error.message || 'Failed to generate paragraph for this case.');
+      setCaseGeneratingCardId(null);
+      setCaseGeneratingText('');
+    } finally {
+      if (caseGenerationAbortRef.current === abortController) {
+        caseGenerationAbortRef.current = null;
+      }
+    }
+  };
+
+  const renderCaseCards = () => {
+    if (caseCardsLoading) {
+      return (
+        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 flex items-center gap-2 text-sm text-slate-300">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Finding relevant cases...
+        </div>
+      );
+    }
+
+    if (caseCardsError) {
+      return (
+        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
+          {caseCardsError}
+        </div>
+      );
+    }
+
+    if (!caseCards.length) return null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Case Law Assistant</div>
+          <div className="text-[11px] text-slate-500">{caseCards.length} result{caseCards.length === 1 ? '' : 's'}</div>
+        </div>
+
+        {caseCards.map((caseItem) => {
+          const isGenerating = caseGeneratingCardId === caseItem.id;
+          return (
+            <div key={caseItem.id} className="rounded-2xl border border-slate-800 bg-slate-950/50 overflow-hidden shadow-lg">
+              <div className="p-4 border-b border-slate-800/80">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-blue-400">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wider">Relevant Case</span>
+                    </div>
+                    <h4 className="mt-2 text-sm font-semibold text-white leading-snug">{caseItem.name}</h4>
+                    <p className="mt-1 text-[11px] text-slate-400">{caseItem.court}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleInsertText(caseItem.citation || caseItem.name)}
+                    className="shrink-0 text-[11px] font-semibold px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors"
+                  >
+                    Insert Citation
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Why Relevant</div>
+                  <p className="text-sm text-slate-200 leading-relaxed">
+                    {caseItem.whyRelevant || 'A matching legal proposition was identified for the highlighted text.'}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">Holding</div>
+                  <p className="text-sm text-slate-200 leading-relaxed">
+                    {caseItem.holding || 'A concise ratio decidendi summary will appear here.'}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateCaseParagraph(caseItem)}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-400 text-white text-[11px] font-semibold px-3 py-2 transition-colors"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Generating Paragraph
+                      </>
+                    ) : (
+                      <>
+                        <Quote className="h-3.5 w-3.5" />
+                        Generate Paragraph
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {isGenerating ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Streaming paragraph into the assistant...
+                    </div>
+                    <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                      {caseGeneratingText || 'Drafting tailored paragraph...'}
+                    </p>
+                  </div>
+                ) : caseItem.generatedParagraph ? (
+                  <div className="rounded-xl border border-emerald-800/70 bg-emerald-950/30 p-3">
+                    <div className="text-xs text-emerald-300 mb-2 font-semibold uppercase tracking-wider">Generated Paragraph</div>
+                    <p className="text-sm text-slate-100 whitespace-pre-wrap leading-relaxed">{caseItem.generatedParagraph}</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -425,7 +759,7 @@ const OnlyOfficeWorkspace = () => {
                   }`}
                 >
                   <div className="whitespace-pre-wrap leading-relaxed">{msg.content || '...'}</div>
-                  
+
                   {msg.role === 'assistant' && !msg.isStreaming && msg.content && (
                     <div className="mt-3.5 pt-2.5 border-t border-slate-700/60 flex justify-end">
                       <button
@@ -440,7 +774,7 @@ const OnlyOfficeWorkspace = () => {
                   )}
                 </div>
               ))}
-              
+
               {/* Streaming Status Indicator */}
               {isChatLoading && statusMessage && (
                 <div className="flex items-center gap-2 text-xs text-slate-400 px-2 py-1 italic animate-pulse">
@@ -448,6 +782,32 @@ const OnlyOfficeWorkspace = () => {
                   {statusMessage}
                 </div>
               )}
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 px-1">
+                  <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Case Law Assistant</div>
+                  <div className="flex items-center gap-2">
+                    {caseCardsLoading ? (
+                      <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Searching
+                      </div>
+                    ) : null}
+                    {caseCards.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={clearCaseState}
+                        className="text-[11px] text-slate-500 hover:text-slate-200 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {renderCaseCards()}
+              </div>
+
               <div ref={chatEndRef} />
             </div>
 
@@ -462,6 +822,15 @@ const OnlyOfficeWorkspace = () => {
                 >
                   <span className="material-symbols-outlined text-sm">school</span>
                   Explain Selection
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFindRelevantCases}
+                  className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                  title="Find case law relevant to the selected text"
+                >
+                  <Gavel size={14} />
+                  Find Relevant Cases
                 </button>
               </div>
 
