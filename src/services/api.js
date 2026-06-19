@@ -1,7 +1,7 @@
 import { API_CONFIG } from './endpoints';
 
 const API_BASE_URL = API_CONFIG.LEX_BOT.BASE_URL;
-const NOTIFICATION_BASE_URL = 'http://localhost:8015';
+const NOTIFICATION_BASE_URL = API_CONFIG.NOTIFICATION.BASE_URL;
 
 export const api = {
     /**

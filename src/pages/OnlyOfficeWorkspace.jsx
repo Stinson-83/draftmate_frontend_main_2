@@ -5,6 +5,7 @@ import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 
 const ONLYOFFICE_API_SRC = `${window.location.protocol}//${window.location.hostname}/onlyoffice/web-apps/apps/api/documents/api.js`;
+const ONLYOFFICE_ORIGIN = `${window.location.protocol}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}`;
 
 const OnlyOfficeWorkspace = () => {
   const location = useLocation();
@@ -164,6 +165,16 @@ const OnlyOfficeWorkspace = () => {
       return;
     }
 
+    // Safely garbage collect previous instance if remounting
+    if (editorInstanceRef.current && typeof editorInstanceRef.current.destroy === 'function') {
+      try {
+        editorInstanceRef.current.destroy();
+        console.log('Previous ONLYOFFICE instance garbage collected safely.');
+      } catch (err) {
+        console.error('Error destroying active editor instance:', err);
+      }
+    }
+
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const pluginUrl = isLocalhost
       ? 'http://host.docker.internal:5173/plugins/assistant/config.json'
@@ -211,6 +222,19 @@ const OnlyOfficeWorkspace = () => {
     editorInstanceRef.current = new window.DocsAPI.DocEditor('onlyoffice-canvas-target-node', {
       ...nextConfig,
     });
+
+    // Clean up instance on component unmount
+    return () => {
+      if (editorInstanceRef.current && typeof editorInstanceRef.current.destroy === 'function') {
+        try {
+          editorInstanceRef.current.destroy();
+          editorInstanceRef.current = null;
+          console.log('ONLYOFFICE editor instance cleanly destroyed.');
+        } catch (e) {
+          console.warn('Deferred clean phase warning:', e);
+        }
+      }
+    };
   }, [docsApiReady, onlyofficeConfig, navigate]);
 
   const clearCaseState = () => {
@@ -240,7 +264,7 @@ const OnlyOfficeWorkspace = () => {
       const plugin = pluginWindowRef.current;
       if (!plugin) return;
       if (Date.now() < selectionPollPausedUntilRef.current) return;
-      plugin.postMessage({ type: 'ONLYOFFICE_POLL_SELECTION' }, '*');
+      plugin.postMessage({ type: 'ONLYOFFICE_POLL_SELECTION' }, ONLYOFFICE_ORIGIN);
     }, 500);
   };
 
@@ -562,7 +586,7 @@ const OnlyOfficeWorkspace = () => {
     }
 
     pendingSelectionActionRef.current = 'explain';
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, '*');
+    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, ONLYOFFICE_ORIGIN);
   };
 
   const handleFindRelevantCases = () => {
@@ -572,7 +596,7 @@ const OnlyOfficeWorkspace = () => {
     }
 
     pendingSelectionActionRef.current = 'cases';
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, '*');
+    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, ONLYOFFICE_ORIGIN);
   };
 
   const handleInsertText = (textToInsert) => {
@@ -581,7 +605,7 @@ const OnlyOfficeWorkspace = () => {
       return;
     }
 
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_INSERT_TEXT', text: textToInsert }, '*');
+    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_INSERT_TEXT', text: textToInsert }, ONLYOFFICE_ORIGIN);
     toast.success('Inserted content into ONLYOFFICE document!');
   };
 
@@ -599,7 +623,7 @@ const OnlyOfficeWorkspace = () => {
     selectionPollPausedUntilRef.current = Date.now() + 1200;
     setIsAutoFormatting(true);
     setShowAutoFormatPopup(false);
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_AUTO_FORMAT_SELECTION' }, '*');
+    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_AUTO_FORMAT_SELECTION' }, ONLYOFFICE_ORIGIN);
   };
 
   const handleEnhanceWithAISelection = () => {
@@ -618,7 +642,7 @@ const OnlyOfficeWorkspace = () => {
     setInputMessage('');
     setActiveTab('chat');
     setShowAutoFormatPopup(false);
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_ENHANCE_WITH_AI' }, '*');
+    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_ENHANCE_WITH_AI' }, ONLYOFFICE_ORIGIN);
   };
 
   const handleGenerateCaseParagraph = async (caseItem) => {

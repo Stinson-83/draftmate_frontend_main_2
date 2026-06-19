@@ -1,7 +1,14 @@
 import logging
 import os
 from dotenv import load_dotenv
-load_dotenv()
+
+# Walk up and load the workspace root .env if it exists
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_env_path = os.path.abspath(os.path.join(_current_dir, "../..", ".env"))
+if os.path.exists(_env_path):
+    load_dotenv(_env_path)
+else:
+    load_dotenv()
 
 import logging
 import hashlib
@@ -976,6 +983,48 @@ async def research_cases(request: CaseSearchRequest, authorization: Optional[str
 @app.get("/")
 def root():
     return {"service": "drafter-service", "status": "ok"}
+
+
+class VariableSyncRequest(BaseModel):
+    filename: str
+    placeholder_tag: str
+    new_value: str
+
+
+@app.post("/v2/draft/variable/sync")
+async def sync_variable_value(request: VariableSyncRequest, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+    if not shared_storage_path:
+        raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        
+    file_path = os.path.join(shared_storage_path, os.path.basename(request.filename))
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Target document not found.")
+        
+    try:
+        from docx import Document
+        doc = Document(file_path)
+        
+        modified = False
+        body_elements = doc.element.body
+        for sdt in body_elements.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}sdt'):
+            tag_elem = sdt.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tag')
+            if tag_elem is not None and tag_elem.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val') == request.placeholder_tag:
+                t_elem = sdt.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                if t_elem is not None:
+                    t_elem.text = request.new_value
+                    modified = True
+                    
+        if modified:
+            doc.save(file_path)
+            return {"status": "synchronized", "updated": True}
+            
+        return {"status": "unchanged", "updated": False}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"XML modification failed: {str(e)}")
 
 
 @app.get("/v2/draft/serve/{filename}")
