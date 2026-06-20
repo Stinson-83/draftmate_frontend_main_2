@@ -29,6 +29,7 @@ services:
       - JWT_IN_BODY=true
     volumes:
       - ./shared_drafts:/var/www/onlyoffice/Data/shared
+      - ./public/plugins/assistant:/var/www/onlyoffice/documentserver/sdkjs-plugins/assistant
     ports:
       - "8081:80"
     extra_hosts:

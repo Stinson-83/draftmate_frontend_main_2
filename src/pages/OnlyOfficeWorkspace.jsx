@@ -175,11 +175,6 @@ const OnlyOfficeWorkspace = () => {
       }
     }
 
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const pluginUrl = isLocalhost
-      ? 'http://host.docker.internal:5173/plugins/assistant/config.json'
-      : `${window.location.protocol}//${window.location.host}/plugins/assistant/config.json`;
-
     const nextConfig = {
       ...onlyofficeConfig,
       editorConfig: {
@@ -199,9 +194,7 @@ const OnlyOfficeWorkspace = () => {
           autostart: [
             'asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}',
           ],
-          pluginsData: [
-            pluginUrl,
-          ],
+          pluginsData: [],
         },
       },
       events: {

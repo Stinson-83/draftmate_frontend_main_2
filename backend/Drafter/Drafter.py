@@ -1401,7 +1401,12 @@ async def onlyoffice_callback(event: Dict[str, Any], authorization: Optional[str
             raise HTTPException(status_code=403, detail="Forbidden")
 
         try:
-            jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            if isinstance(decoded, dict):
+                if "payload" in decoded:
+                    event = decoded["payload"]
+                else:
+                    event = decoded
         except jwt.PyJWTError:
             raise HTTPException(status_code=403, detail="Forbidden")
 

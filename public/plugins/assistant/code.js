@@ -3,8 +3,15 @@
     var lastSelectionSnapshot = '';
     var suppressSelectionSyncUntil = 0;
 
+    var parentOrigin = '*';
+    try {
+        if (document.referrer) {
+            parentOrigin = new URL(document.referrer).origin;
+        }
+    } catch (e) {}
+
     function postToParent(payload) {
-        window.top.postMessage(payload, window.location.origin);
+        window.top.postMessage(payload, parentOrigin);
     }
 
     function getSelectedText(callback) {
