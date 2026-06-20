@@ -9,6 +9,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     extra_hosts:
       - "drafter-service:host-gateway"
+      - "host.docker.internal:host-gateway"
     depends_on:
       - onlyoffice-server
     networks:
@@ -31,6 +32,7 @@ services:
       - "8081:80"
     extra_hosts:
       - "drafter-service:host-gateway"
+      - "host.docker.internal:host-gateway"
     networks:
       - draftmate-network
     restart: unless-stopped

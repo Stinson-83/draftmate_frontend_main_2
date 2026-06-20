@@ -277,6 +277,7 @@ const OnlyOfficeWorkspace = () => {
 
   useEffect(() => {
     const handleMessage = (e) => {
+      if (e.origin !== window.location.origin) return;
       if (!e.data) return;
 
       if (e.data.type === 'ONLYOFFICE_PLUGIN_READY') {

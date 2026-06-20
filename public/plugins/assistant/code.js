@@ -1,10 +1,10 @@
-﻿(function(window, undefined) {
+(function(window, undefined) {
     var pollTimer = null;
     var lastSelectionSnapshot = '';
     var suppressSelectionSyncUntil = 0;
 
     function postToParent(payload) {
-        window.top.postMessage(payload, '*');
+        window.top.postMessage(payload, window.location.origin);
     }
 
     function getSelectedText(callback) {

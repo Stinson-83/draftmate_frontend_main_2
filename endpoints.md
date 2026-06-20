@@ -55,7 +55,7 @@ Handles document conversion (HTML, PDF, etc.).
 Generates legal drafts using AI.
 
 - **Directory**: `backend/Drafter`
-- **Port**: **8001**
+- **Port**: **8003**
 - **Command**:
   ```powershell
   cd c:\Users\AYUSH\draftmate_frontend_main\backend\Drafter
@@ -66,7 +66,7 @@ Generates legal drafts using AI.
   # Install dependencies
   pip install -r requirements.txt
   # Run app
-  uvicorn Drafter:app --host 0.0.0.0 --port 8001 --reload
+  uvicorn Drafter:app --host 0.0.0.0 --port 8003 --reload
   ```
 
 ### D. Enhance Bot (Document Enhancer)
@@ -90,7 +90,7 @@ AI features for enhancing legal content and clauses.
 Provides PDF manipulation tools (Merge, Split, Watermark, etc.).
 
 - **Directory**: `backend/PDF_Editor`
-- **Port**: **8003**
+- **Port**: **8005**
 - **Command**:
   ```powershell
   cd c:\Users\AYUSH\draftmate_frontend_main\backend\PDF_Editor
@@ -98,15 +98,15 @@ Provides PDF manipulation tools (Merge, Split, Watermark, etc.).
   .\venv\Scripts\Activate.ps1
   # Install dependencies
   pip install -r requirements.txt
-  # Run app (MUST use port 8003)
-  uvicorn api:app --reload --port 8003
+  # Run app (MUST use port 8005)
+  uvicorn api:app --reload --port 8005
   ```
 
 ### F. Query Service (Legal Query)
 Handles legal template search and retrieval.
 
 - **Directory**: `backend/query`
-- **Port**: **8001** (Note: Defaults to 8001, which conflicts with Drafter. You may need to run this on a different port, e.g., 8005, using the command below.)
+- **Port**: **8001**
 - **Command**:
   ```powershell
   cd c:\Users\AYUSH\draftmate_frontend_main\backend\query
@@ -116,8 +116,8 @@ Handles legal template search and retrieval.
   .\venv\Scripts\Activate.ps1
   # Install dependencies
   pip install -r requirements.txt
-  # Run app (Change port if 8001 is busy)
-  uvicorn Query:app --host 0.0.0.0 --port 8005 --reload
+  # Run app
+  uvicorn Query:app --host 0.0.0.0 --port 8001 --reload
   ```
 
 ## Summary of Active Ports

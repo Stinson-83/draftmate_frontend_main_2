@@ -10,6 +10,8 @@ if os.path.exists(_env_path):
 else:
     load_dotenv()
 
+ONLYOFFICE_API_URL = os.getenv("ONLYOFFICE_API_URL", "http://onlyoffice-server")
+
 import logging
 import hashlib
 import json
@@ -160,10 +162,12 @@ def _safe_basename_from_url(url: str) -> str:
 
 
 def _normalize_download_url(download_source_url: str) -> str:
+    parsed = urlparse(ONLYOFFICE_API_URL)
+    target_netloc = parsed.netloc or "onlyoffice-server"
     if "localhost" in download_source_url:
-        return download_source_url.replace("localhost", "onlyoffice-server")
+        return download_source_url.replace("localhost", target_netloc)
     if "127.0.0.1" in download_source_url:
-        return download_source_url.replace("127.0.0.1", "onlyoffice-server")
+        return download_source_url.replace("127.0.0.1", target_netloc)
     return download_source_url
 
 
@@ -1013,9 +1017,11 @@ async def sync_variable_value(request: VariableSyncRequest, authorization: Optio
         for sdt in body_elements.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}sdt'):
             tag_elem = sdt.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tag')
             if tag_elem is not None and tag_elem.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val') == request.placeholder_tag:
-                t_elem = sdt.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
-                if t_elem is not None:
-                    t_elem.text = request.new_value
+                t_elements = sdt.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                if t_elements:
+                    t_elements[0].text = request.new_value
+                    for extra_t in t_elements[1:]:
+                        extra_t.text = ""
                     modified = True
                     
         if modified:
@@ -1362,7 +1368,7 @@ async def onlyoffice_forcesave(request: ForceSaveRequest, authorization: Optiona
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                "http://onlyoffice-server/coauthoring/CommandService.ashx",
+                f"{ONLYOFFICE_API_URL.rstrip('/')}/coauthoring/CommandService.ashx",
                 json=command_payload,
                 headers=headers,
                 timeout=15.0,
