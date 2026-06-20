@@ -29,3 +29,24 @@ apprunner_config.json
 
 LEXBOT_LATENCY_ANALYSIS.md
 UPGRADE_PLAN.md
+
+# Python cache & venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.pytest_cache/
+
+# Celery schedule logs
+celerybeat-schedule*
+
+# Translator upload and scratch storage directories
+backend/translator/storage/original/
+backend/translator/storage/translated/
+backend/translator/storage/tmp/
+
+# LexBot data uploads and scratch space
+backend/Deep_research/lex_bot/data/uploads/
+scratch/
+shared_drafts/

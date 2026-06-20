@@ -72,8 +72,10 @@ def test_translation_job_api_accepts_supported_indian_pair(translator_app, monke
 
     translator_app.app.dependency_overrides[translator_app.get_db] = lambda: session
 
+    from unittest.mock import MagicMock
     response = asyncio.run(
         translator_app.create_translation_job(
+            request=MagicMock(),
             file=_UploadFile("sample.pdf", "application/pdf", b"%PDF-1.7\nhello"),
             source_language="hi-IN",
             target_language="en-IN",
@@ -96,14 +98,16 @@ def test_translation_job_api_accepts_supported_indian_pair(translator_app, monke
 )
 def test_translation_job_api_rejects_unsupported_languages(translator_app, source_language, target_language, message):
     with pytest.raises(HTTPException) as exc_info:
+        from unittest.mock import MagicMock
         asyncio.run(
             translator_app.create_translation_job(
+                request=MagicMock(),
                 file=_UploadFile("sample.pdf", "application/pdf", b"%PDF-1.7\nhello"),
                 source_language=source_language,
                 target_language=target_language,
                 db=_FakeSession(),
             )
-    )
+        )
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == message

@@ -114,48 +114,6 @@ def _run_pipeline(session, job: TranslationJob) -> None:
         )
 
 
-def _process_next_job() -> None:
-    if SessionLocal is None:
-        logger.warning("Translator database is not configured; skipping job poll")
-        return
-
-    with SessionLocal() as session:
-        job = (
-            session.query(TranslationJob)
-            .filter(TranslationJob.status == "queued")
-            .order_by(TranslationJob.created_at.asc(), TranslationJob.id.asc())
-            .first()
-        )
-
-        if job is None:
-            logger.info("No queued translation jobs found")
-            return
-
-        logger.info("Processing translation job %s", job.id)
-        _set_job_state(session, job.id, status="processing", stage="extracting", progress=10)
-
-        try:
-            _run_pipeline(session, job)
-            logger.info("Completed translation job %s", job.id)
-        except Exception as error:
-            logger.exception("Failed to process translation job %s: %s", job.id, error)
-            update_translation_job(session, job.id, status="failed", stage="failed", progress=0)
-
-
-@celery_app.task(name="backend.translator.workers.worker.poll_translation_jobs")
-def poll_translation_jobs() -> str:
-    _process_next_job()
-    return "ok"
-
-
-celery_app.conf.beat_schedule = {
-    "poll-translation-jobs-every-5-seconds": {
-        "task": "backend.translator.workers.worker.poll_translation_jobs",
-        "schedule": schedule(run_every=5.0),
-    }
-}
-
-
 def main() -> None:
     _bootstrap_database()
     loglevel = os.getenv("CELERY_LOG_LEVEL", "INFO")
@@ -163,7 +121,6 @@ def main() -> None:
         "worker",
         "--loglevel",
         loglevel,
-        "--beat",
     ])
 
 

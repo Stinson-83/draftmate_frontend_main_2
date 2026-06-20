@@ -150,7 +150,18 @@ class SarvamTranslateClient:
         self.api_key = (api_key or _get_api_key()).strip()
         self.api_url = (api_url or _get_api_url()).strip()
         self.timeout_seconds = timeout_seconds or _get_timeout_seconds()
-        self.session = session or requests.Session()
+
+        if session is not None:
+            self.session = session
+        else:
+            self.session = requests.Session()
+            # Configure HTTPAdapter with high thread pool connections limits
+            adapter = requests.adapters.HTTPAdapter(
+                pool_connections=20,
+                pool_maxsize=50,
+            )
+            self.session.mount("https://", adapter)
+            self.session.mount("http://", adapter)
 
         if not self.api_key:
             raise ValueError("SARVAM_API_KEY is not configured")
@@ -258,17 +269,33 @@ class SarvamTranslateClient:
         return f"Sarvam translation failed with status {status_code}."
 
     def translate_texts(self, texts: list[str], source_language: str, target_language: str) -> list[str]:
-        import time
         if not texts:
             return []
 
-        translated_texts: list[str] = []
-        for text in texts:
-            translated_text, _, _ = self._translate_text(text, source_language, target_language)
-            translated_texts.append(translated_text)
-            time.sleep(0.1) # Smooth out requests to avoid hitting rate limit triggers
+        max_workers = min(len(texts), TRANSLATOR_SARVAM_TRANSLATE_BATCH_SIZE or 10)
 
-        return translated_texts
+        if max_workers <= 1:
+            # Sequential execution for single item batches or tests
+            translated_texts: list[str] = []
+            for text in texts:
+                translated_text, _, _ = self._translate_text(text, source_language, target_language)
+                translated_texts.append(translated_text)
+            return translated_texts
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        def translate_single(index: int, text: str) -> tuple[int, str]:
+            translated, _, _ = self._translate_text(text, source_language, target_language)
+            return index, translated
+
+        results = [None] * len(texts)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(translate_single, i, text) for i, text in enumerate(texts)]
+            for future in futures:
+                i, translated = future.result()
+                results[i] = translated
+
+        return results
 
     def translate_blocks(self, blocks: Sequence[Block], source_language: str, target_language: str) -> list[Block]:
         translated_blocks: list[Block] = []

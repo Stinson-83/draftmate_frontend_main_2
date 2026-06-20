@@ -151,7 +151,7 @@ const TranslateDocumentPage = () => {
   });
 
   const historyJobs = translationHistoryQuery.data?.jobs ?? [];
-  const selectedJobId = activeJobId ?? (!isCreatingJob ? historyJobs[0]?.job_id ?? null : null);
+  const selectedJobId = activeJobId ?? ((!selectedFile && !isCreatingJob) ? historyJobs[0]?.job_id ?? null : null);
 
   const translationJobQuery = useQuery({
     queryKey: ['translation-job', selectedJobId],
@@ -481,7 +481,10 @@ const TranslateDocumentPage = () => {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => setActiveJobId(historyJob.job_id)}
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setActiveJobId(historyJob.job_id);
+                          }}
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
                           <Eye className="h-3.5 w-3.5" />

@@ -96,7 +96,14 @@ def test_sarvam_translate_maps_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_sarvam_translate_raises_quota_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SARVAM_API_KEY", "test-key")
-    session = _FakeSession([_FakeResponse(429, {"message": "Quota exceeded"}, text="Quota exceeded")])
+    import time
+    monkeypatch.setattr(time, "sleep", lambda x: None)
+
+    # Provide 6 responses because max_retries is 6
+    session = _FakeSession([
+        _FakeResponse(429, {"message": "Quota exceeded"}, text="Quota exceeded")
+        for _ in range(6)
+    ])
 
     client = SarvamTranslateClient(api_key="test-key", session=session)
 

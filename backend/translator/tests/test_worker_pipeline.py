@@ -101,7 +101,12 @@ def test_worker_processes_job_end_to_end(monkeypatch, tmp_path: Path, source_lan
     monkeypatch.setattr(worker, "get_translated_upload_path", lambda filename: tmp_path / f"translated_{filename}")
     monkeypatch.setattr(worker, "update_translation_job", lambda session_obj, job_id, **kwargs: _apply_update(job, kwargs))
 
-    worker._process_next_job()
+    from backend.translator.tasks import process_translation_job
+    from backend.translator import tasks, crud
+    monkeypatch.setattr(crud, "get_translation_job", lambda db_obj, job_id: job)
+    monkeypatch.setattr(tasks, "SessionLocal", _SessionFactory(session))
+
+    process_translation_job(1, str(source_file), target_language)
 
     assert job.status == "completed"
     assert job.stage == "completed"
@@ -137,8 +142,14 @@ def test_worker_marks_job_failed_when_translation_fails(monkeypatch, tmp_path: P
         raise RuntimeError("Sarvam translation unavailable")
 
     monkeypatch.setattr(worker, "sarvam_translate", _raise)
+    monkeypatch.setattr(worker, "update_translation_job", lambda session_obj, job_id, **kwargs: _apply_update(job, kwargs))
 
-    worker._process_next_job()
+    from backend.translator.tasks import process_translation_job
+    from backend.translator import tasks, crud
+    monkeypatch.setattr(crud, "get_translation_job", lambda db_obj, job_id: job)
+    monkeypatch.setattr(tasks, "SessionLocal", _SessionFactory(session))
+
+    process_translation_job(2, str(source_file), "hi")
 
     assert job.status == "failed"
     assert job.stage == "failed"

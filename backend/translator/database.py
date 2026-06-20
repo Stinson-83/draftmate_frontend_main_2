@@ -12,7 +12,7 @@ def _get_database_url() -> str:
         os.getenv("TRANSLATOR_DATABASE_URL")
         or os.getenv("DATABASE_URL")
         or os.getenv("POSTGRES_DSN")
-        or ""
+        or "postgresql://lawuser:Siddchick2506@free-lawdb-useast1.cqrmc40e80ow.us-east-1.rds.amazonaws.com:5432/postgres"
     )
 
 DATABASE_URL = _get_database_url()

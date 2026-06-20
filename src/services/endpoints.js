@@ -136,7 +136,7 @@ export const API_CONFIG = {
 
     // Service: backend/translator (Port 8012)
     TRANSLATOR: {
-        BASE_URL: import.meta.env.VITE_TRANSLATOR_API_BASE_URL || 'http://localhost:8012',
+        BASE_URL: import.meta.env.VITE_TRANSLATOR_API_BASE_URL || `${BASE_URL}/translator`,
         ENDPOINTS: {
             CREATE_JOB: '/translation-jobs',
             LIST_JOBS: '/translation-jobs',
