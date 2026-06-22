@@ -163,6 +163,7 @@ export default function Navbar() {
           {/* ── ③ CTA buttons ────────────────────────────────────── */}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => navigate('/login')}
               className="h-[38px] px-4 text-[13px] font-medium rounded-xl
                          border border-slate-200 bg-white text-slate-700
                          hover:bg-slate-50 hover:border-slate-300

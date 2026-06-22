@@ -3,6 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+
 // Markdown enhancements
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -38,6 +40,80 @@ const NODE_LABELS = {
     'memory_store': 'Committing insights to memory'
 };
 
+const ResearchProgressTimeline = ({ activeNodes }) => {
+    const stages = [
+        { id: 'router', label: 'Analyzing Query' },
+        { id: 'research_agent', label: 'Gathering Facts' },
+        { id: 'citation_agent', label: 'Verifying Citations' },
+        { id: 'manager_aggregate', label: 'Compiling Research' }
+    ];
+
+    return (
+        <div className="bg-white border border-blue-100 rounded-2xl p-6 mb-6 shadow-[0_4px_20px_rgba(37,99,235,0.04)] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-blue-50/50 to-transparent pointer-events-none" />
+            <div className="flex items-center justify-between mb-5">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    Autonomous Research Pipeline
+                </h3>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">LIVE</span>
+            </div>
+            <div className="flex items-center justify-between w-full overflow-x-auto pb-2 scrollbar-hide">
+                {stages.map((stage, idx) => {
+                    const isCompleted = activeNodes.some(n => n.node === stage.id && n.status === 'completed');
+                    const isRunning = activeNodes.some(n => n.node === stage.id && n.status === 'running');
+
+                    return (
+                        <React.Fragment key={stage.id}>
+                            <div className="flex flex-col items-center gap-2 min-w-[90px] shrink-0">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${isCompleted ? 'bg-blue-600 border-blue-600 text-white' :
+                                    isRunning ? 'border-blue-500 text-blue-500 animate-pulse' : 'border-slate-200 text-slate-300'
+                                    }`}>
+                                    {isCompleted ? <span className="material-symbols-outlined text-sm">check</span> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                                </div>
+                                <span className={`text-[10px] font-bold text-center whitespace-nowrap ${isRunning ? 'text-blue-600' : isCompleted ? 'text-slate-700' : 'text-slate-400'}`}>
+                                    {stage.label}
+                                </span>
+                            </div>
+                            {idx < stages.length - 1 && <div className={`h-[2px] flex-1 min-w-[30px] mx-2 transition-colors duration-500 ${isCompleted ? 'bg-blue-600' : 'bg-slate-100'}`} />}
+                        </React.Fragment>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+/* ── Enhancement 2: Simulated Sub-Queries ── */
+const SubQueryTasks = ({ isTyping, input }) => {
+    if (!isTyping || !input) return null;
+    const mockTasks = [
+        `Analyzing primary legal issues in: "${input.substring(0, 30)}..."`,
+        "Fetching relevant Section-wise statutory interpretations",
+        "Cross-referencing High Court vs Supreme Court precedents",
+        "Identifying procedural requirements and limitation periods"
+    ];
+
+    return (
+        <div className="space-y-2 mb-6">
+            <p className="text-[11px] font-bold text-slate-400 uppercase ml-1">Research Tasks Identified</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {mockTasks.map((task, i) => (
+                    <motion.div
+                        initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.2 }}
+                        key={i} className="bg-white border border-slate-200 p-3 rounded-xl flex items-center gap-3 shadow-sm"
+                    >
+                        <div className="w-5 h-5 bg-blue-50 text-blue-600 rounded flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-xs">search</span>
+                        </div>
+                        <span className="text-xs text-slate-600 font-medium truncate">{task}</span>
+                    </motion.div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const ResearchChat = () => {
     const navigate = useNavigate();
     const messagesEndRef = useRef(null);
@@ -46,6 +122,7 @@ const ResearchChat = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState(''); // Streaming status
+    const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
     const [activeNodes, setActiveNodes] = useState([]); // Execution steps tracking
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [sessionId, setSessionId] = useState('');
@@ -66,6 +143,7 @@ const ResearchChat = () => {
     // Drafting Modal State
     const [isDraftingOpen, setIsDraftingOpen] = useState(false);
     const [draftingPrompt, setDraftingPrompt] = useState('');
+    const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,7 +154,7 @@ const ResearchChat = () => {
         document.title = 'AI Research | DraftMate';
     }, []);
 
-    // Fetch Sessions
+    // Original Fetch Sessions
     const fetchSessions = async () => {
         try {
             setIsLoadingSessions(true);
@@ -89,6 +167,19 @@ const ResearchChat = () => {
             setIsLoadingSessions(false);
         }
     };
+
+    // Mock Fetch Sessions
+    // const fetchSessions = async () => {
+    //     setIsLoadingSessions(true);
+    //     setTimeout(() => {
+    //         setSessions([
+    //             { session_id: 'mock-1', title: 'Supreme Court Guidelines on Bail', created_at: new Date().toISOString() },
+    //             { session_id: 'mock-2', title: 'Section 138 NI Act Dispute', created_at: new Date(Date.now() - 86400000).toISOString() }, // Yesterday
+    //             { session_id: 'mock-3', title: 'Corporate Merger Due Diligence', created_at: new Date(Date.now() - 86400000 * 3).toISOString() } // 3 days ago
+    //         ]);
+    //         setIsLoadingSessions(false);
+    //     }, 800);
+    // };
 
     // Initialize
     useEffect(() => {
@@ -160,16 +251,36 @@ const ResearchChat = () => {
 
     const sessionGroups = groupSessions(sessions);
 
+    // const startNewChat = () => {
+    //     const newId = crypto.randomUUID();
+    //     setSessionId(newId);
+    //     setMessages([
+    //         {
+    //             id: 1,
+    //             role: 'ai',
+    //             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
+    //         }
+    //     ]);
+    //     localStorage.setItem('last_chat_session_id', newId);
+    //     // Optionally clear URL param
+    //     window.history.replaceState({}, '', '/research');
+    // };
+
     const startNewChat = () => {
         const newId = crypto.randomUUID();
         setSessionId(newId);
-        setMessages([
-            {
-                id: 1,
-                role: 'ai',
-                content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
-            }
-        ]);
+        setMessages([{
+            id: 1,
+            role: 'ai',
+            content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
+            isIntro: true,
+            followups: [
+                "What are the latest Supreme Court judgments on Section 138 of NI Act?",
+                "Draft a Legal Notice for breach of contract.",
+                "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
+            ]
+        }]);
+
         localStorage.setItem('last_chat_session_id', newId);
         // Optionally clear URL param
         window.history.replaceState({}, '', '/research');
@@ -196,14 +307,17 @@ const ResearchChat = () => {
                 }));
                 setMessages(formattedMessages);
             } else {
-                // If empty session, show welcome
-                setMessages([
-                    {
-                        id: 1,
-                        role: 'ai',
-                        content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
-                    }
-                ]);
+                setMessages([{
+                    id: 1,
+                    role: 'ai',
+                    content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
+                    isIntro: true,
+                    followups: [
+                        "What are the latest Supreme Court judgments on Section 138 of NI Act?",
+                        "Draft a Legal Notice for breach of contract.",
+                        "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
+                    ]
+                }]);
             }
         } catch (error) {
             console.error("Failed to load session:", error);
@@ -212,6 +326,7 @@ const ResearchChat = () => {
         }
     };
 
+    // Original Handle send
     const handleSend = async () => {
         if (!input.trim() && selectedFiles.length === 0) return;
         if (isStreamingRef.current) return; // Prevent concurrent sends
@@ -276,9 +391,9 @@ const ResearchChat = () => {
                             if (existingIdx !== -1) {
                                 const newNodes = [...prev];
                                 const currentContent = newNodes[existingIdx].content || '';
-                                newNodes[existingIdx] = { 
-                                    ...newNodes[existingIdx], 
-                                    content: currentContent + chunk 
+                                newNodes[existingIdx] = {
+                                    ...newNodes[existingIdx],
+                                    content: currentContent + chunk
                                 };
                                 return newNodes;
                             }
@@ -365,6 +480,99 @@ const ResearchChat = () => {
         }
     };
 
+    // // Mock Handle send
+    // const handleSend = async () => {
+    //     if (!input.trim() && selectedFiles.length === 0) return;
+    //     if (isStreamingRef.current) return;
+
+    //     isStreamingRef.current = true;
+    //     const currentInput = input;
+    //     const userMsg = {
+    //         id: Date.now(),
+    //         role: 'user',
+    //         content: currentInput,
+    //         file: selectedFiles
+    //     };
+
+    //     setMessages(prev => [...prev, userMsg]);
+    //     setInput('');
+    //     setSelectedFiles([]);
+    //     setIsTyping(true);
+    //     setActiveNodes([]);
+
+    //     const aiMsgId = Date.now() + 1;
+    //     let aiContent = '';
+
+    //     // Add an empty AI message block to the UI
+    //     setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: '' }]);
+
+    //     // Helper to simulate network delay
+    //     const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+    //     try {
+    //         // --- SIMULATE AUTONOMOUS PIPELINE ---
+
+    //         // 1. Analyzing Query
+    //         // --- SIMULATE AUTONOMOUS PIPELINE (Sequential) ---
+
+    //        // 1. Analyzing Query
+    //         setActiveNodes([{ node: 'router', label: 'Analyzing Query', status: 'running' }]);
+    //         await delay(800);
+
+    //         // 2. Gathering Facts
+    //         setActiveNodes([
+    //             { node: 'router', label: 'Analyzing Query', status: 'completed' },
+    //             { node: 'research_agent', label: 'Gathering Facts', status: 'running' }
+    //         ]);
+    //         await delay(800);
+
+    //         // 3. Verifying Citations
+    //         setActiveNodes([
+    //             { node: 'router', label: 'Analyzing Query', status: 'completed' },
+    //             { node: 'research_agent', label: 'Gathering Facts', status: 'completed' },
+    //             { node: 'citation_agent', label: 'Verifying Citations', status: 'running' }
+    //         ]);
+    //         await delay(800);
+
+    //         // --- SIMULATE TEXT STREAMING --- 
+    //         const dummyResponse = "Based on the recent Supreme Court jurisprudence, the right to privacy is recognized as a fundamental right under Article 21 of the Constitution.\n\nFurthermore, regarding your query, the court has consistently held that procedural delays can be condoned if sufficient cause is shown by the applicant.\n\n### Key Takeaways:\n* The limitation period is strictly construed.\n* Condonation of delay requires documented proof.";
+
+    //         const chunks = dummyResponse.split(' ');
+    //         for (let i = 0; i < chunks.length; i++) {
+    //             aiContent += chunks[i] + ' ';
+    //             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, content: aiContent } : m));
+    //             await delay(40); // 40ms per word simulates fast streaming
+    //         }
+
+    //         // 4. Compiling Research (Final Stage)
+    //         setActiveNodes(prev => prev.map(n => n.node === 'citation_agent' ? { ...n, status: 'completed' } : n));
+    //         setActiveNodes(prev => [...prev, { node: 'manager_aggregate', label: 'Compiling Research', status: 'running' }]);
+    //         await delay(1000);
+
+    //         // --- INJECT CITATIONS & FOLLOW-UPS (Enhancements 5 & 7) ---
+    //         setMessages(prev => prev.map(m => m.id === aiMsgId ? {
+    //             ...m,
+    //             sources: [
+    //                 { index: 1, title: 'K.S. Puttaswamy v. Union of India (2017)', type: 'Supreme Court', url: '#' },
+    //                 { index: 2, title: 'Limitation Act, 1963 (Section 5)', type: 'Statute', url: '#' }
+    //             ],
+    //             followups: [
+    //                 "What constitutes 'sufficient cause' for condonation of delay?",
+    //                 "Are there recent High Court judgments conflicting with this?",
+    //                 "Draft an application for condonation of delay."
+    //             ]
+    //         } : m));
+
+    //     } catch (error) {
+    //         console.error("Mock Chat error:", error);
+    //     } finally {
+    //         // Clean up states
+    //         isStreamingRef.current = false;
+    //         setIsTyping(false);
+    //         setActiveNodes([]);
+    //     }
+    // };
+
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -445,7 +653,7 @@ const ResearchChat = () => {
     };
 
     return (
-        <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
+        <div className="flex w-full h-full min-h-0 bg-slate-50 dark:bg-slate-900 transition-colors duration-200 font-sans overflow-hidden text-slate-900 dark:text-slate-100">
 
             {/* Sidebar */}
             <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} flex-none bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 flex flex-col transition-all duration-300 overflow-hidden border-r border-slate-200 dark:border-slate-800`}>
@@ -474,13 +682,15 @@ const ResearchChat = () => {
                                             <button
                                                 key={session.session_id}
                                                 onClick={() => loadSession(session.session_id)}
-                                                className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${sessionId === session.session_id
-                                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                                                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                                                className={`w-full text-left px-4 py-3 rounded-xl text-sm truncate transition-all flex items-center gap-3 border ${sessionId === session.session_id
+                                                    ? 'bg-blue-50 border-blue-100 text-blue-700 shadow-sm font-bold'
+                                                    : 'hover:bg-slate-100 border-transparent text-slate-600 hover:text-slate-900'
                                                     }`}
-                                                title={session.title}
                                             >
-                                                {session.title || "New Chat"}
+                                                <span className={`material-symbols-outlined text-lg ${sessionId === session.session_id ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                    {sessionId === session.session_id ? 'chat_bubble' : 'history'}
+                                                </span>
+                                                {session.title || "New Research Chat"}
                                             </button>
                                         ))}
                                     </div>
@@ -502,7 +712,7 @@ const ResearchChat = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full relative">
+            <div className="flex-1 flex flex-col h-full min-h-0 relative">
 
                 {/* Header */}
                 <header className="flex-none bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between shadow-sm z-10">
@@ -523,7 +733,7 @@ const ResearchChat = () => {
                     </div>
 
                     {/* LLM Switcher Dropdown */}
-                    <div className="relative">
+                    {/* <div className="relative">
                         <button
                             onClick={() => setIsLLMDropdownOpen(!isLLMDropdownOpen)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg hover:border-blue-400 dark:hover:border-blue-500 transition-all"
@@ -561,288 +771,121 @@ const ResearchChat = () => {
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </div> */}
                 </header>
 
                 {/* Messages Area */}
-                <main className="flex-1 overflow-y-auto relative flex flex-col bg-slate-50 dark:bg-slate-900">
-                    {/* Dot Pattern Background */}
-                    <div className="absolute inset-0 pointer-events-none opacity-50"
-                        style={{
-                            backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
-                            backgroundSize: '24px 24px'
-                        }}
-                    ></div>
+                <main className="flex-1 overflow-y-auto relative flex flex-col min-h-0 bg-[#F8FAFF]">
+                    <div className="relative z-0 flex-1 w-full max-w-4xl mx-auto px-4 pt-6 pb-24 flex flex-col gap-6 min-h-0">
 
-                    <div className="relative z-0 flex-1 w-full max-w-3xl mx-auto px-4 py-8 flex flex-col gap-6">
                         {/* Messages */}
-                        {messages.map((msg, index) => (
-                            <div key={msg.id} className={`flex gap-4 items-start ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in-up`}>
-                                {/* Avatar */}
-                                <div className={`flex-none w-8 h-8 rounded-full flex items-center justify-center shadow-sm overflow-hidden
-                                    ${msg.role === 'ai' ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700' : 'bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800'}`}
-                                >
-                                    {msg.role === 'ai' ? (
-                                        <span className="material-symbols-outlined text-blue-600 text-base">gavel</span>
-                                    ) : (
-                                        <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-base">person</span>
-                                    )}
-                                </div>
+                        {messages.map((msg) => {
+                            return (
+                                <div key={msg.id} className={`flex gap-6 items-start ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in-up w-full`}>
 
-                                {/* Bubble */}
-                                <div className={`flex-1 max-w-[90%] p-4 rounded-2xl shadow-sm border leading-relaxed text-sm
-                                    ${msg.role === 'ai'
-                                        ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-tl-none text-slate-900 dark:text-slate-100'
-                                        : 'bg-blue-600 text-white border-blue-600 rounded-tr-none'
-                                    }`}
-                                >
-                                    <div className={`markdown-content ${msg.role === 'user' ? 'text-white' : ''}`}>
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkMath, remarkGfm]}
-                                            rehypePlugins={[rehypeKatex]}
-                                            components={{
-                                                p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
-                                                ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-3" {...props} />,
-                                                ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-3" {...props} />,
-                                                li: ({ node, ...props }) => <li className="mb-1" {...props} />,
-                                                h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
-                                                h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                                                h3: ({ node, ...props }) => <h3 className="text-base font-bold mt-3 mb-1" {...props} />,
-                                                // Syntax highlighted code blocks
-                                                code: ({ node, inline, className, children, ...props }) => {
-                                                    const match = /language-(\w+)/.exec(className || '');
-                                                    return !inline && match ? (
-                                                        <SyntaxHighlighter
-                                                            style={oneDark}
-                                                            language={match[1]}
-                                                            PreTag="div"
-                                                            className="rounded-lg my-3 text-xs"
-                                                            {...props}
-                                                        >
-                                                            {String(children).replace(/\n$/, '')}
-                                                        </SyntaxHighlighter>
-                                                    ) : inline ? (
-                                                        <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-xs font-mono" {...props}>
-                                                            {children}
-                                                        </code>
-                                                    ) : (
-                                                        <pre className="bg-slate-800 text-slate-100 p-3 rounded-lg overflow-x-auto text-xs font-mono my-3">
-                                                            <code {...props}>{children}</code>
-                                                        </pre>
-                                                    );
-                                                },
-                                                strong: ({ node, ...props }) => <strong className="font-semibold" {...props} />,
-                                                // Blockquote styling
-                                                blockquote: ({ node, ...props }) => (
-                                                    <blockquote
-                                                        className="border-l-4 border-blue-500 dark:border-blue-400 pl-4 py-2 my-3 bg-blue-50 dark:bg-blue-900/20 italic text-slate-700 dark:text-slate-300 rounded-r"
-                                                        {...props}
-                                                    />
-                                                ),
-                                                // Horizontal rule styling
-                                                hr: ({ node, ...props }) => (
-                                                    <hr className="my-4 border-t-2 border-slate-200 dark:border-slate-700" {...props} />
-                                                ),
-                                                // Table styling (GFM)
-                                                table: ({ node, ...props }) => (
-                                                    <div className="overflow-x-auto my-3">
-                                                        <table className="min-w-full border-collapse border border-slate-300 dark:border-slate-600 text-sm" {...props} />
-                                                    </div>
-                                                ),
-                                                thead: ({ node, ...props }) => (
-                                                    <thead className="bg-slate-100 dark:bg-slate-700" {...props} />
-                                                ),
-                                                th: ({ node, ...props }) => (
-                                                    <th className="border border-slate-300 dark:border-slate-600 px-3 py-2 text-left font-semibold" {...props} />
-                                                ),
-                                                td: ({ node, ...props }) => (
-                                                    <td className="border border-slate-300 dark:border-slate-600 px-3 py-2" {...props} />
-                                                ),
-                                                // Strikethrough (GFM)
-                                                del: ({ node, ...props }) => (
-                                                    <del className="text-slate-500 line-through" {...props} />
-                                                ),
-                                                a: ({ node, href, children, ...props }) => (
-                                                    <CitationLink href={href} sources={msg.sources}>
-                                                        {children}
-                                                    </CitationLink>
-                                                )
-                                            }}
-                                        >
-                                            {processCitations(msg.content, msg.sources)}
-                                        </ReactMarkdown>
+                                    {/* Avatar */}
+                                    <div className={`flex-none w-8 h-8 rounded-full flex items-center justify-center shadow-sm shrink-0 overflow-hidden ${msg.role === 'ai' ? 'bg-blue-50 border border-blue-100' : 'bg-[#0F1C2E] text-white'}`}>
+                                        {msg.role === 'ai' ? (
+                                            <img src="/logo.png" alt="DraftMate" className="w-5 h-5 object-contain" />
+                                        ) : (
+                                            <span className="material-symbols-outlined text-[18px]">person</span>
+                                        )}
                                     </div>
 
-                                    {/* Follow-up Suggestions */}
-                                    {msg.followups && msg.followups.length > 0 && (
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            {msg.followups.map((question, qIdx) => (
-                                                <button
-                                                    key={qIdx}
-                                                    onClick={() => setInput(question)}
-                                                    className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                                    {/* Bubble / Content */}
+                                    {msg.role === 'user' ? (
+                                        <div className="max-w-[80%] px-6 py-4 rounded-[24px] bg-[#0F1C2E] text-white rounded-tr-sm shadow-md text-[15px] leading-relaxed whitespace-pre-wrap">
+                                            {msg.content}
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 min-w-0 text-[15px] leading-relaxed text-[#0F1C2E] pt-1.5">
+
+                                            {/* Citation Confidence Pills */}
+                                            {msg.sources && msg.sources.length > 0 && (
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-full border border-blue-100">
+                                                        <span className="material-symbols-outlined text-xs">verified</span>
+                                                        {msg.sources.length} Verified Citations
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* Markdown Content */}
+                                            <div className="markdown-content">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkMath, remarkGfm]}
+                                                    rehypePlugins={[rehypeKatex]}
+                                                    components={{
+                                                        p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+                                                        ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-3" {...props} />,
+                                                        ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-3" {...props} />,
+                                                        li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                                        h1: ({ node, ...props }) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                                                        h2: ({ node, ...props }) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                                                        h3: ({ node, ...props }) => <h3 className="text-base font-bold mt-3 mb-1" {...props} />,
+                                                        a: ({ node, href, children, ...props }) => (
+                                                            <CitationLink href={href} sources={msg.sources}>
+                                                                {children}
+                                                            </CitationLink>
+                                                        )
+                                                    }}
                                                 >
-                                                    {question}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {/* Sources Reference */}
-                                    {/* Convert to Draft Button */}
-                                    {msg.role === 'ai' && !msg.isDeepThink && (
-                                        <button
-                                            onClick={() => {
-                                                setDraftingPrompt(`Draft the legal document required for: ${messages[index - 1]?.content || 'this query'}. Focus on drafting the actual legal papers.`);
-                                                setIsDraftingOpen(true);
-                                            }}
-                                            className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-800/50 transition-colors border border-purple-200 dark:border-purple-700 text-xs font-medium"
-                                        >
-                                            <span className="material-symbols-outlined text-sm">edit_document</span>
-                                            Draft a document related to this query
-                                        </button>
-                                    )}
-
-                                    {msg.sources && msg.sources.length > 0 && (
-                                        <details className="mt-4 group">
-                                            <summary className="cursor-pointer text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-sm">menu_book</span>
-                                                {msg.sources.length} Source{msg.sources.length > 1 ? 's' : ''} Referenced
-                                                <span className="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
-                                            </summary>
-                                            <div className="mt-2 space-y-1 pl-1 border-l-2 border-blue-200 dark:border-blue-800">
-                                                {msg.sources.map((source, sIdx) => (
-                                                    <a
-                                                        key={sIdx}
-                                                        href={source.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="block text-xs py-1 px-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
-                                                    >
-                                                        <span className="font-medium text-blue-600 dark:text-blue-400">[{source.index}]</span>
-                                                        <span className="text-slate-600 dark:text-slate-300 ml-1">{source.title}</span>
-                                                        <span className="text-slate-400 dark:text-slate-500 ml-1 text-[10px]">({source.type})</span>
-                                                    </a>
-                                                ))}
+                                                    {processCitations(msg.content, msg.sources)}
+                                                </ReactMarkdown>
                                             </div>
-                                        </details>
-                                    )}
 
-                                    {msg.file && (
-                                        <div className="flex items-center gap-2 mt-2 bg-white/20 p-2 rounded-lg text-xs">
-                                            <span className="material-symbols-outlined text-sm">description</span>
-                                            {msg.file.name}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-
-                        {/* Typing Indicator / Execution Timeline */}
-                        {isTyping && (
-                            <div className="flex gap-4 items-start animate-fade-in-up">
-                                <div className="flex-none w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm">
-                                    <span className="material-symbols-outlined text-blue-600 text-base">gavel</span>
-                                </div>
-                                <div className="flex-1 space-y-2">
-                                    {/* Breadcrumb Timeline */}
-                                    {activeNodes.length > 0 && (
-                                        <div className="flex items-center gap-2 flex-wrap pb-1">
-                                            {activeNodes.map((node, i) => (
-                                                <div key={node.node} className="flex items-center gap-1">
-                                                    {i > 0 && <span className="text-slate-400 dark:text-slate-500 text-xs">→</span>}
-                                                    <span
-                                                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
-                                                            node.status === "running"
-                                                                ? "bg-blue-600 text-white animate-pulse shadow-sm shadow-blue-500/30"
-                                                                : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"
-                                                        }`}
+                                            {/* Completion Actions */}
+                                            {!isTyping && msg.content && !msg.isIntro && (
+                                                <div className="mt-5 flex items-center gap-4 pt-2">
+                                                    <button className="flex items-center gap-1 text-slate-400 hover:text-blue-600 transition-colors text-[11px] font-bold uppercase">
+                                                        <span className="material-symbols-outlined text-sm">thumb_up</span>
+                                                    </button>
+                                                    <button className="flex items-center gap-1 text-slate-400 hover:text-rose-500 transition-colors text-[11px] font-bold uppercase">
+                                                        <span className="material-symbols-outlined text-sm">thumb_down</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { navigator.clipboard.writeText(msg.content); toast.success("Copied to clipboard") }}
+                                                        className="flex items-center gap-1 text-slate-400 hover:text-slate-900 transition-colors text-[11px] font-bold uppercase"
                                                     >
-                                                        {node.label}
-                                                    </span>
+                                                        <span className="material-symbols-outlined text-sm">content_copy</span> Copy
+                                                    </button>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                            )}
 
-                                    {/* Node Cards */}
-                                    {activeNodes.map((node, i) => {
-                                        const isRunning = node.status === 'running';
-                                        return (
-                                            <div key={`${node.node}-${i}`} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden shadow-sm max-w-[90%]">
-                                                <div className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50">
-                                                    <span className="flex items-center gap-2">
-                                                        <span className={`material-symbols-outlined text-base ${isRunning ? 'text-blue-500' : 'text-emerald-500'}`}>
-                                                            {isRunning ? 'sync' : 'check_circle'}
-                                                        </span>
-                                                        <span className="text-sm">{node.label}</span>
-                                                    </span>
-                                                    <span className={`text-[10px] uppercase tracking-wide font-bold px-2 py-0.5 rounded-full ${
-                                                        isRunning
-                                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
-                                                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                                                    }`}>
-                                                        {isRunning ? 'Running' : 'Complete'}
-                                                    </span>
-                                                </div>
-                                                {isRunning && (
-                                                    <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 bg-white dark:bg-slate-900/50">
-                                                        {node.content ? (
-                                                            <div className="markdown-content text-xs text-slate-700 dark:text-slate-300 overflow-y-auto max-h-48 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700 font-mono">
-                                                                <ReactMarkdown>
-                                                                    {node.content + ' ▍'}
-                                                                </ReactMarkdown>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-                                                                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                                                                <span className="text-xs italic">Processing...</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                    
-                                    {/* Traditional Typing Indicator as fallback if no nodes yet */}
-                                    {activeNodes.length === 0 && (
-                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700 inline-block">
-                                            {statusMessage ? (
-                                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                                    <span className="material-symbols-outlined animate-spin text-blue-500 text-sm">progress_activity</span>
-                                                    <span className="text-sm font-medium">{statusMessage}</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex gap-1.5">
-                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                            {/* Follow-up Suggestions */}
+                                            {msg.followups && msg.followups.length > 0 && (
+                                                <div className="mt-5 space-y-2 pt-4 border-t border-slate-100/60 w-full max-w-2xl">
+                                                    {msg.followups.map((question, qIdx) => (
+                                                        <button
+                                                            key={qIdx}
+                                                            onClick={() => setInput(question)}
+                                                            className="w-full text-left px-4 py-2.5 text-[13px] text-slate-600 bg-white hover:bg-blue-50 hover:text-blue-700 border border-slate-200 hover:border-blue-300 rounded-xl transition-all flex items-center justify-between group shadow-sm leading-snug"
+                                                        >
+                                                            {question}
+                                                            <span className="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100 transition-opacity">send</span>
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             )}
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })}
 
-                        {/* Suggested Prompts */}
-                        {messages.length === 1 && !isTyping && (
-                            <div className="mt-auto pb-4 grid grid-cols-1 md:grid-cols-2 gap-3 animate-fade-in-up">
-                                <button
-                                    onClick={() => setInput("What are the latest Supreme Court judgments on Section 138 of NI Act?")}
-                                    className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
-                                >
-                                    <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Section 138 of NI Act</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">Latest Supreme Court judgments summary</div>
-                                </button>
-                                <button
-                                    onClick={() => setInput("Draft a Legal Notice for breach of contract under Indian Contract Act")}
-                                    className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-sm group"
-                                >
-                                    <div className="font-medium text-slate-900 dark:text-white text-sm mb-1 group-hover:text-blue-600 transition-colors">Draft a Legal Notice</div>
-                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">For breach of contract under Indian Contract Act</div>
-                                </button>
+                        
+
+                        {/* Typing / Pipeline Status */}
+                        {isTyping && activeNodes.length === 0 && (
+                            <div className="flex gap-4 items-start animate-fade-in-up w-full">
+                                <div className="flex-none w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                                    <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                                </div>
+                                <div className="pt-1.5 flex gap-1.5 items-center">
+                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                </div>
                             </div>
                         )}
 
@@ -851,16 +894,21 @@ const ResearchChat = () => {
                 </main>
 
                 {/* Footer / Input */}
-                <footer className="flex-none bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-700 pb-6 pt-4 px-4 z-20">
-                    <div className="max-w-3xl mx-auto w-full space-y-3">
+                <footer className="flex-none bg-gradient-to-t from-[#F8FAFF] via-[#F8FAFF] to-transparent pb-6 pt-8 px-4 z-20 relative">
+                    <div className="max-w-4xl mx-auto w-full">
+
+                        {/* Progress Timeline & Tasks UI */}
+                        {isTyping && <ResearchProgressTimeline activeNodes={activeNodes} />}
+                        {isTyping && <SubQueryTasks isTyping={isTyping} input={input} />}
+
                         {/* File Preview */}
                         {selectedFiles.length > 0 && (
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
                                 {selectedFiles.map((file, idx) => (
-                                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 shadow-sm animate-slide-up">
+                                    <div key={`${file.name}-${idx}`} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm animate-slide-up">
                                         <span className="material-symbols-outlined text-red-500 text-base">picture_as_pdf</span>
-                                        <span className="text-sm text-slate-700 dark:text-slate-200 max-w-[150px] truncate" title={file.name}>{file.name}</span>
-                                        <button onClick={() => removeFile(idx)} className="hover:bg-slate-100 dark:hover:bg-slate-600 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                        <span className="text-sm text-slate-700 max-w-[150px] truncate">{file.name}</span>
+                                        <button onClick={() => removeFile(idx)} className="hover:bg-slate-100 rounded-full p-1 text-slate-400 hover:text-red-500 transition-colors">
                                             <span className="material-symbols-outlined text-base">close</span>
                                         </button>
                                     </div>
@@ -868,7 +916,114 @@ const ResearchChat = () => {
                             </div>
                         )}
 
-                        <div className="relative flex items-end gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all p-2">
+                        <div className="relative flex items-end gap-2 bg-white border border-slate-200 rounded-[28px] shadow-lg shadow-slate-200/40 focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-300 transition-all p-2 pl-3">
+
+                            {/* Plus Menu (Dropdown logic) */}
+                            <div className="relative mb-1">
+                                <button
+                                    onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+                                    className={`flex-none p-2 rounded-full transition-colors ${isPlusMenuOpen ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:bg-slate-100'}`}
+                                >
+                                    <span className={`material-symbols-outlined text-2xl transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : ''}`}>
+                                        add_circle
+                                    </span>
+                                </button>
+
+                                {isPlusMenuOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsPlusMenuOpen(false)} />
+                                        <div className="absolute bottom-full left-0 mb-3 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-50 animate-fade-in-up">
+                                            <button className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
+                                                <span className="material-symbols-outlined text-lg">manage_search</span> Add Research
+                                            </button>
+                                            <button onClick={() => { setIsPlusMenuOpen(false); setIsDraftingOpen(true); }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
+                                                <span className="material-symbols-outlined text-lg">edit_document</span> Add Drafting
+                                            </button>
+                                            <button onClick={() => { setIsPlusMenuOpen(false); triggerFileSelect(); }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-3 transition-colors">
+                                                <span className="material-symbols-outlined text-lg">upload_file</span> Add Document
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Ask a legal question..."
+                                rows={1}
+                                className="flex-1 bg-transparent border-0 focus:ring-0 p-3 text-[#0F1C2E] placeholder-slate-400 resize-none max-h-48 overflow-y-auto outline-none text-base font-medium"
+                                style={{ minHeight: '48px' }}
+                            />
+
+                            {/* Dynamic Model & Thinking Selector */}
+                            <div className="relative mb-1.5 flex items-center">
+                                <button
+                                    onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold transition-colors mr-2 whitespace-nowrap"
+                                >
+                                    {LLM_OPTIONS.find(o => o.value === selectedLLM)?.label || 'Fast'} • {deepThinkEnabled ? 'Extended' : 'Standard'}
+                                    <span className={`material-symbols-outlined text-[14px] transition-transform ${isModelSelectorOpen ? 'rotate-180' : ''}`}>expand_less</span>
+                                </button>
+
+                                {isModelSelectorOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsModelSelectorOpen(false)} />
+                                        <div className="absolute bottom-full right-0 mb-3 w-64 bg-[#1E1E1E] text-white rounded-2xl shadow-2xl p-2 z-50 animate-fade-in-up border border-[#333]">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-2">Models</div>
+                                            {LLM_OPTIONS.map(opt => (
+                                                <button
+                                                    key={opt.value}
+                                                    onClick={() => { handleLLMChange(opt.value); }}
+                                                    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-[#333] transition-colors"
+                                                >
+                                                    <span className={`material-symbols-outlined text-[18px] ${selectedLLM === opt.value ? 'text-blue-400' : 'text-transparent'}`}>check</span>
+                                                    <div>
+                                                        <div className="text-sm font-semibold">{opt.label}</div>
+                                                        <div className="text-xs text-slate-400">{opt.description}</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+
+                                            <div className="h-px bg-[#333] my-2" />
+
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-2">Thinking Level</div>
+                                            <button
+                                                onClick={() => { setDeepThinkEnabled(false); setIsModelSelectorOpen(false); }}
+                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-[#333] transition-colors"
+                                            >
+                                                <span className={`material-symbols-outlined text-[18px] ${!deepThinkEnabled ? 'text-blue-400' : 'text-transparent'}`}>check</span>
+                                                <div>
+                                                    <div className="text-sm font-semibold">Standard</div>
+                                                    <div className="text-xs text-slate-400">Best for most questions</div>
+                                                </div>
+                                            </button>
+                                            <button
+                                                onClick={() => { setDeepThinkEnabled(true); setIsModelSelectorOpen(false); }}
+                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-[#333] transition-colors"
+                                            >
+                                                <span className={`material-symbols-outlined text-[18px] ${deepThinkEnabled ? 'text-blue-400' : 'text-transparent'}`}>check</span>
+                                                <div>
+                                                    <div className="text-sm font-semibold">Extended</div>
+                                                    <div className="text-xs text-slate-400">Complex problem solving</div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                <button
+                                    onClick={handleSend}
+                                    disabled={!input.trim() && selectedFiles.length === 0}
+                                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-300 shrink-0 ${input.trim() || selectedFiles.length > 0 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' : 'bg-slate-100 text-slate-300'
+                                        }`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">{isTyping ? 'hourglass_top' : 'arrow_upward'}</span>
+                                </button>
+                            </div>
+
+                            {/* Hidden file input for triggers */}
                             <input
                                 type="file"
                                 ref={fileInputRef}
@@ -877,58 +1032,10 @@ const ResearchChat = () => {
                                 multiple
                                 className="hidden"
                             />
-                            <button
-                                onClick={triggerFileSelect}
-                                className="flex-none p-3 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                title="Add attachment"
-                                disabled={isUploading}
-                            >
-                                <span className="material-symbols-outlined text-xl">add</span>
-                            </button>
-                            <textarea
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Ask a legal question..."
-                                rows={1}
-                                className="flex-1 bg-transparent border-0 focus:ring-0 p-3 text-slate-900 dark:text-white placeholder-slate-400 resize-none max-h-48 overflow-y-auto outline-none shadow-none text-sm"
-                                style={{ minHeight: '44px' }}
-                                onInput={(e) => {
-                                    e.target.style.height = 'auto';
-                                    e.target.style.height = e.target.scrollHeight + 'px';
-                                }}
-                            />
-                            {/* Deep Think Toggle Button */}
-                            <button
-                                onClick={() => setDeepThinkEnabled(!deepThinkEnabled)}
-                                className={`flex-none flex items-center gap-1.5 px-3 py-2 mb-1 rounded-full text-xs font-medium transition-all duration-300 ${deepThinkEnabled
-                                    ? 'bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-                                    }`}
-                                title={deepThinkEnabled ? 'Deep Think enabled' : 'Enable Deep Think'}
-                            >
-                                <span className={`material-symbols-outlined text-sm transition-all duration-300 ${deepThinkEnabled ? 'animate-pulse' : ''
-                                    }`}>
-                                    psychology
-                                </span>
-                                <span className="hidden sm:inline">Deep Think</span>
-                            </button>
-
-                            <button
-                                onClick={handleSend}
-                                disabled={!input.trim() && selectedFiles.length === 0}
-                                className={`flex-none p-3 rounded-full transition-all duration-200 ${input.trim() || selectedFiles.length > 0
-                                    ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                                    }`}
-                            >
-                                <span className="material-symbols-outlined text-xl">send</span>
-                            </button>
                         </div>
-
-                        <div className="text-center">
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                                AI can make mistakes. Check important info.
+                        <div className="text-center mt-3">
+                            <p className="text-[10px] font-medium text-slate-400 flex items-center justify-center gap-1.5">
+                                <span className="material-symbols-outlined text-[12px]">info</span> AI can make mistakes. Always verify outputs before relying on them.
                             </p>
                         </div>
                     </div>
@@ -943,6 +1050,8 @@ const ResearchChat = () => {
                     initialPrompt={draftingPrompt}
                 />
             )}
+
+
         </div>
     );
 };
