@@ -1,6 +1,11 @@
 import logging
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
+import logging
 import hashlib
+import json
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
@@ -16,7 +21,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices
 
 import sys
 import re
@@ -27,12 +32,31 @@ parent_dir = os.path.abspath(os.path.join(current_dir, "../"))
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
+deep_research_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research"))
+if deep_research_dir not in sys.path:
+    sys.path.append(deep_research_dir)
+
 try:
     from Deep_research.lex_bot.tools.pdf_processor import pdf_processor
     from Deep_research.lex_bot.tools.session_cache import get_session_cache
 except ImportError:
     pdf_processor = None
     get_session_cache = None
+
+try:
+    from Deep_research.lex_bot.core.llm_factory import get_llm
+except ImportError:
+    get_llm = None
+
+try:
+    from Deep_research.lex_bot.tools import indian_kanoon_api as ik_api
+except ImportError:
+    ik_api = None
+
+try:
+    from Deep_research.lex_bot.tools.reranker import rerank_documents
+except ImportError:
+    rerank_documents = None
 
 PLACEHOLDER_REGEX = re.compile(r'\b[A-Z][A-Z0-9_]{3,}\b')
 
@@ -63,9 +87,8 @@ def extract_and_cache_docx(file_path: str):
         logger.error(f"Background extraction failed: {e}")
 
 
-from legal_draft import generate_legal_draft
 
-load_dotenv()
+from legal_draft import generate_legal_draft
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +158,537 @@ def _normalize_download_url(download_source_url: str) -> str:
     if "127.0.0.1" in download_source_url:
         return download_source_url.replace("127.0.0.1", "onlyoffice-server")
     return download_source_url
+
+
+def _strip_json_block(text: str) -> str:
+    if not text:
+        return ""
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?", "", candidate, flags=re.IGNORECASE).strip()
+        if candidate.endswith("```"):
+            candidate = candidate[:-3].strip()
+    start = candidate.find("{")
+    end = candidate.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return candidate[start : end + 1]
+    return candidate
+
+
+def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
+    if not text:
+        return None
+    try:
+        payload = json.loads(_strip_json_block(text))
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        return None
+    return None
+
+
+def _llm_text_response(llm: Any, prompt: str) -> str:
+    if llm is None:
+        return ""
+    try:
+        if hasattr(llm, "invoke"):
+            result = llm.invoke(prompt)
+        elif hasattr(llm, "predict"):
+            result = llm.predict(prompt)
+        else:
+            result = llm(prompt)
+    except Exception as exc:
+        logger.warning(f"LLM invocation failed: {exc}")
+        return ""
+
+    if isinstance(result, str):
+        return result
+    if hasattr(result, "content"):
+        return str(result.content)
+    return str(result)
+
+
+def _normalize_answer_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict):
+        parts = []
+        for key in sorted(value.keys()):
+            normalized = _normalize_answer_text(value[key])
+            if normalized:
+                parts.append(f"{key}: {normalized}")
+        return " | ".join(parts).strip()
+    if isinstance(value, list):
+        return ", ".join([_normalize_answer_text(v) for v in value if _normalize_answer_text(v)])
+    return str(value).strip()
+
+
+def _flatten_answers(accumulated_answers: Dict[str, Any]) -> str:
+    if not accumulated_answers:
+        return ""
+    pieces = []
+    for key in sorted(accumulated_answers.keys()):
+        value = _normalize_answer_text(accumulated_answers.get(key))
+        if value:
+            pieces.append(f"{key}: {value}")
+    return "\n".join(pieces)
+
+
+def _build_clarifying_question(question_id: str, prompt: str, options: List[Tuple[str, str]]) -> ClarifyingQuestion:
+    return ClarifyingQuestion(
+        id=question_id,
+        question=prompt,
+        type="single",
+        options=[ClarifyingOption(label=label, value=value) for label, value in options],
+        required=True,
+    )
+
+
+def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[str, Any], current_round_index: int) -> Dict[str, Any]:
+    text = f"{initial_prompt}\n{_flatten_answers(accumulated_answers)}".lower()
+
+    # Look for explicit answers in accumulated_answers
+    ans_doc_type = None
+    ans_jurisdiction = None
+    ans_position = None
+
+    for k, v in accumulated_answers.items():
+        k_lower = str(k).lower()
+        v_str = str(v).strip()
+        if not v_str:
+            continue
+        if "document" in k_lower or "preparing" in k_lower or "doc_type" in k_lower:
+            ans_doc_type = v_str
+        if "jurisdiction" in k_lower or "govern" in k_lower:
+            ans_jurisdiction = v_str
+        if "representing" in k_lower or "side" in k_lower or "position" in k_lower:
+            ans_position = v_str
+
+    document_type = "Legal Document"
+    if any(token in text for token in ["lease", "tenancy"]):
+        document_type = "Lease / Tenancy Agreement"
+    elif any(token in text for token in ["employment", "employee", "employer"]):
+        document_type = "Employment Agreement"
+    elif any(token in text for token in ["share", "equity", "shareholders"]):
+        document_type = "Shareholders Agreement"
+    elif any(token in text for token in ["service", "consulting", "vendor"]):
+        document_type = "Services Agreement"
+    elif any(token in text for token in ["nda", "non-disclosure", "confidential"]):
+        document_type = "NDA / Confidentiality Agreement"
+    elif any(token in text for token in ["petition", "writ", "appeal", "suit"]):
+        document_type = "Litigation Filing"
+
+    if ans_doc_type:
+        document_type = ans_doc_type
+
+    jurisdiction = "Not specified"
+    for candidate in ["india", "indian", "delhi", "mumbai", "maharashtra", "karnataka", "tamil nadu", "california", "new york"]:
+        if candidate in text:
+            jurisdiction = candidate.title()
+            break
+
+    if ans_jurisdiction:
+        jurisdiction = ans_jurisdiction
+
+    rep_position = "Not specified"
+    for candidate in [
+        "for the claimant",
+        "for the plaintiff",
+        "for the petitioner",
+        "for the respondent",
+        "for the defendant",
+        "for the seller",
+        "for the buyer",
+        "for the licensor",
+        "for the licensee",
+    ]:
+        if candidate in text:
+            rep_position = candidate.replace("for the ", "").title()
+            break
+
+    if ans_position:
+        rep_position = ans_position
+
+    questions: List[ClarifyingQuestion] = []
+    missing_key_inputs = []
+    if jurisdiction == "Not specified" and not ans_jurisdiction:
+        missing_key_inputs.append("jurisdiction")
+    if document_type == "Legal Document" and not ans_doc_type:
+        missing_key_inputs.append("document_type")
+    if rep_position == "Not specified" and not ans_position:
+        missing_key_inputs.append("representation_position")
+    if not accumulated_answers:
+        missing_key_inputs.append("commercial_terms")
+
+    if missing_key_inputs:
+        if "jurisdiction" in missing_key_inputs:
+            questions.append(
+                _build_clarifying_question(
+                    "jurisdiction",
+                    "Which jurisdiction should govern this draft?",
+                    [("India", "India"), ("United States", "United States"), ("Other / mixed", "Other / mixed")],
+                )
+            )
+        if "document_type" in missing_key_inputs:
+            questions.append(
+                _build_clarifying_question(
+                    "document_type",
+                    "What kind of document are we preparing?",
+                    [
+                        (document_type, document_type),
+                        ("Contract / Agreement", "Contract / Agreement"),
+                        ("Litigation / Court filing", "Litigation / Court filing"),
+                        ("Other", "Other"),
+                    ],
+                )
+            )
+        if "representation_position" in missing_key_inputs:
+            questions.append(
+                _build_clarifying_question(
+                    "position",
+                    "Which side are we representing?",
+                    [
+                        ("Party A / initiator", "Party A / initiator"),
+                        ("Party B / responding party", "Party B / responding party"),
+                        ("Buyer / recipient", "Buyer / recipient"),
+                        ("Seller / provider", "Seller / provider"),
+                    ],
+                )
+            )
+
+    basis = DraftBasis(
+        document_type=document_type,
+        jurisdiction=jurisdiction,
+        representation_position=rep_position,
+        key_legal_positions=[
+            "Use market-standard allocation of risk where the prompt is silent.",
+            "Preserve internal consistency across definitions, remedies, and termination rights.",
+        ],
+    )
+    assumptions = [
+        "Market-standard boilerplate will be used for missing administrative clauses.",
+        "Ambiguous commercial inputs will be resolved conservatively in favor of internal consistency.",
+    ]
+
+    sufficient = len(questions) == 0
+    return {
+        "sufficiency_met": sufficient,
+        "questions": questions[:5],
+        "draft_summary": DraftSummary(basis=basis, assumptions=assumptions) if sufficient else None,
+        "validation_metadata": {
+            "document_type": document_type,
+            "jurisdiction": jurisdiction,
+            "representation_position": rep_position,
+            "current_round_index": current_round_index,
+            "detected_missing_inputs": missing_key_inputs,
+            "source": "heuristic_fallback",
+        },
+    }
+
+
+def _build_intake_prompt(initial_prompt: str, accumulated_answers: Dict[str, Any], current_round_index: int) -> str:
+    answers_text = _flatten_answers(accumulated_answers)
+    return f"""
+You are a Senior Transactional Lawyer performing intake analysis for a legal drafting workflow.
+
+Follow these steps:
+1. Document Identification.
+2. Requirement Extraction.
+3. Gap Analysis.
+
+If critical structural or commercial risk information is missing, return up to 5 concise clarifying questions.
+Prefer multiple-choice questions with 3-4 options.
+If the matter is sufficiently clear or market-standard provisions can close the gaps, return sufficiency_met true,
+and include:
+- Step 6 assumptions
+- Step 8 draft summary basis
+
+Return JSON only with this schema:
+{{
+  "sufficiency_met": boolean,
+  "questions": [{{"id": string, "question": string, "type": "single"|"multiple", "options": [{{"label": string, "value": string}}]}}],
+  "draft_summary": {{
+    "basis": {{
+      "document_type": string,
+      "jurisdiction": string,
+      "representation_position": string,
+      "key_legal_positions": [string]
+    }},
+    "assumptions": [string]
+  }},
+  "validation_metadata": object
+}}
+
+Current round index: {current_round_index}
+Initial prompt:
+{initial_prompt}
+
+Accumulated answers:
+{answers_text or "[none]"}
+""".strip()
+
+
+def _run_intake_orchestrator(initial_prompt: str, accumulated_answers: Dict[str, Any], current_round_index: int) -> IntakeAnalyzeResponse:
+    if get_llm is not None:
+        try:
+            llm = get_llm(mode="reasoning")
+            prompt = _build_intake_prompt(initial_prompt, accumulated_answers, current_round_index)
+            raw = _llm_text_response(llm, prompt)
+            parsed = _safe_json_loads(raw) or {}
+            sufficiency_met = bool(parsed.get("sufficiency_met"))
+            questions_payload = parsed.get("questions") or []
+            questions: List[ClarifyingQuestion] = []
+            for idx, item in enumerate(questions_payload[:5]):
+                if not isinstance(item, dict):
+                    continue
+                options = item.get("options") or []
+                questions.append(
+                    ClarifyingQuestion(
+                        id=str(item.get("id") or f"q_{current_round_index}_{idx}"),
+                        question=str(item.get("question") or ""),
+                        type=str(item.get("type") or "single"),
+                        options=[
+                            ClarifyingOption(
+                                label=str(opt.get("label") or opt.get("value") or opt),
+                                value=str(opt.get("value") or opt.get("label") or opt),
+                            )
+                            for opt in options
+                            if isinstance(opt, (dict, str))
+                        ],
+                        required=True,
+                    )
+                )
+
+            draft_summary_payload = parsed.get("draft_summary") or {}
+            draft_summary = None
+            if sufficiency_met and isinstance(draft_summary_payload, dict):
+                basis_payload = draft_summary_payload.get("basis") or {}
+                basis = DraftBasis(
+                    document_type=str(basis_payload.get("document_type") or "Legal Document"),
+                    jurisdiction=str(basis_payload.get("jurisdiction") or "Not specified"),
+                    representation_position=str(basis_payload.get("representation_position") or "Not specified"),
+                    key_legal_positions=[str(x) for x in (basis_payload.get("key_legal_positions") or []) if str(x).strip()],
+                )
+                draft_summary = DraftSummary(
+                    basis=basis,
+                    assumptions=[str(x) for x in (draft_summary_payload.get("assumptions") or []) if str(x).strip()],
+                )
+
+            if sufficiency_met and draft_summary is None:
+                fallback = _heuristic_intake_analysis(initial_prompt, accumulated_answers, current_round_index)
+                draft_summary = fallback["draft_summary"]
+                parsed_metadata = fallback["validation_metadata"]
+            else:
+                parsed_metadata = parsed.get("validation_metadata") if isinstance(parsed.get("validation_metadata"), dict) else {}
+
+            if not parsed_metadata:
+                parsed_metadata = {}
+            parsed_metadata.setdefault("source", "llm")
+            parsed_metadata.setdefault("current_round_index", current_round_index)
+            return IntakeAnalyzeResponse(
+                sufficiency_met=sufficiency_met or (draft_summary is not None and not questions),
+                current_round_index=current_round_index,
+                next_round_index=current_round_index + 1,
+                questions=questions[:5],
+                draft_summary=draft_summary,
+                validation_metadata=parsed_metadata,
+            )
+        except Exception as exc:
+            logger.warning(f"LLM intake orchestrator failed, using heuristic fallback: {exc}")
+
+    fallback = _heuristic_intake_analysis(initial_prompt, accumulated_answers, current_round_index)
+    return IntakeAnalyzeResponse(
+        sufficiency_met=bool(fallback["sufficiency_met"]),
+        current_round_index=current_round_index,
+        next_round_index=current_round_index + 1,
+        questions=fallback["questions"][:5],
+        draft_summary=fallback["draft_summary"],
+        validation_metadata=fallback["validation_metadata"],
+    )
+
+
+def _extract_case_tokens(raw_text: str, document_vehicle: Optional[str], jurisdiction_context: Optional[str]) -> Dict[str, str]:
+    base_text = (raw_text or "").strip()
+    if get_llm is not None:
+        try:
+            llm = get_llm(mode="fast")
+            prompt = f"""
+Extract the following from the highlighted legal text:
+- Legal Issue
+- Jurisdiction Context
+- Document Vehicle
+- Core Proposition
+
+Return JSON only:
+{{
+  "legal_issue": string,
+  "jurisdiction_context": string,
+  "document_vehicle": string,
+  "core_proposition": string
+}}
+
+Highlighted text:
+{base_text}
+
+Known context:
+document_vehicle: {document_vehicle or ""}
+jurisdiction_context: {jurisdiction_context or ""}
+""".strip()
+            raw = _llm_text_response(llm, prompt)
+            parsed = _safe_json_loads(raw) or {}
+            return {
+                "legal_issue": str(parsed.get("legal_issue") or base_text[:220] or "legal issue"),
+                "jurisdiction_context": str(parsed.get("jurisdiction_context") or jurisdiction_context or "unspecified"),
+                "document_vehicle": str(parsed.get("document_vehicle") or document_vehicle or "unspecified"),
+                "core_proposition": str(parsed.get("core_proposition") or base_text[:320] or "unspecified"),
+            }
+        except Exception as exc:
+            logger.warning(f"Case token extraction LLM failed, using heuristic fallback: {exc}")
+
+    lowered = base_text.lower()
+    if any(word in lowered for word in ["appeal", "supreme court", "high court", "trial court", "writ"]):
+        issue = "Judicial precedent and procedural posture"
+    elif any(word in lowered for word in ["lease", "rent", "tenant", "landlord"]):
+        issue = "Property or tenancy dispute"
+    elif any(word in lowered for word in ["employment", "dismissal", "termination"]):
+        issue = "Employment dispute"
+    elif any(word in lowered for word in ["contract", "agreement", "breach", "indemnity"]):
+        issue = "Contract interpretation or breach"
+    else:
+        issue = base_text[:160] or "legal issue"
+
+    return {
+        "legal_issue": issue,
+        "jurisdiction_context": jurisdiction_context or "unspecified",
+        "document_vehicle": document_vehicle or "unspecified",
+        "core_proposition": base_text[:320] or "unspecified",
+    }
+
+
+def _case_search_queries(tokens: Dict[str, str]) -> List[str]:
+    queries = [
+        " ".join(part for part in [tokens.get("legal_issue"), tokens.get("jurisdiction_context")] if part and part != "unspecified").strip(),
+        " ".join(part for part in [tokens.get("core_proposition"), tokens.get("jurisdiction_context")] if part and part != "unspecified").strip(),
+        " ".join(part for part in [tokens.get("document_vehicle"), tokens.get("legal_issue")] if part and part != "unspecified").strip(),
+    ]
+    seen: Set[str] = set()
+    final_queries: List[str] = []
+    for query in queries:
+        normalized = query.strip()
+        if normalized and normalized.lower() not in seen:
+            seen.add(normalized.lower())
+            final_queries.append(normalized)
+    if tokens.get("legal_issue") and tokens["legal_issue"].lower() not in seen:
+        final_queries.append(tokens["legal_issue"])
+    return final_queries[:5]
+
+
+def _court_label(candidate: Dict[str, Any]) -> str:
+    for key in ("court", "docsource", "source", "doctype"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return "Court not specified"
+
+
+def _case_weight(candidate: Dict[str, Any], tokens: Dict[str, str]) -> float:
+    haystack = " ".join(
+        str(candidate.get(key, "")) for key in ("title", "snippet", "citation", "court", "docsource", "source")
+    ).lower()
+    weight = 0.0
+    for needle in [
+        tokens.get("legal_issue", ""),
+        tokens.get("core_proposition", ""),
+        tokens.get("jurisdiction_context", ""),
+        tokens.get("document_vehicle", ""),
+    ]:
+        needle = (needle or "").lower().strip()
+        if needle and needle != "unspecified" and needle in haystack:
+            weight += 2.0
+    if "supreme" in haystack or "high court" in haystack:
+        weight += 1.25
+    if candidate.get("citation"):
+        weight += 0.5
+    return weight
+
+
+def _summarize_case_candidate(candidate: Dict[str, Any], tokens: Dict[str, str]) -> CaseSearchItem:
+    title = str(candidate.get("title") or candidate.get("case_name") or "Unknown case")
+    citation = str(candidate.get("citation") or candidate.get("docid") or "")
+    snippet = str(candidate.get("snippet") or candidate.get("summary") or "")
+    court = _court_label(candidate)
+    relevance = candidate.get("relevance_justification")
+    if not isinstance(relevance, str) or not relevance.strip():
+        relevance = (
+            f"Matched the issue profile around {tokens.get('legal_issue', 'the highlighted issue')} "
+            f"and aligns with the stated proposition."
+        )
+    holding = candidate.get("holding_summary")
+    if not isinstance(holding, str) or not holding.strip():
+        holding = snippet[:320] if snippet else "Holding summary unavailable from the retrieved source."
+    return CaseSearchItem(
+        case_name=title,
+        court=court,
+        citation=citation,
+        relevance_justification=relevance.strip(),
+        holding_summary=holding.strip(),
+        source_url=str(candidate.get("url") or candidate.get("source_url") or "") or None,
+        docid=str(candidate.get("docid") or "") or None,
+    )
+
+
+def _fetch_case_candidates(query: str, limit: int) -> List[Dict[str, Any]]:
+    if ik_api is None:
+        return []
+    try:
+        results = ik_api.search(query, max_results=max(5, min(limit, 10)))
+    except Exception as exc:
+        logger.warning(f"Indian Kanoon search failed for query '{query}': {exc}")
+        return []
+    if isinstance(results, list):
+        return [item for item in results if isinstance(item, dict)]
+    return []
+
+
+def _rank_case_candidates(candidates: List[Dict[str, Any]], tokens: Dict[str, str]) -> List[Dict[str, Any]]:
+    if not candidates:
+        return []
+
+    if rerank_documents is not None:
+        try:
+            query = " ".join([tokens.get("legal_issue", ""), tokens.get("core_proposition", ""), tokens.get("jurisdiction_context", "")]).strip()
+            docs = []
+            for candidate in candidates:
+                docs.append(
+                    {
+                        "text": " ".join(str(candidate.get(key, "")) for key in ("title", "snippet", "citation", "docsource")).strip(),
+                        "metadata": candidate,
+                    }
+                )
+            ranked = rerank_documents(query=query, candidates=docs, top_n=min(10, len(docs)))
+            if isinstance(ranked, list) and ranked:
+                ranked_candidates: List[Dict[str, Any]] = []
+                for item in ranked:
+                    if isinstance(item, dict):
+                        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else None
+                        ranked_candidates.append(metadata or item)
+                if ranked_candidates:
+                    candidates = ranked_candidates
+        except Exception as exc:
+            logger.warning(f"Reranking failed, using heuristic ranking: {exc}")
+
+    unique: Dict[str, Dict[str, Any]] = {}
+    for candidate in candidates:
+        docid = str(candidate.get("docid") or candidate.get("id") or candidate.get("citation") or candidate.get("title") or "").strip()
+        if not docid:
+            continue
+        score = _case_weight(candidate, tokens)
+        if docid not in unique or score > unique[docid].get("_score", -1):
+            candidate["_score"] = score
+            unique[docid] = candidate
+    return sorted(unique.values(), key=lambda item: item.get("_score", 0.0), reverse=True)
 
 def create_content_control_run(paragraph, placeholder_tag: str, default_text: str):
     sdt = OxmlElement("w:sdt")
@@ -297,6 +851,128 @@ class ForceSaveRequest(BaseModel):
     document_key: str
 
 
+class IntakeAnalyzeRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    initial_prompt: str = Field(
+        default="",
+        validation_alias=AliasChoices("initial_prompt", "prompt", "case_context", "user_prompt"),
+    )
+    current_round_index: int = 0
+    accumulated_answers: Dict[str, Any] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices("accumulated_answers", "answers"),
+    )
+
+
+class ClarifyingOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    value: str
+
+
+class ClarifyingQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    question: str
+    type: str = "single"
+    options: List[ClarifyingOption] = Field(default_factory=list)
+    required: bool = True
+
+
+class DraftBasis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_type: str
+    jurisdiction: str
+    representation_position: str
+    key_legal_positions: List[str] = Field(default_factory=list)
+
+
+class DraftSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    basis: DraftBasis
+    assumptions: List[str] = Field(default_factory=list)
+
+
+class IntakeAnalyzeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sufficiency_met: bool
+    current_round_index: int
+    next_round_index: int
+    questions: List[ClarifyingQuestion] = Field(default_factory=list)
+    draft_summary: Optional[DraftSummary] = None
+    validation_metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CaseSearchRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    raw_text: str = Field(
+        default="",
+        validation_alias=AliasChoices("raw_text", "highlighted_text", "selection", "query", "text"),
+    )
+    document_vehicle: Optional[str] = None
+    jurisdiction_context: Optional[str] = None
+    limit: int = 8
+
+
+class CaseSearchItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_name: str
+    court: str
+    citation: str
+    relevance_justification: str
+    holding_summary: str
+    source_url: Optional[str] = None
+    docid: Optional[str] = None
+
+
+class CaseSearchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tokens: Dict[str, str]
+    cases: List[CaseSearchItem] = Field(default_factory=list)
+    source: str = "indian_kanoon"
+
+
+@app.post("/v2/draft/intake/analyze", response_model=IntakeAnalyzeResponse)
+async def intake_analyze(request: IntakeAnalyzeRequest, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    return _run_intake_orchestrator(
+        initial_prompt=request.initial_prompt,
+        accumulated_answers=request.accumulated_answers,
+        current_round_index=request.current_round_index,
+    )
+
+
+@app.post("/v2/research/cases", response_model=CaseSearchResponse)
+async def research_cases(request: CaseSearchRequest, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+
+    tokens = _extract_case_tokens(
+        raw_text=request.raw_text,
+        document_vehicle=request.document_vehicle,
+        jurisdiction_context=request.jurisdiction_context,
+    )
+    queries = _case_search_queries(tokens)
+
+    candidates: List[Dict[str, Any]] = []
+    for query in queries:
+        candidates.extend(_fetch_case_candidates(query, request.limit))
+
+    ranked_candidates = _rank_case_candidates(candidates, tokens)
+    top_candidates = ranked_candidates[: max(5, min(request.limit, 10))]
+    cases = [_summarize_case_candidate(candidate, tokens) for candidate in top_candidates]
+
+    return CaseSearchResponse(tokens=tokens, cases=cases)
+
+
 @app.get("/")
 def root():
     return {"service": "drafter-service", "status": "ok"}
@@ -366,7 +1042,16 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
             "editorConfig": {
                 "callbackUrl": "http://drafter-service:8003/v2/draft/callback",
                 "mode": "edit",
-                "customization": {"forcesave": True, "chat": False},
+                "customization": {
+                    "forcesave": True,
+                    "chat": False,
+                    "uiTheme": "theme-light",
+                    "logo": {
+                        "image": "",
+                        "imageDark": "",
+                        "url": ""
+                    }
+                },
             },
         }
         params["token"] = _jwt_encode(params)
@@ -428,7 +1113,16 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
             "editorConfig": {
                 "callbackUrl": "http://drafter-service:8003/v2/draft/callback",
                 "mode": "edit",
-                "customization": {"forcesave": True, "chat": False},
+                "customization": {
+                    "forcesave": True,
+                    "chat": False,
+                    "uiTheme": "theme-light",
+                    "logo": {
+                        "image": "",
+                        "imageDark": "",
+                        "url": ""
+                    }
+                },
             },
         }
         params["token"] = _jwt_encode(params)
@@ -578,7 +1272,16 @@ async def upload_draft(
             "editorConfig": {
                 "callbackUrl": "http://drafter-service:8003/v2/draft/callback",
                 "mode": "edit",
-                "customization": {"forcesave": True, "chat": False},
+                "customization": {
+                    "forcesave": True,
+                    "chat": False,
+                    "uiTheme": "theme-light",
+                    "logo": {
+                        "image": "",
+                        "imageDark": "",
+                        "url": ""
+                    }
+                },
             },
         }
         params["token"] = _jwt_encode(params)

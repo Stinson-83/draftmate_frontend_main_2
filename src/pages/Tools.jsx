@@ -6,6 +6,14 @@ import CourtFeeModal from '../components/CourtFeeModal';
 import axios from 'axios';
 import { API_CONFIG } from '../services/endpoints';
 
+const ensureDocxFilename = (filename, fallback = 'Untitled Draft') => {
+    const raw = String(filename || fallback).trim() || fallback;
+    if (raw.toLowerCase().endsWith('.docx') || raw.toLowerCase().endsWith('.pdf')) {
+        return raw;
+    }
+    return `${raw}.docx`;
+};
+
 const Tools = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -17,6 +25,34 @@ const Tools = () => {
     const [htmlContent, setHtmlContent] = useState('');
     const [initialDraftingPrompt, setInitialDraftingPrompt] = useState('');
     const fileInputRef = useRef(null);
+
+    const saveDeskDraftRecord = (record) => {
+        const savedDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+        const nextRecord = {
+            ...record,
+            id: record.id || record.documentKey || Date.now().toString(),
+            name: record.name || record.filename || record.title || 'Untitled Draft',
+            filename: ensureDocxFilename(record.filename || record.name || record.title || 'Untitled Draft'),
+            documentKey: record.documentKey || record.id || '',
+            lastModified: record.lastModified || new Date().toISOString(),
+            status: record.status || 'In progress',
+            trackingParams: record.trackingParams || {
+                source: record.source || 'tools_upload',
+                documentKey: record.documentKey || record.id || '',
+                filename: ensureDocxFilename(record.filename || record.name || record.title || 'Untitled Draft'),
+                updatedAt: record.lastModified || new Date().toISOString(),
+                folderId: record.folderId ?? null,
+            },
+        };
+
+        const updatedDrafts = [
+            ...savedDrafts.filter((draft) => String(draft.id) !== String(nextRecord.id)),
+            nextRecord,
+        ];
+
+        localStorage.setItem('my_drafts', JSON.stringify(updatedDrafts));
+        window.dispatchEvent(new Event('my_drafts_updated'));
+    };
 
     useEffect(() => {
         if (location.state?.openDrafting) {
@@ -39,10 +75,16 @@ const Tools = () => {
         const file = e.target.files[0];
         if (!file) return;
 
+        const sessionId = localStorage.getItem('session_id');
+        if (!sessionId) {
+            alert('Please sign in again before uploading a document.');
+            e.target.value = '';
+            return;
+        }
+
         setUploadedFileName(file.name);
         setIsUploading(true);
         
-        const sessionId = crypto.randomUUID();
         const formData = new FormData();
         formData.append('file', file);
         formData.append('session_id', sessionId);
@@ -52,17 +94,39 @@ const Tools = () => {
             const response = await axios.post(url, formData, {
                 headers: { 
                     'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${localStorage.getItem('session_id')}`
+                    'Authorization': `Bearer ${sessionId}`
                 },
             });
             const data = response.data;
             
+            saveDeskDraftRecord({
+                id: data.documentKey,
+                name: data.filename,
+                filename: data.filename,
+                documentKey: data.documentKey,
+                onlyofficeConfig: data,
+                variablesDetected: data.variablesDetected || [],
+                status: 'In progress',
+                source: 'tools_upload',
+                trackingParams: {
+                    source: 'tools_upload',
+                    documentKey: data.documentKey,
+                    filename: data.filename,
+                    uploadedAt: new Date().toISOString(),
+                },
+            });
+
             navigate('/dashboard/workspace', {
                 state: {
                     documentKey: data.documentKey,
                     filename: data.filename,
                     onlyofficeConfig: data,
-                    variablesDetected: data.variablesDetected || []
+                    variablesDetected: data.variablesDetected || [],
+                    trackingParams: {
+                        source: 'tools_upload',
+                        documentKey: data.documentKey,
+                        filename: data.filename,
+                    }
                 }
             });
         } catch (error) {
@@ -70,6 +134,7 @@ const Tools = () => {
             alert('Failed to upload and open document. Please try again.');
         } finally {
             setIsUploading(false);
+            e.target.value = '';
         }
     };
 
@@ -226,30 +291,24 @@ const Tools = () => {
                                     Drafting
                                 </h3>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <ToolCard
-                                    icon="history_edu"
-                                    title="AI Legal Drafting"
-                                    description="Start by drafting and do legal research side by side."
+                                    icon="edit_document"
+                                    title="Create New Draft"
+                                    description="Start a new document with AI guidance or an empty workspace."
                                     onClick={handleDraftingClick}
                                 />
                                 <ToolCard
-                                    icon="note_add"
-                                    title="Empty Document"
-                                    description="Start with an empty document without a prompt."
-                                    onClick={handleEmptyDocumentClick}
+                                    icon="upload_file"
+                                    title="Work on Existing Document"
+                                    description="Upload a `.docx` or `.pdf` file and continue in the workspace."
+                                    onClick={handleUploadClick}
                                 />
                                 <ToolCard
                                     icon="description"
                                     title="Review Your Draft"
-                                    description="Review you previously created drafts."
+                                    description="Review your previously created drafts."
                                     onClick={() => navigate('/dashboard/drafts')}
-                                />
-                                <ToolCard
-                                    icon="upload_file"
-                                    title="Upload your own draft"
-                                    description="Upload your own draft and start doing drafting and legal research."
-                                    onClick={handleUploadClick}
                                 />
                             </div>
                         </section>
@@ -401,7 +460,14 @@ const Tools = () => {
             />
 
             {/* Modals */}
-            {isModalOpen && <DraftingModal onClose={() => setIsModalOpen(false)} initialPrompt={initialDraftingPrompt} />}
+            {isModalOpen && (
+                <DraftingModal
+                    onClose={() => setIsModalOpen(false)}
+                    initialPrompt={initialDraftingPrompt}
+                    initialEntryMode="dashboard"
+                    onDraftCreated={saveDeskDraftRecord}
+                />
+            )}
             {isCourtFeeModalOpen && <CourtFeeModal onClose={() => setIsCourtFeeModalOpen(false)} />}
             <UploadModal
                 isOpen={isUploadModalOpen}

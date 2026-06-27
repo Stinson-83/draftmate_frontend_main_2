@@ -29,3 +29,9 @@ apprunner_config.json
 
 LEXBOT_LATENCY_ANALYSIS.md
 UPGRADE_PLAN.md
+
+# Local legal workspace testing directories
+backend/Drafter/__pycache__/
+backend/Deep_research/lex_bot/data/uploads/*.docx
+shared_drafts/
+scratch/

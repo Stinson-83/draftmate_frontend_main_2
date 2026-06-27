@@ -629,6 +629,126 @@ function CreateEventModalTrigger({ onAdd }) {
         setOpen(false);
     };
 
+    const handleWorkspaceDraftOpen = (draft) => {
+        const filename = ensureDocxFilename(draft.filename || draft.title || draft.rawName || 'Untitled Draft');
+        const documentKey = draft.documentKey || draft.id || filename;
+        const onlyofficeConfig = buildWorkspaceConfig({
+            ...draft,
+            filename,
+            documentKey,
+        });
+
+        navigate('/dashboard/workspace', {
+            state: {
+                documentKey,
+                filename,
+                onlyofficeConfig,
+                variablesDetected: draft.variablesDetected || [],
+                trackingParams: draft.trackingParams || {
+                    documentKey,
+                    filename,
+                    source: draft.trackingParams?.source || 'my_desk',
+                    folderId: draft.trackingParams?.folderId ?? null,
+                },
+            },
+        });
+    };
+
+    const handleCreateNewDraft = () => {
+        setIsDraftingModalOpen(true);
+    };
+
+    const handleExistingDocumentClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const ext = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
+        if (!['.docx', '.pdf'].includes(ext)) {
+            toast.error('Only .docx and .pdf files are supported.');
+            event.target.value = '';
+            return;
+        }
+
+        const sessionId = localStorage.getItem('session_id');
+        if (!sessionId) {
+            toast.error('Please sign in again before uploading a document.');
+            event.target.value = '';
+            return;
+        }
+
+        setIsUploadingDocument(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('session_id', sessionId);
+
+            const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${sessionId}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                let detail = 'Failed to upload document.';
+                try {
+                    const errorData = await response.json();
+                    detail = errorData?.detail || detail;
+                } catch {
+                    detail = response.statusText || detail;
+                }
+                throw new Error(detail);
+            }
+
+            const data = await response.json();
+
+            saveDeskDraftRecord({
+                id: data.documentKey,
+                name: data.filename,
+                filename: data.filename,
+                documentKey: data.documentKey,
+                onlyofficeConfig: data,
+                variablesDetected: data.variablesDetected || [],
+                status: 'In progress',
+                source: 'dashboard_upload',
+                trackingParams: {
+                    source: 'dashboard_upload',
+                    documentKey: data.documentKey,
+                    filename: data.filename,
+                    uploadedAt: new Date().toISOString(),
+                },
+            });
+
+            navigate('/dashboard/workspace', {
+                state: {
+                    documentKey: data.documentKey,
+                    filename: data.filename,
+                    onlyofficeConfig: data,
+                    variablesDetected: data.variablesDetected || [],
+                    trackingParams: {
+                        source: 'dashboard_upload',
+                        documentKey: data.documentKey,
+                        filename: data.filename,
+                    },
+                },
+            });
+        } catch (error) {
+            console.error('Upload failed:', error);
+            toast.error(error.message || 'Failed to upload and open document.');
+        } finally {
+            setIsUploadingDocument(false);
+            event.target.value = '';
+        }
+    };
+
+    const visibleDeskDrafts = allDrafts;
+
     return (
         <>
             <button
