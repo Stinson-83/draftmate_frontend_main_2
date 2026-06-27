@@ -6,6 +6,25 @@ import logo from '../assets/draftmate_logo.png';
 
 import { API_CONFIG } from '../services/endpoints';
 
+const readJsonSafely = async (response) => {
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        return text ? { detail: text } : {};
+    }
+
+    const text = await response.text();
+    if (!text) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { detail: text };
+    }
+};
+
 const Signup = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
@@ -32,7 +51,7 @@ const Signup = () => {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await response.json();
+            const data = await readJsonSafely(response);
 
             if (!response.ok) {
                 throw new Error(data.detail || 'Registration failed');
@@ -46,18 +65,20 @@ const Signup = () => {
                 body: JSON.stringify({ email, password }),
             });
 
-            const loginData = await loginResponse.json();
+            const loginData = await readJsonSafely(loginResponse);
 
-            if (loginResponse.ok) {
-                // Save session
-                localStorage.setItem('session_id', loginData.session_id);
-                localStorage.setItem('user_id', loginData.user_id);
-                localStorage.setItem('user_profile', JSON.stringify({
-                    email: email,
-                    id: loginData.user_id,
-                    isNewUser: true
-                }));
+            if (!loginResponse.ok) {
+                throw new Error(loginData.detail || 'Account created, but automatic login failed. Please sign in manually.');
             }
+
+            // Save session
+            localStorage.setItem('session_id', loginData.session_id);
+            localStorage.setItem('user_id', loginData.user_id);
+            localStorage.setItem('user_profile', JSON.stringify({
+                email: email,
+                id: loginData.user_id,
+                isNewUser: true
+            }));
 
             toast.dismiss(loadingToast);
             toast.success("Account created! Let's complete your profile.");
@@ -82,47 +103,28 @@ const Signup = () => {
                     body: JSON.stringify({ token: tokenResponse.credential || tokenResponse.access_token }), // Adjust based on flow
                 });
 
-                // Note: @react-oauth/google useGoogleLogin returns access_token by default (implicit flow)
-                // If using 'credential' (ID token), we need <GoogleLogin /> or flow: 'auth-code'
-                // But auth.py expects 'token'. Let's assume it wants ID token for verification?
-                // auth.py uses: id_token.verify_oauth2_token
-                // So we need the ID token. useGoogleLogin with default flow gives access_token.
-                // We should use flow: 'implicit' but getting id_token requires setup.
-                // Better to use the <GoogleLogin> component? No, button is custom.
-                // Let's use flow: 'implicit' and fetch user info? No, auth.py verifies ID token.
-                // We need ID Token. 
-                // Let's use onSuccess with credential (if we switch to GoogleLogin component) OR
-                // useGoogleLogin({ flow: 'auth-code' })? 
-                // Actually, let's keep it simple. If we need ID token, we might need 'response_type': 'id_token' equivalent.
-                // Or just use the GoogleLogin component which handles this. 
-                // But we have a custom button.
+                const data = await readJsonSafely(response);
 
-                // Let's try passing the access_token? auth.py: id_token.verify_oauth2_token(token, ...)
-                // This definitely expects an ID Token (JWT).
-                // access_token is opaque/hex.
-                // To get ID token with custom button + useGoogleLogin:
-                // We can't easily get it in implicit flow without extra work.
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Google signup failed');
+                }
 
-                // ALTERNATIVE: Use fetch to google userinfo endpoint using access_token on frontend, 
-                // then send email/id to backend? UNSAFE. 
+                localStorage.setItem('session_id', data.session_id);
+                localStorage.setItem('user_id', data.user_id);
+                localStorage.setItem('user_profile', JSON.stringify({
+                    id: data.user_id,
+                    email: data.email,
+                    name: data.name,
+                    image: data.picture,
+                    google: true,
+                }));
 
-                // Let's look at how Login.jsx was planned.
-                // Plan said: "Google Login: POST ... {token: credentialResponse.credential}"
-                // That implies using the <GoogleLogin> component (which returns credentialResponse).
-                // Since I have a custom button styling, I might want to use the render prop or just overlay the Google button opacity 0?
-                // Or I can use `useGoogleLogin` and swap backend verification to use `google-auth` with access_token?
-                // backend/login_db/auth.py uses `id_token.verify_oauth2_token`.
-                // So it MUST be an ID token.
-
-                // I will update the logic to just show a toast "Google Sign In implementation pending ID Token adjustment" for now via the button, 
-                // OR attempt to implementation.
-
-                // Actually, let's just implement the Email/Password flow properly first. 
-                // I'll comment out the actual fetch for google for a second to avoid breakage if token is wrong.
-
-                // Wait, I can try to use `onSuccess` response.
+                toast.dismiss(loadingToast);
+                toast.success("Account created! Welcome.");
+                navigate('/dashboard/home');
             } catch (error) {
-                toast.error("Google Signup failed");
+                    toast.dismiss(loadingToast);
+                    toast.error(error.message || "Google Signup failed");
             } finally {
                 setIsLoading(false);
             }

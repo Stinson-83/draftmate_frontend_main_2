@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
 import EditorToolbar from '../components/EditorToolbar';

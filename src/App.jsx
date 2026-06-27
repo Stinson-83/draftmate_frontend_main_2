@@ -131,6 +131,9 @@ function App() {
 
             <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
 
+            {/* Comparison view moved outside MainLayout for a full-screen experience */}
+            <Route path="/dashboard/translate/compare/:jobId" element={<RequireAuth><TranslateComparePage /></RequireAuth>} />
+
             <Route path="/dashboard" element={<RequireAuth><MainLayout /></RequireAuth>}>
               <Route path="home" element={<Dashboard />} />
               <Route path="editor" element={<Editor />} />

@@ -6,6 +6,25 @@ import logo from '../assets/draftmate_logo.png';
 import fullLogo from '../assets/FULL_LOGO.svg';
 import { API_CONFIG } from '../services/endpoints';
 
+const readJsonSafely = async (response) => {
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        return text ? { detail: text } : {};
+    }
+
+    const text = await response.text();
+    if (!text) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { detail: text };
+    }
+};
+
 const Login = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
@@ -26,7 +45,7 @@ const Login = () => {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await response.json();
+            const data = await readJsonSafely(response);
 
             if (!response.ok) {
                 throw new Error(data.detail || 'Login failed');
@@ -72,7 +91,7 @@ const Login = () => {
                     body: JSON.stringify({ token: tokenResponse.credential || tokenResponse.access_token }),
                 });
 
-                const data = await response.json();
+                const data = await readJsonSafely(response);
 
                 if (!response.ok) {
                     throw new Error(data.detail || 'Google Login failed');

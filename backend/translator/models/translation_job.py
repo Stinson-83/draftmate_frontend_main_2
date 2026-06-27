@@ -16,6 +16,7 @@ class TranslationJob(Base):
     stage = Column(String(50), nullable=False, default="queued")
     progress = Column(Integer, nullable=False, default=0)
     source_file = Column(Text, nullable=False)
+    source_language = Column(String(50), nullable=False, default="auto")
     translated_file = Column(Text, nullable=True)
     target_language = Column(String(50), nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

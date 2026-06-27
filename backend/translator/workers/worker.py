@@ -2,6 +2,7 @@
 
 import logging
 import os
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
@@ -16,7 +17,7 @@ from backend.translator.models.translation_job import TranslationJob
 from backend.translator.rebuilders import rebuild_docx_document, rebuild_html_document, rebuild_pdf_document
 from backend.translator.storage.paths import get_translated_upload_path
 from backend.translator.security import open_secure_storage_file, store_bytes_at_rest
-from backend.translator.translators import translate_blocks
+from backend.translator.translators.sarvam_translate import sarvam_translate
 from backend.translator.tasks import celery_app
 
 logger = logging.getLogger(__name__)
@@ -54,14 +55,42 @@ def _set_job_state(session, job_id: int, *, status: str, stage: str, progress: i
     update_translation_job(session, job_id, status=status, stage=stage, progress=progress)
 
 
+def _translate_blocks(blocks: list[object], source_language: str, target_language: str) -> list[object]:
+    translated_texts = sarvam_translate(
+        [block.text for block in blocks],
+        src_lang=source_language,
+        tgt_lang=target_language,
+    )
+
+    if len(translated_texts) != len(blocks):
+        raise ValueError("Sarvam AI returned an unexpected number of translations")
+
+    translated_blocks: list[object] = []
+    for block, translated_text in zip(blocks, translated_texts, strict=True):
+        translated_blocks.append(
+            replace(
+                block,
+                text=translated_text,
+                style={
+                    **block.style,
+                    "source_language": source_language,
+                    "target_language": target_language,
+                    "translation_provider": "sarvam_translate_api",
+                },
+            )
+        )
+
+    return translated_blocks
+
+
 def _run_pipeline(session, job: TranslationJob) -> None:
     with open_secure_storage_file(job.source_file) as source_path:
         blocks, output_ext, rebuilder = _extract_blocks(source_path)
         _set_job_state(session, job.id, status="processing", stage="extracted", progress=20)
 
-        translated_blocks = translate_blocks(
+        translated_blocks = _translate_blocks(
             blocks,
-            source_language=_source_language(),
+            source_language=job.source_language or _source_language(),
             target_language=job.target_language,
         )
         _set_job_state(session, job.id, status="processing", stage="translated", progress=60)
@@ -108,8 +137,8 @@ def _process_next_job() -> None:
         try:
             _run_pipeline(session, job)
             logger.info("Completed translation job %s", job.id)
-        except Exception:
-            logger.exception("Failed to process translation job %s", job.id)
+        except Exception as error:
+            logger.exception("Failed to process translation job %s: %s", job.id, error)
             update_translation_job(session, job.id, status="failed", stage="failed", progress=0)
 
 

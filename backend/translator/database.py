@@ -1,10 +1,11 @@
 """Database helpers for the translator service."""
 
 import os
-
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+load_dotenv()
 
 def _get_database_url() -> str:
     return (
@@ -14,12 +15,10 @@ def _get_database_url() -> str:
         or ""
     )
 
-
 DATABASE_URL = _get_database_url()
 
 engine = None
 SessionLocal = None
-
 
 def init_engine():
     """Create the SQLAlchemy engine and session factory once a database URL is available."""
@@ -29,20 +28,14 @@ def init_engine():
         return None
 
     if engine is None:
+        # Crucial Fix: Removed the custom hardcoded 'connect_args' dictionary 
+        # to ensure Python 3.14 types do not cause a crash.
         engine = create_engine(
             DATABASE_URL,
-            pool_pre_ping=True,
-            connect_args={
-                "keepalives": 1,
-                "keepalives_idle": 30,
-                "keepalives_interval": 10,
-                "keepalives_count": 5,
-            },
+            pool_pre_ping=True
         )
         SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
     return engine
 
-
 init_engine()
-

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import mimetypes
 import os
 import socket
 import struct
@@ -198,12 +199,36 @@ def open_secure_storage_file(path: str | Path) -> Iterator[Path]:
 
 
 def build_download_response(path: str | Path, *, download_name: str) -> FileResponse:
+    return build_inline_file_response(path, download_name=download_name)
+
+
+def _guess_content_type(download_name: str) -> str:
+    suffix = Path(download_name).suffix.lower()
+    if suffix in SUPPORTED_EXTENSION_MAP:
+        return SUPPORTED_EXTENSION_MAP[suffix]
+
+    guessed_type, _ = mimetypes.guess_type(download_name)
+    return guessed_type or "application/octet-stream"
+
+
+def build_inline_file_response(
+    path: str | Path,
+    *,
+    download_name: str,
+    content_type: str | None = None,
+) -> FileResponse:
     stored_path = Path(path)
     raw_data = stored_path.read_bytes()
     decoded_data = _unpack_payload(raw_data)
+    media_type = content_type or _guess_content_type(download_name)
+    headers = {"Content-Disposition": f'inline; filename="{download_name}"'}
 
     if decoded_data is raw_data:
-        return FileResponse(path=stored_path, filename=download_name)
+        return FileResponse(
+            path=stored_path,
+            media_type=media_type,
+            headers=headers,
+        )
 
     temp_dir = get_temp_work_dir()
     with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix=Path(download_name).suffix) as handle:
@@ -212,6 +237,7 @@ def build_download_response(path: str | Path, *, download_name: str) -> FileResp
 
     return FileResponse(
         path=temp_path,
-        filename=download_name,
+        media_type=media_type,
+        headers=headers,
         background=BackgroundTask(delete_local_file, str(temp_path)),
     )

@@ -6,15 +6,89 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Sequence
 
+import os
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 from backend.translator.extractors.models import Block
 
+import os
+from pathlib import Path
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+from backend.translator.extractors.models import Block
+
+STORAGE_DIR = Path(__file__).resolve().parent.parent / "storage"
+
+FONT_REGISTRY = {
+    "hi-IN": "NotoSansDevanagari-Regular.ttf",
+    "sa-IN": "NotoSansDevanagari-Regular.ttf",
+    "mr-IN": "NotoSansDevanagari-Regular.ttf",
+    "ne-IN": "NotoSansDevanagari-Regular.ttf",
+    "kok-IN": "NotoSansDevanagari-Regular.ttf",
+    "brx-IN": "NotoSansDevanagari-Regular.ttf",
+    "doi-IN": "NotoSansDevanagari-Regular.ttf",
+    "mai-IN": "NotoSansDevanagari-Regular.ttf",
+    "bn-IN": "NotoSansBengali-Regular.ttf",
+    "as-IN": "NotoSansBengali-Regular.ttf",
+    "gu-IN": "NotoSansGujarati-Regular.ttf",
+    "pa-IN": "NotoSansGurmukhi-Regular.ttf",
+    "od-IN": "NotoSansOriya-Regular.ttf",
+    "ta-IN": "NotoSansTamil-Regular.ttf",
+    "te-IN": "NotoSansTelugu-Regular.ttf",
+    "kn-IN": "NotoSansKannada-Regular.ttf",
+    "ml-IN": "NotoSansMalayalam-Regular.ttf",
+    "ur-IN": "NotoNastaliqUrdu-Regular.ttf",
+}
+
+LANGUAGE_FONT_MAP = {}
+
+# Register each font if it exists in storage
+for lang, filename in FONT_REGISTRY.items():
+    font_path = STORAGE_DIR / filename
+    if font_path.exists():
+        font_name = filename.split("-")[0]  # e.g., "NotoSansDevanagari"
+        if font_name not in pdfmetrics.getRegisteredFontNames():
+            try:
+                pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+            except Exception as e:
+                print(f"[FONT REGISTER ERROR] Failed to register {font_name}: {e}")
+                continue
+        LANGUAGE_FONT_MAP[lang] = font_name
+
+# Fallback Devanagari font paths (system lookup)
+SYSTEM_DEVANAGARI_PATHS = [
+    "C:/Windows/Fonts/mangal.ttf",
+    "C:/Windows/Fonts/kokila.ttf",
+    "C:/Windows/Fonts/utsaah.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+]
+for path in SYSTEM_DEVANAGARI_PATHS:
+    if os.path.exists(path) and "hi-IN" not in LANGUAGE_FONT_MAP:
+        try:
+            pdfmetrics.registerFont(TTFont("SystemDevanagari", path))
+            for lang in ["hi-IN", "sa-IN", "mr-IN", "ne-IN", "kok-IN", "brx-IN", "doi-IN", "mai-IN"]:
+                LANGUAGE_FONT_MAP[lang] = "SystemDevanagari"
+            break
+        except Exception:
+            continue
+
 
 def _font_name(block: Block) -> str:
     style = block.style or {}
+    target_lang = style.get("target_language")
+
+    # Use specific registered font for the target script if available
+    if target_lang in LANGUAGE_FONT_MAP:
+        return LANGUAGE_FONT_MAP[target_lang]
+
     font_name = str(style.get("font_name") or "Helvetica")
     bold = bool(style.get("bold"))
     italic = bool(style.get("italic"))

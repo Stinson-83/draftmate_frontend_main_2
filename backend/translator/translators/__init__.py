@@ -1,6 +1,6 @@
 """Translation adapters for the translator service."""
 
-from .google_translate import GoogleTranslateClient, translate_block_texts, translate_blocks
+from .sarvam_translate import SarvamTranslateClient, sarvam_translate, translate_block_texts, translate_blocks
 
-__all__ = ["GoogleTranslateClient", "translate_block_texts", "translate_blocks"]
+__all__ = ["SarvamTranslateClient", "sarvam_translate", "translate_block_texts", "translate_blocks"]
 
