@@ -261,33 +261,21 @@ def define_graph():
 app = define_graph()
 
 
-# Convenience function for direct invocation
-def run_query(
+def prepare_initial_state(
     query: str,
     user_id: str = None,
     session_id: str = None,
     llm_mode: str = "fast",
     file_path: str = None,
-    chat_store_instance=None
-) -> Dict[str, Any]:
-    """
-    Run a legal research query through the agent workflow.
-    
-    Args:
-        query: User's legal research query
-        user_id: Optional user ID for memory personalization
-        session_id: Optional session ID for conversation tracking
-        llm_mode: "fast" or "reasoning"
-        file_path: Optional path to an uploaded document
-        chat_store_instance: Shared ChatStore to avoid new DB connections
-    
-    Returns:
-        Final state with answer, context, and latency breakdown
-    """
-    from lex_bot.core.timing import LatencyTracker
-    tracker = LatencyTracker()
-
-    print(f"🔄 run_query called with: {query}")
+    chat_store_instance=None,
+    tracker=None
+) -> dict:
+    """Prepare the initial state for the graph."""
+    if not tracker:
+        from lex_bot.core.timing import LatencyTracker
+        tracker = LatencyTracker()
+        
+    print(f"🔄 Preparing initial state for query: {query}")
     
     # Auto-detect file path from session cache if not provided
     uploaded_file_paths = []
@@ -341,7 +329,7 @@ def run_query(
         )
         print(f"✅ Query rewritten to: {processed_query}")
     
-    initial_state = {
+    return {
         "messages": chat_history,
         "original_query": processed_query,  # Use rewritten query
         "user_id": user_id,
@@ -355,6 +343,30 @@ def run_query(
         "tool_results": [],
         "errors": [],
     }
+
+def run_query(
+    query: str,
+    user_id: str = None,
+    session_id: str = None,
+    llm_mode: str = "fast",
+    file_path: str = None,
+    chat_store_instance=None
+) -> Dict[str, Any]:
+    """
+    Run a legal research query through the agent workflow.
+    """
+    from lex_bot.core.timing import LatencyTracker
+    tracker = LatencyTracker()
+
+    initial_state = prepare_initial_state(
+        query=query,
+        user_id=user_id,
+        session_id=session_id,
+        llm_mode=llm_mode,
+        file_path=file_path,
+        chat_store_instance=chat_store_instance,
+        tracker=tracker
+    )
     
     with tracker.step("graph_invoke"):
         print("🚀 Invoking graph app.invoke(initial_state)...")

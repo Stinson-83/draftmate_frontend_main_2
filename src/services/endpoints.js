@@ -95,6 +95,16 @@ export const API_CONFIG = {
         }
     },
 
+    // Service: backend/legal_workflow (Port 8010)
+    LEGAL_WORKFLOW: {
+        BASE_URL: `${BASE_URL}/workflow`,
+        ENDPOINTS: {
+            TURN: '/api/workflow/turn', // POST
+            GET_DRAFT: (draftId) => `/api/workflow/draft/${draftId}`, // GET
+            GET_PDF: (draftId) => `/api/workflow/draft/${draftId}/pdf`, // GET
+        }
+    },
+
     // Service: backend/login_db (Port 8009)
     AUTH: {
         BASE_URL: `${BASE_URL}/auth`,
@@ -131,6 +141,61 @@ export const API_CONFIG = {
         ENDPOINTS: {
             SEARCH: '/search', // GET
             DOC: (docId) => `/doc/${docId}`, // GET
+        }
+    },
+
+    // Service: backend/Advocate_Profile (Port 8007) — routed via /advocate-api/
+    ADVOCATE: {
+        BASE_URL: `${BASE_URL}/advocate-api`,
+        ENDPOINTS: {
+            // Auth
+            REGISTER: '/api/v1/auth/register',
+            LOGIN: '/api/v1/auth/login',
+            REFRESH: '/api/v1/auth/refresh',
+            LOGOUT: '/api/v1/auth/logout',
+            // Profile
+            MY_PROFILE: '/api/v1/profiles/me',
+            COMPLETE_ONBOARDING: '/api/v1/profiles/me/complete-onboarding',
+            UPDATE_PRACTICE_AREAS: '/api/v1/profiles/me/practice-areas',
+            UPDATE_DETAILS: '/api/v1/profiles/me/details',
+            UPLOAD_IMAGE: '/api/v1/profiles/me/upload-image',
+            PUBLIC_PROFILE: (slug) => `/api/v1/profiles/public/${slug}`,
+            // Discovery
+            SEARCH: '/api/v1/discovery/search',
+            FEATURED: '/api/v1/discovery/featured',
+            TRENDING: '/api/v1/discovery/trending',
+            RECENT: '/api/v1/discovery/recent',
+            RECOMMENDED: '/api/v1/discovery/recommended',
+            PRACTICE_AREAS: '/api/v1/discovery/practice-areas',
+            // Consultations
+            CONSULTATION_REQUEST: '/api/v1/consultations/request',
+            MY_CONSULTATIONS: '/api/v1/consultations',
+            UPDATE_CONSULTATION_STATUS: (id) => `/api/v1/consultations/${id}/status`,
+            // Messages (Legacy)
+            CONTACT_REQUEST: '/api/v1/contact/requests',
+            MY_MESSAGES: '/api/v1/contact/requests',
+            UPDATE_MESSAGE_STATUS: (id) => `/api/v1/contact/requests/${id}/status`,
+            // New Messaging System
+            MESSAGES_CONVERSATIONS: '/api/v1/messages/conversations',
+            MESSAGES_CONVERSATION: (email) => `/api/v1/messages/conversation/${email}`,
+            MESSAGES_SEND: '/api/v1/messages',
+            MESSAGES_REPLY: (email) => `/api/v1/messages/conversation/${email}/reply`,
+            MESSAGES_READ: (id) => `/api/v1/messages/${id}/read`,
+            MESSAGES_CONVERSATION_READ: (email) => `/api/v1/messages/conversation/${email}/read`,
+            MESSAGES_CONVERSATION_ARCHIVE: (email) => `/api/v1/messages/conversation/${email}/archive`,
+            // Verification
+            SUBMIT_VERIFICATION: '/api/v1/verification/submit',
+            // Analytics
+            TRACK_VIEW: '/api/v1/analytics/view',
+            TRACK_SHARE: '/api/v1/analytics/share',
+            MY_ANALYTICS: '/api/v1/analytics/dashboard',
+            // Bookmarks
+            BOOKMARKS: '/api/v1/bookmarks',
+            REMOVE_BOOKMARK: (id) => `/api/v1/bookmarks/${id}`,
+            // Admin
+            ADMIN_VERIFICATIONS: '/api/v1/admin/verifications',
+            UPDATE_VERIFICATION_STATUS: (id) => `/api/v1/admin/verifications/${id}/status`,
+            ADMIN_STATS: '/api/v1/admin/stats',
         }
     }
 };

@@ -295,3 +295,91 @@ select:focus {
 .animate-scroll:hover {
   animation-play-state: paused;
 }
+
+/* Phase 7 Design Tokens */
+:root {
+  --navy-900: #0A0F1E;
+  --navy-800: #0D1B3E;
+  --blue-600: #2563EB;
+  --blue-500: #3B82F6;
+  --blue-100: #EFF6FF;
+  --blue-50:  #F0F7FF;
+
+  --gray-50:  #F8FAFC;
+  --gray-100: #F1F5F9;
+  --gray-200: #E5E7EB;
+  --gray-500: #6B7280;
+  --gray-900: #111827;
+
+  --verified: #10B981;
+  --warning:  #F59E0B;
+  --error:    #EF4444;
+  --purple:   #7C3AED;
+
+  --shadow-card:  0 2px 12px rgba(0,0,0,0.07);
+  --shadow-hover: 0 12px 40px rgba(37,99,235,0.13);
+  --shadow-modal: 0 25px 60px rgba(0,0,0,0.15);
+
+  --radius-card:   12px;
+  --radius-button: 8px;
+  --radius-pill:   999px;
+}
+
+/* Phase 4 Motion & Animation System */
+.advocate-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.advocate-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-hover);
+  border-left: 3px solid var(--blue-600);
+}
+
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.animate-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes singlePulse {
+  0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(37,99,235,0); }
+  100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+}
+
+@keyframes fillProgress {
+  from { width: 0%; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pulse-once {
+  animation: singlePulse 1.5s ease-out 1;
+}
+
+/* Custom Scrollbar for hiding in mobile view */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -53,7 +53,7 @@ if current_dir not in sys.path:
     sys.path.append(os.path.dirname(current_dir))
     sys.path.append(current_dir)
 
-from lex_bot.graph import run_query
+from lex_bot.graph import run_query, prepare_initial_state, app as langgraph_app
 from lex_bot.memory import UserMemoryManager
 from lex_bot.memory.chat_store import ChatStore
 from lex_bot.config import MEM0_ENABLED, DATABASE_URL
@@ -585,29 +585,83 @@ async def _stream_chat(request: ChatRequest, user_id: str):
             asyncio.create_task(_background_generate_title(session_id, user_id, request.query))
 
     try:
-        logger.info(f"🚀 Calling run_query for session {session_id}...")
+        logger.info(f"🚀 Calling graph for session {session_id} with node tracking...")
         
-        # Run run_query in a separate thread to allow yielding keep-alive pings
+        import queue
+        
+        tracked_nodes = {
+            "memory_recall", "router", "research_agent", "document_agent", 
+            "law_agent", "case_agent", "citation_agent", "strategy_agent", 
+            "explainer_agent", "manager_aggregate", "memory_store"
+        }
+        
+        from lex_bot.core.timing import LatencyTracker
+        tracker = LatencyTracker()
+        
         loop = asyncio.get_running_loop()
-        future = loop.run_in_executor(
-            None, 
-            lambda: run_query(
+        initial_state = await loop.run_in_executor(
+            None,
+            lambda: prepare_initial_state(
                 query=request.query,
                 user_id=user_id,
                 session_id=session_id,
                 llm_mode="fast",
-                chat_store_instance=chat_store
+                chat_store_instance=chat_store,
+                tracker=tracker
             )
         )
         
-        # Wait for result while yielding pings
-        while not future.done():
-            await asyncio.sleep(2)  # Check every 2 seconds
-            # Yield a ping/status update to keep connection alive
-            yield f"data: {json.dumps({'event': 'ping', 'message': 'Processing...'})}\n\n"
+        node_runs = {}
+        result = None
+        
+        try:
+            async for event in langgraph_app.astream_events(initial_state, version="v2"):
+                kind = event["event"]
+                name = event.get("name", "")
+                run_id = event.get("run_id")
+                
+                if kind == "on_chain_start" and name in tracked_nodes:
+                    node_runs[run_id] = name
+                    yield f"data: {json.dumps({'event': 'node_update', 'node': name, 'status': 'running'})}\n\n"
+                    
+                elif kind == "on_chain_end" and name in tracked_nodes:
+                    yield f"data: {json.dumps({'event': 'node_update', 'node': name, 'status': 'complete'})}\n\n"
+                    
+                elif kind == "on_chat_model_stream":
+                    active_node = None
+                    tags = event.get("tags", [])
+                    
+                    for tag in tags:
+                        if tag.startswith("langgraph:node:"):
+                            node_name = tag.replace("langgraph:node:", "")
+                            if node_name in tracked_nodes:
+                                active_node = node_name
+                                break
+                                
+                    if not active_node:
+                        for pid in event.get("parent_ids", []):
+                            if pid in node_runs:
+                                active_node = node_runs[pid]
+                                break
+                                
+                    if active_node:
+                        chunk = event.get("data", {}).get("chunk")
+                        if chunk:
+                            content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                            if content:
+                                yield f"data: {json.dumps({'event': 'node_stream', 'node': active_node, 'chunk': content})}\n\n"
+                                
+                elif kind == "on_chain_end" and not event.get("parent_ids"):
+                    result = event.get("data", {}).get("output")
+        except Exception as e:
+            logger.error(f"Error in astream_events: {e}")
+            raise
             
-        result = await future
-        logger.info(" run_query returned successfully")
+        tracker.summary()
+        if not result:
+            result = {}
+        result["latency"] = tracker.as_dict()
+        logger.info(" Graph execution returned successfully")
         
         answer = result.get("final_answer", "I apologize, but I couldn't generate a response.")
         sources = result.get("sources", [])

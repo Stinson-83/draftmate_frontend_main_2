@@ -17,13 +17,26 @@ import DraftingModal from '../components/DraftingModal';
 // Shared citation utilities
 import { processCitations, CitationLink } from '../utils/citationUtils';
 
-// LLM options for dropdown
 const LLM_OPTIONS = [
     { value: 'gemini-2.5-flash', label: 'Fast', description: 'High speed responses' },
     { value: 'gemini-2.5-pro', label: 'Advanced', description: 'Deep reasoning & analysis' },
     { value: 'gpt-4o', label: 'Reasoning', description: 'Complex problem solving' },
     { value: 'gpt-4o-mini', label: 'Fast & Efficient', description: 'Balanced performance' },
 ];
+
+const NODE_LABELS = {
+    'memory_recall': 'Reviewing your past instructions',
+    'router': 'Understanding your query',
+    'research_agent': 'Gathering preliminary legal facts',
+    'document_agent': 'Scanning your uploaded documents',
+    'law_agent': 'Identifying relevant statutory provisions',
+    'case_agent': 'Searching Supreme & High Court precedents',
+    'citation_agent': 'Verifying case citations',
+    'strategy_agent': 'Formulating legal strategy',
+    'explainer_agent': 'Breaking down complex legal terms',
+    'manager_aggregate': 'Synthesizing the final answer',
+    'memory_store': 'Committing insights to memory'
+};
 
 const ResearchChat = () => {
     const navigate = useNavigate();
@@ -33,6 +46,7 @@ const ResearchChat = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [statusMessage, setStatusMessage] = useState(''); // Streaming status
+    const [activeNodes, setActiveNodes] = useState([]); // Execution steps tracking
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [sessionId, setSessionId] = useState('');
     const [isUploading, setIsUploading] = useState(false);
@@ -216,6 +230,7 @@ const ResearchChat = () => {
         setSelectedFiles([]);
         setIsTyping(true);
         setStatusMessage('');
+        setActiveNodes([]);
 
         // Create placeholder for AI response
         const aiMsgId = Date.now() + 1;
@@ -241,6 +256,34 @@ const ResearchChat = () => {
                 await api.chatStream(currentInput, sessionId, {
                     onStatus: (message) => {
                         setStatusMessage(message);
+                    },
+                    onNodeUpdate: (event) => {
+                        const { node, status } = event;
+                        setActiveNodes(prev => {
+                            const existingIdx = prev.findIndex(n => n.node === node);
+                            if (existingIdx !== -1) {
+                                const newNodes = [...prev];
+                                newNodes[existingIdx] = { ...newNodes[existingIdx], status };
+                                return newNodes;
+                            }
+                            return [...prev, { node, label: NODE_LABELS[node] || node, status, content: '' }];
+                        });
+                    },
+                    onNodeStream: (event) => {
+                        const { node, chunk } = event;
+                        setActiveNodes(prev => {
+                            const existingIdx = prev.findIndex(n => n.node === node);
+                            if (existingIdx !== -1) {
+                                const newNodes = [...prev];
+                                const currentContent = newNodes[existingIdx].content || '';
+                                newNodes[existingIdx] = { 
+                                    ...newNodes[existingIdx], 
+                                    content: currentContent + chunk 
+                                };
+                                return newNodes;
+                            }
+                            return prev;
+                        });
                     },
                     onToken: (chunk, accumulated) => {
                         // Update message progressively with each token chunk
@@ -695,23 +738,88 @@ const ResearchChat = () => {
                             </div>
                         ))}
 
-                        {/* Typing Indicator */}
+                        {/* Typing Indicator / Execution Timeline */}
                         {isTyping && (
                             <div className="flex gap-4 items-start animate-fade-in-up">
                                 <div className="flex-none w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm">
                                     <span className="material-symbols-outlined text-blue-600 text-base">gavel</span>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700">
-                                    {statusMessage ? (
-                                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                            <span className="material-symbols-outlined animate-spin text-blue-500 text-sm">progress_activity</span>
-                                            <span className="text-sm font-medium">{statusMessage}</span>
+                                <div className="flex-1 space-y-2">
+                                    {/* Breadcrumb Timeline */}
+                                    {activeNodes.length > 0 && (
+                                        <div className="flex items-center gap-2 flex-wrap pb-1">
+                                            {activeNodes.map((node, i) => (
+                                                <div key={node.node} className="flex items-center gap-1">
+                                                    {i > 0 && <span className="text-slate-400 dark:text-slate-500 text-xs">→</span>}
+                                                    <span
+                                                        className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                                                            node.status === "running"
+                                                                ? "bg-blue-600 text-white animate-pulse shadow-sm shadow-blue-500/30"
+                                                                : "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"
+                                                        }`}
+                                                    >
+                                                        {node.label}
+                                                    </span>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ) : (
-                                        <div className="flex gap-1.5">
-                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                            <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                    )}
+
+                                    {/* Node Cards */}
+                                    {activeNodes.map((node, i) => {
+                                        const isRunning = node.status === 'running';
+                                        return (
+                                            <div key={`${node.node}-${i}`} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden shadow-sm max-w-[90%]">
+                                                <div className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/50">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className={`material-symbols-outlined text-base ${isRunning ? 'text-blue-500' : 'text-emerald-500'}`}>
+                                                            {isRunning ? 'sync' : 'check_circle'}
+                                                        </span>
+                                                        <span className="text-sm">{node.label}</span>
+                                                    </span>
+                                                    <span className={`text-[10px] uppercase tracking-wide font-bold px-2 py-0.5 rounded-full ${
+                                                        isRunning
+                                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                                                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                                    }`}>
+                                                        {isRunning ? 'Running' : 'Complete'}
+                                                    </span>
+                                                </div>
+                                                {isRunning && (
+                                                    <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 bg-white dark:bg-slate-900/50">
+                                                        {node.content ? (
+                                                            <div className="markdown-content text-xs text-slate-700 dark:text-slate-300 overflow-y-auto max-h-48 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700 font-mono">
+                                                                <ReactMarkdown>
+                                                                    {node.content + ' ▍'}
+                                                                </ReactMarkdown>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                                                                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                                                <span className="text-xs italic">Processing...</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                    
+                                    {/* Traditional Typing Indicator as fallback if no nodes yet */}
+                                    {activeNodes.length === 0 && (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 dark:border-slate-700 inline-block">
+                                            {statusMessage ? (
+                                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                                    <span className="material-symbols-outlined animate-spin text-blue-500 text-sm">progress_activity</span>
+                                                    <span className="text-sm font-medium">{statusMessage}</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-1.5">
+                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                    <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -10,10 +10,20 @@ services:
     extra_hosts:
       - "drafter-service:host-gateway"
     depends_on:
-      - onlyoffice-server
-    networks:
-      - draftmate-network
-    restart: unless-stopped
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./public
+          target: /app/public
+        - action: sync
+          path: ./index.html
+          target: /app/index.html
+        - action: rebuild
+          path: package.json
 
   onlyoffice-server:
     image: onlyoffice/documentserver:latest
@@ -26,15 +36,162 @@ services:
       - JWT_HEADER=Authorization
       - JWT_IN_BODY=true
     volumes:
-      - ./shared_drafts:/var/www/onlyoffice/Data/shared
-    ports:
-      - "8081:80"
-    extra_hosts:
-      - "drafter-service:host-gateway"
-    networks:
-      - draftmate-network
-    restart: unless-stopped
+      - qdrant_data:/qdrant/storage
 
-networks:
-  draftmate-network:
-    driver: bridge
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  clamav:
+    image: clamav/clamav:latest
+    ports:
+      - "3310:3310"
+
+  translator-cleanup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+    command: ["python", "-m", "backend.translator.scripts.cleanup_storage", "--max-age-hours", "${TRANSLATOR_STORAGE_RETENTION_HOURS:-24}", "--interval-seconds", "3600"]
+    environment:
+      - TRANSLATOR_STORAGE_RETENTION_HOURS=${TRANSLATOR_STORAGE_RETENTION_HOURS:-24}
+    volumes:
+      - translator_original_data:/app/backend/translator/storage/original
+      - translator_translated_data:/app/backend/translator/storage/translated
+    depends_on:
+      - translator-api
+
+  translator-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+    command: ["uvicorn", "backend.translator.app:app", "--host", "0.0.0.0", "--port", "8012"]
+    ports:
+      - "8012:8012"
+    environment:
+      - TRANSLATOR_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_DSN=${POSTGRES_DSN}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - TRANSLATOR_SOURCE_LANGUAGE=${TRANSLATOR_SOURCE_LANGUAGE:-auto}
+      - TRANSLATOR_MAX_UPLOAD_BYTES=${TRANSLATOR_MAX_UPLOAD_BYTES:-26214400}
+      - TRANSLATOR_ENCRYPT_FILES_AT_REST=${TRANSLATOR_ENCRYPT_FILES_AT_REST:-false}
+      - TRANSLATOR_ENCRYPTION_KEY=${TRANSLATOR_ENCRYPTION_KEY}
+      - TRANSLATOR_CLAMAV_SCAN_ENABLED=${TRANSLATOR_CLAMAV_SCAN_ENABLED:-true}
+      - TRANSLATOR_CLAMAV_REQUIRED=${TRANSLATOR_CLAMAV_REQUIRED:-true}
+      - TRANSLATOR_CLAMAV_HOST=${TRANSLATOR_CLAMAV_HOST:-clamav}
+      - TRANSLATOR_CLAMAV_PORT=${TRANSLATOR_CLAMAV_PORT:-3310}
+      - TRANSLATOR_CLAMAV_TIMEOUT_SECONDS=${TRANSLATOR_CLAMAV_TIMEOUT_SECONDS:-10}
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
+      - SARVAM_API_URL=${SARVAM_API_URL:-https://api.sarvam.ai/translate}
+      - SARVAM_TRANSLATE_MODEL=${SARVAM_TRANSLATE_MODEL:-sarvam-translate:v1}
+      - SARVAM_TRANSLATE_TIMEOUT_SECONDS=${SARVAM_TRANSLATE_TIMEOUT_SECONDS:-30}
+      - SARVAM_TRANSLATE_BATCH_SIZE=${SARVAM_TRANSLATE_BATCH_SIZE:-10}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - translator_original_data:/app/backend/translator/storage/original
+      - translator_translated_data:/app/backend/translator/storage/translated
+    depends_on:
+      - db
+      - redis
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+    ports:
+      - "8080:8080"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+      - GOOGLE_SERP_API_KEY=${GOOGLE_SERP_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - FIRECRAWLER_API_KEY=${FIRECRAWLER_API_KEY}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - IKApi=${IKApi}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - PSQL_PASSWD=${PSQL_PASSWD}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - LLM_MODE=${LLM_MODE}
+      - LLM_PROVIDER=${LLM_PROVIDER}
+      - EMBED_MODEL=${EMBED_MODEL}
+      - RERANK_MODEL=${RERANK_MODEL}
+      - MEM0_ENABLED=${MEM0_ENABLED}
+      - SESSION_CACHE_TTL=${SESSION_CACHE_TTL}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT}
+      - SCRAPE_DELAY=${SCRAPE_DELAY}
+      - MAX_TOKENS_PER_QUERY=${MAX_TOKENS_PER_QUERY}
+      - MAX_TOKENS_PER_USER_DAILY=${MAX_TOKENS_PER_USER_DAILY}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT}
+      - MAX_QUERY_LENGTH=${MAX_QUERY_LENGTH}
+      - RATE_LIMIT_RPM=${RATE_LIMIT_RPM}
+      - CHAT_RETENTION_DAYS=${CHAT_RETENTION_DAYS}
+      - MEM0_RETENTION_DAYS=${MEM0_RETENTION_DAYS}
+      - TEST_MODE=${TEST_MODE}
+      - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS}
+      - PREFERRED_DOMAINS=${PREFERRED_DOMAINS}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
+      - INPUT_JSON=${INPUT_JSON}
+      - INTERACTIVE=${INTERACTIVE}
+      - SSH_KEY_PATH=/app/bastion.key.pem
+      - BASTION_IP=${BASTION_IP}
+      - SSH_USER=${SSH_USER}
+      - POSTGRES_DSN=${POSTGRES_DSN}
+      - AUTH_SERVICE_URL=http://127.0.0.1:8009
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - FRONTEND_URL_DEV=${FRONTEND_URL_DEV}
+      - FRONTEND_URL_PROD=${FRONTEND_URL_PROD}
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+      - QDRANT_HOST=qdrant
+      - JWT_SECRET=${JWT_SECRET}
+      - ADVOCATE_PROFILE_PORT=8007
+      - NOTIFICATION_SERVICE_URL=http://127.0.0.1:8015
+    depends_on:
+      - db
+      - qdrant
+    volumes:
+      - ./backend:/app/backend
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app/backend
+          ignore:
+            - backend/__pycache__/
+            - backend/Deep_research/lex_bot/data/
+        - action: rebuild
+          path: requirements.txt
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  translator_original_data:
+  translator_translated_data:
