@@ -106,7 +106,7 @@ export const api = {
      * @param {Object} callbacks - Event callbacks { onStatus, onAnswer, onFollowups, onDone, onError }
      */
     chatStream: async (query, sessionId, callbacks = {}) => {
-        const { onStatus, onToken, onAnswer, onFollowups, onSources, onDone, onError } = callbacks;
+        const { onStatus, onToken, onAnswer, onFollowups, onSources, onDone, onError, onNodeUpdate, onNodeStream } = callbacks;
 
         try {
             const response = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -164,6 +164,12 @@ export const api = {
                                     break;
                                 case 'done':
                                     onDone?.(event);
+                                    break;
+                                case 'node_update':
+                                    onNodeUpdate?.(event);
+                                    break;
+                                case 'node_stream':
+                                    onNodeStream?.(event);
                                     break;
                                 case 'error':
                                     onError?.(new Error(event.message));

@@ -1,303 +1,227 @@
+import json
+import logging
 import os
+from typing import Any, Dict, List, Optional
+
 import google.generativeai as genai
-from typing import Optional
 from dotenv import load_dotenv
+
 load_dotenv()
 
-# System prompt for legal drafting with plain HTML output
-LEGAL_DRAFT_SYSTEM_PROMPT = """
-You are an expert legal drafting assistant with extensive knowledge of legal terminology, 
-document structures, and professional legal writing conventions. Your task is to create 
-comprehensive, professionally formatted legal drafts based on the provided case context 
-and reference legal documents.
+logger = logging.getLogger(__name__)
 
-## YOUR CORE RESPONSIBILITIES:
 
-1. **Analyze the Case Context**: Carefully examine all provided case details including:
-   - Parties involved (plaintiff, defendant, petitioner, respondent, etc.)
-   - Nature of the dispute or legal matter
-   - Relevant facts and circumstances
-   - Applicable jurisdiction and court
-   - Relief or remedies sought
-   - Dates, amounts, and specific details mentioned
+LEGAL_DRAFT_DOCX_PROMPT = """
+You are DraftMate's production legal drafting engine for DOCX generation.
 
-2. **Reference Legal Documents**: Study any provided legal documents to:
-   - Understand the legal framework and precedents
-   - Extract relevant legal provisions and sections
-   - Identify standard clauses and formatting conventions
-   - Incorporate appropriate legal citations
+You will be given a CASE FACTS MATRIX in plain text. You must inspect it carefully and produce ONE valid raw JSON object that strictly conforms to the schema below. Output ONLY the JSON object. Do not wrap the output in markdown. Do not include commentary, explanations, or extra keys.
 
-3. **Draft the Legal Document**: Create a complete, professional legal draft that:
-   - Follows proper legal document structure and formatting
-   - Uses appropriate legal terminology and language
-   - Includes all necessary sections (title, parties, recitals, clauses, signatures, etc.)
-   - Maintains logical flow and coherence
-   - Is tailored specifically to the case context provided
+STRICT JSON SCHEMA (no additional keys allowed):
+{
+  "title": "string",
+  "metadata": {
+    "jurisdiction": "string",
+    "placeholders_detected": ["string"]
+  },
+  "content": [
+    {
+      "element_type": "header_block" | "heading_1" | "paragraph",
+      "text": "string"
+    }
+  ]
+}
 
-## CRITICAL INSTRUCTION FOR MISSING INFORMATION:
+ELEMENT RULES:
+1) content must be an array of paragraph blocks. Each block must contain only:
+   - element_type: one of "header_block", "heading_1", "paragraph"
+   - text: a plain string
+2) Do not include HTML, Markdown, bullet markers, or styling markers in text. Keep it plain text.
+3) Ensure the content reads like a complete professional legal document for the specified document type.
 
-When any information is missing, incomplete, or not provided in the case context, you MUST 
-insert a placeholder in the following exact format:
+MISSING FACTS / VARIABLES POLICY (STRICT):
+If any required legal fact or variable is missing or ambiguous, substitute a clean uppercase alphanumeric token using underscores only, for example:
+EXECUTION_DATE
+PLAINTIFF_NAME
+DEFENDANT_ADDRESS
+COURT_NAME
+CASE_NUMBER
+AMOUNT_IN_DISPUTE
 
-    [the exact description of missing information]
+The placeholder token must:
+- be uppercase
+- contain only A-Z, 0-9, and underscores
+- not be wrapped in brackets, quotes beyond normal JSON quoting, punctuation, or markdown
 
-### Examples of proper placeholder usage:
-- If party name is missing: "[Full legal name of the Plaintiff]"
-- If address is missing: "[Complete residential address of the Defendant]"
-- If date is missing: "[Date of incident/agreement/filing]"
-- If amount is missing: "[Exact amount in dispute in INR/USD]"
-- If case number is missing: "[Case Number assigned by the Court]"
-- If court name is missing: "[Name of the Hon'ble Court and Jurisdiction]"
-- If witness details are missing: "[Name and address of Witness 1]"
-- If exhibit reference is missing: "[Reference number of attached exhibit]"
+PLACEHOLDER TRACKING (STRICT):
+metadata.placeholders_detected must list every placeholder token you used anywhere in title or content text. Each entry must be the raw token string.
 
-## DOCUMENT STRUCTURE GUIDELINES:
-
-1. **Header Section**:
-   - Court name and jurisdiction
-   - Case title/number
-   - Document title (e.g., "WRITTEN STATEMENT", "LEGAL NOTICE", "PETITION")
-
-2. **Introduction/Preamble**:
-   - Identification of parties
-   - Brief overview of the matter
-
-3. **Body/Main Content**:
-   - Numbered paragraphs for facts
-   - Legal grounds and arguments
-   - Reference to applicable laws/sections
-   - Prayer/Relief clause
-
-4. **Closing Section**:
-   - Place and date
-   - Signature blocks
-   - Verification/Affirmation (if required)
-   - Advocate details (if applicable)
-
-## FORMATTING REQUIREMENTS:
-
-- Use proper legal numbering (1., 2., 3. or i., ii., iii. or a., b., c.)
-- Capitalize party names and key legal terms appropriately
-- Use formal, professional language throughout
-- Include proper paragraph spacing
-- Add section headers where appropriate
-- Use "WHEREAS", "AND WHEREAS", "NOW THEREFORE" for contracts/agreements
-- Use "That" at the beginning of numbered facts in petitions/plaints
-
-## LEGAL WRITING PRINCIPLES:
-
-1. Be precise and unambiguous
-2. Use active voice where possible
-3. Define terms on first use
-4. Avoid redundancy while maintaining legal completeness
-5. Include all material facts
-## CRITICAL HTML OUTPUT FORMAT:
-
-You MUST output strictly HTML structure compatible with the editor. Follow these rules:
-
-1. **STRUCTURE**:
-   - Wrap paragraphs in `<p>` tags.
-   - You MAY use headings `<h2>`, `<h3>` etc. for section titles if appropriate, or `<p style="text-align: center"><b>...</b></p>`.
-   - Lists (`<ul>`, `<ol>`, `<li>`) are permitted and encouraged for numbering facts.
-
-2. **RICH FORMATTING (REQUIRED)**:
-   - **BOLD**: Use `<b>` or `<strong>` for:
-     - Party names (e.g., **PETITIONER**, **RESPONDENT**)
-     - Key legal terms (e.g., **PROVIDED THAT**, **WHEREFORE**)
-     - Section Headers
-   - **ALIGNMENT**: Use `style="text-align: center;"` for document titles and main headers.
-   - **ITALICS**: Use with `<i>` or `<em>` for Latin terms or emphasis.
-   - **Underline**: Use `<u>` where legally conventional.
-
-3. **CLEANLINESS**:
-   - Do NOT use custom CSS classes unknown to standard HTML.
-   - Keep styles inline if needed (e.g. `style="text-align: justify;"` is good for body text).
-
-4. **FLAT STRUCTURE (CRITICAL FOR PAGINATION)**:
-   - **NO LIST TAGS**: Do NOT use `<ul>`, `<ol>`, or `<li>` tags. The editor cannot split these across pages.
-   - **Use Paragraphs for Lists**: Instead, use separate `<p>` tags with manual numbering/bullets.
-     - Example: `<p>1. First point...</p>`
-     - Example: `<p>2. Second point...</p>`
-   - **Short Layout**: Break any text longer than 8 lines into a new `<p>`.
-
-5. **Placeholders**:
-   - Keep the `[description]` placeholders as plain text.
-
-## PAGINATION & SPACING RULES (CRITICAL):
-
-1. **Short Paragraphs**: To ensure proper page breaking, paragraphs MUST NOT exceed 8-10 lines. Break longer text into multiple shorter paragraphs.
-2. **No Extra Spacing**: Do NOT use empty paragraphs (`<p>&nbsp;</p>` or `<br>`) for spacing. The editor handles spacing automatically.
-3. **Closing**: Ensure the document has a proper closing.
-
-## OUTPUT EXAMPLE:
-
-<p style="text-align: center;"><b><u>LEGAL NOTICE</u></b></p>
-<p>&nbsp;</p>
-<p><b>REF. NO.:</b> [Reference Number]</p>
-<p><b>DATE:</b> 20th December 2024</p>
-<p>&nbsp;</p>
-<p><b>To,</b></p>
-<p><b>The Managing Director,</b></p>
-<p>[Company Address]</p>
-<p>&nbsp;</p>
-<p><b>SUBJECT: NOTICE FOR [Subject Matter]</b></p>
-<p>&nbsp;</p>
-<p>Sir/Madam,</p>
-<p style="text-align: justify;">Under instruction from my client <b>[Client Name]</b>, resident of [Address], I hereby serve you with the following legal notice:</p>
-<p>1. That my client is a law-abiding citizen...</p>
-<p>2. That on [Date], you agreed to the terms...</p>
-<p>3. That despite repeated reminders...</p>
-<p>&nbsp;</p>
-<p style="text-align: right;"><b>(Signature)</b></p>
-<p style="text-align: right;"><b>[Advocate Name]</b></p>
-
-## OUTPUT:
-
-Provide the complete legal draft as valid HTML following the structure above. Output ONLY the HTML.
+OUTPUT REQUIREMENTS:
+- Return exactly one JSON object that matches the schema.
+- Do not include any keys other than: title, metadata, content.
+- Do not include any keys other than: jurisdiction, placeholders_detected inside metadata.
+- Do not include any keys other than: element_type, text inside each content item.
 """
 
-api_key= os.getenv("GOOGLE_API_KEY")
+
+_ALLOWED_ELEMENT_TYPES = {"header_block", "heading_1", "paragraph"}
+
+
+def _extract_response_text(response: Any) -> str:
+    text = getattr(response, "text", None)
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+    candidates = getattr(response, "candidates", None)
+    if isinstance(candidates, list) and candidates:
+        try:
+            parts = candidates[0].content.parts
+            assembled = "".join(getattr(p, "text", "") for p in parts if getattr(p, "text", None))
+            if assembled.strip():
+                return assembled.strip()
+        except Exception:
+            pass
+    raise ValueError("Gemini returned an empty response payload.")
+
+
+def _strict_validate_production_schema(payload: Any) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("Draft payload must be a JSON object.")
+
+    expected_top_keys = {"title", "metadata", "content"}
+    if set(payload.keys()) != expected_top_keys:
+        raise ValueError(f"Draft payload must contain exactly keys {sorted(expected_top_keys)}.")
+
+    title = payload.get("title")
+    if not isinstance(title, str):
+        raise ValueError("Draft payload 'title' must be a string.")
+
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError("Draft payload 'metadata' must be an object.")
+
+    expected_metadata_keys = {"jurisdiction", "placeholders_detected"}
+    if set(metadata.keys()) != expected_metadata_keys:
+        raise ValueError(f"Draft payload 'metadata' must contain exactly keys {sorted(expected_metadata_keys)}.")
+
+    jurisdiction = metadata.get("jurisdiction")
+    if not isinstance(jurisdiction, str):
+        raise ValueError("Draft payload 'metadata.jurisdiction' must be a string.")
+
+    placeholders_detected = metadata.get("placeholders_detected")
+    if not isinstance(placeholders_detected, list) or any(not isinstance(x, str) for x in placeholders_detected):
+        raise ValueError("Draft payload 'metadata.placeholders_detected' must be an array of strings.")
+
+    content = payload.get("content")
+    if not isinstance(content, list) or not content:
+        raise ValueError("Draft payload 'content' must be a non-empty array.")
+
+    for i, item in enumerate(content):
+        if not isinstance(item, dict):
+            raise ValueError(f"Draft payload 'content[{i}]' must be an object.")
+        expected_item_keys = {"element_type", "text"}
+        if set(item.keys()) != expected_item_keys:
+            raise ValueError(f"Draft payload 'content[{i}]' must contain exactly keys {sorted(expected_item_keys)}.")
+        element_type = item.get("element_type")
+        if element_type not in _ALLOWED_ELEMENT_TYPES:
+            raise ValueError(
+                f"Draft payload 'content[{i}].element_type' must be one of {sorted(_ALLOWED_ELEMENT_TYPES)}."
+            )
+        text = item.get("text")
+        if not isinstance(text, str):
+            raise ValueError(f"Draft payload 'content[{i}].text' must be a string.")
+
+    for token in placeholders_detected:
+        if not token or any(ch for ch in token if not (ch.isupper() or ch.isdigit() or ch == "_")):
+            raise ValueError(
+                "Each entry in 'metadata.placeholders_detected' must be an uppercase alphanumeric underscore token."
+            )
+
+    return payload
+
+
+def generate_production_json_draft(case_context: str, document_type: str = "Legal Document") -> dict:
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GOOGLE_API_KEY is not set. Set it as an environment variable before calling the drafter service "
+            "(e.g., in Docker Compose: environment: GOOGLE_API_KEY=... )."
+        )
+
+    genai.configure(api_key=api_key)
+
+    model = genai.GenerativeModel(
+        model_name="gemini-2.5-flash",
+        system_instruction=LEGAL_DRAFT_DOCX_PROMPT,
+        generation_config=genai.GenerationConfig(
+            temperature=0.1,
+            response_mime_type="application/json",
+            max_output_tokens=8192,
+        ),
+    )
+
+    user_prompt = "\n".join(
+        [
+            "DOCUMENT_TYPE:",
+            str(document_type),
+            "",
+            "CASE_FACTS_MATRIX:",
+            str(case_context),
+        ]
+    )
+
+    try:
+        response = model.generate_content(user_prompt)
+    except Exception as e:
+        logger.exception("Gemini request failed.")
+        raise RuntimeError(f"Gemini request failed: {e}") from e
+
+    usage = getattr(response, "usage_metadata", None)
+    if usage is not None:
+        logger.info(
+            "Gemini usage_metadata prompt=%s candidates=%s total=%s",
+            getattr(usage, "prompt_token_count", None),
+            getattr(usage, "candidates_token_count", None),
+            getattr(usage, "total_token_count", None),
+        )
+
+    raw_text = _extract_response_text(response)
+    logger.debug("Gemini raw JSON length=%s", len(raw_text))
+
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.lstrip("`").strip()
+    if cleaned.endswith("```"):
+        cleaned = cleaned.rstrip("`").strip()
+
+    try:
+        payload = json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse Gemini JSON output: %s", e)
+        logger.error("Gemini raw output (first 1200 chars): %s", cleaned[:1200])
+        logger.error("Gemini raw output (last 1200 chars): %s", cleaned[-1200:])
+        raise ValueError(f"Gemini returned invalid JSON: {e}") from e
+
+    try:
+        return _strict_validate_production_schema(payload)
+    except Exception as e:
+        logger.error("Schema validation failed: %s", e)
+        logger.error("Parsed payload keys=%s", list(payload.keys()) if isinstance(payload, dict) else type(payload))
+        raise
 
 
 def generate_legal_draft(
     case_context: str,
     legal_documents: Optional[str] = None,
-    document_type: Optional[str] = None
-) -> str:
-    print(f"DEBUG: Starting legal draft generation for type: {document_type}")
-    
-    # Configure API key - Priority: parameter > DEFAULT_API_KEY > environment variable
-    if api_key:
-        genai.configure(api_key=api_key)
-    else:
-        import os
-        if os.environ.get("GOOGLE_API_KEY"):
-            genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-        else:
-            raise ValueError(
-                "No API key provided. Please set GOOGLE_API_KEY environment variable"
-            )
-    
-    # Initialize the Gemini model (using gemini-1.5-flash)
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=LEGAL_DRAFT_SYSTEM_PROMPT,
-        generation_config=genai.GenerationConfig(
-            max_output_tokens=8192,
-            temperature=0.7,
-        )
-    )
-    
-    # Construct the user prompt
-    user_prompt_parts = []
-    
-    # Add document type if specified
-    if document_type:
-        user_prompt_parts.append(
-            f"## DOCUMENT TYPE TO GENERATE:\n{document_type}\n"
-        )
-    
-    # Add case context
-    user_prompt_parts.append(
-        f"## CASE CONTEXT:\n{case_context}\n"
-    )
-    
-    # Add reference legal documents if provided
+    document_type: Optional[str] = None,
+) -> dict:
+    combined_context_parts: List[str] = []
+    if case_context:
+        combined_context_parts.append("CASE_CONTEXT:\n" + case_context)
     if legal_documents:
-        user_prompt_parts.append(
-            f"## REFERENCE LEGAL DOCUMENTS:\n{legal_documents}\n"
-        )
-    
-    # Add final instruction
-    user_prompt_parts.append(
-        "\n## INSTRUCTION:\n"
-        "Based on the above case context and any reference documents provided, "
-        "generate a complete, professionally formatted legal draft. "
-        "Remember to use placeholders _(description of missing info)_ for any "
-        "information that is not provided in the case context. "
-        "Output ONLY the HTML content (<p><span>...</span></p>)."
-    )
-    
-    # Combine all parts
-    user_prompt = "\n".join(user_prompt_parts)
-    
-    # Generate the legal draft
-    try:
-        response = model.generate_content(user_prompt)
-        
-        # Extract and return the generated text
-        if response.text:
-            html_content = response.text.strip()
-            
-            # Clean up any markdown code block markers if present
-            if html_content.startswith("```html"):
-                html_content = html_content[7:]
-            if html_content.startswith("```"):
-                html_content = html_content[3:]
-            if html_content.endswith("```"):
-                html_content = html_content[:-3]
-            
-            print("DEBUG: Legal draft generated successfully")
-            return html_content.strip()
-        else:
-            raise Exception(
-                "The model returned an empty response. "
-                "Please try again with more detailed case context."
-            )
-            
-    except Exception as e:
-        raise Exception(f"Failed to generate legal draft: {str(e)}")
-
-
-# Convenience function for specific document types
-def generate_legal_notice(
-    case_context: str,
-    reference_docs: Optional[str] = None,
-) -> str:
-    """Generate a Legal Notice document."""
-    return generate_legal_draft(
-        case_context=case_context,
-        legal_documents=reference_docs,
-        document_type="Legal Notice"
-    )
-
-
-def generate_petition(
-    case_context: str,
-    reference_docs: Optional[str] = None,
-    api_key: Optional[str] = None
-) -> str:
-    """Generate a Court Petition document."""
-    return generate_legal_draft(
-        case_context=case_context,
-        legal_documents=reference_docs,
-        document_type="Petition"
-    )
-
-
-def generate_contract(
-    case_context: str,
-    reference_docs: Optional[str] = None,
-    api_key: Optional[str] = None
-) -> str:
-    """Generate a Contract/Agreement document."""
-    return generate_legal_draft(
-        case_context=case_context,
-        legal_documents=reference_docs,
-        document_type="Contract/Agreement"
-    )
-
-
-def generate_affidavit(
-    case_context: str,
-    reference_docs: Optional[str] = None,
-    api_key: Optional[str] = None
-) -> str:
-    """Generate an Affidavit document."""
-    return generate_legal_draft(
-        case_context=case_context,
-        legal_documents=reference_docs,
-        document_type="Affidavit"
+        combined_context_parts.append("REFERENCE_LEGAL_DOCUMENTS:\n" + legal_documents)
+    combined_context = "\n\n".join(combined_context_parts).strip()
+    return generate_production_json_draft(
+        case_context=combined_context,
+        document_type=document_type or "Legal Document",
     )
 
 if __name__ == "__main__":

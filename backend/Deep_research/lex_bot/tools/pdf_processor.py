@@ -3,8 +3,14 @@ from typing import List
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import fitz  # PyMuPDF
 from pdf2image import convert_from_path
-import easyocr
-import numpy as np
+
+try:
+    import easyocr
+    import numpy as np
+except ImportError:
+    easyocr = None
+    np = None
+
 logger = logging.getLogger(__name__)
 
 class PDFProcessor:
@@ -20,12 +26,18 @@ class PDFProcessor:
             chunk_overlap=chunk_overlap,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
-        import os
-        easyocr_path = os.getenv("EASYOCR_MODULE_PATH")
-        if easyocr_path:
-             self.reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=easyocr_path)
-        else:
-             self.reader = easyocr.Reader(['en'], gpu=False)
+        self.reader = None
+        if easyocr:
+            import os
+            easyocr_path = os.getenv("EASYOCR_MODULE_PATH")
+            try:
+                if easyocr_path:
+                     self.reader = easyocr.Reader(['en'], gpu=False, model_storage_directory=easyocr_path)
+                else:
+                     self.reader = easyocr.Reader(['en'], gpu=False)
+            except Exception as e:
+                logger.warning(f"Failed to initialize EasyOCR reader: {e}")
+                self.reader = None
 
     def extract_text(self, pdf_path: str) -> str:
             # 1. Try Direct Extraction
@@ -43,6 +55,11 @@ class PDFProcessor:
                 return extracted_text
             
             # 3. Fallback to OCR using EasyOCR
+            if not easyocr or not self.reader or np is None:
+                print("No selectable text found, and EasyOCR is not loaded. OCR fallback skipped.")
+                doc.close()
+                return extracted_text
+                
             print("No selectable text found. Falling back to OCR...")
             ocr_text_list = []
             

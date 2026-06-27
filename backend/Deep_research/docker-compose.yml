@@ -15,6 +15,18 @@ services:
       - db
     env_file:
       - .env
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - lex_bot/data/
+            - __pycache__/
+            - .pytest_cache/
+            - .git/
+        - action: rebuild
+          path: requirements.txt
 
   db:
     image: postgres:15-alpine

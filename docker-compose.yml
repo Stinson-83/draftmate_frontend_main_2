@@ -1,36 +1,40 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+  gateway:
+    image: nginx:1.27-alpine
     ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8080
-      - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "drafter-service:host-gateway"
     depends_on:
       - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./public
+          target: /app/public
+        - action: sync
+          path: ./index.html
+          target: /app/index.html
+        - action: rebuild
+          path: package.json
 
-  db:
-    image: ankane/pgvector:latest
-    ports:
-      - "5432:5432"
+  onlyoffice-server:
+    image: onlyoffice/documentserver:latest
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  qdrant:
-    image: qdrant/qdrant:latest
+      - JWT_ENABLED=true
+      - JWT_SECRET=${JWT_SECRET}
+      - DEV_BYPASS_AUTH=true
+      - JWT_HEADER=Authorization
+      - JWT_IN_BODY=true
     volumes:
       - qdrant_data:/qdrant/storage
 
@@ -116,30 +120,24 @@ services:
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - QDRANT_HOST=qdrant
-      - TRANSLATOR_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
-      - TRANSLATOR_SOURCE_LANGUAGE=${TRANSLATOR_SOURCE_LANGUAGE:-auto}
-      - TRANSLATOR_MAX_UPLOAD_BYTES=${TRANSLATOR_MAX_UPLOAD_BYTES:-26214400}
-      - TRANSLATOR_ENCRYPT_FILES_AT_REST=${TRANSLATOR_ENCRYPT_FILES_AT_REST:-false}
-      - TRANSLATOR_ENCRYPTION_KEY=${TRANSLATOR_ENCRYPTION_KEY}
-      - TRANSLATOR_CLAMAV_SCAN_ENABLED=${TRANSLATOR_CLAMAV_SCAN_ENABLED:-true}
-      - TRANSLATOR_CLAMAV_REQUIRED=${TRANSLATOR_CLAMAV_REQUIRED:-true}
-      - TRANSLATOR_CLAMAV_HOST=${TRANSLATOR_CLAMAV_HOST:-clamav}
-      - TRANSLATOR_CLAMAV_PORT=${TRANSLATOR_CLAMAV_PORT:-3310}
-      - TRANSLATOR_CLAMAV_TIMEOUT_SECONDS=${TRANSLATOR_CLAMAV_TIMEOUT_SECONDS:-10}
-      - SARVAM_API_KEY=${SARVAM_API_KEY}
-      - SARVAM_API_URL=${SARVAM_API_URL:-https://api.sarvam.ai/translate}
-      - SARVAM_TRANSLATE_MODEL=${SARVAM_TRANSLATE_MODEL:-sarvam-translate:v1}
-      - SARVAM_TRANSLATE_TIMEOUT_SECONDS=${SARVAM_TRANSLATE_TIMEOUT_SECONDS:-30}
-      - SARVAM_TRANSLATE_BATCH_SIZE=${SARVAM_TRANSLATE_BATCH_SIZE:-10}
-    volumes:
-      - translator_original_data:/app/backend/translator/storage/original
-      - translator_translated_data:/app/backend/translator/storage/translated
+      - JWT_SECRET=${JWT_SECRET}
+      - ADVOCATE_PROFILE_PORT=8007
+      - NOTIFICATION_SERVICE_URL=http://127.0.0.1:8015
     depends_on:
       - db
       - qdrant
-      - redis
-      - clamav
-
+    volumes:
+      - ./backend:/app/backend
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app/backend
+          ignore:
+            - backend/__pycache__/
+            - backend/Deep_research/lex_bot/data/
+        - action: rebuild
+          path: requirements.txt
 
 volumes:
   postgres_data:

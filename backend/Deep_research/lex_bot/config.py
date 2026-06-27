@@ -6,6 +6,11 @@ from dotenv import load_dotenv
 _this_dir = Path(__file__).parent
 load_dotenv(_this_dir / ".env")
 
+# Also search in the root workspace folder (3 levels up)
+_root_env = _this_dir.parent.parent.parent / ".env"
+if _root_env.is_file():
+    load_dotenv(_root_env)
+
 # --- API KEYS ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
