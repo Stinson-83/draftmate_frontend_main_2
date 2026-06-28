@@ -711,7 +711,10 @@ def touch_draft(draft_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE drafts SET updated_at = CURRENT_TIMESTAMP WHERE id = %s", (draft_id,))
+        import uuid
+        import hashlib
+        new_key = hashlib.sha256(str(uuid.uuid4()).encode('utf-8')).hexdigest()
+        cur.execute("UPDATE drafts SET updated_at = CURRENT_TIMESTAMP, document_key = %s WHERE id = %s", (new_key, draft_id))
         conn.commit()
         return {"ok": True}
     except Exception as e:

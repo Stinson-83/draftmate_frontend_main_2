@@ -241,9 +241,16 @@ const MyDrafts = () => {
     const getStatusColor = (s) => {
         if (s === 'Started') return 'bg-gray-400';
         if (s === 'In progress') return 'bg-yellow-400';
-        if (s === 'Review') return 'bg-blue-400';
+        if (s === 'Review') return 'bg-red-500';
         if (s === 'Completed') return 'bg-green-500';
         return 'bg-yellow-400';
+    };
+
+    const getStatusLabel = (s) => {
+        if (s === 'In progress') return 'In Progress';
+        if (s === 'Review') return 'Work under Review';
+        if (s === 'Completed') return 'Draft Completed';
+        return s || 'In Progress';
     };
 
     const getProgress = (status) => {
@@ -251,7 +258,7 @@ const MyDrafts = () => {
         if (status === 'In progress') return 45;
         if (status === 'Review') return 80;
         if (status === 'Completed') return 100;
-        return 20;
+        return 45;
     };
 
 
@@ -458,7 +465,7 @@ const MyDrafts = () => {
                                                 style={{ width: `${progress}%` }}
                                             ></div>
                                         </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{status}</p>
+                                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{getStatusLabel(status)}</p>
                                     </div>
                                     {/* Footer Button */}
                                     <div className="p-5 pt-0 mt-auto">

@@ -5,7 +5,7 @@ import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 
 const ONLYOFFICE_API_SRC = `${window.location.protocol}//${window.location.hostname}/onlyoffice/web-apps/apps/api/documents/api.js`;
-const ONLYOFFICE_ORIGIN = `${window.location.protocol}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ''}`;
+const ONLYOFFICE_ORIGIN = new URL(ONLYOFFICE_API_SRC).origin;
 
 const OnlyOfficeWorkspace = () => {
   const location = useLocation();
@@ -25,6 +25,7 @@ const OnlyOfficeWorkspace = () => {
   const selectionPollRef = useRef(null);
   const selectionPollPausedUntilRef = useRef(0);
 
+  const canvasTargetRef = useRef(null);
   const [docsApiReady, setDocsApiReady] = useState(false);
   const [isCanvasLoading, setIsCanvasLoading] = useState(true);
 
@@ -55,6 +56,10 @@ const OnlyOfficeWorkspace = () => {
   const [activeSelectionText, setActiveSelectionText] = useState('');
   const [sidebarWidth, setSidebarWidth] = useState(360);
   const [isDragging, setIsDragging] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState('In progress');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarInput, setSidebarInput] = useState('');
 
   // Dynamic config and sharing states
   const [dynamicConfig, setDynamicConfig] = useState(null);
@@ -121,23 +126,34 @@ const OnlyOfficeWorkspace = () => {
 
   useEffect(() => {
     const fetchConfig = async () => {
-      if (!draftId) return;
+      if (!draftId) {
+        console.warn("fetchConfig called but draftId is null");
+        return;
+      }
       setConfigLoading(true);
       try {
         const token = localStorage.getItem('session_id');
+        console.log("[OnlyOfficeWorkspace] Fetching config for draftId:", draftId);
         const resp = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/config/${draftId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           }
         });
+        console.log("[OnlyOfficeWorkspace] Fetch config response status:", resp.status);
         if (resp.ok) {
           const config = await resp.json();
+          console.log("[OnlyOfficeWorkspace] Fetched config successfully:", config);
           setDynamicConfig(config);
+          if (config.status) {
+            setCurrentStatus(config.status);
+          }
         } else {
-          console.error("Failed to load dynamic draft config from backend, falling back to state config.");
+          console.error("[OnlyOfficeWorkspace] Failed to load dynamic draft config. Status:", resp.status);
+          const errorText = await resp.text().catch(() => "");
+          console.error("[OnlyOfficeWorkspace] Response error details:", errorText);
         }
       } catch (err) {
-        console.error("Error fetching draft config:", err);
+        console.error("[OnlyOfficeWorkspace] Error fetching draft config:", err);
       } finally {
         setConfigLoading(false);
       }
@@ -185,11 +201,21 @@ const OnlyOfficeWorkspace = () => {
   const activeConfig = dynamicConfig || onlyofficeConfig;
 
   useEffect(() => {
-    if (!docsApiReady) return;
-    if (!activeConfig) return;
+    console.log("[OnlyOfficeWorkspace] Editor init useEffect triggered. docsApiReady =", docsApiReady, "activeConfig =", activeConfig);
+    if (!docsApiReady) {
+      console.log("[OnlyOfficeWorkspace] docsApiReady is false, skipping editor init.");
+      return;
+    }
+    if (!activeConfig) {
+      console.log("[OnlyOfficeWorkspace] activeConfig is null/falsy, skipping editor init.");
+      return;
+    }
 
-    const mount = document.getElementById('onlyoffice-canvas-target-node');
-    if (!mount) return;
+    const mount = canvasTargetRef.current;
+    if (!mount) {
+      console.error("[OnlyOfficeWorkspace] onlyoffice-canvas-target-node ref is not set");
+      return;
+    }
 
     setIsCanvasLoading(true);
     mount.innerHTML = '';
@@ -212,26 +238,6 @@ const OnlyOfficeWorkspace = () => {
 
     const nextConfig = {
       ...activeConfig,
-      editorConfig: {
-        ...(activeConfig?.editorConfig || {}),
-        customization: {
-          chat: true,
-          uiTheme: 'theme-light',
-          ...(activeConfig?.editorConfig?.customization || {}),
-          forcesave: true,
-          logo: {
-            image: '',
-            imageDark: '',
-            url: '',
-          },
-        },
-        plugins: {
-          autostart: [
-            'asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}',
-          ],
-          pluginsData: [],
-        },
-      },
       events: {
         ...(activeConfig?.events || {}),
         onDocumentReady: (...args) => {
@@ -242,17 +248,39 @@ const OnlyOfficeWorkspace = () => {
             setIsCanvasLoading(false);
           }
         },
+        onError: (event) => {
+          console.error("ONLYOFFICE Error:", event);
+          setIsCanvasLoading(false); // Hide skeleton so user can see the error
+        },
+        onAppReady: () => {
+          console.log("ONLYOFFICE App is ready.");
+        }
       },
       width: '100%',
       height: '100%',
     };
 
-    editorInstanceRef.current = new window.DocsAPI.DocEditor('onlyoffice-canvas-target-node', {
-      ...nextConfig,
-    });
+    // Fallback to hide skeleton after 15 seconds if DocEditor hangs silently
+    const loadingTimeout = setTimeout(() => {
+      setIsCanvasLoading(false);
+      console.warn("ONLYOFFICE initialization timed out. Hidden skeleton loader.");
+    }, 15000);
+
+    try {
+      console.log("[OnlyOfficeWorkspace] Instantiating DocsAPI.DocEditor...");
+      editorInstanceRef.current = new window.DocsAPI.DocEditor('onlyoffice-canvas-target-node', {
+        ...nextConfig,
+      });
+      console.log("[OnlyOfficeWorkspace] DocsAPI.DocEditor instantiated successfully:", editorInstanceRef.current);
+    } catch (editorError) {
+      console.error("[OnlyOfficeWorkspace] Critical error during DocsAPI.DocEditor instantiation:", editorError);
+      toast.error("Failed to initialize ONLYOFFICE editor: " + (editorError.message || editorError));
+      setIsCanvasLoading(false);
+    }
 
     // Clean up instance on component unmount
     return () => {
+      clearTimeout(loadingTimeout);
       if (editorInstanceRef.current && typeof editorInstanceRef.current.destroy === 'function') {
         try {
           editorInstanceRef.current.destroy();
@@ -305,7 +333,7 @@ const OnlyOfficeWorkspace = () => {
 
   useEffect(() => {
     const handleMessage = (e) => {
-      if (e.origin !== window.location.origin) return;
+      if (e.origin !== window.location.origin && e.origin !== ONLYOFFICE_ORIGIN) return;
       if (!e.data) return;
 
       if (e.data.type === 'ONLYOFFICE_PLUGIN_READY') {
@@ -388,10 +416,21 @@ const OnlyOfficeWorkspace = () => {
 
   useEffect(() => {
     return () => {
+      if (documentKey) {
+        const sessionId = localStorage.getItem('session_id');
+        const headers = { 'Content-Type': 'application/json' };
+        if (sessionId) headers.Authorization = `Bearer ${sessionId}`;
+        
+        fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/forcesave`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ document_key: documentKey }),
+        }).catch((err) => console.warn("Background forcesave on unmount failed:", err));
+      }
       clearCaseState();
       stopSelectionPolling();
     };
-  }, []);
+  }, [documentKey]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -822,6 +861,36 @@ const OnlyOfficeWorkspace = () => {
     );
   };
 
+  const handleUpdateStatus = async (newStatus) => {
+    setIsStatusDropdownOpen(false);
+    if (!draftId) return;
+
+    try {
+      const token = localStorage.getItem('session_id');
+      const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id: draftId,
+          status: newStatus,
+        }),
+      });
+
+      if (response.ok) {
+        setCurrentStatus(newStatus);
+        toast.success(`Draft status updated to ${newStatus === 'Review' ? 'Work under Review' : newStatus === 'Completed' ? 'Draft Completed' : 'In Progress'}`);
+      } else {
+        toast.error('Failed to update draft status.');
+      }
+    } catch (error) {
+      console.error('Error updating draft status:', error);
+      toast.error('Failed to update draft status.');
+    }
+  };
+
   const handleShareDraft = async (e) => {
     e.preventDefault();
     if (!shareEmail.trim()) return;
@@ -868,9 +937,66 @@ const OnlyOfficeWorkspace = () => {
       <div className="flex-1 flex flex-col min-w-0 h-full border-r border-[#B9D9EB]">
         <div className="shrink-0 border-b border-[#B9D9EB] bg-[#E3F0F7]/95 backdrop-blur">
           <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">DRAFTMATE WORKSPACE</div>
-              <div className="font-bold text-slate-800 truncate">{filename || 'Untitled'}</div>
+            <div className="min-w-0 flex items-center gap-3">
+              <div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">DRAFTMATE WORKSPACE</div>
+                <div className="font-bold text-slate-800 truncate max-w-[200px] sm:max-w-[300px]">{filename || 'Untitled'}</div>
+              </div>
+
+              {/* Work Status Dropdown Selector */}
+              {draftId && (
+                <div className="relative inline-block text-left ml-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                    className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-[#B9D9EB] text-xs font-semibold text-slate-700 shadow-sm transition-colors"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${
+                      currentStatus === 'In progress' ? 'bg-yellow-400' :
+                      currentStatus === 'Review' ? 'bg-red-500' :
+                      currentStatus === 'Completed' ? 'bg-green-500' : 'bg-yellow-400'
+                    }`} />
+                    <span>
+                      {currentStatus === 'In progress' ? 'In Progress' :
+                       currentStatus === 'Review' ? 'Work under Review' :
+                       currentStatus === 'Completed' ? 'Draft Completed' : 'In Progress'}
+                    </span>
+                    <span className="material-symbols-outlined text-xs text-slate-400">arrow_drop_down</span>
+                  </button>
+
+                  {isStatusDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsStatusDropdownOpen(false)} />
+                      <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 flex items-center gap-1.5 bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl px-2 py-1.5 whitespace-nowrap transition-all">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus('In progress')}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                          <span>In Progress</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus('Review')}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          <span>Work under Review</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus('Completed')}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          <span>Draft Completed</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {draftId && (
@@ -894,12 +1020,22 @@ const OnlyOfficeWorkspace = () => {
               >
                 <Download className="h-5 w-5" />
               </button>
+              {isSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center justify-center"
+                  title="Expand Sidebar"
+                >
+                  <span className="material-symbols-outlined text-lg">last_page</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 relative">
-          <div id="onlyoffice-canvas-target-node" className="h-full w-full bg-white" />
+          <div ref={canvasTargetRef} id="onlyoffice-canvas-target-node" className="h-full w-full bg-white" />
           {showAutoFormatPopup && selectionPreview ? (
             <div className="absolute top-4 right-4 z-30 w-[min(360px,calc(100%-2rem))] rounded-xl border border-[#B9D9EB] bg-white shadow-2xl overflow-hidden">
               <div className="border-b border-[#B9D9EB]/70 bg-[#F7FBFD] px-3 py-2.5">
@@ -959,18 +1095,29 @@ const OnlyOfficeWorkspace = () => {
       </div>
 
       {/* Resizable Sash Divider */}
-      <div
-        onMouseDown={startResize}
-        className="w-1.5 hover:w-2 shrink-0 cursor-col-resize transition-all select-none h-full bg-[#B9D9EB] hover:bg-blue-400 active:bg-blue-500 z-30"
-      />
+      {!isSidebarCollapsed && (
+        <div
+          onMouseDown={startResize}
+          className="w-1.5 hover:w-2 shrink-0 cursor-col-resize transition-all select-none h-full bg-[#B9D9EB] hover:bg-blue-400 active:bg-blue-500 z-30"
+        />
+      )}
 
       {/* Right Resizable Panel: Tabbed Navigation with AI Assistant / Variables */}
-      <aside
-        style={{ width: `${sidebarWidth}px` }}
-        className="shrink-0 h-full bg-[#E3F0F7] text-slate-800 flex flex-col shadow-2xl z-10 border-l border-[#B9D9EB]"
-      >
-        {/* Tabs Headers */}
-        <div className="shrink-0 flex border-b border-[#B9D9EB] bg-[#CDE3F0]">
+      {!isSidebarCollapsed && (
+        <aside
+          style={{ width: `${sidebarWidth}px` }}
+          className="shrink-0 h-full bg-[#E3F0F7] text-slate-800 flex flex-col shadow-2xl z-10 border-l border-[#B9D9EB]"
+        >
+          {/* Tabs Headers */}
+          <div className="shrink-0 flex border-b border-[#B9D9EB] bg-[#CDE3F0]">
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="px-3 hover:bg-[#B9D9EB]/50 text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center border-r border-[#B9D9EB]"
+              title="Collapse Sidebar"
+            >
+              <span className="material-symbols-outlined text-base">first_page</span>
+            </button>
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
@@ -1095,11 +1242,43 @@ const OnlyOfficeWorkspace = () => {
             </div>
 
             {/* Bottom Controls Bar for AI Assistant */}
-            <div className="shrink-0 p-4 border-t border-[#B9D9EB] bg-[#CDE3F0]/60 flex">
+            <div className="shrink-0 p-4 border-t border-[#B9D9EB] bg-[#CDE3F0]/60 flex flex-col gap-2">
+              {/* Secondary Chat Input Bar */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (sidebarInput.trim()) {
+                    handleSendMessage(sidebarInput.trim());
+                    setSidebarInput('');
+                  }
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#B9D9EB] shadow-sm w-full"
+              >
+                <input
+                  type="text"
+                  value={sidebarInput}
+                  onChange={(e) => setSidebarInput(e.target.value)}
+                  placeholder="your legal research..."
+                  disabled={isChatLoading}
+                  className="flex-1 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 text-sm text-slate-800 placeholder:text-slate-455"
+                />
+                <button
+                  type="submit"
+                  disabled={isChatLoading || !sidebarInput.trim()}
+                  className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${
+                    sidebarInput.trim()
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">send</span>
+                </button>
+              </form>
+
               <button
                 type="button"
                 onClick={handleExplainSelection}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-[#B9D9EB] text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-[#B9D9EB] text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
                 title="Select text in ONLYOFFICE and click here to explain it"
               >
                 <span className="material-symbols-outlined text-base mr-1.5">school</span>
@@ -1162,6 +1341,7 @@ const OnlyOfficeWorkspace = () => {
           </div>
         )}
       </aside>
+      )}
 
       {/* Floating expanding chat input bar */}
       <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 flex flex-col items-center gap-3 pointer-events-none select-none" style={{ width: 'min(760px, calc(100vw - 2rem))' }}>

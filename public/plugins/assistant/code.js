@@ -11,7 +11,7 @@
     } catch (e) {}
 
     function postToParent(payload) {
-        window.top.postMessage(payload, parentOrigin);
+        window.top.postMessage(payload, '*');
     }
 
     function getSelectedText(callback) {

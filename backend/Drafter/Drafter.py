@@ -16,7 +16,7 @@ import logging
 import hashlib
 import json
 from typing import Any, Dict, List, Optional, Set, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 import httpx
 import jwt
@@ -162,13 +162,23 @@ def _safe_basename_from_url(url: str) -> str:
 
 
 def _normalize_download_url(download_source_url: str) -> str:
-    parsed = urlparse(ONLYOFFICE_API_URL)
-    target_netloc = parsed.netloc or "onlyoffice-server"
-    if "localhost" in download_source_url:
-        return download_source_url.replace("localhost", target_netloc)
-    if "127.0.0.1" in download_source_url:
-        return download_source_url.replace("127.0.0.1", target_netloc)
-    return download_source_url
+    parsed_source = urlparse(download_source_url)
+    
+    path = parsed_source.path
+    if path.startswith("/onlyoffice/"):
+        path = path.replace("/onlyoffice", "", 1)
+        
+    parsed_internal = urlparse(ONLYOFFICE_API_URL)
+    
+    normalized_url = urlunparse((
+        parsed_internal.scheme or "http",
+        parsed_internal.netloc or "onlyoffice-server",
+        path,
+        parsed_source.params,
+        parsed_source.query,
+        parsed_source.fragment
+    ))
+    return normalized_url
 
 
 def _strip_json_block(text: str) -> str:
@@ -1182,6 +1192,12 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
                         "url": ""
                     }
                 },
+                "plugins": {
+                    "autostart": [
+                        "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
+                    ],
+                    "pluginsData": []
+                }
             },
         }
         params["token"] = _jwt_encode(params)
@@ -1591,6 +1607,12 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
                         "url": ""
                     }
                 },
+                "plugins": {
+                    "autostart": [
+                        "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
+                    ],
+                    "pluginsData": []
+                }
             },
         }
         params["token"] = _jwt_encode(params)
@@ -1598,6 +1620,7 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
         params["filename"] = file_name
         params["variablesDetected"] = draft_data.get("variablesDetected", [])
         params["draftId"] = draft_id
+        params["status"] = draft_data.get("status", "In progress")
          
         return params
     except HTTPException as he:
@@ -1656,7 +1679,23 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
             if not shared_storage_path:
                 return {"error": 0}
 
-            file_name = _safe_basename_from_url(url)
+            file_name = None
+            if draft_id:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        draft_resp = await client.get(
+                            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
+                            timeout=5.0
+                        )
+                        draft_resp.raise_for_status()
+                        draft_data = draft_resp.json()
+                        file_name = draft_data.get("filename")
+                except Exception as exc:
+                    logger.error(f"Failed to fetch draft metadata from auth service: {exc}")
+
+            if not file_name:
+                file_name = _safe_basename_from_url(url)
+
             if not file_name:
                 return {"error": 0}
 
