@@ -1,12 +1,31 @@
-/* src/pages/HelpCenter.css */
-details>summary {
-    list-style: none;
+/* Custom Scrollbar for search/filters */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
 }
 
-details>summary::-webkit-details-marker {
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* Ensure images/icons stay sharp */
+.shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Utility to hide standard scrollbar if needed on mobile */
+.scrollbar-hide::-webkit-scrollbar {
     display: none;
 }
-
-details[open] .chevron-icon {
-    transform: rotate(180deg);
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }

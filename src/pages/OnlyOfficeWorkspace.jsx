@@ -4,7 +4,7 @@ import { Download, Gavel, Loader2, Plus, Mic, Quote, Send, Sparkles } from 'luci
 import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 
-const ONLYOFFICE_API_SRC = `${window.location.protocol}//${window.location.hostname}/onlyoffice/web-apps/apps/api/documents/api.js`;
+const ONLYOFFICE_API_SRC = `${window.location.origin}/onlyoffice/web-apps/apps/api/documents/api.js`;
 const ONLYOFFICE_ORIGIN = new URL(ONLYOFFICE_API_SRC).origin;
 
 const OnlyOfficeWorkspace = () => {

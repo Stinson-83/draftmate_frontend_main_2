@@ -36,10 +36,10 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Local legal workspace testing directories
 shared_drafts/*
 !shared_drafts/.gitkeep
 scratch/*
 !scratch/.gitkeep
 backend/Deep_research/lex_bot/data/uploads/*
 !backend/Deep_research/lex_bot/data/uploads/.gitkeep
+backend/Drafter/__pycache__/

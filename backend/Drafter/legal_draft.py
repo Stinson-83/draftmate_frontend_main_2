@@ -223,3 +223,7 @@ def generate_legal_draft(
         case_context=combined_context,
         document_type=document_type or "Legal Document",
     )
+
+if __name__ == "__main__":
+    t=generate_petition(case_context="My client wants to file a divorce petition")
+    print(t)

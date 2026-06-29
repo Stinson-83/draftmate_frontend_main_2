@@ -173,7 +173,7 @@ const Tools = () => {
     const handleUploadSkip = () => navigate('/dashboard/editor', { state: { htmlContent } });
 
     // Reusable Card Component matching the new design
-    const ToolCard = ({ icon, title, description, onClick, primary = false, children }) => (
+    const ToolCard = ({ icon, title, description, onClick, children }) => (
         <div
             onClick={onClick}
             className={`group flex flex-col gap-4 p-6 rounded-xl border shadow-sm transition-all duration-300 cursor-pointer h-full relative overflow-hidden
@@ -341,6 +341,12 @@ const Tools = () => {
                                             </div>
                                         </div>
                                     </ToolCard>
+                                    <ToolCard
+                                        icon="translate"
+                                        title="Document Translator"
+                                        description="Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file."
+                                        onClick={() => navigate('/dashboard/translate-document')}
+                                    />
                                 </div>
                             </section>
                         )}
