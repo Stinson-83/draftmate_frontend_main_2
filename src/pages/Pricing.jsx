@@ -18,7 +18,7 @@ import LenisProvider from '../components/landing/LenisProvider';
 const PLANS = [
   {
     name: "DraftMate Basic",
-    for: "Law Students",
+    for: "Law Students & Independent Practitioner",
     priceMonthly: 699,
     priceAnnual: 559,
     features: [
@@ -76,9 +76,9 @@ const PLANS = [
 ];
 
 const TOP_UPS = [
-  { name: "Pack A", price: 199, credits: "2,000", highlight: false },
-  { name: "Pack B", price: 499, credits: "6,000", badge: "Most Popular", highlight: true },
-  { name: "Pack C", price: 999, credits: "15,000", highlight: false }
+  { name: "Pack A", price: 199, credits: "1,000", highlight: false },
+  { name: "Pack B", price: 399, credits: "1,500", badge: "Most Popular", highlight: true },
+  { name: "Pack C", price: 499, credits: "2,000", highlight: false }
 ];
 
 const COMPARISON = [
@@ -303,7 +303,8 @@ export default function Pricing() {
           <div className="w-full max-w-5xl mx-auto px-5 md:px-10 text-center">
             <ScrollReveal>
               <h2 className="text-3xl md:text-4xl font-black text-[#0F1C2E] mb-4">Need More Credits?</h2>
-              <p className="text-slate-600 mb-16">Top up anytime. <span className="font-semibold text-blue-600">These credits never expire and roll over indefinitely until used.</span></p>
+              {/* Top up anytime. These credits are added to your wallet and valid till your current DraftMate Subscription. */}
+              <p className="text-slate-600 mb-16">Top up anytime. <span className="font-semibold text-blue-600">The credits are added to your wallet and will valid till your DraftMate Subscription.</span></p>
             </ScrollReveal>
 
             <div className="grid md:grid-cols-3 gap-6">

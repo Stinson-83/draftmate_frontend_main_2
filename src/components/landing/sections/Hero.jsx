@@ -8,6 +8,7 @@ import {
 import TypewriterText from "@/components/landing/TypewriterText";
 import AnimatedCounter from "@/components/landing/AnimatedCounter";
 import { useNavigate } from "react-router-dom";
+import BookDemoModal from "../BookDemoModal";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const TYPED = [
@@ -43,14 +44,14 @@ const CARDS = [
 ];
 
 const STATS = [
-  { to: 212,   suffix: "+", label: "Publishers"   },
+  { to: 212, suffix: "+", label: "Publishers" },
   { to: 10000, suffix: "+", label: "Docs Drafted" },
-  { to: 98,    suffix: "%", label: "Accuracy"     },
-  { to: 5000,  suffix: "+", label: "Advocates"    },
+  { to: 98, suffix: "%", label: "Accuracy" },
+  { to: 5000, suffix: "+", label: "Advocates" },
 ];
 
 const PARTICLES = [
-  { top: "20%", right: "29%", size: 5, delay: "0s",   dur: "4.2s" },
+  { top: "20%", right: "29%", size: 5, delay: "0s", dur: "4.2s" },
   { top: "34%", right: "48%", size: 4, delay: "1.1s", dur: "5.1s" },
   { top: "61%", right: "21%", size: 6, delay: "2.2s", dur: "3.7s" },
   { top: "17%", right: "16%", size: 3, delay: "0.6s", dur: "6.3s" },
@@ -61,15 +62,15 @@ const PARTICLES = [
 // ── Background image + parallax FX ──────────────────────────────────────────
 function HeroBgImage() {
   const containerRef = useRef(null);
-  const imageRef     = useRef(null);
+  const imageRef = useRef(null);
 
   const onMove = useCallback((e) => {
-    const c   = containerRef.current;
+    const c = containerRef.current;
     const img = imageRef.current;
     if (!c || !img) return;
     const r = c.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width  - 0.5;
-    const y = (e.clientY - r.top)  / r.height - 0.5;
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
     img.style.transform = `scale(1.05) translateX(${x * -20}px) translateY(${y * -13}px)`;
   }, []);
 
@@ -97,7 +98,7 @@ function HeroBgImage() {
         ref={imageRef}
         className="absolute inset-0"
         style={{
-          transform:  "scale(1.02)",
+          transform: "scale(1.02)",
           transition: "transform 0.9s cubic-bezier(0.25,0.46,0.45,0.94)",
           willChange: "transform",
         }}
@@ -135,33 +136,33 @@ function HeroBgImage() {
         top: "4%", right: "9%",
         width: "200px", height: "260px",
         background: "radial-gradient(ellipse, rgba(96,165,250,0.28) 0%, transparent 70%)",
-        animation:  "featherGlow 3.5s ease-in-out infinite",
+        animation: "featherGlow 3.5s ease-in-out infinite",
       }} />
 
       {/* Energy beam from book spine */}
       <div className="absolute pointer-events-none" style={{
         bottom: "29%", right: "21%",
         width: "300px", height: "3px",
-        background:   "linear-gradient(to left, rgba(37,99,235,0.85), rgba(14,165,233,0.55), transparent)",
+        background: "linear-gradient(to left, rgba(37,99,235,0.85), rgba(14,165,233,0.55), transparent)",
         borderRadius: "99px",
-        animation:    "writingBeam 3s ease-in-out infinite",
-        filter:       "blur(1px)",
+        animation: "writingBeam 3s ease-in-out infinite",
+        filter: "blur(1px)",
       }} />
       <div className="absolute pointer-events-none" style={{
         bottom: "29.6%", right: "21%",
         width: "190px", height: "1px",
         background: "linear-gradient(to left, rgba(14,165,233,0.7), transparent)",
-        animation:  "writingBeam 3s ease-in-out 0.6s infinite",
+        animation: "writingBeam 3s ease-in-out 0.6s infinite",
       }} />
 
       {/* Book spine light streak */}
       <div className="absolute pointer-events-none" style={{
         bottom: "21%", right: "17%",
         width: "340px", height: "4px",
-        background:   "linear-gradient(to right, transparent, rgba(37,99,235,0.65), rgba(14,165,233,0.85), transparent)",
+        background: "linear-gradient(to right, transparent, rgba(37,99,235,0.65), rgba(14,165,233,0.85), transparent)",
         borderRadius: "99px",
-        animation:    "lightLeak 5.5s ease-in-out infinite",
-        filter:       "blur(2px)",
+        animation: "lightLeak 5.5s ease-in-out infinite",
+        filter: "blur(2px)",
       }} />
 
       {/* Floating AI particles */}
@@ -169,9 +170,9 @@ function HeroBgImage() {
         <div key={i} className="absolute rounded-full pointer-events-none" style={{
           top: p.top, right: p.right,
           width: p.size, height: p.size,
-          background:  i % 2 === 0 ? "rgba(37,99,235,0.75)" : "rgba(14,165,233,0.85)",
-          animation:   `particleDrift ${p.dur} ease-in-out ${p.delay} infinite`,
-          boxShadow:   `0 0 ${p.size * 2}px rgba(37,99,235,0.55)`,
+          background: i % 2 === 0 ? "rgba(37,99,235,0.75)" : "rgba(14,165,233,0.85)",
+          animation: `particleDrift ${p.dur} ease-in-out ${p.delay} infinite`,
+          boxShadow: `0 0 ${p.size * 2}px rgba(37,99,235,0.55)`,
         }} />
       ))}
     </div>
@@ -222,6 +223,7 @@ function FloatingCard({ icon: Icon, label, sub, delay, pos }) {
 // ── Main Hero ─────────────────────────────────────────────────────────────────
 export default function Hero() {
   const [mounted, setMounted] = useState(false);
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const navigate = useNavigate();
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
@@ -260,17 +262,16 @@ export default function Hero() {
 
             {/* ① Badge */}
             <div
-              className={`transition-all duration-500 ${
-                mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
+              className={`transition-all duration-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                }`}
             >
               <span
                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full
                            text-[11px] font-semibold tracking-widest uppercase"
                 style={{
                   background: "rgba(37,99,235,0.07)",
-                  border:     "1px solid rgba(37,99,235,0.18)",
-                  color:      "#1D4ED8",
+                  border: "1px solid rgba(37,99,235,0.18)",
+                  color: "#1D4ED8",
                 }}
               >
                 <span className="relative flex h-1.5 w-1.5">
@@ -286,9 +287,8 @@ export default function Hero() {
 
             {/* ② Headline */}
             <div
-              className={`transition-all duration-700 delay-75 ${
-                mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
+              className={`transition-all duration-700 delay-75 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+                }`}
             >
               <h1
                 className="font-black leading-[1.07] text-[#0F1C2E]"
@@ -305,17 +305,16 @@ export default function Hero() {
 
             {/* ③ Typewriter pill */}
             <div
-              className={`transition-all duration-700 delay-150 ${
-                mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
+              className={`transition-all duration-700 delay-150 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+                }`}
             >
               <div
                 className="rounded-2xl px-5 py-4"
                 style={{
-                  background:  "rgba(255,255,255,0.92)",
-                  border:      "1px solid rgba(226,232,240,0.7)",
-                  borderLeft:  "3px solid #2563EB",
-                  boxShadow:   "0 2px 12px rgba(15,28,46,0.06)",
+                  background: "rgba(255,255,255,0.92)",
+                  border: "1px solid rgba(226,232,240,0.7)",
+                  borderLeft: "3px solid #2563EB",
+                  boxShadow: "0 2px 12px rgba(15,28,46,0.06)",
                 }}
               >
                 <div className="flex items-start gap-3">
@@ -343,9 +342,8 @@ export default function Hero() {
 
             {/* ④ Body copy */}
             <p
-              className={`text-[14px] md:text-[15px] leading-relaxed transition-all duration-700 delay-200 ${
-                mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
+              className={`text-[14px] md:text-[15px] leading-relaxed transition-all duration-700 delay-200 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+                }`}
               style={{ color: "#475569" }}
             >
               Research, draft, manage cases, collaborate, and grow your practice —
@@ -354,9 +352,8 @@ export default function Hero() {
 
             {/* ⑤ CTA buttons */}
             <div
-              className={`flex flex-wrap gap-3 transition-all duration-700 delay-300 ${
-                mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
+              className={`flex flex-wrap gap-3 transition-all duration-700 delay-300 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+                }`}
             >
               <button
                 onClick={() => navigate('/login')}
@@ -365,13 +362,14 @@ export default function Hero() {
                            hover:opacity-90 hover:scale-[1.02]"
                 style={{
                   background: "linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%)",
-                  boxShadow:  "0 4px 20px rgba(37,99,235,0.35)",
+                  boxShadow: "0 4px 20px rgba(37,99,235,0.35)",
                 }}
               >
                 <Zap className="w-4 h-4" />
                 Start Drafting Free
               </button>
               <button
+                onClick={() => setIsDemoModalOpen(true)}
                 className="flex items-center gap-2 px-8 py-4 text-[15px] font-semibold
                            rounded-xl border border-slate-200 bg-white text-slate-700
                            hover:bg-slate-50 hover:border-slate-300 transition-all duration-200"
@@ -385,13 +383,12 @@ export default function Hero() {
 
             {/* ⑥ Trust micro-row */}
             <div
-              className={`flex flex-wrap items-center gap-x-5 gap-y-2 transition-all duration-700 delay-[400ms] ${
-                mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
-              }`}
+              className={`flex flex-wrap items-center gap-x-5 gap-y-2 transition-all duration-700 delay-[400ms] ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+                }`}
             >
               {[
-                { icon: Shield,   text: "DPDPA Compliant"  },
-                { icon: Zap,      text: "~2 min avg. draft" },
+                { icon: Shield, text: "DPDPA Compliant" },
+                { icon: Zap, text: "~2 min avg. draft" },
                 { icon: BookOpen, text: "Indian Law Trained" },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} className="flex items-center gap-1.5 text-[12px]" style={{ color: "#94A3B8" }}>
@@ -408,13 +405,12 @@ export default function Hero() {
           Stats bar — pinned to bottom of hero
       ══════════════════════════════════════════════════════════ */}
       <div
-        className={`relative z-10 transition-all duration-700 delay-500 ${
-          mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-        }`}
+        className={`relative z-10 transition-all duration-700 delay-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+          }`}
         style={{
-          background:     "rgba(255,255,255,0.90)",
+          background: "rgba(255,255,255,0.90)",
           backdropFilter: "blur(20px)",
-          borderTop:      "1px solid rgba(226,232,240,0.7)",
+          borderTop: "1px solid rgba(226,232,240,0.7)",
         }}
       >
         <div className="max-w-[1440px] mx-auto px-5 md:px-10 lg:px-20">
@@ -451,6 +447,12 @@ export default function Hero() {
           style={{ background: "linear-gradient(to bottom, rgba(37,99,235,0.35), transparent)" }}
         />
       </div>
+
+      {/* Render the Book Demo Modal */}
+      <BookDemoModal 
+        isOpen={isDemoModalOpen} 
+        onClose={() => setIsDemoModalOpen(false)} 
+      />
     </section>
   );
 }

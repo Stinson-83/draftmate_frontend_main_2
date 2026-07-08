@@ -180,7 +180,7 @@ export default function Billing() {
 
                 <div>
                   <h2 className="text-lg font-bold text-[#0F1C2E] mb-2">Need More Credits?</h2>
-                  <p className="text-sm text-slate-500 font-medium mb-6">Top up anytime. These credits never expire and roll over indefinitely.</p>
+                  <p className="text-sm text-slate-500 font-medium mb-6">Top up anytime. These credits are added to your wallet and valid till your current DraftMate Subscription.</p>
                   
                   <div className="grid md:grid-cols-3 gap-4">
                     {TOP_UPS.map((pack, i) => (

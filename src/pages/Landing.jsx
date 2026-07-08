@@ -16,6 +16,7 @@ import VideoTestimonials from '../components/landing/sections/VideoTestimonials'
 import FAQSection from '../components/landing/sections/FAQSection';
 import UpgradeSection from '../components/landing/sections/UpgradeSection';
 import Footer from '../components/landing/sections/Footer';
+import LegalBanner from '../components/landing/ui/LegalBanner';
 
 const Landing = () => {
   return (
@@ -37,6 +38,7 @@ const Landing = () => {
         <UpgradeSection />
         <FAQSection />
         <Footer />
+        <LegalBanner />
       </main>
     </LenisProvider>
   );

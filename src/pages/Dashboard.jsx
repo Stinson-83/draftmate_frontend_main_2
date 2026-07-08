@@ -517,12 +517,12 @@ export default function Dashboard() {
                 <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8 flex-1">
                         <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden shadow-md shrink-0 border-2 border-white">
-                            <img src="https://i.pravatar.cc/150?img=11" alt="Profile" className="w-full h-full object-cover" />
+                            <img src="/Ayush_gaurav_pic.jpeg" alt="Profile" className="w-full h-full object-cover" />
                             <div className="absolute bottom-1.5 right-1.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
                         </div>
                         <div className="flex-1 max-w-3xl">
                             <div className="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-4 mb-1.5">
-                                <h2 className="text-2xl md:text-3xl font-bold text-[#0F1C2E]">Julian Vance</h2>
+                                <h2 className="text-2xl md:text-3xl font-bold text-[#0F1C2E]">Ayush Gaurav</h2>
                                 <span className="text-[10px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">Partner • Senior Counsel</span>
                             </div>
                             <p className="text-sm text-slate-600 mb-5 leading-relaxed max-w-2xl font-medium">

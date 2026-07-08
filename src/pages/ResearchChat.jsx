@@ -20,10 +20,10 @@ import DraftingModal from '../components/DraftingModal';
 import { processCitations, CitationLink } from '../utils/citationUtils';
 
 const LLM_OPTIONS = [
-    { value: 'gemini-2.5-flash', label: 'Fast', description: 'High speed responses' },
-    { value: 'gemini-2.5-pro', label: 'Advanced', description: 'Deep reasoning & analysis' },
-    { value: 'gpt-4o', label: 'Reasoning', description: 'Complex problem solving' },
-    { value: 'gpt-4o-mini', label: 'Fast & Efficient', description: 'Balanced performance' },
+    { value: 'gemini-2.5-flash', label: 'Lex - Fast', description: 'High speed responses' },
+    { value: 'gemini-2.5-pro', label: 'Themis - Advanced', description: 'Deep reasoning & analysis' },
+    { value: 'gpt-4o', label: 'Neeti - Reasoning', description: 'Complex problem solving' },
+    { value: 'gpt-4o-mini', label: 'Vidhi - Fast & Efficient', description: 'Balanced performance' },
 ];
 
 const NODE_LABELS = {
@@ -1035,7 +1035,7 @@ const ResearchChat = () => {
                         </div>
                         <div className="text-center mt-3">
                             <p className="text-[10px] font-medium text-slate-400 flex items-center justify-center gap-1.5">
-                                <span className="material-symbols-outlined text-[12px]">info</span> AI can make mistakes. Always verify outputs before relying on them.
+                                <span className="material-symbols-outlined text-[12px]">info</span> AI can do mistakes, so Human intervention is required.
                             </p>
                         </div>
                     </div>
