@@ -3,12 +3,13 @@ FROM node:20-slim AS frontend-builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline --no-audit --progress=false
-COPY index.html vite.config.js eslint.config.js ./
+COPY index.html vite.config.js eslint.config.js tailwind.config.js postcss.config.js ./
 COPY src/ src/
 COPY public/ public/
 ARG VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com
 ENV VITE_CLIENT_ID=$VITE_CLIENT_ID
 RUN VITE_BASE_PATH=/ VITE_API_BASE_URL=/ VITE_CLIENT_ID=$VITE_CLIENT_ID npm run build
+
 
 # Stage 2: Backend & Runtime
 FROM python:3.11-slim-bookworm
