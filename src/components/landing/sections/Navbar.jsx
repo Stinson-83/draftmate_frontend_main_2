@@ -125,12 +125,6 @@ export default function Navbar() {
             ))}
 
             <button
-              onClick={() => navigate('/blogs')}
-              className="px-2.5 py-2 text-[12.5px] font-medium text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50/80 transition-all duration-200 whitespace-nowrap"
-            >
-              Blogs
-            </button>
-            <button
               onClick={() => navigate('/about')}
               className="px-2.5 py-2 text-[12.5px] font-medium text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50/80 transition-all duration-200 whitespace-nowrap"
             >
