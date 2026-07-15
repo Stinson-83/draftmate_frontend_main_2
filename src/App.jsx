@@ -7,6 +7,7 @@ import Editor from './pages/Editor';
 import PDFEditor from './pages/PDFEditor';
 import MyDrafts from './pages/MyDrafts';
 import OnlyOfficeWorkspace from './pages/OnlyOfficeWorkspace';
+import DraftingLanding from './pages/DraftingLanding';
 
 import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
@@ -161,6 +162,7 @@ function App() {
               <Route path="translate" element={<TranslateDocumentPage />} />
               <Route path="pdf-editor" element={<PDFEditor />} />
               <Route path="tools" element={<Tools />} />
+              <Route path="drafting" element={<DraftingLanding />} />
               <Route path="drafts" element={<MyDrafts />} />
               <Route path="research" element={<ResearchChat />} />
               <Route path="chat-pdf" element={<ChatWithPDF />} />

@@ -8,13 +8,14 @@ import {
   Search, Bell, LayoutDashboard, FileText, Scale, FolderOpen, 
   Languages, Library, GraduationCap, Eye, Gavel, Wrench, 
   Settings, Menu, X, Zap, ChevronLeft, ChevronRight, LogOut,
-  CreditCard, HelpCircle, BookOpen, MessageSquare, Gift, Bug, Copy, Share2, UploadCloud
+  CreditCard, HelpCircle, BookOpen, MessageSquare, Gift, Bug, Copy, Share2, UploadCloud, Edit
 } from 'lucide-react';
 
 const SIDEBAR_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard/home" },
   { icon: Scale, label: "Legal Research", path: "/dashboard/research" },
   { icon: FolderOpen, label: "Document Management", path: "/dashboard/cases" },
+  { icon: Edit, label: "Drafting", path: "/dashboard/drafting" },
   { icon: FileText, label: "My Drafts", path: "/dashboard/drafts" },
   { icon: Languages, label: "Translations", path: "/dashboard/translate" },
   { icon: Library, label: "Legal Library", path: "/dashboard/library" },
