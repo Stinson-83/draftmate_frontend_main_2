@@ -790,12 +790,42 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     );
 
     const renderLoadingView = () => (
-        <div className="step-content fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
-            <Loader2 size={48} className="spinner" style={{ marginBottom: '16px', color: '#4f46e5' }} />
-            <h2 className="modal-title">{loadingMessage}</h2>
-            <p className="modal-subtitle">Please wait while DraftMate prepares your workspace.</p>
+    <div
+        className="step-content fade-in"
+        style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '400px',
+            textAlign: 'center',
+        }}
+    >
+        <Loader2
+            size={52}
+            className="spinner"
+            style={{ marginBottom: '20px' }}
+        />
+        <h2 className="modal-title" style={{ textAlign: 'center', maxWidth: '100%' }}>
+            {loadingMessage}
+        </h2>
+        <p className="modal-subtitle" style={{ marginBottom: '8px' }}>
+            Please wait while DraftMate prepares your workspace.
+        </p>
+
+        {/* Animated dots */}
+        <div className="loading-dots">
+            <span />
+            <span />
+            <span />
         </div>
-    );
+
+        {/* Progress bar */}
+        <div className="loading-progress-bar">
+            <div className="loading-progress-fill" />
+        </div>
+    </div>
+);
 
     return (
         <div className="modal-overlay" onClick={onClose}>
