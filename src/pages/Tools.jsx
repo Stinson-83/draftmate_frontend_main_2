@@ -177,26 +177,27 @@ const Tools = () => {
         <div
             onClick={onClick}
             className={`group flex flex-col gap-4 p-6 rounded-xl border shadow-sm transition-all duration-300 cursor-pointer h-full relative overflow-hidden
-            bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 
-            hover:bg-primary hover:border-primary hover:shadow-lg hover:shadow-blue-500/20`}
+            bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800
+            hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/15 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 hover:-translate-y-0.5`}
         >
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-colors shrink-0
-                bg-primary/10 text-primary 
-                group-hover:bg-white/20 group-hover:text-white`}
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all shrink-0
+                bg-primary/10 text-primary
+                group-hover:bg-primary group-hover:text-white group-hover:scale-110`}
             >
                 <span className="material-symbols-outlined text-2xl">{icon}</span>
             </div>
             <div className="flex flex-col flex-1">
-                <h4 className={`text-lg font-bold mb-2 text-[#0d131b] dark:text-white group-hover:text-white transition-colors`}>
+                <h4 className={`text-lg font-bold mb-2 text-[#0d131b] dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors`}>
                     {title}
                 </h4>
-                <p className={`text-sm leading-relaxed text-slate-600 dark:text-slate-400 group-hover:text-white transition-colors`}>
+                <p className={`text-sm leading-relaxed text-slate-600 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors`}>
                     {description}
                 </p>
                 {children && <div className="flex-1 flex flex-col justify-center pt-4">{children}</div>}
             </div>
         </div>
     );
+
 
     const FilterButton = ({ icon, label, isActive, onClick }) => (
         <button
@@ -333,11 +334,11 @@ const Tools = () => {
                                     >
                                         <div className="flex flex-col gap-4 mt-4 transition-opacity">
                                             <div className="flex justify-between items-center px-4">
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">layers</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">content_cut</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">compress</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">description</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">approval</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">layers</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">content_cut</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">compress</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">description</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">approval</span>
                                             </div>
                                         </div>
                                     </ToolCard>
