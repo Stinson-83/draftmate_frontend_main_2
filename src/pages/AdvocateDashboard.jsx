@@ -62,17 +62,10 @@ export default function AdvocateDashboard() {
                 const sessionId = localStorage.getItem('session_id');
                 if (sessionId) {
                     try {
-                        const response = await fetch(`${API_CONFIG.ADVOCATE.BASE_URL}/api/v1/auth/session-login`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ session_id: sessionId })
-                        });
-                        if (response.ok) {
-                            const data = await response.json();
-                            advocateAuth.saveTokens(data);
-                            fetchAll();
-                            return;
-                        }
+                        const data = await advocateAuth.sessionLogin(sessionId);
+                        advocateAuth.saveTokens(data);
+                        fetchAll();
+                        return;
                     } catch (e) {
                         console.error('Session auto-login failed:', e);
                     }

@@ -332,20 +332,44 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
             conn.close()
 
 
-class SessionLoginRequest(BaseModel):
-    session_id: str
-
-
 @router.post("/session-login", response_model=Token)
-def session_login(body: SessionLoginRequest):
+async def session_login(request: Request):
     """
     Authenticate using a valid DraftMate user session_id.
     Validates with the login_db auth service, then provisions
     or logs in the corresponding advocate user.
     """
-    session_id = body.session_id
+    session_id = None
+    
+    # 1. Try to get session_id from query parameters
+    session_id = request.query_params.get("session_id")
+    
+    # 2. Try to parse JSON body
     if not session_id:
-        raise HTTPException(status_code=400, detail="session_id is required.")
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                session_id = body.get("session_id")
+            elif isinstance(body, str):
+                session_id = body
+        except Exception:
+            # Fallback to reading raw body
+            try:
+                raw_body = await request.body()
+                decoded = raw_body.decode('utf-8').strip()
+                # If it looks like a JSON string, try to parse it
+                if decoded.startswith('{'):
+                    import json
+                    session_id = json.loads(decoded).get("session_id")
+                else:
+                    session_id = decoded.replace('"', '').replace("'", "")
+            except Exception:
+                pass
+
+    if not session_id or len(session_id.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Valid session_id is required.")
+
+    session_id = session_id.strip()
 
     # Validate with login_db auth service
     auth_url = os.getenv("AUTH_SERVICE_URL", "http://127.0.0.1:8009")

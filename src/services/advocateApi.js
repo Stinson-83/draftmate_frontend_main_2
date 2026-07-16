@@ -120,6 +120,19 @@ export const advocateAuth = {
         tokens.setAccess(access_token);
         tokens.setRefresh(refresh_token);
     },
+
+    sessionLogin: async (sessionId) => {
+        const res = await fetch(`${BASE}${EP.SESSION_LOGIN}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Session login failed.');
+        }
+        return res.json();
+    },
 };
 
 // ── Profile ───────────────────────────────────────────────────────────────────

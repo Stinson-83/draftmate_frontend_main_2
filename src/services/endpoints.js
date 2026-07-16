@@ -165,6 +165,7 @@ export const API_CONFIG = {
             LOGIN: '/api/v1/auth/login',
             REFRESH: '/api/v1/auth/refresh',
             LOGOUT: '/api/v1/auth/logout',
+            SESSION_LOGIN: '/api/v1/auth/session-login',
             // Profile
             MY_PROFILE: '/api/v1/profiles/me',
             COMPLETE_ONBOARDING: '/api/v1/profiles/me/complete-onboarding',
