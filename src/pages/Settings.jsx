@@ -229,57 +229,52 @@ const PersonalSettings = () => {
 
                     <div className="flex flex-col sm:flex-row gap-6">
                         <label className="flex flex-col flex-1">
-                            <span className="text-[#0d131b] dark:text-slate-200 text-sm font-semibold leading-normal pb-2">Role / Designation</span>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="material-symbols-outlined text-[#94a3b8]" style={{ fontSize: '20px' }}>badge</span>
-                                </div>
-                                <input
-                                    name="role"
-                                    value={profile.role}
-                                    onChange={handleChange}
-                                    className="form-input flex w-full rounded-lg text-[#0d131b] dark:text-white border border-[#cfd9e7] dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary h-11 pl-10 pr-4 text-base placeholder:text-[#94a3b8] transition-all"
-                                    placeholder="e.g. Senior Associate"
-                                />
-                            </div>
+                            <span className="text-[#0d131b] dark:text-slate-200 text-sm font-semibold leading-normal pb-2 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-[#94a3b8]" style={{ fontSize: '16px' }}>badge</span>
+                                Role / Designation
+                            </span>
+                            <input
+                                name="role"
+                                value={profile.role}
+                                onChange={handleChange}
+                                className="form-input flex w-full rounded-lg text-[#0d131b] dark:text-white border border-[#cfd9e7] dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary h-11 px-4 text-base placeholder:text-[#94a3b8] transition-all"
+                                placeholder="e.g. Senior Associate"
+                            />
                         </label>
                         <label className="flex flex-col flex-1">
-                            <span className="text-[#0d131b] dark:text-slate-200 text-sm font-semibold leading-normal pb-2">Current Workplace</span>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="material-symbols-outlined text-[#94a3b8]" style={{ fontSize: '20px' }}>business</span>
-                                </div>
-                                <input
-                                    name="workplace"
-                                    value={profile.workplace}
-                                    onChange={handleChange}
-                                    className="form-input flex w-full rounded-lg text-[#0d131b] dark:text-white border border-[#cfd9e7] dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary h-11 pl-10 pr-4 text-base placeholder:text-[#94a3b8] transition-all"
-                                    placeholder="e.g. Law Firm LLC"
-                                />
-                            </div>
+                            <span className="text-[#0d131b] dark:text-slate-200 text-sm font-semibold leading-normal pb-2 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-[#94a3b8]" style={{ fontSize: '16px' }}>business</span>
+                                Current Workplace
+                            </span>
+                            <input
+                                name="workplace"
+                                value={profile.workplace}
+                                onChange={handleChange}
+                                className="form-input flex w-full rounded-lg text-[#0d131b] dark:text-white border border-[#cfd9e7] dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary h-11 px-4 text-base placeholder:text-[#94a3b8] transition-all"
+                                placeholder="e.g. Law Firm LLC"
+                            />
                         </label>
                     </div>
 
                     <div className="flex flex-col">
                         <label className="flex flex-col w-full sm:w-1/2 pr-0 sm:pr-3">
-                            <span className="text-[#0d131b] dark:text-slate-200 text-sm font-semibold leading-normal pb-2">Email Address</span>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <span className="material-symbols-outlined text-[#94a3b8]" style={{ fontSize: '20px' }}>mail</span>
-                                </div>
-                                <input
-                                    name="email"
-                                    value={profile.email}
-                                    readOnly
-                                    className="form-input flex w-full rounded-lg text-[#64748b] bg-slate-50 dark:bg-slate-900 border border-[#cfd9e7] dark:border-slate-700 h-11 pl-10 pr-4 text-base cursor-not-allowed select-none"
-                                />
-                            </div>
+                            <span className="text-[#0d131b] dark:text-slate-200 text-sm font-semibold leading-normal pb-2 flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-[#94a3b8]" style={{ fontSize: '16px' }}>mail</span>
+                                Email Address
+                            </span>
+                            <input
+                                name="email"
+                                value={profile.email}
+                                readOnly
+                                className="form-input flex w-full rounded-lg text-[#64748b] bg-slate-50 dark:bg-slate-900 border border-[#cfd9e7] dark:border-slate-700 h-11 px-4 text-base cursor-not-allowed select-none"
+                            />
                             <span className="text-xs text-[#4c6c9a] mt-1.5 flex items-center gap-1">
                                 <span className="material-symbols-outlined text-[14px]">lock</span>
                                 Contact your administrator to change your email.
                             </span>
                         </label>
                     </div>
+
 
                     <div className="flex flex-col">
                         <label className="flex flex-col w-full">
