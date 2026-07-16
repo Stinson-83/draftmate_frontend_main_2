@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { toast } from 'sonner';
@@ -213,9 +213,27 @@ const Signup = () => {
                 if (!response.ok) throw new Error(data.detail || 'Google Signup failed');
                 localStorage.setItem('session_id', data.session_id);
                 localStorage.setItem('user_id', data.user_id);
-                localStorage.setItem('user_profile', JSON.stringify({
-                    email: data.email, id: data.user_id, google: true
-                }));
+                
+                let profileData = {};
+                if (data.profile && Object.keys(data.profile).length > 0) {
+                    profileData = {
+                        ...data.profile,
+                        id: data.user_id,
+                        email: data.email,
+                        google: true
+                    };
+                } else {
+                    profileData = {
+                        id: data.user_id,
+                        email: data.email,
+                        name: data.name,
+                        image: data.picture,
+                        firstName: data.name ? data.name.split(' ')[0] : '',
+                        lastName: data.name ? data.name.split(' ').slice(1).join(' ') : '',
+                        google: true
+                    };
+                }
+                localStorage.setItem('user_profile', JSON.stringify(profileData));
                 toast.dismiss(loadingToast);
                 toast.success("Welcome to DraftMate!");
                 navigate('/onboarding');

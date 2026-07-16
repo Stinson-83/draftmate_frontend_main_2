@@ -46,9 +46,11 @@ export default function MainLayout() {
   const [isBugOpen, setIsBugOpen] = useState(false);
 
   const [userProfile, setUserProfile] = useState({
-    firstName: 'Devendra',
-    lastName: 'Gupta',
-    workplace: 'DraftMate Legal'
+    firstName: '',
+    lastName: '',
+    workplace: 'DraftMate Legal',
+    email: '',
+    image: ''
   });
 
   useEffect(() => {
@@ -63,6 +65,17 @@ export default function MainLayout() {
     window.addEventListener('user_profile_updated', loadProfile);
     return () => window.removeEventListener('user_profile_updated', loadProfile);
   }, []);
+
+  const getDisplayName = () => {
+    const fullName = [userProfile.firstName, userProfile.lastName].filter(Boolean).join(" ");
+    if (fullName) return fullName;
+    if (userProfile.name) return userProfile.name;
+    if (userProfile.email) {
+      const prefix = userProfile.email.split('@')[0];
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+    return "User";
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -180,12 +193,16 @@ export default function MainLayout() {
 
         {/* User Profile in Sidebar with Plan Indicator */}
         <div onClick={() => navigate('/dashboard/settings')} className="p-4 border-t border-slate-100 bg-slate-50/50 hover:bg-blue-50 transition-colors cursor-pointer flex items-center gap-3 overflow-hidden group">
-          <img src="/Ayush_gaurav_pic.jpeg" alt="Profile" className="w-9 h-9 rounded-full shadow-sm shrink-0 border border-slate-200 group-hover:border-blue-300 transition-colors" />
+          <img 
+            src={userProfile.image || `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6"><circle cx="12" cy="12" r="12" fill="%23eff6ff"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%233b82f6"/></svg>`} 
+            alt="Profile" 
+            className="w-9 h-9 rounded-full shadow-sm shrink-0 border border-slate-200 group-hover:border-blue-300 transition-colors object-cover" 
+          />
           <AnimatePresence>
             {isSidebarOpen && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col overflow-hidden">
                 <span className="text-sm font-bold text-[#0F1C2E] truncate group-hover:text-blue-700 transition-colors">
-                  {userProfile.firstName} {userProfile.lastName}
+                  {getDisplayName()}
                 </span>
                 <span className="text-[10px] font-medium text-slate-500 truncate mb-1.5">
                   {userProfile.workplace || 'DraftMate Legal'}

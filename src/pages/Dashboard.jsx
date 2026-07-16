@@ -131,16 +131,31 @@ export default function Dashboard() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState('Month');
 
-    const [userName, setUserName] = useState("Devendra");
+    const [userName, setUserName] = useState("");
+    const [userProfile, setUserProfile] = useState({
+        firstName: '',
+        lastName: '',
+        bio: 'Welcome to your intelligente AI Legal Workspace. Complete your profile in settings to list practice areas and experience.',
+        role: 'Lawyer / Legal Pro',
+        image: ''
+    });
 
     useEffect(() => {
         const loadProfile = () => {
             const saved = localStorage.getItem('user_profile');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // Combine first and last name, or fallback to "Devendra"
+                setUserProfile(prev => ({ ...prev, ...parsed }));
+                
                 const fullName = [parsed.firstName, parsed.lastName].filter(Boolean).join(" ");
-                if (fullName) setUserName(fullName);
+                if (fullName) {
+                    setUserName(fullName);
+                } else if (parsed.name) {
+                    setUserName(parsed.name);
+                } else if (parsed.email) {
+                    const prefix = parsed.email.split('@')[0];
+                    setUserName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
+                }
             }
         };
 
@@ -517,28 +532,32 @@ export default function Dashboard() {
                 <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8 flex-1">
                         <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden shadow-md shrink-0 border-2 border-white">
-                            <img src="/Ayush_gaurav_pic.jpeg" alt="Profile" className="w-full h-full object-cover" />
+                            <img 
+                                src={userProfile.image || `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6"><circle cx="12" cy="12" r="12" fill="%23eff6ff"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%233b82f6"/></svg>`} 
+                                alt="Profile" 
+                                className="w-full h-full object-cover" 
+                            />
                             <div className="absolute bottom-1.5 right-1.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
                         </div>
                         <div className="flex-1 max-w-3xl">
                             <div className="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-4 mb-1.5">
-                                <h2 className="text-2xl md:text-3xl font-bold text-[#0F1C2E]">Ayush Gaurav</h2>
-                                <span className="text-[10px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">Partner • Senior Counsel</span>
+                                <h2 className="text-2xl md:text-3xl font-bold text-[#0F1C2E]">{userName || 'DraftMate User'}</h2>
+                                <span className="text-[10px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">{userProfile.role || 'Lawyer / Legal Pro'}</span>
                             </div>
                             <p className="text-sm text-slate-600 mb-5 leading-relaxed max-w-2xl font-medium">
-                                Specializing in Corporate Arbitration and IP Litigation. Active member of the Bar Association for 12 years.
+                                {userProfile.bio || 'Welcome to your intelligent AI Legal Workspace. Edit your profile to list your practice areas, bio, experience and court affiliations.'}
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 <span className="inline-flex items-center gap-1.5 bg-white text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
                                     <ShieldCheck className="w-4 h-4 text-blue-600" /> Tier 1 Practitioner
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 bg-white text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
-                                    <Gavel className="w-4 h-4 text-slate-500" /> 142 Cases Won
+                                    <Gavel className="w-4 h-4 text-slate-500" /> Professional Member
                                 </span>
                             </div>
                         </div>
                     </div>
-
+ 
                     <div className="flex flex-row md:flex-col items-center md:items-end justify-center gap-4 shrink-0 mt-2 md:mt-0 pr-4 md:pr-12 relative z-10">
                         <button onClick={() => navigate('/dashboard/settings')} className="text-slate-600 hover:text-blue-600 text-xs font-bold transition-colors px-2">Edit Profile</button>
                         <button onClick={() => navigate('/dashboard/settings')} className="bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 text-[#0F1C2E] px-8 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">Settings</button>
