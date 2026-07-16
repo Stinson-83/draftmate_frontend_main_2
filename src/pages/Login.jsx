@@ -33,7 +33,7 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     // ─── Demo credentials ────────────────────────────────────────────────────
-    const DEMO_EMAIL    = 'Test@gmail.com';
+    const DEMO_EMAIL = 'Test@gmail.com';
     const DEMO_PASSWORD = 'Test@1234';
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -43,25 +43,6 @@ const Login = () => {
         const loadingToast = toast.loading("Logging in...");
 
         try {
-            // ── Dummy / demo login bypass ─────────────────────────────────────
-            if (email.toLowerCase() === DEMO_EMAIL.toLowerCase() && password === DEMO_PASSWORD) {
-                const demoProfile = {
-                    id: 'demo-user-001',
-                    email: DEMO_EMAIL,
-                    name: 'Test User',
-                    firstName: 'Test',
-                    lastName: 'User',
-                    image: `https://ui-avatars.com/api/?name=Test+User&background=3b82f6&color=fff&size=128`,
-                };
-                localStorage.setItem('session_id', 'demo-session-001');
-                localStorage.setItem('user_id', 'demo-user-001');
-                localStorage.setItem('user_profile', JSON.stringify(demoProfile));
-                toast.dismiss(loadingToast);
-                toast.success('Welcome, Test User! 👋');
-                navigate('/dashboard/home');
-                return;
-            }
-            // ─────────────────────────────────────────────────────────────────
 
             const loginUrl = `${API_CONFIG.AUTH.BASE_URL}${API_CONFIG.AUTH.ENDPOINTS.LOGIN}`;
             const response = await fetch(loginUrl, {
@@ -190,7 +171,7 @@ const Login = () => {
                         <form className="space-y-5" onSubmit={handleLogin}>
 
                             {/* Demo Credentials Banner */}
-                            <div 
+                            <div
                                 onClick={() => {
                                     setEmail('Test@gmail.com');
                                     setPassword('Test@1234');
