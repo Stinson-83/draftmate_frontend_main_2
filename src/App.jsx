@@ -54,6 +54,13 @@ import AdminDashboard from './pages/AdminDashboard';
 import TranslateDocumentPage from './pages/TranslateDocumentPage';
 import TranslateComparePage from './pages/TranslateComparePage';
 
+// Onboarding Detail Pages (imported from feature/UI_changes)
+import StudentDetails from './pages/StudentDetails';
+import AdvocateDetails from './pages/AdvocateDetails';
+import FirmDetails from './pages/FirmDetails';
+import CADetails from './pages/CADetails';
+import UserDetails from './pages/UserDetails';
+
 import SitePolicy from './components/landing/sections/SitePolicy';
 
 
@@ -161,6 +168,11 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/onboarding/student-details" element={<StudentDetails />} />
+            <Route path="/onboarding/advocate-details" element={<AdvocateDetails />} />
+            <Route path="/onboarding/firm-details" element={<FirmDetails />} />
+            <Route path="/onboarding/ca-details" element={<CADetails />} />
+            <Route path="/onboarding/user-details" element={<UserDetails />} />
             
             <Route path="/cookie-policy" element={<SitePolicy />} />
             {/* Public pages */}
