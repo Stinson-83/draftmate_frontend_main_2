@@ -7,24 +7,24 @@ import { API_CONFIG } from '../services/endpoints';
 import ErrorBoundary from '../components/ErrorBoundary';
 import {
   Search, Bell, LayoutDashboard, FileText, Scale, FolderOpen,
-  Languages, Library, GraduationCap, Eye, Gavel, Wrench,
+  Languages, Library, GraduationCap, Gavel, Wrench,
   Settings, Menu, X, Zap, ChevronLeft, ChevronRight, LogOut,
-  CreditCard, HelpCircle, BookOpen, MessageSquare, Gift, Bug, Copy, Share2, UploadCloud, Edit
+  CreditCard, HelpCircle, BookOpen, MessageSquare, Gift, Bug, Copy, Share2, UploadCloud, Edit,
+  UserCircle, Landmark
 } from 'lucide-react';
 
 const SIDEBAR_ITEMS = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard/home" },
-  { icon: Scale, label: "Legal Research", path: "/dashboard/research" },
-  { icon: Gavel, label: "Judgments", path: "/dashboard/judgments" },
-  { icon: BookOpen, label: "Legal Assistant", path: "/dashboard/legal-workflow" },
-  { icon: FolderOpen, label: "Document Management", path: "/dashboard/cases" },
   { icon: Edit, label: "Drafting", path: "/dashboard/drafting" },
   { icon: FileText, label: "My Drafts", path: "/dashboard/drafts" },
-  { icon: Languages, label: "Translations", path: "/dashboard/translate" },
+  { icon: Scale, label: "Legal Research", path: "/dashboard/research" },
+  { icon: FolderOpen, label: "Document Management", path: "/dashboard/cases" },
+  { icon: Gavel, label: "Judgment Search", path: "/dashboard/judgments" },
+  { icon: Languages, label: "Translation", path: "/dashboard/translate" },
+  { icon: GraduationCap, label: "Student Center", path: "/dashboard/academy" },
+  { icon: UserCircle, label: "Lawyer Profile", path: "/dashboard/profile" },
+  { icon: Landmark, label: "E-Court Services", path: "/dashboard/ecourt" },
   { icon: Library, label: "Legal Library", path: "/dashboard/library" },
-  { icon: GraduationCap, label: "Student Mode", path: "/dashboard/academy" },
-  { icon: Eye, label: "Visibility & Reach", path: "/dashboard/profile" },
-  { icon: Gavel, label: "E-Court Services", path: "/dashboard/ecourt" },
   { icon: Wrench, label: "Tools", path: "/dashboard/tools" },
 ];
 
