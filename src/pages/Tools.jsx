@@ -190,7 +190,7 @@ const Tools = () => {
                 <h4 className={`text-lg font-bold mb-2 text-[#0d131b] dark:text-white group-hover:text-white transition-colors`}>
                     {title}
                 </h4>
-                <p className={`text-sm leading-relaxed text-slate-600 dark:text-slate-400 group-hover:text-blue-100 transition-colors`}>
+                <p className={`text-sm leading-relaxed text-slate-600 dark:text-slate-400 group-hover:text-white transition-colors`}>
                     {description}
                 </p>
                 {children && <div className="flex-1 flex flex-col justify-center pt-4">{children}</div>}
@@ -331,13 +331,13 @@ const Tools = () => {
                                         description="Merge PDFs, Rearrange pages and Convert to DOCX format."
                                         onClick={() => navigate('/dashboard/pdf-editor')}
                                     >
-                                        <div className="flex flex-col gap-4 mt-4 opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex flex-col gap-4 mt-4 transition-opacity">
                                             <div className="flex justify-between items-center px-4">
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-100">layers</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-100">content_cut</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-100">compress</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-100">description</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-100">approval</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">layers</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">content_cut</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">compress</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">description</span>
+                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-white">approval</span>
                                             </div>
                                         </div>
                                     </ToolCard>
