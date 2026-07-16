@@ -57,11 +57,32 @@ export default function AdvocateDashboard() {
     const [practiceAreas, setPracticeAreas] = useState([]);
 
     useEffect(() => {
-        if (!tokens.getAccess()) {
-            navigate('/advocate/login?session_expired=1');
-            return;
+        async function verifyAndLoad() {
+            if (!tokens.getAccess()) {
+                const sessionId = localStorage.getItem('session_id');
+                if (sessionId) {
+                    try {
+                        const response = await fetch(`${API_CONFIG.ADVOCATE.BASE_URL}/api/v1/auth/session-login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session_id: sessionId })
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            advocateAuth.saveTokens(data);
+                            fetchAll();
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Session auto-login failed:', e);
+                    }
+                }
+                navigate('/advocate/login?session_expired=1');
+                return;
+            }
+            fetchAll();
         }
-        fetchAll();
+        verifyAndLoad();
     }, []);
 
     async function fetchAll() {

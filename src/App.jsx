@@ -122,8 +122,9 @@ function App() {
   // Requires a valid advocate JWT specifically
   const RequireAdvocateAuth = ({ children }) => {
     const advocateToken = localStorage.getItem('advocate_token');
-    if (!advocateToken) {
-      return <Navigate to="/advocate/login?session_expired=1" replace />;
+    const sessionId = localStorage.getItem('session_id');
+    if (!advocateToken && !sessionId) {
+      return <Navigate to="/advocate/login" replace />;
     }
     return children;
   };

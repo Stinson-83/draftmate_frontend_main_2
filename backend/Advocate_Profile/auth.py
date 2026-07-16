@@ -330,3 +330,78 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     finally:
         if conn:
             conn.close()
+
+
+class SessionLoginRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/session-login", response_model=Token)
+def session_login(body: SessionLoginRequest):
+    """
+    Authenticate using a valid DraftMate user session_id.
+    Validates with the login_db auth service, then provisions
+    or logs in the corresponding advocate user.
+    """
+    session_id = body.session_id
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+
+    # Validate with login_db auth service
+    auth_url = os.getenv("AUTH_SERVICE_URL", "http://127.0.0.1:8009")
+    verify_url = f"{auth_url.rstrip('/')}/verify_session/{session_id}"
+    try:
+        import urllib.request
+        import json
+        req = urllib.request.Request(verify_url, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as response:
+            res_data = json.loads(response.read().decode())
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to verify session with auth service: {e}"
+        )
+
+    if not res_data.get("valid") or not res_data.get("user_id"):
+        raise HTTPException(status_code=401, detail="Invalid session.")
+
+    user_id = res_data["user_id"]
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # Check user in DB
+            cur.execute("SELECT email, password_hash FROM users WHERE id = %s", (user_id,))
+            user_row = cur.fetchone()
+            if not user_row:
+                raise HTTPException(status_code=404, detail="User not found in DB.")
+
+            email = user_row["email"]
+            # Check or create advocate profile
+            cur.execute("SELECT id FROM advocate_profiles WHERE user_id = %s", (user_id,))
+            prof_row = cur.fetchone()
+            if not prof_row:
+                slug = f"{email.split('@')[0].lower()}-{str(uuid.uuid4())[:8]}"
+                title = email.split('@')[0].capitalize()
+                cur.execute(
+                    """
+                    INSERT INTO advocate_profiles (user_id, slug, title, is_public)
+                    VALUES (%s, %s, %s, FALSE)
+                    """,
+                    (user_id, slug, title),
+                )
+                conn.commit()
+
+        access, refresh = _issue_token_pair(user_id)
+        _store_refresh_token(conn, user_id, refresh)
+        return Token(access_token=access, refresh_token=refresh)
+
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
