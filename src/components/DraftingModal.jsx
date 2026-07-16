@@ -830,7 +830,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()}>
-                <button className="close-btn" onClick={onClose}>
+                <button type="button" className="close-btn" onClick={(e) => { e.stopPropagation(); onClose(); }}>
                     <X size={20} />
                 </button>
 
