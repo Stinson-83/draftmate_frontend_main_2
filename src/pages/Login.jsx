@@ -190,24 +190,32 @@ const Login = () => {
                         <form className="space-y-5" onSubmit={handleLogin}>
 
                             {/* Demo Credentials Banner */}
-                            <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                            <div 
+                                onClick={() => {
+                                    setEmail('Test@gmail.com');
+                                    setPassword('Test@1234');
+                                    toast.success('Demo credentials loaded!');
+                                }}
+                                className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-all select-none duration-200"
+                            >
                                 <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[20px] mt-0.5 flex-shrink-0">info</span>
                                 <div className="text-sm">
                                     <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1">Demo Account</p>
                                     <p className="text-blue-700 dark:text-blue-400">
-                                        Email: <button type="button" onClick={() => { setEmail('Test@gmail.com'); }} className="font-mono font-bold hover:underline">Test@gmail.com</button>
+                                        Email: <span className="font-mono font-bold">Test@gmail.com</span>
                                     </p>
                                     <p className="text-blue-700 dark:text-blue-400">
-                                        Password: <button type="button" onClick={() => { setPassword('Test@1234'); }} className="font-mono font-bold hover:underline">Test@1234</button>
+                                        Password: <span className="font-mono font-bold">Test@1234</span>
                                     </p>
-                                    <p className="text-blue-500 dark:text-blue-500 text-xs mt-1">Click values above to auto-fill.</p>
+                                    <p className="text-blue-500 dark:text-blue-500 text-xs mt-1 font-medium">Click anywhere on this card to auto-fill.</p>
                                 </div>
                             </div>
 
                             {/* Email */}
-                            <label className="flex flex-col gap-2 group">
-                                <span className="text-slate-900 dark:text-white text-sm font-medium leading-normal">Email or Username</span>
+                            <div className="flex flex-col gap-2 group">
+                                <label htmlFor="email" className="text-slate-900 dark:text-white text-sm font-medium leading-normal">Email or Username</label>
                                 <input
+                                    id="email"
                                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 h-14 px-4 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base transition-colors"
                                     placeholder="attorney@lawfirm.com"
                                     type="email"
@@ -215,13 +223,14 @@ const Login = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
-                            </label>
+                            </div>
 
                             {/* Password */}
-                            <label className="flex flex-col gap-2 group">
-                                <span className="text-slate-900 dark:text-white text-sm font-medium leading-normal">Password</span>
+                            <div className="flex flex-col gap-2 group">
+                                <label htmlFor="password" className="text-slate-900 dark:text-white text-sm font-medium leading-normal">Password</label>
                                 <div className="relative flex items-center group-focus-within:ring-0">
                                     <input
+                                        id="password"
                                         className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 h-14 pl-4 pr-12 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base transition-colors"
                                         placeholder="••••••••"
                                         type={showPassword ? "text" : "password"}
@@ -230,15 +239,19 @@ const Login = () => {
                                         onChange={(e) => setPassword(e.target.value)}
                                     />
                                     <div
-                                        onClick={() => setShowPassword(!showPassword)}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setShowPassword(!showPassword);
+                                        }}
                                         className="absolute right-0 top-0 bottom-0 pr-3 flex items-center justify-center cursor-pointer text-slate-400 hover:text-slate-600 transition-colors"
                                     >
-                                        <span className="material-symbols-outlined text-[24px]">
+                                        <span className="material-symbols-outlined text-[24px] select-none">
                                             {showPassword ? 'visibility' : 'visibility_off'}
                                         </span>
                                     </div>
                                 </div>
-                            </label>
+                            </div>
 
                             {/* Forgot Password & Remember */}
                             <div className="flex items-center justify-between pt-1">
