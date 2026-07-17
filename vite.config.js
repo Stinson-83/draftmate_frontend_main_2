@@ -19,6 +19,16 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       allowedHosts: true,
+      watch: {
+        ignored: [
+          '**/node_modules/**',
+          '**/backend/**',
+          '**/.git/**',
+          '**/shared_drafts/**',
+          '**/dist/**',
+          '**/.github/**',
+        ]
+      },
       proxy: {
         '/drafter': {
           target: backendTarget,
