@@ -31,7 +31,19 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [ripples, setRipples] = useState([]);
 
+    const addRipple = (e) => {
+        const btn = e.currentTarget;
+        const rect = btn.getBoundingClientRect();
+        const id = Date.now();
+        setRipples(prev => [...prev, {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            id
+        }]);
+        setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 900);
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -143,6 +155,67 @@ const Login = () => {
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 font-sans antialiased text-slate-900 dark:text-white h-screen overflow-hidden flex transition-colors duration-300">
+            <style>{`
+                /* Ripple effect */
+                .ripple {
+                    position: absolute; border-radius: 50%;
+                    background: rgba(255, 255, 255, 0.38);
+                    width: 70px; height: 70px;
+                    margin-left: -35px; margin-top: -35px;
+                    animation: rippleOut 0.9s linear forwards;
+                    pointer-events: none;
+                }
+                @keyframes rippleOut {
+                    from { transform: scale(0); opacity: 0.55; }
+                    to   { transform: scale(4.5); opacity: 0; }
+                }
+
+                /* Buttons & Animations */
+                .btn-primary {
+                    position: relative; overflow: hidden;
+                    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+                }
+                .btn-primary:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 14px 30px rgba(37,99,235,0.38), 0 4px 10px rgba(37,99,235,0.22);
+                }
+                .btn-primary:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+                .btn-primary::after {
+                    content: '';
+                    position: absolute; inset: 0;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+                    transform: translateX(-120%);
+                    transition: transform 0.55s ease;
+                }
+                .btn-primary:hover::after { transform: translateX(120%); }
+
+                .btn-google {
+                    position: relative; overflow: hidden;
+                    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+                }
+                .btn-google:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 22px rgba(0,0,0,0.13);
+                }
+                .btn-google::after {
+                    content: '';
+                    position: absolute; inset: 0;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                    transform: translateX(-120%);
+                    transition: transform 0.55s ease;
+                }
+                .btn-google:hover::after { transform: translateX(120%); }
+
+                form label {
+                    border: none !important;
+                    background: transparent !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                    height: auto !important;
+                    width: auto !important;
+                    border-radius: 0 !important;
+                }
+            `}</style>
             {/* Left Side: Form Section */}
             <div className="w-full lg:w-1/2 h-full flex flex-col bg-white dark:bg-slate-900 relative overflow-y-auto z-10 transition-colors duration-300">
                 {/* Logo Area */}
@@ -218,8 +291,36 @@ const Login = () => {
                             </div>
 
                             {/* Login Button */}
-                            <button disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 rounded-lg font-bold text-base transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-blue-600/20 flex items-center justify-center gap-2 mt-4 disabled:opacity-70 disabled:cursor-not-allowed">
-                                {isLoading ? 'Logging In...' : 'Sign In'}
+                            <button
+                                disabled={isLoading}
+                                onMouseDown={addRipple}
+                                className="btn-primary group w-full bg-blue-600 hover:bg-blue-700 text-white
+                                    h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2
+                                    disabled:opacity-70 disabled:cursor-not-allowed mt-4 shadow-sm"
+                            >
+                                {ripples.map(r => (
+                                    <span key={r.id} className="ripple"
+                                        style={{ left: r.x, top: r.y }} />
+                                ))}
+                                {isLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10"
+                                                stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor"
+                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Logging In...
+                                    </>
+                                ) : (
+                                    <>
+                                        Sign In
+                                        <span className="material-symbols-outlined text-[20px]
+                                            group-hover:translate-x-1 transition-transform">
+                                            arrow_forward
+                                        </span>
+                                    </>
+                                )}
                             </button>
 
                             <div className="text-center pt-2">
@@ -235,7 +336,11 @@ const Login = () => {
                             </div>
 
                             {/* SSO Button */}
-                            <button onClick={() => googleLogin()} className="w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 h-12 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-3" type="button">
+                            <button
+                                onClick={() => googleLogin()}
+                                className="btn-google w-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 h-12 rounded-xl font-medium text-sm flex items-center justify-center gap-3"
+                                type="button"
+                            >
                                 <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
