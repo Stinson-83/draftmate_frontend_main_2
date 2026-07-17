@@ -19,7 +19,9 @@ const OnlyOfficeWorkspace = () => {
   const caseGenerationAbortRef = useRef(null);
   const caseParagraphTextRef = useRef('');
   const chatEndRef = useRef(null);
-
+  const composerTextareaRef = useRef(null);
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const [composerHasValue, setComposerHasValue] = useState(false);
   const selectionPollRef = useRef(null);
   const selectionPollPausedUntilRef = useRef(0);
 
@@ -36,7 +38,6 @@ const OnlyOfficeWorkspace = () => {
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
-  const [sidebarInput, setSidebarInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [selectionPreview, setSelectionPreview] = useState('');
@@ -55,6 +56,7 @@ const OnlyOfficeWorkspace = () => {
   const [currentStatus, setCurrentStatus] = useState('In progress');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarInput, setSidebarInput] = useState('');
 
   const [dynamicConfig, setDynamicConfig] = useState(null);
   const [configLoading, setConfigLoading] = useState(false);
@@ -91,7 +93,18 @@ const OnlyOfficeWorkspace = () => {
     };
   }, [isDragging]);
 
+  useEffect(() => {
+    const el = composerTextareaRef.current;
+    if (!el) return;
 
+    const minHeight = 24;
+    const maxHeight = 160;
+    el.style.height = '0px';
+    const nextHeight = Math.min(el.scrollHeight || minHeight, maxHeight);
+    el.style.height = `${nextHeight}px`;
+    setComposerExpanded(nextHeight > 42);
+    setComposerHasValue(Boolean(inputMessage.trim()));
+  }, [inputMessage]);
 
   const { documentKey, filename, onlyofficeConfig, variablesDetected } = useMemo(() => {
     const state = location?.state || {};
@@ -388,10 +401,7 @@ const OnlyOfficeWorkspace = () => {
       ? buildEnhancementPrompt(enhanceSelectionText.trim(), queryText.trim())
       : queryText;
 
-    if (!customQuery) {
-      setInputMessage('');
-      setEnhanceSelectionText('');
-    }
+    if (!customQuery) setInputMessage('');
 
     const userMsg = {
       role: 'user',
