@@ -262,14 +262,24 @@ const Signup = () => {
         if (typing) return 'border-blue-400 ring-2 ring-blue-300/30 bg-blue-50/20 dark:bg-blue-900/10';
         if (valid === true) return 'border-emerald-500 ring-2 ring-emerald-400/20 bg-emerald-50/20 dark:bg-emerald-900/10';
         if (valid === false) return 'border-red-500 ring-2 ring-red-400/20 bg-red-50/20 dark:bg-red-900/10';
-        if (focused) return 'border-blue-500 ring-2 ring-blue-400/20';
-        return 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800';
+        if (focused) return 'border-blue-500 ring-2 ring-blue-400/20 bg-white dark:bg-slate-900';
+        return 'border-transparent bg-slate-100 dark:bg-slate-800/80';
     };
 
     return (
         <div className="bg-slate-50 dark:bg-slate-900 font-sans antialiased text-slate-900 dark:text-white h-screen overflow-hidden flex">
             <style>{`
-                /* ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ KEYFRAMES ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ */
+                form label {
+                    border: none !important;
+                    background: transparent !important;
+                    padding: 0 !important;
+                    box-shadow: none !important;
+                    height: auto !important;
+                    width: auto !important;
+                    border-radius: 0 !important;
+                    display: flex !important;
+                }
+                /* ══════════════ KEYFRAMES ══════════════ */
                 @keyframes fadeSlideLeft {
                     from { opacity: 0; transform: translateX(-36px); }
                     to   { opacity: 1; transform: translateX(0); }
