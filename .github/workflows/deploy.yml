@@ -110,6 +110,11 @@ jobs:
           secrets: |
             "github_token=${{ secrets.GITHUB_TOKEN }}"
 
+      - name: Force ECS Redeployment
+        run: |
+          echo "🚀 Triggering ECS service redeployment with latest image..."
+          aws ecs update-service --cluster default --service draftmatebackendservice --force-new-deployment --region ${{ secrets.AWS_REGION }}
+
       - name: Download Trivy HTML Template
         run: wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
