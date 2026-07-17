@@ -1,4 +1,4 @@
-﻿// src/pages/Onboarding.jsx
+// src/pages/Onboarding.jsx
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -284,7 +284,7 @@ const Onboarding = () => {
       </header>
 
       <main className="onboarding-content">
-        <div className="hand-icon anim-wave">≡ƒæï</div>
+        <div className="hand-icon anim-wave">👋</div>
         <h1 className="onboarding-title anim-fade-up" style={{ animationDelay: "0.2s" }}>
           Welcome to <span className="title-gradient">DraftMate!</span>
         </h1>
@@ -322,7 +322,7 @@ const Onboarding = () => {
 
         <p className="onboarding-hint anim-fade-up" style={{ animationDelay: "1s" }}>
           {selectedRole
-            ? "Great choice! Click Continue to proceed ΓåÆ"
+            ? "Great choice! Click Continue to proceed →"
             : "You can always change this later in your settings."}
         </p>
       </main>
