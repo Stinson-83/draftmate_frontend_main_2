@@ -44,37 +44,37 @@ const StudentDetails = () => {
         setTimeout(() => navigate(path), 700);
     };
 
-   const handleSubmit = async () => {
-    if (!college.trim()) {
-        toast.error("Please enter your college name.");
-        return;
-    }
-    if (!selectedYear) {
-        toast.error("Please select your year.");
-        return;
-    }
+    const handleSubmit = async () => {
+        if (!college.trim()) {
+            toast.error("Please enter your college name.");
+            return;
+        }
+        if (!selectedYear) {
+            toast.error("Please select your year.");
+            return;
+        }
 
-    setIsLoading(true);
-    const loadingToast = toast.loading("Saving your details...");
+        setIsLoading(true);
+        const loadingToast = toast.loading("Saving your details...");
 
-    try {
-        // Γ£à Save to localStorage only
-        const userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
-        userProfile.college_name = college.trim();
-        userProfile.study_year = selectedYear;
-        localStorage.setItem('user_profile', JSON.stringify(userProfile));
+        try {
+            // Γ£à Save to localStorage only
+            const userProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+            userProfile.college_name = college.trim();
+            userProfile.study_year = selectedYear;
+            localStorage.setItem('user_profile', JSON.stringify(userProfile));
 
-        await new Promise(resolve => setTimeout(resolve, 600));
+            await new Promise(resolve => setTimeout(resolve, 600));
 
-        toast.dismiss(loadingToast);
-        toast.success("Welcome aboard, future lawyer! 🎓");
-        triggerExitAndNavigate('/dashboard/home');
-    } catch (error) {
-        toast.dismiss(loadingToast);
-        toast.error(error.message || "Something went wrong");
-        setIsLoading(false);
-    }
-};
+            toast.dismiss(loadingToast);
+            toast.success("Welcome aboard, future lawyer! 🎓");
+            triggerExitAndNavigate('/dashboard/home');
+        } catch (error) {
+            toast.dismiss(loadingToast);
+            toast.error(error.message || "Something went wrong");
+            setIsLoading(false);
+        }
+    };
 
     const handleSkip = () => {
         triggerExitAndNavigate('/dashboard/home');
