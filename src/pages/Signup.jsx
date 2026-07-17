@@ -755,7 +755,7 @@ const Signup = () => {
                                     Passwords do not match
                                 </SlideMessage>
                                 <SlideMessage show={confirmValid === true && confirmPassword.length > 0} color="green">
-                                    Γ£ô Passwords match
+                                    ✓ Passwords match
                                 </SlideMessage>
                             </div>
 
