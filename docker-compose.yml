@@ -84,8 +84,8 @@ services:
       - 1.1.1.1
     ports:
       # host:container — nginx inside the image listens on 80.
-      # Map host 80 -> container 80.
-      - "80:80"
+      # Map host 8080 -> container 80.
+      - "8080:80"
       - "8003:8003"
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
