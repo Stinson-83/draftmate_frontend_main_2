@@ -241,7 +241,7 @@ const Login = () => {
 
                             {/* Email */}
                             <div className="flex flex-col gap-2 group">
-                                <label htmlFor="email" className="text-slate-900 dark:text-white text-sm font-medium leading-normal">Email or Username</label>
+                                <label htmlFor="email" className="text-slate-900 dark:text-white text-sm font-medium leading-normal">Email</label>
                                 <input
                                     id="email"
                                     className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 h-14 px-4 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base transition-colors"
