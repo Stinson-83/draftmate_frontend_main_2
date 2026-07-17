@@ -255,7 +255,7 @@ const Signup = () => {
         if (p.length < 12) return 3;
         return 4;
     };
-    const strengthLabels = ['', '≡ƒö┤ Too short', '≡ƒƒá Fair', '≡ƒƒí Good', '≡ƒƒó Strong'];
+    const strengthLabels = ['', 'Too short', 'Fair', 'Good', 'Strong'];
     const strengthColors = ['', '#ef4444', '#f97316', '#eab308', '#10b981'];
 
     const getInputClasses = (valid, focused, typing) => {
