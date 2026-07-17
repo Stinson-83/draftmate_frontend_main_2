@@ -32,10 +32,6 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // ─── Demo credentials ────────────────────────────────────────────────────
-    const DEMO_EMAIL = 'Test@gmail.com';
-    const DEMO_PASSWORD = 'Test@1234';
-    // ─────────────────────────────────────────────────────────────────────────
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -169,28 +165,6 @@ const Login = () => {
 
                         {/* Form */}
                         <form className="space-y-5" onSubmit={handleLogin}>
-
-                            {/* Demo Credentials Banner */}
-                            <div
-                                onClick={() => {
-                                    setEmail('Test@gmail.com');
-                                    setPassword('Test@1234');
-                                    toast.success('Demo credentials loaded!');
-                                }}
-                                className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-all select-none duration-200"
-                            >
-                                <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[20px] mt-0.5 flex-shrink-0">info</span>
-                                <div className="text-sm">
-                                    <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1">Demo Account</p>
-                                    <p className="text-blue-700 dark:text-blue-400">
-                                        Email: <span className="font-mono font-bold">Test@gmail.com</span>
-                                    </p>
-                                    <p className="text-blue-700 dark:text-blue-400">
-                                        Password: <span className="font-mono font-bold">Test@1234</span>
-                                    </p>
-                                    <p className="text-blue-500 dark:text-blue-500 text-xs mt-1 font-medium">Click anywhere on this card to auto-fill.</p>
-                                </div>
-                            </div>
 
                             {/* Email */}
                             <div className="flex flex-col gap-2 group">
