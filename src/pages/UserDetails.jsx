@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import fullLogo from "../assets/FULL_LOGO.svg";
@@ -46,7 +46,7 @@ const UserDetails = () => {
 
       <main className="onboarding-content">
         <div className="details-card anim-fade-up">
-          <h1 className="details-title">≡ƒæï Welcome aboard!</h1>
+          <h1 className="details-title">👋 Welcome aboard!</h1>
           <p className="details-subtitle">
             Tell us why you're here so we can give you the <strong>best experience</strong>.
           </p>
@@ -89,7 +89,7 @@ const UserDetails = () => {
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? "Saving..." : "Continue to Dashboard ΓåÆ"}
+            {isLoading ? "Saving..." : "Continue to Dashboard →"}
           </button>
         </div>
       </main>

@@ -1,4 +1,4 @@
-﻿// src/pages/StudentDetails.jsx
+// src/pages/StudentDetails.jsx
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -67,7 +67,7 @@ const StudentDetails = () => {
         await new Promise(resolve => setTimeout(resolve, 600));
 
         toast.dismiss(loadingToast);
-        toast.success("Welcome aboard, future lawyer! ≡ƒÄô");
+        toast.success("Welcome aboard, future lawyer! 🎓");
         triggerExitAndNavigate('/dashboard/home');
     } catch (error) {
         toast.dismiss(loadingToast);
@@ -160,7 +160,7 @@ const StudentDetails = () => {
             <div className="sd-card">
                 {/* Header */}
                 <div className="sd-card-header anim-slide-down">
-                    <span className="sd-emoji">≡ƒÿÄ</span>
+                    <span className="sd-emoji">😎</span>
                     <h1 className="sd-title">Hey future lawyer!</h1>
                 </div>
 

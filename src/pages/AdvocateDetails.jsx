@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import fullLogo from "../assets/FULL_LOGO.svg";
@@ -45,7 +45,7 @@ const AdvocateDetails = () => {
 
       <main className="onboarding-content">
         <div className="details-card anim-fade-up">
-          <h1 className="details-title">ΓÜû∩╕Å Hello, Advocate!</h1>
+          <h1 className="details-title">⚖️ Hello, Advocate!</h1>
           <p className="details-subtitle">
             Tell us about your <strong>practice</strong> so we can personalize your experience.
           </p>
@@ -99,7 +99,7 @@ const AdvocateDetails = () => {
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? "Saving..." : "Continue to Dashboard ΓåÆ"}
+            {isLoading ? "Saving..." : "Continue to Dashboard →"}
           </button>
         </div>
       </main>
