@@ -536,10 +536,10 @@ const HowItWorks = () => {
                     <div className="mb-12 lg:mb-16">
                         <div className="relative">
                             {/* Progress Line */}
-                            <div className="hidden lg:block absolute top-6 left-0 right-0 h-1 bg-slate-200 rounded-full" />
+                            <div className="hidden lg:block absolute top-10 left-[8.33%] right-[8.33%] h-1 bg-slate-200 rounded-full z-0" />
                             <div
-                                className="hidden lg:block absolute top-6 left-0 h-1 bg-gradient-to-r from-primary via-blue-500 to-cyan-500 transition-all duration-700 ease-out rounded-full shadow-lg shadow-primary/50"
-                                style={{ width: `${(activeStep / (steps.length - 1)) * 100}%` }}
+                                className="hidden lg:block absolute top-10 left-[8.33%] h-1 bg-gradient-to-r from-primary via-blue-500 to-cyan-500 transition-all duration-700 ease-out rounded-full shadow-lg shadow-primary/50 z-0"
+                                style={{ width: `${(activeStep / (steps.length - 1)) * 83.33}%` }}
                             />
 
                             {/* Steps */}
@@ -548,7 +548,7 @@ const HowItWorks = () => {
                                     <button
                                         key={step.id}
                                         onClick={() => handleStepChange(index)}
-                                        className={`relative flex flex-col items-center text-center p-4 rounded-xl transition-all duration-500 animate-slideInUp ${activeStep === index
+                                        className={`relative flex flex-col items-center text-center py-4 px-2 rounded-xl transition-all duration-500 animate-slideInUp ${activeStep === index
                                             ? 'bg-white shadow-xl border-2 border-primary scale-105 -translate-y-2'
                                             : index < activeStep
                                                 ? 'bg-primary/5 hover:bg-primary/10 hover:scale-105'
@@ -573,10 +573,10 @@ const HowItWorks = () => {
                                                 <div className="absolute inset-0 rounded-xl bg-primary animate-ping opacity-30" />
                                             )}
                                         </div>
-                                        <span className={`text-sm font-bold transition-colors duration-300 ${activeStep === index ? 'text-primary' : 'text-slate-700'}`}>
+                                        <span className={`text-xs font-bold transition-colors duration-300 ${activeStep === index ? 'text-primary' : 'text-slate-700'}`}>
                                             Step {step.id}
                                         </span>
-                                        <span className={`text-xs mt-1 transition-colors duration-300 ${activeStep === index ? 'text-slate-600' : 'text-slate-400'}`}>
+                                        <span className={`text-[11px] mt-1 leading-tight transition-colors duration-300 ${activeStep === index ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
                                             {step.title}
                                         </span>
                                     </button>
