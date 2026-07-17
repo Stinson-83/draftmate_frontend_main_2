@@ -653,7 +653,7 @@ const Signup = () => {
                                             ${!passwordTyping && passwordValid === true ? 'state-valid' : ''}
                                             ${!passwordTyping && passwordValid === false ? 'state-invalid' : ''}
                                         `}
-                                        placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+                                        placeholder="••••••••"
                                         type={showPassword ? 'text' : 'password'}
                                         required
                                         value={password}
@@ -729,7 +729,7 @@ const Signup = () => {
                                             ${!confirmTyping && confirmValid === true ? 'state-valid' : ''}
                                             ${!confirmTyping && confirmValid === false ? 'state-invalid' : ''}
                                         `}
-                                        placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+                                        placeholder="••••••••"
                                         type={showConfirmPassword ? 'text' : 'password'}
                                         required
                                         value={confirmPassword}
