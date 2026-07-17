@@ -773,7 +773,7 @@ const Signup = () => {
                             <button
                                 disabled={isLoading}
                                 onMouseDown={addRipple}
-                                className="btn-primary w-full bg-blue-600 hover:bg-blue-700 text-white
+                                className="btn-primary group w-full bg-blue-600 hover:bg-blue-700 text-white
                                     h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2
                                     disabled:opacity-70 disabled:cursor-not-allowed anim-scale-in"
                                 style={{ animationDelay: '0.46s' }}
