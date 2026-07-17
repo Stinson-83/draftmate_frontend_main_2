@@ -36,6 +36,7 @@ const OnlyOfficeWorkspace = () => {
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
+  const [sidebarInput, setSidebarInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [selectionPreview, setSelectionPreview] = useState('');
