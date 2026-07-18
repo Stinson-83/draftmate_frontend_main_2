@@ -1,5 +1,6 @@
 import { mockHearings } from '../../data/mockHearings';
 import { mockDiaryEntries } from '../../data/mockDiary';
+import { ecourtsApi } from './ecourtsApi';
 
 // Mock responses for e-Courts and Surepass APIs
 const mockCaseData = {
@@ -41,6 +42,35 @@ const mockHearingsFromECourts = [
 
 export const ecourtsService = {
   async searchByCNR(cnrNumber) {
+    try {
+      const apiResult = await ecourtsApi.searchByCNR(cnrNumber);
+      if (apiResult) {
+        return {
+          cnrNumber: apiResult.cnr,
+          caseNumber: apiResult.case_number,
+          caseTitle: `${apiResult.petitioner} v. ${apiResult.respondent}`,
+          caseType: apiResult.case_type,
+          court: apiResult.court,
+          courtEstablishment: apiResult.court,
+          petitioner: apiResult.petitioner,
+          respondent: apiResult.respondent,
+          caseStage: apiResult.case_status,
+          status: apiResult.case_status,
+          nextHearingDate: apiResult.next_hearing_date,
+          nextHearingTime: '10:00',
+          lastUpdated: apiResult.filing_date,
+          latestOrder: {
+            date: apiResult.registration_date,
+            title: 'Status Update',
+            description: 'Case listed for admission'
+          },
+          latestProceeding: 'Proceeding active'
+        };
+      }
+    } catch (err) {
+      console.warn("Backend searchByCNR API failed, falling back to mock:", err);
+    }
+    // Fallback
     await new Promise(r => setTimeout(r, 1000));
     return {
       ...mockCaseData,
@@ -49,6 +79,35 @@ export const ecourtsService = {
   },
 
   async fetchCaseStatus(cnrNumber) {
+    try {
+      const apiResult = await ecourtsApi.getCaseStatus(cnrNumber);
+      if (apiResult) {
+        return {
+          cnrNumber: apiResult.cnr,
+          caseNumber: apiResult.case_number,
+          caseTitle: `${apiResult.petitioner} v. ${apiResult.respondent}`,
+          caseType: apiResult.case_type,
+          court: apiResult.court,
+          courtEstablishment: apiResult.court,
+          petitioner: apiResult.petitioner,
+          respondent: apiResult.respondent,
+          caseStage: apiResult.case_status,
+          status: apiResult.case_status,
+          nextHearingDate: apiResult.next_hearing_date,
+          nextHearingTime: '10:00',
+          lastUpdated: apiResult.filing_date,
+          latestOrder: {
+            date: apiResult.registration_date,
+            title: 'Status Update',
+            description: 'Case listed for admission'
+          },
+          latestProceeding: 'Proceeding active'
+        };
+      }
+    } catch (err) {
+      console.warn("Backend getCaseStatus API failed, falling back to mock:", err);
+    }
+    // Fallback
     await new Promise(r => setTimeout(r, 800));
     return {
       ...mockCaseData,
@@ -57,11 +116,43 @@ export const ecourtsService = {
   },
 
   async fetchOrders(cnrNumber) {
+    try {
+      const apiResult = await ecourtsApi.getOrders(cnrNumber);
+      if (apiResult && apiResult.length > 0) {
+        return apiResult.map((order, idx) => ({
+          id: order.id || `order-${idx}`,
+          date: order.date,
+          title: order.title,
+          type: order.description || 'Order'
+        }));
+      }
+    } catch (err) {
+      console.warn("Backend getOrders API failed, falling back to mock:", err);
+    }
+    // Fallback
     await new Promise(r => setTimeout(r, 1200));
     return mockOrders;
   },
 
   async fetchHearings(cnrNumber) {
+    try {
+      const caseData = await ecourtsApi.getCaseStatus(cnrNumber);
+      if (caseData && caseData.next_hearing_date) {
+        return [
+          {
+            id: 'h-1',
+            date: caseData.next_hearing_date,
+            time: '10:00',
+            court: caseData.court,
+            judge: 'Hon. Presiding Judge',
+            status: 'Scheduled'
+          }
+        ];
+      }
+    } catch (err) {
+      console.warn("Backend getCaseStatus for hearings failed, falling back to mock:", err);
+    }
+    // Fallback
     await new Promise(r => setTimeout(r, 900));
     return mockHearingsFromECourts;
   }

@@ -234,8 +234,7 @@ class ECourtsService:
         logger.info(f"Searching e-Courts by CNR: {cnr}")
         
         if not self.api_key:
-            logger.warning("ECOURTS_API_KEY not set, returning None")
-            return None
+            logger.warning("ECOURTS_API_KEY not set, using mock case data")
         
         try:
             # Mock response for now (replace with real API call when we have docs)
@@ -300,8 +299,7 @@ class ECourtsService:
         logger.info(f"Fetching orders for CNR: {cnr}")
         
         if not self.api_key:
-            logger.warning("ECOURTS_API_KEY not set, returning empty list")
-            return []
+            logger.warning("ECOURTS_API_KEY not set, using mock orders list")
         
         try:
             # Mock response for now
@@ -350,8 +348,7 @@ class ECourtsService:
         logger.info(f"Fetching judgments for CNR: {cnr}")
         
         if not self.api_key:
-            logger.warning("ECOURTS_API_KEY not set, returning empty list")
-            return []
+            logger.warning("ECOURTS_API_KEY not set, using mock judgments list")
         
         try:
             # Mock response for now
@@ -400,8 +397,7 @@ class ECourtsService:
         logger.info(f"Fetching cause list for court: {court}, date: {date}")
         
         if not self.api_key:
-            logger.warning("ECOURTS_API_KEY not set, returning empty list")
-            return []
+            logger.warning("ECOURTS_API_KEY not set, using mock cause list")
         
         try:
             # Mock response for now

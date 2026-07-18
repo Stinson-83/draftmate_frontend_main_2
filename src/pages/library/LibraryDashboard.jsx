@@ -93,6 +93,13 @@ const libraryCards = [
     description: 'Track cases with e-Courts integration readiness.',
     color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
   },
+  {
+    title: 'Integration Settings',
+    icon: 'settings',
+    path: '/dashboard/library/integrations/ecourts',
+    description: 'Manage your e-Courts and third-party integrations.',
+    color: 'bg-slate-50 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+  },
 ];
 
 const LibraryDashboard = () => {
