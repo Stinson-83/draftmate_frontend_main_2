@@ -1,5 +1,6 @@
 import logging
 import os
+from .s3_helper import upload_file_to_s3_background, ensure_file_exists_locally
 from dotenv import load_dotenv
 
 # Walk up and load the workspace root .env if it exists
@@ -1046,6 +1047,11 @@ async def sync_variable_value(request: VariableSyncRequest, authorization: Optio
                     
         if modified:
             doc.save(file_path)
+            # Push updated file to S3
+            s3_key = request.filename.replace("\\", "/")
+            if "/" not in s3_key:
+                s3_key = os.path.basename(file_path)
+            upload_file_to_s3_background(file_path, s3_key)
             return {"status": "synchronized", "updated": True}
             
         return {"status": "unchanged", "updated": False}
@@ -1064,6 +1070,7 @@ def serve_draft_file(filename: str):
         raise HTTPException(status_code=400, detail="Invalid filename.")
 
     file_path = os.path.join(shared_storage_path, safe_name)
+    ensure_file_exists_locally(safe_name, file_path)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="File not found.")
 
@@ -1086,8 +1093,11 @@ async def serve_draft(draft_id: str, filename: str):
         raise HTTPException(status_code=400, detail="Invalid path parameter.")
 
     file_path = os.path.join(shared_storage_path, safe_draft_id, safe_name)
+    s3_key = f"{safe_draft_id}/{safe_name}"
+    ensure_file_exists_locally(s3_key, file_path)
     if not os.path.isfile(file_path):
         root_path = os.path.join(shared_storage_path, safe_name)
+        ensure_file_exists_locally(safe_name, root_path)
         if os.path.isfile(root_path):
             file_path = root_path
         else:
@@ -1138,6 +1148,9 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
         # Move generated file to the sandboxed path
         sandboxed_path = os.path.join(draft_dir, file_name)
         os.rename(output_path, sandboxed_path)
+        
+        # Upload to S3 in background
+        upload_file_to_s3_background(sandboxed_path, f"{draft_id}/{file_name}")
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
 
@@ -1248,6 +1261,9 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
 
         with open(output_path, "rb") as f:
             file_bytes = f.read()
+            
+        # Upload to S3 in background
+        upload_file_to_s3_background(output_path, f"{draft_id}/{file_name}")
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
 
@@ -1406,6 +1422,9 @@ async def upload_draft(
         # Read the DOCX bytes
         with open(output_path, "rb") as f:
             docx_bytes = f.read()
+
+        # Upload to S3 in background
+        upload_file_to_s3_background(output_path, f"{draft_id}/{safe_name}")
 
         # Copy file to lex_bot upload directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1724,6 +1743,10 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
                         async for chunk in resp.aiter_bytes():
                             if chunk:
                                 f.write(chunk)
+                                
+            # Upload saved file to S3
+            s3_key = f"{draft_id}/{file_name}" if draft_id else file_name
+            upload_file_to_s3_background(target_path, s3_key)
                                 
             # Touch draft updated_at in DB
             if draft_id:
