@@ -38,6 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     pandoc \
     wkhtmltopdf \
+    redis-server \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker layer caching
@@ -71,11 +72,12 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copy Frontend Build Artifacts from Stage 1
 COPY --from=frontend-builder /app/dist /var/www/html
 
-# Create directory for uploads (used by lex_bot)
-RUN mkdir -p backend/Deep_research/lex_bot/data/uploads
+# Create directory for uploads (used by lex_bot) and shared draft storage
+RUN mkdir -p backend/Deep_research/lex_bot/data/uploads && \
+    mkdir -p /app/shared_drafts
 
 # Expose Nginx port (Main Entrypoint)
 EXPOSE 8080
 
 # Initialize database and run supervisor to start all services
-CMD ["sh", "-c", "python backend/login_db/init_db.py && /usr/bin/supervisord"]
+CMD ["sh", "-c", "mkdir -p /app/shared_drafts && python backend/login_db/init_db.py && /usr/bin/supervisord"]
