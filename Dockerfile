@@ -45,13 +45,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements_base.txt requirements.txt ./
 
 # Upgrade pip and install Python dependencies in a single cached layer.
-# Note: we avoid `--no-cache-dir` here to allow pip caching between builds (faster rebuilds,
-# at the cost of larger image). If you prefer smaller images, re-add `--no-cache-dir`.
-RUN pip install --upgrade pip && \
-    pip install --default-timeout=3000 --retries 10 -r requirements_base.txt && \
-    pip install --default-timeout=3000 --retries 10 torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --default-timeout=3000 --retries 10 easyocr sentence-transformers && \
-    pip install --default-timeout=3000 --retries 10 -r requirements.txt
+# Using --no-cache-dir to significantly reduce final Docker image size.
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --default-timeout=3000 --retries 10 -r requirements_base.txt && \
+    pip install --no-cache-dir --default-timeout=3000 --retries 10 torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir --default-timeout=3000 --retries 10 easyocr sentence-transformers && \
+    pip install --no-cache-dir --default-timeout=3000 --retries 10 -r requirements.txt
 
 # Copy all backend code (including pre-downloaded models if present)
 COPY backend/ backend/
