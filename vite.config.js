@@ -99,6 +99,19 @@ export default defineConfig(({ mode }) => {
               proxyReq.setHeader('X-Forwarded-Proto', 'http');
             });
           }
+        },
+        '/doc': {
+          target: onlyofficeTarget,
+          changeOrigin: true,
+          ws: true,
+        },
+        '/heartbeat': {
+          target: onlyofficeTarget,
+          changeOrigin: true,
+        },
+        '/info': {
+          target: onlyofficeTarget,
+          changeOrigin: true,
         }
       }
     }
