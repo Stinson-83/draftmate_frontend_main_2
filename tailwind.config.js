@@ -117,13 +117,5 @@ export default {
       },
     },
   },
-  // Safelist: force-keep these classes even if Tailwind's scanner can't find
-  // them statically (e.g. when class names are built via ternary/variables).
-  safelist: [
-    "animate-marquee-x-left",
-    "animate-marquee-x-right",
-    "animate-marquee-left",
-    "animate-marquee-right",
-  ],
   plugins: [],
-};
+};
