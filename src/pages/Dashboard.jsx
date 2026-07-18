@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -6,7 +7,7 @@ import {
     Briefcase, Calendar as CalendarIcon, FileText, Zap, MapPin, Scale, ChevronRight,
     Plus, Search, ArrowUpRight, CheckCircle2, AlertCircle, Languages,
     ShieldCheck, Share2, ChevronLeft, CalendarDays, Gavel, X, Filter,
-    Folder, FolderPlus, Library, Layers, PlayCircle
+    Folder, FolderPlus, Library, Layers, PlayCircle, Tag, Clock, AlignLeft
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────
@@ -722,8 +723,8 @@ function CreateEventModalTrigger({ onAdd }) {
                 <Plus className="w-4 h-4" /> Create Event
             </button>
 
-            {open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {open && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
                     {/* Overlay */}
                     <div 
                         onClick={() => setOpen(false)}
@@ -735,7 +736,7 @@ function CreateEventModalTrigger({ onAdd }) {
                         initial={{ opacity: 0, scale: 0.95, y: 15 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         transition={{ type: "spring", duration: 0.4 }}
-                        className="bg-white dark:bg-slate-900 rounded-[24px] w-full max-w-md p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative z-10 flex flex-col gap-5"
+                        className="bg-white dark:bg-slate-900 rounded-[24px] w-full max-w-md p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative z-[10000] flex flex-col gap-5 text-slate-800 dark:text-white"
                     >
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-black text-[#0F1C2E] dark:text-white">
@@ -752,7 +753,7 @@ function CreateEventModalTrigger({ onAdd }) {
                         <form className="space-y-4" onSubmit={handleSubmit}>
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[14px]">title</span>
+                                    <Tag className="w-3.5 h-3.5 text-blue-500" />
                                     Event Title*
                                 </label>
                                 <input
@@ -767,7 +768,7 @@ function CreateEventModalTrigger({ onAdd }) {
 
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[14px]">category</span>
+                                    <Briefcase className="w-3.5 h-3.5 text-blue-500" />
                                     Event Type
                                 </label>
                                 <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
@@ -799,7 +800,7 @@ function CreateEventModalTrigger({ onAdd }) {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                                        <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
                                         Date*
                                     </label>
                                     <input
@@ -812,7 +813,7 @@ function CreateEventModalTrigger({ onAdd }) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[14px]">schedule</span>
+                                        <Clock className="w-3.5 h-3.5 text-blue-500" />
                                         Time*
                                     </label>
                                     <input
@@ -827,7 +828,7 @@ function CreateEventModalTrigger({ onAdd }) {
 
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[14px]">description</span>
+                                    <AlignLeft className="w-3.5 h-3.5 text-blue-500" />
                                     Description
                                 </label>
                                 <textarea
@@ -855,7 +856,8 @@ function CreateEventModalTrigger({ onAdd }) {
                             </div>
                         </form>
                     </motion.div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );

@@ -23,6 +23,7 @@ ENV RERANK_MODEL=/app/backend/models/rerank
 ENV EASYOCR_MODULE_PATH=/app/backend/models/easyocr
 ENV SKIP_TUNNEL=true
 ENV HF_ENDPOINT=https://hf-mirror.com
+ENV SHARED_STORAGE_PATH=/app/shared_drafts
 
 # Set work directory
 WORKDIR /app
