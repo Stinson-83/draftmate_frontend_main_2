@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import DraftingModal from '../components/DraftingModal';
 import UploadModal from '../components/UploadModal';
 import CourtFeeModal from '../components/CourtFeeModal';
+import InvoiceModal from '../components/InvoiceModal';
+import DictationModal from '../components/DictationModal';
 import axios from 'axios';
 import { API_CONFIG } from '../services/endpoints';
 
@@ -20,6 +22,8 @@ const Tools = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isCourtFeeModalOpen, setIsCourtFeeModalOpen] = useState(false);
+    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+    const [isDictationModalOpen, setIsDictationModalOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState('');
     const [htmlContent, setHtmlContent] = useState('');
@@ -224,6 +228,7 @@ const Tools = () => {
         { id: 'Drafting', icon: 'edit_document', label: 'Drafting' },
         { id: 'PDF Tools', icon: 'picture_as_pdf', label: 'PDF Tools' },
         { id: 'Research', icon: 'search', label: 'Research' },
+        { id: 'Utilities', icon: 'construction', label: 'Utilities' },
         { id: 'How to use ?', icon: 'help', label: 'How to use ?' }
     ];
 
@@ -391,6 +396,32 @@ const Tools = () => {
                         )}
                     </div>
 
+                    {/* Utilities Section */}
+                    {(activeCategory === 'All features' || activeCategory === 'Utilities') && (
+                        <section className="flex flex-col gap-6 border-t border-slate-200 dark:border-slate-800 pt-8">
+                            <div className="flex flex-col gap-2">
+                                <h3 className="text-2xl font-bold text-[#0d131b] dark:text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary">construction</span>
+                                    Utility Tools
+                                </h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <ToolCard
+                                    icon="receipt_long"
+                                    title="Invoice Generator"
+                                    description="Create professional legal invoices for your clients and download as PDF."
+                                    onClick={() => setIsInvoiceModalOpen(true)}
+                                />
+                                <ToolCard
+                                    icon="mic"
+                                    title="Voice Dictation"
+                                    description="Dictate your legal notes using voice-to-text. Supports Hindi & English."
+                                    onClick={() => setIsDictationModalOpen(true)}
+                                />
+                            </div>
+                        </section>
+                    )}
+
                     {/* How to use? Section */}
                     {activeCategory === 'How to use ?' && (
                         <section className="flex flex-col gap-6">
@@ -470,6 +501,8 @@ const Tools = () => {
                 />
             )}
             {isCourtFeeModalOpen && <CourtFeeModal onClose={() => setIsCourtFeeModalOpen(false)} />}
+            {isInvoiceModalOpen && <InvoiceModal onClose={() => setIsInvoiceModalOpen(false)} />}
+            {isDictationModalOpen && <DictationModal onClose={() => setIsDictationModalOpen(false)} />}
             <UploadModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}
