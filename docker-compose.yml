@@ -88,6 +88,7 @@ services:
       - "8080:8080"
       - "8003:8003"
     environment:
+      - DRAFTER_SELF_URL=http://backend:8003
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - POSTGRES_USER=${POSTGRES_USER}
