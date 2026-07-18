@@ -1078,7 +1078,7 @@ const Tools = () => {
                             description="Court Fee, GST, SIP & Salary calculators — all in one place."
                             onClick={() => setIsCalculatorHubOpen(true)}
                             accentColor="#8b5cf6"
-                            badge="4-IN-1"
+
                         />
                         <ToolCard
                             icon="receipt_long"
@@ -1086,7 +1086,7 @@ const Tools = () => {
                             description="Create professional legal invoices for your clients and download as PDF."
                             onClick={() => setIsInvoiceModalOpen(true)}
                             accentColor="#10b981"
-                            badge="NEW"
+
                         />
                         <ToolCard
                             icon="mic"
@@ -1094,7 +1094,7 @@ const Tools = () => {
                             description="Dictate your legal notes using voice-to-text. Supports Hindi & English."
                             onClick={() => setIsDictationModalOpen(true)}
                             accentColor="#f43f5e"
-                            badge="NEW"
+
                         />
                     </motion.div>
                 </div>
