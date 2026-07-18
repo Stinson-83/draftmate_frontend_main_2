@@ -11,6 +11,10 @@ else:
     load_dotenv()
 
 ONLYOFFICE_API_URL = os.getenv("ONLYOFFICE_API_URL", "http://onlyoffice-server")
+# URL OnlyOffice uses to reach THIS service to fetch the document and post callbacks.
+# In Docker Compose this is the service hostname (drafter-service:8003).
+# On AWS Fargate all containers share localhost, so default to 127.0.0.1:8003.
+DRAFTER_SELF_URL = os.getenv("DRAFTER_SELF_URL", "http://127.0.0.1:8003")
 
 import logging
 import hashlib
@@ -1173,12 +1177,12 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"http://drafter-service:8003/v2/draft/serve/{draft_id}/{file_name}",
+                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{file_name}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"http://drafter-service:8003/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1279,12 +1283,12 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"http://drafter-service:8003/v2/draft/serve/{draft_id}/{file_name}",
+                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{file_name}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"http://drafter-service:8003/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1469,12 +1473,12 @@ async def upload_draft(
                 "fileType": "docx",
                 "key": document_key,
                 "title": safe_name,
-                "url": f"http://drafter-service:8003/v2/draft/serve/{draft_id}/{safe_name}",
+                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{safe_name}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"http://drafter-service:8003/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1584,7 +1588,7 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"http://drafter-service:8003/v2/draft/serve/{draft_id}/{file_name}",
+                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{file_name}",
                 "permissions": {
                     "edit": access_level == "edit",
                     "download": True,
@@ -1593,7 +1597,7 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"http://drafter-service:8003/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
                 "mode": "edit" if access_level == "edit" else "view",
                 "user": {
                     "id": user_id,
@@ -1739,3 +1743,4 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
 
 if __name__ == "__main__":
     uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=True)
+
