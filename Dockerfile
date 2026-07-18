@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline --no-audit --progress=false
 COPY index.html vite.config.js eslint.config.js tailwind.config.js postcss.config.js ./
+ENV CACHE_BUST=1
 COPY src/ src/
 COPY public/ public/
 ARG VITE_CLIENT_ID=462761102428-dnm0f7tmt3dbv0l41aun71k4lj1c9hig.apps.googleusercontent.com
