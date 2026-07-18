@@ -1,6 +1,6 @@
 import logging
 import os
-from .s3_helper import upload_file_to_s3_background, ensure_file_exists_locally
+from s3_helper import upload_file_to_s3_background, ensure_file_exists_locally
 from dotenv import load_dotenv
 
 # Walk up and load the workspace root .env if it exists
