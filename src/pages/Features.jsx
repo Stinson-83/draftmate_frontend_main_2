@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import fullLogo from '../assets/FULL_LOGO.svg';
+import Footer from '../components/landing/sections/Footer';
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ const StatCard = ({ icon, value, suffix, label, color, delay }) => {
 
 // ─── Timeline Step ────────────────────────────────────────────────────────────
 
-const WorkflowStep = ({ step, icon, title, desc, color, delay, isLast }) => {
+const WorkflowStep = ({ step, icon, title, desc, color, delay, isLast, nextColor }) => {
   const { ref, inView } = useInView(0.15);
   return (
     <div
@@ -224,40 +225,94 @@ const WorkflowStep = ({ step, icon, title, desc, color, delay, isLast }) => {
         transition: `opacity 0.7s ease ${delay}ms, transform 0.7s ease ${delay}ms`,
       }}
     >
-      {!isLast && (
-        <div className="hidden lg:block absolute top-10 left-[calc(50%+36px)] right-[calc(-50%+36px)] h-[2px] overflow-hidden">
-          <div
-            className="h-full"
+      <div className="relative mb-4 w-full flex justify-center">
+        {/* Left-extending line with dot for Step 1 */}
+        {step === 1 && (
+          <div 
+            className="hidden md:block absolute top-10 h-[2px] overflow-hidden"
             style={{
-              background: `linear-gradient(to right, ${color}, #C4B5FD)`,
-              width: inView ? '100%' : '0%',
-              transition: `width 1s ease ${delay + 400}ms`,
+              left: 'calc(50% - 104px)',
+              width: '60px',
             }}
-          />
-          <div
-            className="absolute right-0 top-1/2 -translate-y-1/2 transition-opacity duration-300"
-            style={{ opacity: inView ? 1 : 0, transitionDelay: `${delay + 900}ms` }}
           >
-            <div className="w-0 h-0 border-t-4 border-b-4 border-l-8 border-t-transparent border-b-transparent" style={{ borderLeftColor: '#C4B5FD' }} />
+            <div
+              className="h-full"
+              style={{
+                background: `linear-gradient(to right, #C4B5FD, ${color})`,
+                width: inView ? '100%' : '0%',
+                transition: `width 1s ease ${delay + 400}ms`,
+              }}
+            />
+            {/* Start Dot */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white z-10" />
           </div>
-        </div>
-      )}
-      <div className="relative mb-4">
-        <div
-          className="size-20 rounded-full flex items-center justify-center border-2 transition-all duration-500"
-          style={{
-            background: `linear-gradient(135deg, ${color}30, ${color}15)`,
-            borderColor: inView ? color : 'transparent',
-            boxShadow: inView ? `0 0 30px ${color}50` : 'none',
-          }}
-        >
-          <span className="material-symbols-outlined text-3xl" style={{ color, fontSize: '32px' }}>{icon}</span>
-        </div>
-        <div
-          className="absolute -top-2 -right-2 size-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg"
-          style={{ background: color }}
-        >
-          {step}
+        )}
+
+        {/* Connecting line to the right (for Steps 1, 2, 3) */}
+        {!isLast && (
+          <div 
+            className="hidden md:block absolute top-10 h-[2px] overflow-hidden"
+            style={{
+              left: 'calc(50% + 44px)',
+              width: 'calc(100% - 88px)',
+            }}
+          >
+            <div
+              className="h-full"
+              style={{
+                background: `linear-gradient(to right, ${color}, ${nextColor || '#C4B5FD'})`,
+                width: inView ? '100%' : '0%',
+                transition: `width 1s ease ${delay + 400}ms`,
+              }}
+            />
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 transition-opacity duration-300"
+              style={{ opacity: inView ? 1 : 0, transitionDelay: `${delay + 900}ms` }}
+            >
+              <div className="w-0 h-0 border-t-4 border-b-4 border-l-8 border-t-transparent border-b-transparent" style={{ borderLeftColor: nextColor || '#C4B5FD' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Right-extending line with dot for the Last Step */}
+        {isLast && (
+          <div 
+            className="hidden md:block absolute top-10 h-[2px] overflow-hidden"
+            style={{
+              left: 'calc(50% + 44px)',
+              width: '60px',
+            }}
+          >
+            <div
+              className="h-full"
+              style={{
+                background: `linear-gradient(to right, ${color}, #C4B5FD)`,
+                width: inView ? '100%' : '0%',
+                transition: `width 1s ease ${delay + 400}ms`,
+              }}
+            />
+            {/* End Dot */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white z-10" />
+          </div>
+        )}
+
+        <div className="relative size-20">
+          <div
+            className="size-20 rounded-full flex items-center justify-center border-2 transition-all duration-500"
+            style={{
+              background: `linear-gradient(135deg, ${color}30, ${color}15)`,
+              borderColor: inView ? color : 'transparent',
+              boxShadow: inView ? `0 0 30px ${color}50` : 'none',
+            }}
+          >
+            <span className="material-symbols-outlined text-3xl" style={{ color, fontSize: '32px' }}>{icon}</span>
+          </div>
+          <div
+            className="absolute -top-2 -right-2 size-7 rounded-full flex items-center justify-center text-xs font-black text-white shadow-lg"
+            style={{ background: color }}
+          >
+            {step}
+          </div>
         </div>
       </div>
       <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
@@ -657,14 +712,14 @@ const Features = () => {
             <p className="text-blue-100 text-lg max-w-xl mx-auto">Four simple steps to go from raw case details to a court-ready document.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mt-8">
             {[
               { step: 1, icon: 'input',         title: 'Input Facts',    desc: 'Enter case details via text, voice, or file upload',             color: '#93C5FD' },
               { step: 2, icon: 'psychology',     title: 'AI Analysis',    desc: 'AI identifies relevant laws, sections & precedents',              color: '#C4B5FD' },
               { step: 3, icon: 'edit_document',  title: 'Generate Draft', desc: 'Receive a perfectly formatted document with citations',           color: '#FCD34D' },
               { step: 4, icon: 'download',       title: 'Export & File',  desc: 'Edit, export to Word / PDF and file directly in court',          color: '#6EE7B7' },
             ].map((item, i, arr) => (
-              <WorkflowStep key={item.step} {...item} delay={i * 200} isLast={i === arr.length - 1} />
+              <WorkflowStep key={item.step} {...item} delay={i * 200} isLast={i === arr.length - 1} nextColor={arr[i+1]?.color} />
             ))}
           </div>
 
@@ -802,22 +857,7 @@ const Features = () => {
       </section>
 
       {/* ── FOOTER ──────────────────────────────────────────────────────────── */}
-      <footer className="bg-slate-900 text-white py-12 px-4">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="h-8 bg-white/90 backdrop-blur-sm rounded-full px-4 py-1 shadow-sm">
-              <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
-            </div>
-          </Link>
-          <div className="flex gap-6">
-            <Link to="/" className="text-slate-400 hover:text-white transition-colors">Home</Link>
-            <Link to="/how-it-works" className="text-slate-400 hover:text-white transition-colors">How It Works</Link>
-            <Link to="/features" className="text-slate-400 hover:text-white transition-colors">Features</Link>
-            <Link to="/login" className="text-slate-400 hover:text-white transition-colors">Login</Link>
-          </div>
-          <p className="text-slate-500 text-sm">© 2024 DraftMate. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
 
       <style>{`
         @keyframes orbitDot {

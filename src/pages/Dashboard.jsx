@@ -686,6 +686,8 @@ function CreateEventModalTrigger({ onAdd }) {
     const [title, setTitle] = useState("");
     const [date, setDate] = useState("");
     const [time, setTime] = useState("");
+    const [description, setDescription] = useState("");
+    const [eventType, setEventType] = useState("hearing");
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -697,135 +699,18 @@ function CreateEventModalTrigger({ onAdd }) {
             title,
             date,
             time,
-            type: "event",
-            color: "bg-blue-500",
+            description,
+            type: eventType,
+            color: eventType === "hearing" ? "bg-blue-500" : "bg-amber-500",
         });
 
         setTitle("");
         setDate("");
         setTime("");
+        setDescription("");
+        setEventType("hearing");
 
         setOpen(false);
-    };
-
-    const handleWorkspaceDraftOpen = (draft) => {
-        const filename = ensureDocxFilename(draft.filename || draft.title || draft.rawName || 'Untitled Draft');
-        const documentKey = draft.documentKey || draft.id || filename;
-        const onlyofficeConfig = buildWorkspaceConfig({
-            ...draft,
-            filename,
-            documentKey,
-        });
-
-        navigate('/dashboard/workspace', {
-            state: {
-                draftId: draft.id,
-                id: draft.id,
-                documentKey,
-                filename,
-                onlyofficeConfig,
-                variablesDetected: draft.variablesDetected || [],
-                trackingParams: draft.trackingParams || {
-                    documentKey,
-                    filename,
-                    source: draft.trackingParams?.source || 'my_desk',
-                    folderId: draft.trackingParams?.folderId ?? null,
-                },
-            },
-        });
-    };
-
-    const handleCreateNewDraft = () => {
-        setIsDraftingModalOpen(true);
-    };
-
-    const handleExistingDocumentClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileUpload = async (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const ext = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
-        if (!['.docx', '.pdf'].includes(ext)) {
-            toast.error('Only .docx and .pdf files are supported.');
-            event.target.value = '';
-            return;
-        }
-
-        const sessionId = localStorage.getItem('session_id');
-        if (!sessionId) {
-            toast.error('Please sign in again before uploading a document.');
-            event.target.value = '';
-            return;
-        }
-
-        setIsUploadingDocument(true);
-
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('session_id', sessionId);
-
-            const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${sessionId}`,
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                let detail = 'Failed to upload document.';
-                try {
-                    const errorData = await response.json();
-                    detail = errorData?.detail || detail;
-                } catch {
-                    detail = response.statusText || detail;
-                }
-                throw new Error(detail);
-            }
-
-            const data = await response.json();
-
-            saveDeskDraftRecord({
-                id: data.documentKey,
-                name: data.filename,
-                filename: data.filename,
-                documentKey: data.documentKey,
-                onlyofficeConfig: data,
-                variablesDetected: data.variablesDetected || [],
-                status: 'In progress',
-                source: 'dashboard_upload',
-                trackingParams: {
-                    source: 'dashboard_upload',
-                    documentKey: data.documentKey,
-                    filename: data.filename,
-                    uploadedAt: new Date().toISOString(),
-                },
-            });
-
-            navigate('/dashboard/workspace', {
-                state: {
-                    documentKey: data.documentKey,
-                    filename: data.filename,
-                    onlyofficeConfig: data,
-                    variablesDetected: data.variablesDetected || [],
-                    trackingParams: {
-                        source: 'dashboard_upload',
-                        documentKey: data.documentKey,
-                        filename: data.filename,
-                    },
-                },
-            });
-        } catch (error) {
-            console.error('Upload failed:', error);
-            toast.error(error.message || 'Failed to upload and open document.');
-        } finally {
-            setIsUploadingDocument(false);
-            event.target.value = '';
-        }
     };
 
     return (
@@ -838,15 +723,27 @@ function CreateEventModalTrigger({ onAdd }) {
             </button>
 
             {open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[28px] w-full max-w-md p-6 shadow-2xl border border-slate-200">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-black text-[#0F1C2E]">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Overlay */}
+                    <div 
+                        onClick={() => setOpen(false)}
+                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
+                    />
+
+                    {/* Modal Card */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ type: "spring", duration: 0.4 }}
+                        className="bg-white dark:bg-slate-900 rounded-[24px] w-full max-w-md p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative z-10 flex flex-col gap-5"
+                    >
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-black text-[#0F1C2E] dark:text-white">
                                 Create New Event
                             </h2>
                             <button
                                 onClick={() => setOpen(false)}
-                                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-400 flex items-center justify-center transition-colors"
+                                className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-300 flex items-center justify-center transition-colors"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -854,7 +751,8 @@ function CreateEventModalTrigger({ onAdd }) {
 
                         <form className="space-y-4" onSubmit={handleSubmit}>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[14px]">title</span>
                                     Event Title*
                                 </label>
                                 <input
@@ -862,61 +760,101 @@ function CreateEventModalTrigger({ onAdd }) {
                                     placeholder="e.g. Client Meeting"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500 text-sm font-medium"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white transition-all"
                                     required
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
-                                <button type="button" className="bg-white text-blue-600 font-bold text-xs py-2.5 rounded-lg shadow-sm border border-slate-200">Court Hearing</button>
-                                <button type="button" className="text-slate-400 font-bold text-xs py-2.5 rounded-lg hover:text-slate-600">Non-Court Event</button>
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[14px]">category</span>
+                                    Event Type
+                                </label>
+                                <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventType("hearing")}
+                                        className={`py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                                            eventType === "hearing"
+                                                ? "bg-white dark:bg-slate-750 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/20"
+                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        Court Hearing
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventType("event")}
+                                        className={`py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                                            eventType === "event"
+                                                ? "bg-white dark:bg-slate-750 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/20"
+                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        Non-Court Event
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date</label>
+                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                                        Date*
+                                    </label>
                                     <input
                                         type="date"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:border-blue-500 text-sm font-medium"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white transition-all"
                                         required
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Time</label>
+                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[14px]">schedule</span>
+                                        Time*
+                                    </label>
                                     <input
                                         type="time"
                                         value={time}
                                         onChange={(e) => setTime(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:border-blue-500 text-sm font-medium"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white transition-all"
                                         required
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Description</label>
-                                <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 text-sm font-medium min-h-[100px]" placeholder="Add preparation notes..." />
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[14px]">description</span>
+                                    Description
+                                </label>
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white min-h-[100px] transition-all"
+                                    placeholder="Add preparation notes..."
+                                />
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setOpen(false)}
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-slate-100 transition-colors"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="w-full bg-[#0F1C2E] text-white font-bold py-3.5 rounded-xl hover:bg-blue-900 shadow-lg shadow-blue-900/10 transition-colors"
+                                    className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-colors"
                                 >
                                     Create Event
                                 </button>
                             </div>
                         </form>
-                    </div>
+                    </motion.div>
                 </div>
             )}
         </>

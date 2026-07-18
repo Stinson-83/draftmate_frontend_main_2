@@ -47,6 +47,122 @@ const Tools = () => {
     const [initialDraftingPrompt, setInitialDraftingPrompt] = useState('');
     const fileInputRef = useRef(null);
 
+    // List of all tools for uniform dynamic grid representation
+    const allTools = [
+        {
+            id: 'create-draft',
+            icon: 'edit_document',
+            title: 'Create New Draft',
+            description: 'Start a new document with AI guidance or an empty workspace.',
+            onClick: () => handleDraftingClick(),
+            accentColor: '#3b82f6',
+            category: 'Drafting'
+        },
+        {
+            id: 'existing-doc',
+            icon: 'upload_file',
+            title: 'Work on Existing Document',
+            description: 'Upload a `.docx` or `.pdf` file and continue in the workspace.',
+            onClick: () => handleUploadClick(),
+            accentColor: '#6366f1',
+            category: 'Drafting'
+        },
+        {
+            id: 'review-draft',
+            icon: 'description',
+            title: 'Review Your Draft',
+            description: 'Review your previously created drafts.',
+            onClick: () => navigate('/dashboard/drafts'),
+            accentColor: '#f59e0b',
+            category: 'Drafting'
+        },
+        {
+            id: 'pdf-toolkit',
+            icon: 'book',
+            title: 'PDF Tool kit',
+            description: 'Merge PDFs, rearrange pages, compress, watermark and convert to DOCX format.',
+            onClick: () => navigate('/dashboard/pdf-editor'),
+            accentColor: '#3b82f6',
+            badge: '5-in-1',
+            category: 'PDF Tools',
+            children: (
+                <div className="flex justify-between items-center px-4 mt-2">
+                    <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">layers</span>
+                    <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">content_cut</span>
+                    <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">compress</span>
+                    <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">description</span>
+                    <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">approval</span>
+                </div>
+            )
+        },
+        {
+            id: 'translator',
+            icon: 'translate',
+            title: 'Document Translator',
+            description: 'Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file.',
+            onClick: () => navigate('/dashboard/translate-document'),
+            accentColor: '#06b6d4',
+            badge: 'NEW',
+            category: 'PDF Tools'
+        },
+        {
+            id: 'lex-bot',
+            icon: 'balance',
+            title: 'Lex Bot',
+            description: 'Do accurate legal research by talking to our AI.',
+            onClick: () => navigate('/dashboard/research'),
+            accentColor: '#8b5cf6',
+            category: 'Research'
+        },
+        {
+            id: 'case-search',
+            icon: 'gavel',
+            title: 'Case Search',
+            description: 'Search Indian Kanoon database for legal cases and precedence.',
+            onClick: () => navigate('/dashboard/case-search'),
+            accentColor: '#ef4444',
+            category: 'Research'
+        },
+        {
+            id: 'chat-pdf',
+            icon: 'picture_as_pdf',
+            title: 'Chat with PDF',
+            description: 'Upload a PDF and ask questions, summarize, or analyze it.',
+            onClick: () => navigate('/dashboard/chat-pdf'),
+            accentColor: '#ec4899',
+            category: 'Research'
+        },
+        {
+            id: 'court-fee',
+            icon: 'calculate',
+            title: 'Court Fee Calculator',
+            description: 'Calculate Ad-Valorem Court Fees for your jurisdiction.',
+            onClick: () => setIsCourtFeeModalOpen(true),
+            accentColor: '#f59e0b',
+            category: 'Research'
+        },
+        {
+            id: 'invoice-gen',
+            icon: 'receipt_long',
+            title: 'Invoice Generator',
+            description: 'Create professional legal invoices for your clients and download as PDF.',
+            onClick: () => setIsInvoiceModalOpen(true),
+            accentColor: '#10b981',
+            badge: 'NEW',
+            category: 'Utilities'
+        },
+        {
+            id: 'dictation',
+            icon: 'mic',
+            title: 'Voice Dictation',
+            description: 'Dictate your legal notes using voice-to-text. Supports Hindi & English.',
+            onClick: () => setIsDictationModalOpen(true),
+            accentColor: '#f43f5e',
+            badge: 'NEW',
+            category: 'Utilities'
+        }
+    ];
+
     const saveDeskDraftRecord = (record) => {
         const savedDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
         const nextRecord = {
@@ -243,18 +359,6 @@ const Tools = () => {
                         <span className="material-symbols-outlined text-2xl">{icon}</span>
                     </motion.div>
 
-                    {badge && (
-                        <motion.span
-                            initial={{ scale: 0, rotate: -180 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            transition={{ type: 'spring', stiffness: 200, delay: 0.4 }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
-                                bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
-                        >
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                            {badge}
-                        </motion.span>
-                    )}
                 </div>
 
                 <div className="relative z-10 flex flex-col flex-1">
@@ -266,6 +370,28 @@ const Tools = () => {
                     </p>
                     {children && <div className="flex-1 flex flex-col justify-center pt-4">{children}</div>}
                 </div>
+
+                <motion.div
+                    className="relative z-10 flex items-center gap-1.5 text-sm font-semibold mt-auto pt-2"
+                    style={{ color: accentColor }}
+                >
+                    <span>Open Tool</span>
+                    <motion.span
+                        className="material-symbols-outlined text-lg"
+                        animate={isHovered ? { x: [0, 5, 0] } : { x: 0 }}
+                        transition={{ duration: 0.6, repeat: isHovered ? Infinity : 0 }}
+                    >
+                        arrow_right_alt
+                    </motion.span>
+                </motion.div>
+
+                <motion.div
+                    initial={{ scaleX: 0 }}
+                    animate={isHovered ? { scaleX: 1 } : { scaleX: 0 }}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="absolute bottom-0 left-0 right-0 h-1 origin-left"
+                    style={{ backgroundColor: accentColor }}
+                />
             </motion.div>
         );
     };
@@ -362,153 +488,24 @@ const Tools = () => {
             >
                 <div className={`w-full max-w-[1200px] mx-auto px-4 md:px-10 lg:px-40 ${activeCategory === 'How to use ?' ? '' : 'pt-6 pb-12 flex flex-col gap-16'}`}>
 
-                    {/* Drafting Section */}
-                    {(activeCategory === 'All features' || activeCategory === 'Drafting') && (
-                        <section className="flex flex-col gap-6">
-                            <div className="flex flex-col gap-2">
-                                <h3 className="text-2xl font-bold text-[#0d131b] dark:text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary">edit_document</span>
-                                    Drafting
-                                </h3>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <ToolCard
-                                    icon="edit_document"
-                                    title="Create New Draft"
-                                    description="Start a new document with AI guidance or an empty workspace."
-                                    onClick={handleDraftingClick}
-                                    accentColor="#3b82f6"
-                                />
-                                <ToolCard
-                                    icon="upload_file"
-                                    title="Work on Existing Document"
-                                    description="Upload a `.docx` or `.pdf` file and continue in the workspace."
-                                    onClick={handleUploadClick}
-                                    accentColor="#6366f1"
-                                />
-                                <ToolCard
-                                    icon="description"
-                                    title="Review Your Draft"
-                                    description="Review your previously created drafts."
-                                    onClick={() => navigate('/dashboard/drafts')}
-                                    accentColor="#f59e0b"
-                                />
-                            </div>
-                        </section>
-                    )}
-
-                    <div className={`grid grid-cols-1 ${activeCategory === 'All features' ? 'lg:grid-cols-2' : 'grid-cols-1'} gap-8 pt-8 ${activeCategory === 'All features' ? 'border-t border-slate-200 dark:border-slate-800' : ''}`}>
-                        {/* PDF Tools Section */}
-                        {(activeCategory === 'All features' || activeCategory === 'PDF Tools') && (
-                            <section className="flex flex-col gap-6">
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-2xl font-bold text-[#0d131b] dark:text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary">picture_as_pdf</span>
-                                        PDF Tools
-                                    </h3>
-                                </div>
-                                <div className="grid grid-cols-1 gap-6 h-full">
+                    {activeCategory !== 'How to use ?' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 pb-12">
+                            {allTools
+                                .filter(tool => activeCategory === 'All features' || tool.category === activeCategory)
+                                .map(tool => (
                                     <ToolCard
-                                        icon="book"
-                                        title="PDF Tool kit"
-                                        description="Merge PDFs, Rearrange pages and Convert to DOCX format."
-                                        onClick={() => navigate('/dashboard/pdf-editor')}
-                                        accentColor="#3b82f6"
-                                        badge="5-in-1"
+                                        key={tool.id}
+                                        icon={tool.icon}
+                                        title={tool.title}
+                                        description={tool.description}
+                                        onClick={tool.onClick}
+                                        accentColor={tool.accentColor}
+                                        badge={tool.badge}
                                     >
-                                        <div className="flex flex-col gap-4 mt-4 transition-opacity">
-                                            <div className="flex justify-between items-center px-4">
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">layers</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">content_cut</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">compress</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">description</span>
-                                                <span className="material-symbols-outlined text-2xl text-slate-400 group-hover:text-blue-500">approval</span>
-                                            </div>
-                                        </div>
+                                        {tool.children}
                                     </ToolCard>
-                                    <ToolCard
-                                        icon="translate"
-                                        title="Document Translator"
-                                        description="Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file."
-                                        onClick={() => navigate('/dashboard/translate-document')}
-                                        accentColor="#06b6d4"
-                                        badge="NEW"
-                                    />
-                                </div>
-                            </section>
-                        )}
- 
-                        {/* Research Section */}
-                        {(activeCategory === 'All features' || activeCategory === 'Research') && (
-                            <section className={`flex flex-col gap-6 ${activeCategory === 'All features' ? 'lg:border-l lg:pl-8 lg:border-slate-200 lg:dark:border-slate-800 border-t lg:border-t-0 pt-8 lg:pt-0 border-slate-200 dark:border-slate-800' : ''}`}>
-                                <div className="flex flex-col gap-2">
-                                    <h3 className="text-2xl font-bold text-[#0d131b] dark:text-white flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-primary">search</span>
-                                        Research
-                                    </h3>
-                                </div>
-                                <div className="grid grid-cols-1 gap-6">
-                                    <ToolCard
-                                        icon="balance"
-                                        title="Lex Bot"
-                                        description="Do accurate legal research by talking to our AI."
-                                        onClick={() => navigate('/dashboard/research')}
-                                        accentColor="#8b5cf6"
-                                    />
-                                    <ToolCard
-                                        icon="gavel"
-                                        title="Case Search"
-                                        description="Search Indian Kanoon database for legal cases and precedence."
-                                        onClick={() => navigate('/dashboard/case-search')}
-                                        accentColor="#ef4444"
-                                    />
-                                    <ToolCard
-                                        icon="picture_as_pdf"
-                                        title="Chat with PDF"
-                                        description="Upload a PDF and ask questions, summarize, or analyze it."
-                                        onClick={() => navigate('/dashboard/chat-pdf')}
-                                        accentColor="#ec4899"
-                                    />
-                                    <ToolCard
-                                        icon="calculate"
-                                        title="Court Fee Calculator"
-                                        description="Calculate Ad-Valorem Court Fees for your jurisdiction."
-                                        onClick={() => setIsCourtFeeModalOpen(true)}
-                                        accentColor="#f59e0b"
-                                    />
-                                </div>
-                            </section>
-                        )}
-                    </div>
-
-                    {/* Utilities Section */}
-                    {(activeCategory === 'All features' || activeCategory === 'Utilities') && (
-                        <section className="flex flex-col gap-6 border-t border-slate-200 dark:border-slate-800 pt-8">
-                            <div className="flex flex-col gap-2">
-                                <h3 className="text-2xl font-bold text-[#0d131b] dark:text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary">construction</span>
-                                    Utility Tools
-                                </h3>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <ToolCard
-                                    icon="receipt_long"
-                                    title="Invoice Generator"
-                                    description="Create professional legal invoices for your clients and download as PDF."
-                                    onClick={() => setIsInvoiceModalOpen(true)}
-                                    accentColor="#10b981"
-                                    badge="NEW"
-                                />
-                                <ToolCard
-                                    icon="mic"
-                                    title="Voice Dictation"
-                                    description="Dictate your legal notes using voice-to-text. Supports Hindi & English."
-                                    onClick={() => setIsDictationModalOpen(true)}
-                                    accentColor="#f43f5e"
-                                    badge="NEW"
-                                />
-                            </div>
-                        </section>
+                                ))}
+                        </div>
                     )}
 
                     {/* How to use? Section */}

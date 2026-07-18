@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import fullLogo from '../assets/FULL_LOGO.svg';
+import Footer from '../components/landing/sections/Footer';
 
 const HowItWorks = () => {
     const [activeStep, setActiveStep] = useState(0);
@@ -796,25 +797,7 @@ const HowItWorks = () => {
             </section>
 
             {/* Footer */}
-            <footer 
-                ref={(el) => (sectionRefs.current[2] = el)} 
-                data-section="footer"
-                className="bg-slate-900 text-white py-12 px-4"
-            >
-                <div className={`max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 transition-all duration-700 ${isVisible('footer') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
-                    <Link to="/" className="flex items-center gap-3">
-                        <div className="h-8 bg-white/90 backdrop-blur-sm rounded-full px-4 py-1 shadow-sm">
-                            <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
-                        </div>
-                    </Link>
-                    <div className="flex gap-6">
-                        <Link to="/" className="text-slate-400 hover:text-white transition-all duration-300 hover:-translate-y-1 inline-block">Home</Link>
-                        <Link to="/features" className="text-slate-400 hover:text-white transition-all duration-300 hover:-translate-y-1 inline-block">Features</Link>
-                        <Link to="/login" className="text-slate-400 hover:text-white transition-all duration-300 hover:-translate-y-1 inline-block">Login</Link>
-                    </div>
-                    <p className="text-slate-500 text-sm">© 2024 DraftMate. All rights reserved.</p>
-                </div>
-            </footer>
+            <Footer />
         </div>
     );
 };
