@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import DraftingModal from '../components/DraftingModal';
 import UploadModal from '../components/UploadModal';
 import CourtFeeModal from '../components/CourtFeeModal';
@@ -14,6 +15,22 @@ const ensureDocxFilename = (filename, fallback = 'Untitled Draft') => {
         return raw;
     }
     return `${raw}.docx`;
+};
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: { staggerChildren: 0.08, delayChildren: 0.1 }
+    }
+};
+
+const cardVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.98 },
+    visible: {
+        opacity: 1, y: 0, scale: 1,
+        transition: { type: 'spring', stiffness: 260, damping: 22 }
+    }
 };
 
 const Tools = () => {
@@ -176,31 +193,82 @@ const Tools = () => {
 
     const handleUploadSkip = () => navigate('/dashboard/editor', { state: { htmlContent } });
 
-    // Reusable Card Component matching the new design
-    const ToolCard = ({ icon, title, description, onClick, children }) => (
-        <div
-            onClick={onClick}
-            className={`group flex flex-col gap-4 p-6 rounded-xl border shadow-sm transition-all duration-300 cursor-pointer h-full relative overflow-hidden
-            bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800
-            hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/15 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 hover:-translate-y-0.5`}
-        >
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center transition-all shrink-0
-                bg-primary/10 text-primary
-                group-hover:bg-primary group-hover:text-white group-hover:scale-110`}
+    // Reusable Card Component with interactive radial glow and animation
+    const ToolCard = ({ icon, title, description, onClick, accentColor = "#136dec", badge, children }) => {
+        const cardRef = useRef(null);
+        const [isHovered, setIsHovered] = useState(false);
+        const [localMouse, setLocalMouse] = useState({ x: 0, y: 0 });
+
+        const handleMouseMove = (e) => {
+            if (!cardRef.current) return;
+            const rect = cardRef.current.getBoundingClientRect();
+            setLocalMouse({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        };
+
+        return (
+            <motion.div
+                ref={cardRef}
+                variants={cardVariants}
+                onMouseMove={handleMouseMove}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                whileHover={{ y: -6, transition: { type: 'spring', stiffness: 400, damping: 17 } }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onClick}
+                className="group relative flex flex-col gap-4 p-6 rounded-2xl border cursor-pointer h-full overflow-hidden
+                    bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800
+                    hover:border-primary/30 dark:hover:border-primary/40
+                    hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300"
             >
-                <span className="material-symbols-outlined text-2xl">{icon}</span>
-            </div>
-            <div className="flex flex-col flex-1">
-                <h4 className={`text-lg font-bold mb-2 text-[#0d131b] dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors`}>
-                    {title}
-                </h4>
-                <p className={`text-sm leading-relaxed text-slate-600 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors`}>
-                    {description}
-                </p>
-                {children && <div className="flex-1 flex flex-col justify-center pt-4">{children}</div>}
-            </div>
-        </div>
-    );
+                {isHovered && (
+                    <div
+                        className="absolute pointer-events-none transition-opacity duration-300 opacity-100"
+                        style={{
+                            background: `radial-gradient(500px circle at ${localMouse.x}px ${localMouse.y}px, ${accentColor}08, transparent 50%)`,
+                            top: 0, left: 0, right: 0, bottom: 0
+                        }}
+                    />
+                )}
+
+                <div className="relative z-10 flex items-start justify-between gap-3">
+                    <motion.div
+                        whileHover={{ rotate: [0, -8, 8, 0], scale: 1.08 }}
+                        transition={{ duration: 0.5 }}
+                        className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300"
+                        style={{
+                            backgroundColor: `${accentColor}15`,
+                            color: accentColor
+                        }}
+                    >
+                        <span className="material-symbols-outlined text-2xl">{icon}</span>
+                    </motion.div>
+
+                    {badge && (
+                        <motion.span
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{ type: 'spring', stiffness: 200, delay: 0.4 }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider
+                                bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
+                        >
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                            {badge}
+                        </motion.span>
+                    )}
+                </div>
+
+                <div className="relative z-10 flex flex-col flex-1">
+                    <h4 className="text-lg font-bold mb-2 text-[#0d131b] dark:text-white transition-colors duration-300">
+                        {title}
+                    </h4>
+                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 transition-colors duration-300">
+                        {description}
+                    </p>
+                    {children && <div className="flex-1 flex flex-col justify-center pt-4">{children}</div>}
+                </div>
+            </motion.div>
+        );
+    };
 
 
     const FilterButton = ({ icon, label, isActive, onClick }) => (
@@ -285,7 +353,13 @@ const Tools = () => {
             </div>
 
             {/* Content Container */}
-            <div className={`flex-1 ${activeCategory === 'How to use ?' ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto pb-20'}`}>
+            <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                key={activeCategory}
+                className={`flex-1 ${activeCategory === 'How to use ?' ? 'overflow-hidden flex flex-col justify-center' : 'overflow-y-auto pb-20'}`}
+            >
                 <div className={`w-full max-w-[1200px] mx-auto px-4 md:px-10 lg:px-40 ${activeCategory === 'How to use ?' ? '' : 'pt-6 pb-12 flex flex-col gap-16'}`}>
 
                     {/* Drafting Section */}
@@ -303,18 +377,21 @@ const Tools = () => {
                                     title="Create New Draft"
                                     description="Start a new document with AI guidance or an empty workspace."
                                     onClick={handleDraftingClick}
+                                    accentColor="#3b82f6"
                                 />
                                 <ToolCard
                                     icon="upload_file"
                                     title="Work on Existing Document"
                                     description="Upload a `.docx` or `.pdf` file and continue in the workspace."
                                     onClick={handleUploadClick}
+                                    accentColor="#6366f1"
                                 />
                                 <ToolCard
                                     icon="description"
                                     title="Review Your Draft"
                                     description="Review your previously created drafts."
                                     onClick={() => navigate('/dashboard/drafts')}
+                                    accentColor="#f59e0b"
                                 />
                             </div>
                         </section>
@@ -336,6 +413,8 @@ const Tools = () => {
                                         title="PDF Tool kit"
                                         description="Merge PDFs, Rearrange pages and Convert to DOCX format."
                                         onClick={() => navigate('/dashboard/pdf-editor')}
+                                        accentColor="#3b82f6"
+                                        badge="5-in-1"
                                     >
                                         <div className="flex flex-col gap-4 mt-4 transition-opacity">
                                             <div className="flex justify-between items-center px-4">
@@ -352,11 +431,13 @@ const Tools = () => {
                                         title="Document Translator"
                                         description="Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file."
                                         onClick={() => navigate('/dashboard/translate-document')}
+                                        accentColor="#06b6d4"
+                                        badge="NEW"
                                     />
                                 </div>
                             </section>
                         )}
-
+ 
                         {/* Research Section */}
                         {(activeCategory === 'All features' || activeCategory === 'Research') && (
                             <section className={`flex flex-col gap-6 ${activeCategory === 'All features' ? 'lg:border-l lg:pl-8 lg:border-slate-200 lg:dark:border-slate-800 border-t lg:border-t-0 pt-8 lg:pt-0 border-slate-200 dark:border-slate-800' : ''}`}>
@@ -372,24 +453,28 @@ const Tools = () => {
                                         title="Lex Bot"
                                         description="Do accurate legal research by talking to our AI."
                                         onClick={() => navigate('/dashboard/research')}
+                                        accentColor="#8b5cf6"
                                     />
                                     <ToolCard
                                         icon="gavel"
                                         title="Case Search"
                                         description="Search Indian Kanoon database for legal cases and precedence."
                                         onClick={() => navigate('/dashboard/case-search')}
+                                        accentColor="#ef4444"
                                     />
                                     <ToolCard
                                         icon="picture_as_pdf"
                                         title="Chat with PDF"
                                         description="Upload a PDF and ask questions, summarize, or analyze it."
                                         onClick={() => navigate('/dashboard/chat-pdf')}
+                                        accentColor="#ec4899"
                                     />
                                     <ToolCard
                                         icon="calculate"
                                         title="Court Fee Calculator"
                                         description="Calculate Ad-Valorem Court Fees for your jurisdiction."
                                         onClick={() => setIsCourtFeeModalOpen(true)}
+                                        accentColor="#f59e0b"
                                     />
                                 </div>
                             </section>
@@ -411,12 +496,16 @@ const Tools = () => {
                                     title="Invoice Generator"
                                     description="Create professional legal invoices for your clients and download as PDF."
                                     onClick={() => setIsInvoiceModalOpen(true)}
+                                    accentColor="#10b981"
+                                    badge="NEW"
                                 />
                                 <ToolCard
                                     icon="mic"
                                     title="Voice Dictation"
                                     description="Dictate your legal notes using voice-to-text. Supports Hindi & English."
                                     onClick={() => setIsDictationModalOpen(true)}
+                                    accentColor="#f43f5e"
+                                    badge="NEW"
                                 />
                             </div>
                         </section>
@@ -480,7 +569,7 @@ const Tools = () => {
                         </section>
                     )}
                 </div>
-            </div>
+            </motion.div>
 
             {/* Hidden Input for File Upload */}
             <input
