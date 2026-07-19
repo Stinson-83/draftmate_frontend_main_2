@@ -308,8 +308,10 @@ def verify_session(session_id: str):
     
     try:
         user_id = resolve_and_provision_session(session_id, cur, conn)
-        return {"valid": True, "user_id": user_id}
-        
+        cur.execute("SELECT email FROM users WHERE id = %s", (user_id,))
+        user_row = cur.fetchone()
+        email = user_row[0] if user_row else f"user_{user_id[:8]}@example.com"
+        return {"valid": True, "user_id": user_id, "email": email}
     except HTTPException as he:
         raise he
     except Exception as e:

@@ -399,7 +399,19 @@ async def session_login(request: Request):
             cur.execute("SELECT email, password_hash FROM users WHERE id = %s", (user_id,))
             user_row = cur.fetchone()
             if not user_row:
-                raise HTTPException(status_code=404, detail="User not found in DB.")
+                email = res_data.get("email") or f"user_{user_id[:8]}@example.com"
+                hashed = pwd_context.hash(str(uuid.uuid4()))
+                display_name = email.split('@')[0].capitalize()
+                cur.execute(
+                    """
+                    INSERT INTO users (id, email, password_hash, full_name, user_type)
+                    VALUES (%s, %s, %s, %s, 'ADVOCATE')
+                    """,
+                    (user_id, email, hashed, display_name),
+                )
+                conn.commit()
+                cur.execute("SELECT email, password_hash FROM users WHERE id = %s", (user_id,))
+                user_row = cur.fetchone()
 
             email = user_row["email"]
             # Check or create advocate profile
