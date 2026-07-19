@@ -266,7 +266,7 @@ function App() {
                 {/* Sidebar items — real pages */}
                 <Route path="academy" element={<LjAcademy />} />
 
-                <Route path="cases" element={<ComingSoon title="Document Management" />} />
+                <Route path="cases" element={<DocumentManagement />} />
                 <Route path="documents" element={<DocumentManagement />} />
                 <Route path="library" element={<ComingSoon title="Legal Library" />} />
                 {/* Visibility & Reach -> existing advocate dashboard (profile + analytics/reach) */}
