@@ -1764,6 +1764,96 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
     return {"error": 0}
 
 
+@app.post("/v2/document/upload")
+async def upload_document_to_case(
+    file: UploadFile = File(...),
+    case_id: Optional[str] = Form(None),
+    authorization: Optional[str] = Header(default=None)
+):
+    try:
+        user_id = await verify_token(authorization)
+        
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+        if not shared_storage_path:
+            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+            
+        import uuid
+        doc_id = str(uuid.uuid4())
+        sub_dir = case_id if case_id else "general"
+        target_dir = os.path.join(shared_storage_path, sub_dir)
+        os.makedirs(target_dir, exist_ok=True)
+        
+        file_name = file.filename or "uploaded_file.bin"
+        safe_name = os.path.basename(file_name.strip())
+        output_path = os.path.join(target_dir, safe_name)
+        
+        file_bytes = await file.read()
+        with open(output_path, "wb") as f:
+            f.write(file_bytes)
+            
+        s3_key = f"{sub_dir}/{safe_name}"
+        upload_file_to_s3_background(output_path, s3_key)
+        
+        size_bytes = len(file_bytes)
+        if size_bytes < 1024:
+            size_str = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            size_str = f"{size_bytes / 1024:.1f} KB"
+        else:
+            size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+            
+        return {
+            "ok": True,
+            "id": doc_id,
+            "name": safe_name,
+            "filename": safe_name,
+            "size": size_str,
+            "s3_key": s3_key,
+            "url": f"/drafter/v2/document/serve/{sub_dir}/{safe_name}"
+        }
+    except Exception as e:
+        logger.exception("Failed to upload document.")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v2/document/serve/{sub_dir}/{filename}")
+async def serve_document(sub_dir: str, filename: str):
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+    if not shared_storage_path:
+        raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        
+    safe_sub_dir = os.path.basename(sub_dir.replace("\\", "/"))
+    safe_name = os.path.basename((filename or "").replace("\\", "/"))
+    if not safe_name or not safe_sub_dir:
+        raise HTTPException(status_code=400, detail="Invalid path parameter.")
+        
+    file_path = os.path.join(shared_storage_path, safe_sub_dir, safe_name)
+    s3_key = f"{safe_sub_dir}/{safe_name}"
+    
+    ensure_file_exists_locally(s3_key, file_path)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+        
+    ext = safe_name.split('.')[-1].lower() if '.' in safe_name else ''
+    media_types = {
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'doc': 'application/msword',
+        'txt': 'text/plain',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+    media_type = media_types.get(ext, 'application/octet-stream')
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=safe_name,
+    )
+
+
 if __name__ == "__main__":
     uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=True)
 

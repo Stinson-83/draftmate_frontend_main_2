@@ -75,6 +75,8 @@ def create_case(
         priority=case_in.priority,
         assigned_advocate=case_in.assigned_advocate,
         description=case_in.description,
+        folders=case_in.folders if case_in.folders is not None else [],
+        documents=case_in.documents if case_in.documents is not None else [],
     )
     db.add(case)
     db.commit()

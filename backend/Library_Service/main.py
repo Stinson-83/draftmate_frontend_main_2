@@ -7,6 +7,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from database import engine, Base
+from sqlalchemy import text
 from routers import clients, cases, hearings, calendar, video_links, case_tracking, notes, bookmarks, indiankanoon, bareacts, ecourts
 
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
@@ -20,6 +21,16 @@ logger = logging.getLogger(__name__)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Ensure folders and documents columns exist in library_cases table for production DMS integration
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE library_cases ADD COLUMN IF NOT EXISTS folders JSONB DEFAULT '[]'::jsonb;"))
+        conn.execute(text("ALTER TABLE library_cases ADD COLUMN IF NOT EXISTS documents JSONB DEFAULT '[]'::jsonb;"))
+        conn.commit()
+        logger.info("Checked and updated library_cases schema for DMS compatibility.")
+except Exception as schema_err:
+    logger.warning(f"Schema update check completed with notice: {schema_err}")
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="DraftMate Library Service", version="1.0.0")

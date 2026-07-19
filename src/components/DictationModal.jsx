@@ -135,13 +135,24 @@ const DictationModal = ({ onClose }) => {
     };
 
     const handleDownload = () => {
+        const fileName = `dictation-${new Date().toISOString().slice(0, 10)}.txt`;
         const blob = new Blob([transcript], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `dictation-${new Date().toISOString().slice(0, 10)}.txt`;
+        a.download = fileName;
         a.click();
         URL.revokeObjectURL(url);
+
+        import('../services/library/caseService').then(({ caseService }) => {
+            caseService.addCaseDocument(null, {
+                name: fileName,
+                filename: fileName,
+                size: '2 KB',
+                syncStatus: 'synced',
+                source: 'dictation'
+            }).catch(err => console.error(err));
+        });
     };
 
     const handleClear = () => {

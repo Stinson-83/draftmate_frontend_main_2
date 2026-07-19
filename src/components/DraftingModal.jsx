@@ -3,6 +3,7 @@ import { Check, FileText, Lock, Loader2, PenTool, Square, X } from 'lucide-react
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
+import { caseService } from '../services/library/caseService';
 import PromptQualityBar from './PromptQualityBar';
 import './DraftingModal.css';
 
@@ -16,7 +17,7 @@ const INITIAL_SUMMARY = {
     assumptions: [],
 };
 
-const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', onDraftCreated }) => {
+const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', onDraftCreated, caseId }) => {
     const navigate = useNavigate();
     const isDashboardEntryMode = initialEntryMode === 'dashboard';
     const [intakeStep, setIntakeStep] = useState(isDashboardEntryMode ? 'selection' : 'prompt_input');
@@ -221,6 +222,17 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                 ...(recordMeta.trackingParams || {}),
             },
         });
+
+        if (caseId) {
+            caseService.addCaseDocument(caseId, {
+                id: documentKey,
+                name: fileName,
+                filename: fileName,
+                size: '15 KB',
+                syncStatus: 'synced',
+                source: 'drafter'
+            }).catch(err => console.warn("Failed to link compiled draft to case:", err));
+        }
 
         navigate('/dashboard/workspace', {
             state: {
@@ -653,7 +665,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                                                 className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${checked
                                                     ? 'border-primary bg-primary/5 dark:bg-primary/10'
                                                     : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                                                }`}
+                                                    }`}
                                             >
                                                 <input
                                                     type={question.multiple ? 'checkbox' : 'radio'}
@@ -790,42 +802,42 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     );
 
     const renderLoadingView = () => (
-    <div
-        className="step-content fade-in"
-        style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '400px',
-            textAlign: 'center',
-        }}
-    >
-        <Loader2
-            size={52}
-            className="spinner"
-            style={{ marginBottom: '20px' }}
-        />
-        <h2 className="modal-title" style={{ textAlign: 'center', maxWidth: '100%' }}>
-            {loadingMessage}
-        </h2>
-        <p className="modal-subtitle" style={{ marginBottom: '8px' }}>
-            Please wait while DraftMate prepares your workspace.
-        </p>
+        <div
+            className="step-content fade-in"
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '400px',
+                textAlign: 'center',
+            }}
+        >
+            <Loader2
+                size={52}
+                className="spinner"
+                style={{ marginBottom: '20px' }}
+            />
+            <h2 className="modal-title" style={{ textAlign: 'center', maxWidth: '100%' }}>
+                {loadingMessage}
+            </h2>
+            <p className="modal-subtitle" style={{ marginBottom: '8px' }}>
+                Please wait while DraftMate prepares your workspace.
+            </p>
 
-        {/* Animated dots */}
-        <div className="loading-dots">
-            <span />
-            <span />
-            <span />
-        </div>
+            {/* Animated dots */}
+            <div className="loading-dots">
+                <span />
+                <span />
+                <span />
+            </div>
 
-        {/* Progress bar */}
-        <div className="loading-progress-bar">
-            <div className="loading-progress-fill" />
+            {/* Progress bar */}
+            <div className="loading-progress-bar">
+                <div className="loading-progress-fill" />
+            </div>
         </div>
-    </div>
-);
+    );
 
     return (
         <div className="modal-overlay" onClick={onClose}>

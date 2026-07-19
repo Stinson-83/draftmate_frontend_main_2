@@ -18,7 +18,7 @@ const SIDEBAR_ITEMS = [
   { icon: Edit, label: "Drafting", path: "/dashboard/drafting" },
   { icon: FileText, label: "My Drafts", path: "/dashboard/drafts" },
   { icon: Scale, label: "Legal Research", path: "/dashboard/research" },
-  { icon: FolderOpen, label: "Document Management", path: "/dashboard/cases" },
+  { icon: FolderOpen, label: "Document Management", path: "/dashboard/documents" },
   { icon: Gavel, label: "Judgment Search", path: "/dashboard/judgments" },
   { icon: Languages, label: "Translation", path: "/dashboard/translate" },
   { icon: GraduationCap, label: "Student Center", path: "/dashboard/academy" },

@@ -28,6 +28,17 @@ const CourtFeeModal = ({ onClose }) => {
             setError(res.error);
         } else {
             setResult(res);
+
+            const reportName = `court_fee_calculation_${state.toLowerCase()}_${Date.now().toString().slice(-4)}.txt`;
+            import('../services/library/caseService').then(({ caseService }) => {
+                caseService.addCaseDocument(null, {
+                    name: reportName,
+                    filename: reportName,
+                    size: '1.2 KB',
+                    syncStatus: 'synced',
+                    source: 'courtfee'
+                }).catch(err => console.error(err));
+            });
         }
     };
 

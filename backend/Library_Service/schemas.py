@@ -50,6 +50,8 @@ class CaseBase(BaseModel):
     priority: Optional[str] = "Medium"
     assigned_advocate: Optional[str] = None
     description: Optional[str] = None
+    folders: Optional[List[Dict[str, Any]]] = None
+    documents: Optional[List[Dict[str, Any]]] = None
 
 
 class CaseCreate(CaseBase):
@@ -57,18 +59,20 @@ class CaseCreate(CaseBase):
 
 
 class CaseUpdate(BaseModel):
-    case_number: Optional[str] = None
-    case_title: Optional[str] = None
-    case_type: Optional[str] = None
-    court: Optional[str] = None
-    client_id: Optional[str] = None
-    opposite_party: Optional[str] = None
-    filing_date: Optional[date] = None
-    next_hearing_date: Optional[date] = None
-    status: Optional[str] = None
-    priority: Optional[str] = None
-    assigned_advocate: Optional[str] = None
-    description: Optional[str] = None
+    case_number: Optional[Optional[str]] = None
+    case_title: Optional[Optional[str]] = None
+    case_type: Optional[Optional[str]] = None
+    court: Optional[Optional[str]] = None
+    client_id: Optional[Optional[str]] = None
+    opposite_party: Optional[Optional[str]] = None
+    filing_date: Optional[Optional[date]] = None
+    next_hearing_date: Optional[Optional[date]] = None
+    status: Optional[Optional[str]] = None
+    priority: Optional[Optional[str]] = None
+    assigned_advocate: Optional[Optional[str]] = None
+    description: Optional[Optional[str]] = None
+    folders: Optional[List[Dict[str, Any]]] = None
+    documents: Optional[List[Dict[str, Any]]] = None
 
 
 class Case(CaseBase):
