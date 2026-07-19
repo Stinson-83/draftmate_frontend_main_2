@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, Date, Time, ForeignKey, Boolean, DateTime, func
+from sqlalchemy import Column, String, Text, Date, Time, ForeignKey, Boolean, DateTime, func, text
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from database import Base
 
@@ -38,8 +38,8 @@ class Case(Base):
     priority = Column(String(50), default="Medium")
     assigned_advocate = Column(String(255))
     description = Column(Text)
-    folders = Column(JSONB, nullable=False, server_default='[]'::jsonb)
-    documents = Column(JSONB, nullable=False, server_default='[]'::jsonb)
+    folders = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    documents = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
