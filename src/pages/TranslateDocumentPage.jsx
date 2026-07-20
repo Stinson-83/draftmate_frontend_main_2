@@ -524,11 +524,30 @@ const TranslateDocumentPage = () => {
                 <ArrowRight className="h-4 w-4 text-slate-400" />
               </div>
               {previewAllowed ? (
-                <iframe
-                  src={downloadUrl}
-                  className="mt-4 h-[420px] w-full rounded-2xl border border-slate-200 bg-white dark:border-slate-800"
-                  title="Translated document preview"
-                />
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800">
+                  <object
+                    data={downloadUrl}
+                    type="application/pdf"
+                    className="h-[450px] w-full"
+                  >
+                    <iframe
+                      src={downloadUrl}
+                      className="h-[450px] w-full border-0"
+                      title="Translated document preview"
+                    />
+                  </object>
+                  <div className="flex items-center justify-between bg-slate-50 px-4 py-2 text-xs text-slate-500 border-t border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400">
+                    <span>Having trouble viewing?</span>
+                    <a
+                      href={downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                    >
+                      Open preview in new tab ↗
+                    </a>
+                  </div>
+                </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
                   Browser preview is unavailable for this file type. Use the download button to open the translated document.
