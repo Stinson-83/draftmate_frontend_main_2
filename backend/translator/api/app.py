@@ -269,6 +269,15 @@ def download_translated_file(job_id: int, request: Request, raw: str | None = Qu
     if not translated_path.exists():
         translated_path = Path(os.getcwd()) / translated_path
 
+    if not translated_path.exists():
+        try:
+            from backend.Drafter.s3_helper import ensure_file_exists_locally
+            s3_key = f"translator/translated/{translated_path.name}"
+            os.makedirs(translated_path.parent, exist_ok=True)
+            ensure_file_exists_locally(s3_key, str(translated_path))
+        except Exception:
+            pass
+
     if translated_path.exists():
         if raw != "1" and translated_path.suffix.lower() == ".docx":
             return _docx_to_html_preview(translated_path, title="Translated Document")
