@@ -62,12 +62,11 @@ def list_translation_jobs(
     limit: int = 20,
 ) -> list[TranslationJob]:
     query = session.query(TranslationJob)
-    if user_id is None:
-        return []
+    if user_id and user_id.strip() and user_id != "null" and user_id != "undefined":
+        query = query.filter(TranslationJob.user_id == user_id)
 
     return (
-        query.filter(TranslationJob.user_id == user_id)
-        .order_by(TranslationJob.created_at.desc(), TranslationJob.id.desc())
+        query.order_by(TranslationJob.created_at.desc(), TranslationJob.id.desc())
         .limit(limit)
         .all()
     )
