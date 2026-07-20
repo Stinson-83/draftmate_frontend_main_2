@@ -89,7 +89,10 @@ def get_db() -> Generator[Session, None, None]:
 def _build_asset_url(request: Request, *, route_name: str, job_id: int) -> str | None:
     # Generate clean, absolute web-accessible download links for the React frontend
     try:
-        return str(request.url_for(route_name, job_id=job_id))
+        raw_url = str(request.url_for(route_name, job_id=job_id))
+        if "/translator/" not in raw_url:
+            raw_url = raw_url.replace("/translation-jobs/", "/translator/translation-jobs/")
+        return raw_url
     except Exception as e:
         print(f"[ERROR BUILD URL] Failed to compile asset route: {e}")
         return None
