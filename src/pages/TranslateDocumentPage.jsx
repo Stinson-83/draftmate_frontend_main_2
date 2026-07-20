@@ -520,14 +520,14 @@ const TranslateDocumentPage = () => {
           {isCompleted && downloadUrl && (
             <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Preview</h3>
+                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Document Preview</h3>
                 <ArrowRight className="h-4 w-4 text-slate-400" />
               </div>
               {previewAllowed ? (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800">
                   <object
                     data={downloadUrl}
-                    type="application/pdf"
+                    type={job?.file_name?.endsWith('.pdf') ? 'application/pdf' : 'text/html'}
                     className="h-[450px] w-full"
                   >
                     <iframe
@@ -549,8 +549,29 @@ const TranslateDocumentPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-                  Browser preview is unavailable for this file type. Use the download button to open the translated document.
+                <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-6 text-center dark:border-indigo-900/30 dark:bg-indigo-950/30">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-300">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <h4 className="mt-3 text-sm font-bold text-slate-900 dark:text-white">Word Document (.docx) Ready</h4>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+                    Word documents are saved as editable <code>.docx</code> files for Microsoft Word & OnlyOffice.
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-3">
+                    <a
+                      href={downloadUrl}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition shadow-sm"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download .DOCX File
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/dashboard/translate/compare/${selectedJobId}`)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition shadow-sm dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300"
+                    >
+                      <Split className="h-3.5 w-3.5" /> Compare View
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
