@@ -188,6 +188,11 @@ const TranslateDocumentPage = () => {
     return api.getTranslationDownloadUrl(selectedJobId);
   }, [selectedJobId]);
 
+  const sourceUrl = useMemo(() => {
+    if (!selectedJobId) return null;
+    return api.getTranslationSourceUrl(selectedJobId);
+  }, [selectedJobId]);
+
   const previewAllowed = useMemo(() => {
     const name = (job?.file_name || selectedFile?.name || '').toLowerCase();
     if (!name) return false;
@@ -519,33 +524,57 @@ const TranslateDocumentPage = () => {
 
           {isCompleted && downloadUrl && (
             <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Document Preview</h3>
-                <ArrowRight className="h-4 w-4 text-slate-400" />
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 dark:text-white">Side-by-Side Document Preview</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Comparing original source and target translation</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/dashboard/translate/compare/${selectedJobId}`)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
+                >
+                  <Split className="h-3.5 w-3.5" />
+                  Full Screen
+                </button>
               </div>
+
               {previewAllowed ? (
-                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800">
-                  <object
-                    data={downloadUrl}
-                    type={job?.file_name?.endsWith('.pdf') ? 'application/pdf' : 'text/html'}
-                    className="h-[450px] w-full"
-                  >
-                    <iframe
-                      src={downloadUrl}
-                      className="h-[450px] w-full border-0"
-                      title="Translated document preview"
-                    />
-                  </object>
-                  <div className="flex items-center justify-between bg-slate-50 px-4 py-2 text-xs text-slate-500 border-t border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400">
-                    <span>Having trouble viewing?</span>
-                    <a
-                      href={downloadUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-indigo-600 hover:underline dark:text-indigo-400"
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {/* Left Column: Original */}
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                    <div className="bg-slate-100 px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
+                      Original ({getLanguageLabel(job?.source_language || sourceLanguage)})
+                    </div>
+                    <object
+                      data={sourceUrl}
+                      type={job?.file_name?.endsWith('.pdf') ? 'application/pdf' : 'text/html'}
+                      className="h-[400px] w-full"
                     >
-                      Open preview in new tab ↗
-                    </a>
+                      <iframe
+                        src={sourceUrl}
+                        className="h-[400px] w-full border-0"
+                        title="Original document preview"
+                      />
+                    </object>
+                  </div>
+
+                  {/* Right Column: Translated */}
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                    <div className="bg-slate-100 px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-indigo-700 dark:bg-slate-800 dark:text-indigo-300 border-b border-slate-200 dark:border-slate-800">
+                      Translation ({getLanguageLabel(job?.target_language || targetLanguage)})
+                    </div>
+                    <object
+                      data={downloadUrl}
+                      type={job?.file_name?.endsWith('.pdf') ? 'application/pdf' : 'text/html'}
+                      className="h-[400px] w-full"
+                    >
+                      <iframe
+                        src={downloadUrl}
+                        className="h-[400px] w-full border-0"
+                        title="Translated document preview"
+                      />
+                    </object>
                   </div>
                 </div>
               ) : (
@@ -562,14 +591,14 @@ const TranslateDocumentPage = () => {
                       href={downloadUrl}
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition shadow-sm"
                     >
-                      <Download className="h-3.5 w-3.5" /> Download .DOCX File
+                      <Download className="h-3.5 w-3.5" /> Download Translated .DOCX
                     </a>
                     <button
                       type="button"
                       onClick={() => navigate(`/dashboard/translate/compare/${selectedJobId}`)}
                       className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition shadow-sm dark:border-indigo-800 dark:bg-slate-900 dark:text-indigo-300"
                     >
-                      <Split className="h-3.5 w-3.5" /> Compare View
+                      <Split className="h-3.5 w-3.5" /> Full Screen Comparison
                     </button>
                   </div>
                 </div>

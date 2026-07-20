@@ -291,6 +291,7 @@ export const api = {
     },
 
     getTranslationDownloadUrl: (jobId) => `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.DOWNLOAD_JOB(jobId)}`,
+    getTranslationSourceUrl: (jobId) => `${TRANSLATOR_BASE_URL}/translation-jobs/${jobId}/source`,
 
     /**
      * Send email notification for calendar event.
