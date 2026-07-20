@@ -164,8 +164,7 @@ class SarvamTranslateClient:
             self.session.mount("http://", adapter)
 
         if not self.api_key:
-            import logging
-            logging.getLogger(__name__).warning("SARVAM_API_KEY is not configured. Falling back to mock translations.")
+            raise ValueError("SARVAM_API_KEY is not configured")
 
     def _translate_text(
         self,
@@ -273,41 +272,30 @@ class SarvamTranslateClient:
         if not texts:
             return []
 
-        import logging
-        logger = logging.getLogger(__name__)
+        max_workers = min(len(texts), TRANSLATOR_SARVAM_TRANSLATE_BATCH_SIZE or 10)
 
-        if not self.api_key or self.api_key.strip() == "":
-            logger.warning("[SARVAM CLIENT] No API key configured. Returning mock translations.")
-            return [f"[{target_language.upper()}] {t}" for t in texts]
+        if max_workers <= 1:
+            # Sequential execution for single item batches or tests
+            translated_texts: list[str] = []
+            for text in texts:
+                translated_text, _, _ = self._translate_text(text, source_language, target_language)
+                translated_texts.append(translated_text)
+            return translated_texts
 
-        try:
-            max_workers = min(len(texts), TRANSLATOR_SARVAM_TRANSLATE_BATCH_SIZE or 10)
+        from concurrent.futures import ThreadPoolExecutor
 
-            if max_workers <= 1:
-                # Sequential execution for single item batches or tests
-                translated_texts: list[str] = []
-                for text in texts:
-                    translated_text, _, _ = self._translate_text(text, source_language, target_language)
-                    translated_texts.append(translated_text)
-                return translated_texts
+        def translate_single(index: int, text: str) -> tuple[int, str]:
+            translated, _, _ = self._translate_text(text, source_language, target_language)
+            return index, translated
 
-            from concurrent.futures import ThreadPoolExecutor
+        results = [None] * len(texts)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(translate_single, i, text) for i, text in enumerate(texts)]
+            for future in futures:
+                i, translated = future.result()
+                results[i] = translated
 
-            def translate_single(index: int, text: str) -> tuple[int, str]:
-                translated, _, _ = self._translate_text(text, source_language, target_language)
-                return index, translated
-
-            results = [None] * len(texts)
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(translate_single, i, text) for i, text in enumerate(texts)]
-                for future in futures:
-                    i, translated = future.result()
-                    results[i] = translated
-
-            return results
-        except Exception as error:
-            logger.warning(f"[SARVAM CLIENT] Translation API failed ({error}). Falling back to mock translations.")
-            return [f"[{target_language.upper()}] {t}" for t in texts]
+        return results
 
     def translate_blocks(self, blocks: Sequence[Block], source_language: str, target_language: str) -> list[Block]:
         translated_blocks: list[Block] = []

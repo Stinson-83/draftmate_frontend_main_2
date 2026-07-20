@@ -12,29 +12,11 @@ class TranslationJobNotFoundError(Exception):
     """Raised when a translation job cannot be found."""
 
 
-def _strip_uuid_prefix(filename: str) -> str:
-    """Return the user-visible filename by stripping the leading UUID prefix.
-
-    Stored filenames are in the form ``<uuid>_<original_name>``.  We detect
-    the UUID by looking for the first ``_`` separator that follows a 36-char
-    UUID segment (8-4-4-4-12 hex with dashes).  If the pattern is not found
-    the original filename is returned unchanged.
-    """
-    import re
-    match = re.match(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_(.+)$",
-        filename,
-        re.IGNORECASE,
-    )
-    return match.group(1) if match else filename
-
-
 def serialize_translation_job(job: TranslationJob) -> dict[str, str | int | bool | None]:
     translated_file_exists = bool(job.translated_file and Path(job.translated_file).exists())
-    raw_name = Path(job.source_file).name
     return {
         "job_id": job.id,
-        "file_name": _strip_uuid_prefix(raw_name),
+        "file_name": Path(job.source_file).name,
         "status": job.status,
         "stage": job.stage,
         "progress": job.progress,

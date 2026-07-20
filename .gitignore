@@ -57,3 +57,7 @@ supervisord_auth_snippet.conf
 
 # Compressed assets
 *.gz
+
+# Translation storage
+backend/translator/storage/
+
