@@ -266,9 +266,8 @@ function App() {
                 {/* Sidebar items — real pages */}
                 <Route path="academy" element={<LjAcademy />} />
 
-                <Route path="cases" element={<DocumentManagement />} />
+                <Route path="cases" element={<Navigate to="/dashboard/documents" replace />} />
                 <Route path="documents" element={<DocumentManagement />} />
-                <Route path="library" element={<ComingSoon title="Legal Library" />} />
                 {/* Visibility & Reach -> existing advocate dashboard (profile + analytics/reach) */}
                 <Route path="profile" element={
                   <RequireAdvocateAuth><AdvocateDashboard /></RequireAdvocateAuth>
