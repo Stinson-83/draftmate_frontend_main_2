@@ -1003,7 +1003,7 @@ const Tools = () => {
             icon: 'translate',
             title: 'Document Translator',
             description: 'Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file.',
-            onClick: () => navigate('/dashboard/translate-document'),
+            onClick: () => navigate('/dashboard/translate'),
             accentColor: '#06b6d4',
             category: 'PDF Tools'
         },
