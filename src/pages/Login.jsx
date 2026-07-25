@@ -100,8 +100,12 @@ const Login = () => {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.detail || 'Login failed');
+            const text = await response.text();
+            let data = {};
+            if (text) {
+                try { data = JSON.parse(text); } catch (e) { data = { detail: text }; }
+            }
+            if (!response.ok) throw new Error(data.detail || `Login failed (${response.status})`);
 
             localStorage.setItem('session_id', data.session_id);
             localStorage.setItem('user_id', data.user_id);
@@ -138,8 +142,12 @@ const Login = () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token: tokenResponse.credential || tokenResponse.access_token }),
                 });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Google Login failed');
+                const text = await response.text();
+                let data = {};
+                if (text) {
+                    try { data = JSON.parse(text); } catch (e) { data = { detail: text }; }
+                }
+                if (!response.ok) throw new Error(data.detail || `Google Login failed (${response.status})`);
 
                 localStorage.setItem('session_id', data.session_id);
                 localStorage.setItem('user_id', data.user_id);
