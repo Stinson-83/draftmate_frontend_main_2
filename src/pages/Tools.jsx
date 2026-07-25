@@ -987,7 +987,6 @@ const Tools = () => {
             description: 'Merge PDFs, rearrange pages, compress, watermark and convert to DOCX format.',
             onClick: () => navigate('/dashboard/pdf-editor'),
             accentColor: '#3b82f6',
-            badge: '5-in-1',
             category: 'PDF Tools',
             children: (
                 <div className="flex justify-between items-center px-4 mt-2">
@@ -1006,7 +1005,6 @@ const Tools = () => {
             description: 'Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file.',
             onClick: () => navigate('/dashboard/translate-document'),
             accentColor: '#06b6d4',
-            badge: 'NEW',
             category: 'PDF Tools'
         },
         {
@@ -1052,7 +1050,6 @@ const Tools = () => {
             description: 'Create professional legal invoices for your clients and download as PDF.',
             onClick: () => setIsInvoiceModalOpen(true),
             accentColor: '#10b981',
-            badge: 'NEW',
             category: 'Utilities'
         },
         {
@@ -1062,7 +1059,6 @@ const Tools = () => {
             description: 'Dictate your legal notes using voice-to-text. Supports Hindi & English.',
             onClick: () => setIsDictationModalOpen(true),
             accentColor: '#f43f5e',
-            badge: 'NEW',
             category: 'Utilities'
         }
     ];

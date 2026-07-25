@@ -135,7 +135,7 @@ const ChatWithPDF = () => {
     const sessionGroups = groupSessions(sessions);
 
     const startNewChat = () => {
-        const newId = crypto.randomUUID();
+        const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
         setSessionId(newId);
         setMessages([
             {

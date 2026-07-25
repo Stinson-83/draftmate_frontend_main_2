@@ -48,7 +48,7 @@ const Editor = () => {
     });
 
     // AI Sidebar Chat State
-    const [aiSessionId, setAiSessionId] = useState(() => crypto.randomUUID());
+    const [aiSessionId, setAiSessionId] = useState(() => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2)));
     const [isAiTyping, setIsAiTyping] = useState(false);
 
     // Settings State

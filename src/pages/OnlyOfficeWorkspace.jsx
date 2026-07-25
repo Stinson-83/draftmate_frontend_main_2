@@ -411,7 +411,7 @@ const OnlyOfficeWorkspace = () => {
     setIsChatLoading(true);
     setStatusMessage(isEnhancementMode ? 'Enhancing selected text...' : 'Assistant is thinking...');
 
-    const assistantMsgId = crypto.randomUUID();
+    const assistantMsgId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
     setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }]);
 
     try {
