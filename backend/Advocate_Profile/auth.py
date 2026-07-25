@@ -165,6 +165,7 @@ def register_advocate(request: Request, user: UserCreate):
     conn = None
     try:
         conn = get_db_connection()
+        _ensure_users_table_columns(conn)
         with conn.cursor() as cur:
             # Duplicate email check
             cur.execute("SELECT id FROM users WHERE email = %s", (user.email,))
@@ -332,6 +333,17 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
             conn.close()
 
 
+def _ensure_users_table_columns(conn):
+    """Ensure full_name and user_type columns exist on users table."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(50) DEFAULT 'ADVOCATE';")
+            conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
 @router.post("/session-login", response_model=Token)
 async def session_login(request: Request):
     """
@@ -399,6 +411,7 @@ async def session_login(request: Request):
     conn = None
     try:
         conn = get_db_connection()
+        _ensure_users_table_columns(conn)
         with conn.cursor() as cur:
             # Check user in DB
             cur.execute("SELECT email, password_hash FROM users WHERE id = %s", (user_id,))
