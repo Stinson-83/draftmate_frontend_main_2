@@ -115,6 +115,8 @@ export const caseService = {
         const cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         cases.unshift(mapped);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+        window.dispatchEvent(new Event('cases_updated'));
+        window.dispatchEvent(new Event('case_documents_updated'));
         return mapped;
       }
     } catch (e) {
@@ -131,6 +133,8 @@ export const caseService = {
     };
     cases.unshift(newCase);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+    window.dispatchEvent(new Event('cases_updated'));
+    window.dispatchEvent(new Event('case_documents_updated'));
     return newCase;
   },
 
@@ -165,6 +169,8 @@ export const caseService = {
           cases[idx] = mapped;
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
         }
+        window.dispatchEvent(new Event('cases_updated'));
+        window.dispatchEvent(new Event('case_documents_updated'));
         return mapped;
       }
     } catch (e) {
@@ -177,6 +183,8 @@ export const caseService = {
     if (index !== -1) {
       cases[index] = { ...cases[index], ...caseData };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+      window.dispatchEvent(new Event('cases_updated'));
+      window.dispatchEvent(new Event('case_documents_updated'));
       return cases[index];
     }
     throw new Error('Case not found');
@@ -192,6 +200,8 @@ export const caseService = {
         let cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         cases = cases.filter(c => c.id !== id);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+        window.dispatchEvent(new Event('cases_updated'));
+        window.dispatchEvent(new Event('case_documents_updated'));
         return true;
       }
     } catch (e) {
@@ -202,6 +212,8 @@ export const caseService = {
     let cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     cases = cases.filter(c => c.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
+    window.dispatchEvent(new Event('cases_updated'));
+    window.dispatchEvent(new Event('case_documents_updated'));
     return true;
   },
 

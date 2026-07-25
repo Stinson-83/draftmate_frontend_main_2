@@ -207,7 +207,7 @@ export default function Dashboard() {
                 translationsCount = Math.max(transHist.length, jobs.length);
             } catch (e) {}
 
-            // Calculate hearings from cases + calendar events
+            // Calculate hearings from cases + valid user events
             const hearingsList = [];
             casesList.forEach(c => {
                 if (c.nextHearingDate) {
@@ -220,17 +220,28 @@ export default function Dashboard() {
                     });
                 }
             });
-            events.forEach(ev => {
-                if (ev.type === 'hearing' || ev.title) {
-                    hearingsList.push({
-                        time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
-                        court: ev.location || ev.court || "District Court",
-                        case: ev.title,
-                        judge: ev.judge || "Hon'ble Judge",
-                        status: "Upcoming"
-                    });
-                }
-            });
+
+            // Include custom calendar events if cases exist or if event is user-created
+            if (casesList.length > 0) {
+                events.forEach(ev => {
+                    if (ev.type === 'hearing' || ev.title) {
+                        // Check if event belongs to an existing case
+                        const matchesExistingCase = casesList.some(c => 
+                            c.caseTitle?.toLowerCase().includes(ev.title?.toLowerCase() || '') ||
+                            ev.title?.toLowerCase().includes(c.caseTitle?.toLowerCase() || '')
+                        );
+                        if (matchesExistingCase || ev.isUserCreated) {
+                            hearingsList.push({
+                                time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
+                                court: ev.location || ev.court || "District Court",
+                                case: ev.title,
+                                judge: ev.judge || "Hon'ble Judge",
+                                status: "Upcoming"
+                            });
+                        }
+                    }
+                });
+            }
 
             setUpcomingHearings(hearingsList);
             setKpiStats({
@@ -266,11 +277,15 @@ export default function Dashboard() {
         window.addEventListener('user_profile_updated', loadProfile);
         window.addEventListener('my_drafts_updated', loadDashboardData);
         window.addEventListener('case_documents_updated', loadDashboardData);
+        window.addEventListener('cases_updated', loadDashboardData);
+        window.addEventListener('storage', loadDashboardData);
 
         return () => {
             window.removeEventListener('user_profile_updated', loadProfile);
             window.removeEventListener('my_drafts_updated', loadDashboardData);
             window.removeEventListener('case_documents_updated', loadDashboardData);
+            window.removeEventListener('cases_updated', loadDashboardData);
+            window.removeEventListener('storage', loadDashboardData);
         };
     }, [events]);
 
