@@ -56,6 +56,59 @@ export default function AdvocateDashboard() {
     const [verificationDoc, setVerificationDoc] = useState(null);
     const [practiceAreas, setPracticeAreas] = useState([]);
 
+    // Inline Auth State for unauthenticated advocates accessing Lawyer Profile
+    const [authMode, setAuthMode] = useState('login');
+    const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+    const [registerForm, setRegisterForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
+    const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+    const handleInlineLogin = async (e) => {
+        e.preventDefault();
+        setIsAuthenticating(true);
+        const tid = toast.loading('Signing in as Advocate...');
+        try {
+            const data = await advocateAuth.login(loginForm);
+            advocateAuth.saveTokens(data);
+            toast.dismiss(tid);
+            toast.success('Advocate sign in successful!');
+            setLoadError(null);
+            fetchAll();
+        } catch (err) {
+            toast.dismiss(tid);
+            toast.error(err.message || 'Login failed');
+        } finally {
+            setIsAuthenticating(false);
+        }
+    };
+
+    const handleInlineRegister = async (e) => {
+        e.preventDefault();
+        if (registerForm.password.length < 8) {
+            toast.error('Password must be at least 8 characters.');
+            return;
+        }
+        setIsAuthenticating(true);
+        const tid = toast.loading('Creating your advocate profile...');
+        try {
+            const data = await advocateAuth.register({
+                email: registerForm.email,
+                password: registerForm.password,
+                first_name: registerForm.firstName,
+                last_name: registerForm.lastName,
+            });
+            advocateAuth.saveTokens(data);
+            toast.dismiss(tid);
+            toast.success('Advocate account created successfully!');
+            setLoadError(null);
+            fetchAll();
+        } catch (err) {
+            toast.dismiss(tid);
+            toast.error(err.message || 'Registration failed');
+        } finally {
+            setIsAuthenticating(false);
+        }
+    };
+
     useEffect(() => {
         async function verifyAndLoad() {
             if (!tokens.getAccess()) {
@@ -68,7 +121,7 @@ export default function AdvocateDashboard() {
                         return;
                     } catch (e) {
                         console.error('Session auto-login failed:', e);
-                        setLoadError('Advocate session could not be authenticated. Please log in or register as an advocate.');
+                        setLoadError('Advocate session could not be authenticated. Please sign in or create an advocate profile below.');
                         setLoading(false);
                         return;
                     }
@@ -249,7 +302,8 @@ export default function AdvocateDashboard() {
     const handleLogout = async () => {
         await advocateAuth.logout();
         toast.success('Logged out successfully.');
-        navigate('/advocate/login');
+        setProfile(null);
+        setLoadError('Logged out. Please sign in or register to access advocate profile.');
     };
 
     // ── Loading & Error states ─────────────────────────────────────────────────
@@ -263,22 +317,122 @@ export default function AdvocateDashboard() {
 
     if (loadError) {
         return (
-            <div className="flex items-center justify-center min-h-screen p-8">
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center max-w-md">
-                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-red-800 mb-2">Advocate Profile Error</h3>
-                    <p className="text-red-600 text-sm mb-6">{loadError}</p>
-                    <div className="flex flex-wrap gap-3 justify-center">
-                        <Button onClick={fetchAll} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            Retry
-                        </Button>
-                        <Button variant="outline" onClick={() => navigate('/advocate/login')}>
-                            Advocate Login
-                        </Button>
-                        <Button onClick={() => navigate('/advocate/signup')} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                            Register as Advocate
-                        </Button>
+            <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-slate-50 dark:bg-slate-900 mt-8">
+                <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 space-y-6">
+                    <div className="text-center">
+                        <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/40 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                            <User className="w-7 h-7" />
+                        </div>
+                        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">Advocate Profile Access</h2>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Sign in or create an Advocate profile to access case management</p>
                     </div>
+
+                    <div className="flex bg-slate-100 dark:bg-slate-700/50 p-1 rounded-xl">
+                        <button
+                            type="button"
+                            onClick={() => setAuthMode('login')}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                                authMode === 'login'
+                                    ? 'bg-white dark:bg-slate-800 text-blue-600 shadow'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                            }`}
+                        >
+                            Advocate Sign In
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAuthMode('register')}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                                authMode === 'register'
+                                    ? 'bg-white dark:bg-slate-800 text-blue-600 shadow'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                            }`}
+                        >
+                            Create Advocate Profile
+                        </button>
+                    </div>
+
+                    {authMode === 'login' ? (
+                        <form onSubmit={handleInlineLogin} className="space-y-4">
+                            <div>
+                                <Label>Email Address</Label>
+                                <Input
+                                    type="email"
+                                    required
+                                    placeholder="advocate@lawfirm.com"
+                                    value={loginForm.email}
+                                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                                    className="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Password</Label>
+                                <Input
+                                    type="password"
+                                    required
+                                    placeholder="••••••••"
+                                    value={loginForm.password}
+                                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                                    className="mt-1"
+                                />
+                            </div>
+                            <Button type="submit" disabled={isAuthenticating} className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                                {isAuthenticating ? 'Signing in...' : 'Sign In as Advocate'}
+                            </Button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleInlineRegister} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label>First Name</Label>
+                                    <Input
+                                        type="text"
+                                        required
+                                        placeholder="Adv."
+                                        value={registerForm.firstName}
+                                        onChange={(e) => setRegisterForm({ ...registerForm, firstName: e.target.value })}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Last Name</Label>
+                                    <Input
+                                        type="text"
+                                        required
+                                        placeholder="Sharma"
+                                        value={registerForm.lastName}
+                                        onChange={(e) => setRegisterForm({ ...registerForm, lastName: e.target.value })}
+                                        className="mt-1"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Email Address</Label>
+                                <Input
+                                    type="email"
+                                    required
+                                    placeholder="advocate@lawfirm.com"
+                                    value={registerForm.email}
+                                    onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                                    className="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label>Password (min 8 chars, letter & digit)</Label>
+                                <Input
+                                    type="password"
+                                    required
+                                    placeholder="••••••••"
+                                    value={registerForm.password}
+                                    onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                                    className="mt-1"
+                                />
+                            </div>
+                            <Button type="submit" disabled={isAuthenticating} className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                                {isAuthenticating ? 'Creating Profile...' : 'Register & Access Profile'}
+                            </Button>
+                        </form>
+                    )}
                 </div>
             </div>
         );
