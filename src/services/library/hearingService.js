@@ -33,6 +33,8 @@ export const hearingService = {
     };
     hearings.unshift(newHearing);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(hearings));
+    window.dispatchEvent(new Event('hearings_updated'));
+    window.dispatchEvent(new Event('cases_updated'));
     return newHearing;
   },
 
@@ -44,6 +46,8 @@ export const hearingService = {
     if (index !== -1) {
       hearings[index] = { ...hearings[index], ...hearingData };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(hearings));
+      window.dispatchEvent(new Event('hearings_updated'));
+      window.dispatchEvent(new Event('cases_updated'));
       return hearings[index];
     }
     throw new Error('Hearing not found');
@@ -55,6 +59,8 @@ export const hearingService = {
     let hearings = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     hearings = hearings.filter(h => h.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(hearings));
+    window.dispatchEvent(new Event('hearings_updated'));
+    window.dispatchEvent(new Event('cases_updated'));
     return true;
   },
 };

@@ -9,6 +9,9 @@ import {
     ShieldCheck, Share2, ChevronLeft, CalendarDays, Gavel, X, Filter,
     Folder, FolderPlus, Library, Layers, PlayCircle, Tag, Clock, AlignLeft
 } from 'lucide-react';
+import { caseService } from '../services/library/caseService';
+import { hearingService } from '../services/library/hearingService';
+import { API_CONFIG } from '../services/endpoints';
 
 /* ─────────────────────────────────────────────────────────────
    Premium Glow Styles & Component
@@ -170,6 +173,23 @@ export default function Dashboard() {
                 console.warn("Failed to fetch cases count:", e);
             }
 
+            // Fallback to localStorage if backend cases array is empty but local storage has cases
+            if (casesList.length === 0) {
+                try {
+                    const localCases = JSON.parse(localStorage.getItem('draftmate_cases') || '[]');
+                    casesList = localCases;
+                } catch (e) {}
+            }
+
+            let hearingsListFromService = [];
+            try {
+                hearingsListFromService = await hearingService.getHearings();
+            } catch (e) {
+                try {
+                    hearingsListFromService = JSON.parse(localStorage.getItem('draftmate_hearings') || '[]');
+                } catch (err) {}
+            }
+
             let draftsCount = 0;
             try {
                 const token = localStorage.getItem('session_id');
@@ -207,41 +227,49 @@ export default function Dashboard() {
                 translationsCount = Math.max(transHist.length, jobs.length);
             } catch (e) {}
 
-            // Calculate hearings from cases + valid user events
+            // Combine hearings from caseService nextHearingDate + hearingService + user calendar events
             const hearingsList = [];
+
+            // 1. Hearings from Hearing Tracker service (e.g. "priya rai bribary")
+            hearingsListFromService.forEach(h => {
+                hearingsList.push({
+                    time: h.hearingDate ? (h.hearingDate.includes('T') ? new Date(h.hearingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : h.hearingDate) : "10:00 AM",
+                    court: h.court || "District Court",
+                    case: h.caseTitle || h.title || "Hearing Matter",
+                    judge: h.judge || "Hon'ble Judge",
+                    status: h.status || "Scheduled"
+                });
+            });
+
+            // 2. Hearings from active cases
             casesList.forEach(c => {
                 if (c.nextHearingDate) {
+                    // Check if not already added from hearingService
+                    const exists = hearingsList.some(existing => existing.case?.toLowerCase() === c.caseTitle?.toLowerCase());
+                    if (!exists) {
+                        hearingsList.push({
+                            time: c.hearingTime || "10:00 AM",
+                            court: c.court || "High Court",
+                            case: c.caseTitle,
+                            judge: c.assignedAdvocate || "Presiding Judge",
+                            status: "Upcoming"
+                        });
+                    }
+                }
+            });
+
+            // 3. User created calendar events
+            events.forEach(ev => {
+                if (ev.isUserCreated) {
                     hearingsList.push({
-                        time: c.hearingTime || "10:00 AM",
-                        court: c.court || "High Court",
-                        case: c.caseTitle,
-                        judge: c.assignedAdvocate || "Presiding Judge",
+                        time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
+                        court: ev.location || ev.court || "District Court",
+                        case: ev.title,
+                        judge: ev.judge || "Hon'ble Judge",
                         status: "Upcoming"
                     });
                 }
             });
-
-            // Include custom calendar events if cases exist or if event is user-created
-            if (casesList.length > 0) {
-                events.forEach(ev => {
-                    if (ev.type === 'hearing' || ev.title) {
-                        // Check if event belongs to an existing case
-                        const matchesExistingCase = casesList.some(c => 
-                            c.caseTitle?.toLowerCase().includes(ev.title?.toLowerCase() || '') ||
-                            ev.title?.toLowerCase().includes(c.caseTitle?.toLowerCase() || '')
-                        );
-                        if (matchesExistingCase || ev.isUserCreated) {
-                            hearingsList.push({
-                                time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
-                                court: ev.location || ev.court || "District Court",
-                                case: ev.title,
-                                judge: ev.judge || "Hon'ble Judge",
-                                status: "Upcoming"
-                            });
-                        }
-                    }
-                });
-            }
 
             setUpcomingHearings(hearingsList);
             setKpiStats({
@@ -278,6 +306,7 @@ export default function Dashboard() {
         window.addEventListener('my_drafts_updated', loadDashboardData);
         window.addEventListener('case_documents_updated', loadDashboardData);
         window.addEventListener('cases_updated', loadDashboardData);
+        window.addEventListener('hearings_updated', loadDashboardData);
         window.addEventListener('storage', loadDashboardData);
 
         return () => {
@@ -285,6 +314,7 @@ export default function Dashboard() {
             window.removeEventListener('my_drafts_updated', loadDashboardData);
             window.removeEventListener('case_documents_updated', loadDashboardData);
             window.removeEventListener('cases_updated', loadDashboardData);
+            window.removeEventListener('hearings_updated', loadDashboardData);
             window.removeEventListener('storage', loadDashboardData);
         };
     }, [events]);
