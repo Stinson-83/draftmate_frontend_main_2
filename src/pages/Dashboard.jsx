@@ -136,12 +136,112 @@ export default function Dashboard() {
     const [userProfile, setUserProfile] = useState({
         firstName: '',
         lastName: '',
-        bio: 'Welcome to your intelligente AI Legal Workspace. Complete your profile in settings to list practice areas and experience.',
+        bio: 'Welcome to your intelligent AI Legal Workspace. Complete your profile in settings to list practice areas and experience.',
         role: 'Lawyer / Legal Pro',
         image: ''
     });
 
+    const [kpiStats, setKpiStats] = useState({
+        casesCount: 0,
+        hearingsCount: 0,
+        draftsCount: 0,
+        researchesCount: 0,
+        translationsCount: 0
+    });
+    const [upcomingHearings, setUpcomingHearings] = useState([]);
+    const [allDrafts, setAllDrafts] = useState([]);
+
+    const [events, setEvents] = useState(() => {
+        try {
+            const saved = localStorage.getItem('draftmate_calendar_events');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+
     useEffect(() => {
+        const loadDashboardData = async () => {
+            let casesList = [];
+            try {
+                const casesData = await caseService.getCases();
+                casesList = casesData || [];
+            } catch (e) {
+                console.warn("Failed to fetch cases count:", e);
+            }
+
+            let draftsCount = 0;
+            try {
+                const token = localStorage.getItem('session_id');
+                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const savedDrafts = data.drafts || [];
+                    draftsCount = savedDrafts.length;
+                    setAllDrafts(savedDrafts);
+                } else {
+                    const localDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+                    draftsCount = localDrafts.length;
+                    setAllDrafts(localDrafts);
+                }
+            } catch (e) {
+                const localDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+                draftsCount = localDrafts.length;
+                setAllDrafts(localDrafts);
+            }
+
+            let researchesCount = 0;
+            try {
+                const resHist = JSON.parse(localStorage.getItem('research_history') || '[]');
+                const lexSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
+                const lastRes = localStorage.getItem('last_research_session') ? 1 : 0;
+                researchesCount = Math.max(resHist.length, lexSessions.length, lastRes);
+            } catch (e) {}
+
+            let translationsCount = 0;
+            try {
+                const transHist = JSON.parse(localStorage.getItem('translation_history') || '[]');
+                const jobs = JSON.parse(localStorage.getItem('translator_jobs') || '[]');
+                translationsCount = Math.max(transHist.length, jobs.length);
+            } catch (e) {}
+
+            // Calculate hearings from cases + calendar events
+            const hearingsList = [];
+            casesList.forEach(c => {
+                if (c.nextHearingDate) {
+                    hearingsList.push({
+                        time: c.hearingTime || "10:00 AM",
+                        court: c.court || "High Court",
+                        case: c.caseTitle,
+                        judge: c.assignedAdvocate || "Presiding Judge",
+                        status: "Upcoming"
+                    });
+                }
+            });
+            events.forEach(ev => {
+                if (ev.type === 'hearing' || ev.title) {
+                    hearingsList.push({
+                        time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
+                        court: ev.location || ev.court || "District Court",
+                        case: ev.title,
+                        judge: ev.judge || "Hon'ble Judge",
+                        status: "Upcoming"
+                    });
+                }
+            });
+
+            setUpcomingHearings(hearingsList);
+            setKpiStats({
+                casesCount: casesList.length,
+                hearingsCount: hearingsList.length,
+                draftsCount,
+                researchesCount,
+                translationsCount
+            });
+        };
+
         const loadProfile = () => {
             const saved = localStorage.getItem('user_profile');
             if (saved) {
@@ -160,71 +260,19 @@ export default function Dashboard() {
             }
         };
 
-        const handleDraftUpdate = async () => {
-            try {
-                const token = localStorage.getItem('session_id');
-                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error("Failed to load drafts from database.");
-                }
-                const data = await response.json();
-                const savedDrafts = data.drafts || [];
-                const processedDrafts = savedDrafts.map((draft) => {
-                    const status = draft.status || 'In progress';
-                    const trackingParams = draft.trackingParams || {
-                        documentKey: draft.documentKey || draft.id || '',
-                        filename: ensureDocxFilename(draft.filename || draft.name || 'Untitled Draft'),
-                        source: draft.source || 'db_draft',
-                        folderId: draft.folderId ?? null,
-                    };
+        loadProfile();
+        loadDashboardData();
 
-                    return {
-                        id: draft.id,
-                        title: draft.name || trackingParams.filename || 'Untitled Draft',
-                        filename: ensureDocxFilename(draft.filename || draft.name || trackingParams.filename || 'Untitled Draft'),
-                        documentKey: draft.documentKey || draft.id || trackingParams.documentKey || '',
-                        modified: new Date(draft.lastModified || Date.now()).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        }),
-                        status,
-                        statusColor: buildStatusColor(status),
-                        content: draft.content,
-                        placeholders: draft.placeholders,
-                        rawName: draft.name,
-                        onlyofficeConfig: draft.onlyofficeConfig || null,
-                        variablesDetected: draft.variablesDetected || [],
-                        trackingParams,
-                    };
-                });
-
-                setAllDrafts(processedDrafts);
-            } catch (error) {
-                console.error('Failed to load drafts for dashboard', error);
-                setAllDrafts([]);
-            }
-        };
-        loadProfile(); // Initial load
         window.addEventListener('user_profile_updated', loadProfile);
-        return () => window.removeEventListener('user_profile_updated', loadProfile);
-    }, []);
+        window.addEventListener('my_drafts_updated', loadDashboardData);
+        window.addEventListener('case_documents_updated', loadDashboardData);
 
-    const [events, setEvents] = useState([
-        {
-            id: 1,
-            title: "Sharma vs Gupta Builders",
-            date: "2026-06-14",
-            time: "10:00",
-            type: "hearing",
-            color: "bg-blue-500"
-        }
-    ]);
+        return () => {
+            window.removeEventListener('user_profile_updated', loadProfile);
+            window.removeEventListener('my_drafts_updated', loadDashboardData);
+            window.removeEventListener('case_documents_updated', loadDashboardData);
+        };
+    }, [events]);
 
     const handleNavigate = (direction) => {
         const newDate = new Date(currentDate);
@@ -276,7 +324,13 @@ export default function Dashboard() {
 
             {/* ── ROW 2: SUMMARY KPI ── */}
             <div className="bg-white rounded-[24px] border border-slate-200 p-6 shadow-[0_8px_30px_rgb(37,99,235,0.04)] flex flex-wrap md:flex-nowrap items-center justify-between gap-6 overflow-x-auto scrollbar-hide">
-                {KPIS.map((kpi, i) => (
+                {[
+                    { label: "Active Cases", value: kpiStats.casesCount, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50" },
+                    { label: "Hearings", value: kpiStats.hearingsCount, icon: CalendarIcon, color: "text-rose-600", bg: "bg-rose-50" },
+                    { label: "Drafts", value: kpiStats.draftsCount, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50" },
+                    { label: "Researches Done", value: kpiStats.researchesCount, icon: Zap, color: "text-cyan-600", bg: "bg-cyan-50" },
+                    { label: "Doc Translated", value: kpiStats.translationsCount, icon: Languages, color: "text-yellow-600", bg: "bg-yellow-50" },
+                ].map((kpi, i) => (
                     <div key={i} className="flex items-center gap-4 min-w-[140px] shrink-0">
                         <div className={`w-10 h-10 rounded-xl ${kpi.bg} ${kpi.color} flex items-center justify-center shrink-0`}>
                             <kpi.icon className="w-5 h-5" />
@@ -403,24 +457,31 @@ export default function Dashboard() {
                             <h2 className="text-sm font-bold text-[#0F1C2E]">Upcoming Hearings</h2>
                         </div>
                         <div className="p-2 flex-1 flex flex-col gap-2 z-10 max-h-[420px] overflow-y-auto draftmate-scroll">
-                            {HEARINGS.map((hearing, i) => (
-                                <div key={i} className="flex flex-col gap-2 p-4 bg-white/80 hover:bg-white rounded-xl transition-all cursor-pointer group border border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-md">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-sm font-black text-[#0F1C2E]">{hearing.time.split(' ')[0]}</span>
-                                            <span className="text-[10px] font-bold text-slate-500">{hearing.time.split(' ')[1]}</span>
+                            {upcomingHearings.length > 0 ? (
+                                upcomingHearings.map((hearing, i) => (
+                                    <div key={i} className="flex flex-col gap-2 p-4 bg-white/80 hover:bg-white rounded-xl transition-all cursor-pointer group border border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-md">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="text-sm font-black text-[#0F1C2E]">{hearing.time.split(' ')[0]}</span>
+                                                <span className="text-[10px] font-bold text-slate-500">{hearing.time.split(' ')[1] || 'AM'}</span>
+                                            </div>
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-bold ${hearing.status === 'Upcoming' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                {hearing.status === 'Upcoming' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} {hearing.status}
+                                            </span>
                                         </div>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-bold ${hearing.status === 'Upcoming' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                            {hearing.status === 'Upcoming' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} {hearing.status}
-                                        </span>
+                                        <h3 className="font-bold text-[#0F1C2E] text-sm group-hover:text-blue-600 transition-colors">{hearing.case}</h3>
+                                        <div className="flex flex-col gap-1 text-[11px] font-medium text-slate-500 mt-1">
+                                            <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {hearing.court}</span>
+                                            <span className="flex items-center gap-1.5"><Scale className="w-3 h-3" /> {hearing.judge}</span>
+                                        </div>
                                     </div>
-                                    <h3 className="font-bold text-[#0F1C2E] text-sm group-hover:text-blue-600 transition-colors">{hearing.case}</h3>
-                                    <div className="flex flex-col gap-1 text-[11px] font-medium text-slate-500 mt-1">
-                                        <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {hearing.court}</span>
-                                        <span className="flex items-center gap-1.5"><Scale className="w-3 h-3" /> {hearing.judge}</span>
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center p-8 text-center my-auto">
+                                    <CalendarIcon className="w-8 h-8 text-slate-300 mb-2" />
+                                    <p className="text-xs font-semibold text-slate-400">No upcoming hearings scheduled</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </section>
                 </div>

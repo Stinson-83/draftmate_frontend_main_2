@@ -1072,7 +1072,15 @@ def serve_draft_file(filename: str):
     file_path = os.path.join(shared_storage_path, safe_name)
     ensure_file_exists_locally(safe_name, file_path)
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found.")
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            doc = Document()
+            doc.add_paragraph("")
+            doc.save(file_path)
+            upload_file_to_s3_background(file_path, safe_name)
+        except Exception as create_err:
+            logger.error(f"Failed to auto-generate blank docx: {create_err}")
+            raise HTTPException(status_code=404, detail="File not found.")
 
     return FileResponse(
         path=file_path,
@@ -1101,7 +1109,15 @@ async def serve_draft(draft_id: str, filename: str):
         if os.path.isfile(root_path):
             file_path = root_path
         else:
-            raise HTTPException(status_code=404, detail="File not found.")
+            try:
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                doc = Document()
+                doc.add_paragraph("")
+                doc.save(file_path)
+                upload_file_to_s3_background(file_path, s3_key)
+            except Exception as create_err:
+                logger.error(f"Failed to auto-generate blank docx: {create_err}")
+                raise HTTPException(status_code=404, detail="File not found.")
 
     return FileResponse(
         path=file_path,

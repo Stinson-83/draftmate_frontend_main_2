@@ -13,8 +13,19 @@ const getHeaders = () => {
 };
 
 const initializeStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockCases));
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } else {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(c => c.id !== 'case-1' && c.id !== 'case-2' && c.id !== 'case-3' && !c.caseTitle?.includes('Ramesh Sharma') && !c.caseTitle?.includes('Priya Enterprises') && !c.caseTitle?.includes('Sunita Verma'));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {}
   }
 };
 
