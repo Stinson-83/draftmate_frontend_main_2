@@ -121,7 +121,7 @@ export default function AdvocateDashboard() {
                         return;
                     } catch (e) {
                         console.error('Session auto-login failed:', e);
-                        navigate('/advocate/login?session_expired=1', { replace: true });
+                        navigate('/advocate/login', { replace: true });
                         return;
                     }
                 }
@@ -165,7 +165,7 @@ export default function AdvocateDashboard() {
         } catch (err) {
             console.error('Failed to load advocate profile:', err);
             tokens.clear();
-            navigate('/advocate/login?session_expired=1', { replace: true });
+            navigate('/advocate/login', { replace: true });
         } finally {
             setLoading(false);
         }
