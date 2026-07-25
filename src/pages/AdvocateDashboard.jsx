@@ -68,9 +68,13 @@ export default function AdvocateDashboard() {
                         return;
                     } catch (e) {
                         console.error('Session auto-login failed:', e);
+                        setLoadError('Advocate session could not be authenticated. Please log in or register as an advocate.');
+                        setLoading(false);
+                        return;
                     }
                 }
-                navigate('/advocate/login?session_expired=1');
+                setLoadError('Advocate profile requires authentication.');
+                setLoading(false);
                 return;
             }
             fetchAll();
