@@ -376,10 +376,15 @@ async def session_login(request: Request):
     verify_url = f"{auth_url.rstrip('/')}/verify_session/{session_id}"
     try:
         import urllib.request
+        import urllib.error
         import json
         req = urllib.request.Request(verify_url, method="GET")
         with urllib.request.urlopen(req, timeout=5) as response:
             res_data = json.loads(response.read().decode())
+    except urllib.error.HTTPError as http_err:
+        if http_err.code == 401:
+            raise HTTPException(status_code=401, detail="Invalid session token.")
+        raise HTTPException(status_code=500, detail=f"Auth service returned status {http_err.code}")
     except Exception as e:
         raise HTTPException(
             status_code=500,

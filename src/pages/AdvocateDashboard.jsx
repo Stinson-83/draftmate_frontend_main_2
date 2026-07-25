@@ -266,14 +266,17 @@ export default function AdvocateDashboard() {
             <div className="flex items-center justify-center min-h-screen p-8">
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center max-w-md">
                     <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-red-800 mb-2">Failed to load dashboard</h3>
+                    <h3 className="text-lg font-bold text-red-800 mb-2">Advocate Profile Error</h3>
                     <p className="text-red-600 text-sm mb-6">{loadError}</p>
-                    <div className="flex gap-3 justify-center">
-                        <Button onClick={fetchAll} className="bg-red-600 hover:bg-red-700 text-white">
+                    <div className="flex flex-wrap gap-3 justify-center">
+                        <Button onClick={fetchAll} className="bg-blue-600 hover:bg-blue-700 text-white">
                             Retry
                         </Button>
                         <Button variant="outline" onClick={() => navigate('/advocate/login')}>
-                            Login Again
+                            Advocate Login
+                        </Button>
+                        <Button onClick={() => navigate('/advocate/signup')} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                            Register as Advocate
                         </Button>
                     </div>
                 </div>
