@@ -121,19 +121,17 @@ export default function AdvocateDashboard() {
                         return;
                     } catch (e) {
                         console.error('Session auto-login failed:', e);
-                        setLoadError('Advocate session could not be authenticated. Please sign in or create an advocate profile below.');
-                        setLoading(false);
+                        navigate('/advocate/login?session_expired=1', { replace: true });
                         return;
                     }
                 }
-                setLoadError('Advocate profile requires authentication.');
-                setLoading(false);
+                navigate('/advocate/login', { replace: true });
                 return;
             }
             fetchAll();
         }
         verifyAndLoad();
-    }, []);
+    }, [navigate]);
 
     async function fetchAll() {
         setLoading(true);
@@ -165,7 +163,9 @@ export default function AdvocateDashboard() {
             if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data || null);
 
         } catch (err) {
-            setLoadError(err.message);
+            console.error('Failed to load advocate profile:', err);
+            tokens.clear();
+            navigate('/advocate/login?session_expired=1', { replace: true });
         } finally {
             setLoading(false);
         }

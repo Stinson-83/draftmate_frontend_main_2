@@ -60,7 +60,16 @@ services:
     ports:
       - "3310:3310"
 
-
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Draftmate9989
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -94,9 +103,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
       - GOOGLE_SERP_API_KEY=${GOOGLE_SERP_API_KEY}
@@ -139,7 +148,7 @@ services:
       - SSH_KEY_PATH=/app/bastion.key.pem
       - BASTION_IP=${BASTION_IP}
       - SSH_USER=${SSH_USER}
-      - POSTGRES_DSN=${POSTGRES_DSN}
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - AUTH_SERVICE_URL=http://127.0.0.1:8009
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - FRONTEND_URL_DEV=${FRONTEND_URL_DEV}
@@ -157,6 +166,8 @@ services:
       - SHARED_STORAGE_PATH=/app/shared_drafts
       - SARVAM_API_KEY=${SARVAM_API_KEY}
     depends_on:
+      db:
+        condition: service_started
       qdrant:
         condition: service_started
     volumes:
@@ -176,6 +187,7 @@ services:
           path: requirements.txt
 
 volumes:
+  postgres_data:
   qdrant_data:
   translator_original_data:
   translator_translated_data:
