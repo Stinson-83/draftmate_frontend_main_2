@@ -204,6 +204,10 @@ def ensure_auth_schema():
             ALTER TABLE users
             ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)
         """)
+        cur.execute("""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)
+        """)
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
@@ -516,8 +520,8 @@ def google_login(model: GoogleLoginModel):
             display_name = user_info.get('name') if 'user_info' in locals() else id_info.get('name') if 'id_info' in locals() else build_display_name(email)
             placeholder_password = hash_password(str(uuid.uuid4()))
             cur.execute(
-                "INSERT INTO users (id, name, email, password, password_hash, google_id) VALUES (%s, %s, %s, %s, %s, %s)",
-                (user_id, display_name, email, placeholder_password, placeholder_password, google_id)
+                "INSERT INTO users (id, email, password_hash, google_id, full_name) VALUES (%s, %s, %s, %s, %s)",
+                (user_id, email, placeholder_password, google_id, display_name)
             )
         
         # Ensure Profile exists for Google Login users
