@@ -47,19 +47,39 @@ const mapCaseToFrontend = (backendCase) => {
     description: backendCase.description,
     folders: Array.isArray(backendCase.folders) ? backendCase.folders : [],
     documents: Array.isArray(backendCase.documents) ? backendCase.documents : [],
-    clientId: backendCase.client_id
   };
 };
 
 export const caseService = {
   async getCases() {
+    const deletedIds = new Set(JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]'));
+
+    const filterDeletedDocs = (c) => {
+      if (!c) return c;
+      if (c.documents && c.documents.length > 0) {
+        const seenIds = new Set();
+        const seenNames = new Set();
+        c.documents = c.documents.filter(d => {
+          const idKey = String(d.id);
+          const nameKey = (d.name || d.filename || '').toLowerCase().trim();
+          if (deletedIds.has(idKey) || (nameKey && deletedIds.has(nameKey))) return false;
+          if (seenIds.has(idKey)) return false;
+          if (nameKey && seenNames.has(nameKey)) return false;
+          seenIds.add(idKey);
+          if (nameKey) seenNames.add(nameKey);
+          return true;
+        });
+      }
+      return c;
+    };
+
     try {
       const resp = await fetch(`${API_CONFIG.LIBRARY.BASE_URL}/cases/`, {
         headers: getHeaders()
       });
       if (resp.ok) {
         const data = await resp.json();
-        const mapped = data.map(mapCaseToFrontend);
+        const mapped = data.map(mapCaseToFrontend).map(filterDeletedDocs);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
         return mapped;
       }
@@ -67,7 +87,8 @@ export const caseService = {
       console.warn("Backend getCases failed, falling back to localStorage:", e);
     }
     initializeStorage();
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const localCases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    return localCases.map(filterDeletedDocs);
   },
 
   async getCaseById(id) {
@@ -371,6 +392,26 @@ export const caseService = {
       activeCase.folders.push(folder);
     }
 
+    // Check if document already exists by ID or filename to prevent duplicate rows
+    const targetName = (uploadedMetadata?.name || documentData.name || documentData.filename || '').toLowerCase();
+    const targetId = String(uploadedMetadata?.id || documentData.id || '');
+
+    const existingIdx = activeCase.documents.findIndex(d => 
+      (targetId && String(d.id) === targetId) || 
+      (targetName && (d.name || '').toLowerCase() === targetName) ||
+      (targetName && (d.filename || '').toLowerCase() === targetName)
+    );
+
+    if (existingIdx !== -1) {
+      activeCase.documents[existingIdx] = {
+        ...activeCase.documents[existingIdx],
+        syncStatus: 'synced',
+        lastModified: new Date().toISOString()
+      };
+      await this.updateCase(targetCaseId, activeCase);
+      return activeCase.documents[existingIdx];
+    }
+
     // Create the document
     const newDoc = {
       id: uploadedMetadata?.id || documentData.id || `doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -389,25 +430,6 @@ export const caseService = {
     activeCase.documents.push(newDoc);
     await this.updateCase(targetCaseId, activeCase);
 
-    // Background sync simulation (transition syncing -> synced after 2.5s)
-    if (newDoc.syncStatus === 'syncing') {
-      setTimeout(async () => {
-        try {
-          const latestCase = await this.getCaseById(targetCaseId);
-          if (latestCase) {
-            const dIdx = latestCase.documents.findIndex(d => d.id === newDoc.id);
-            if (dIdx !== -1) {
-              latestCase.documents[dIdx].syncStatus = 'synced';
-              await this.updateCase(targetCaseId, latestCase);
-              window.dispatchEvent(new Event('case_documents_updated'));
-            }
-          }
-        } catch (syncErr) {
-          console.warn("Background document sync failed:", syncErr);
-        }
-      }, 2500);
-    }
-
     return newDoc;
   },
 
@@ -425,13 +447,48 @@ export const caseService = {
   },
 
   async deleteCaseDocument(caseId, docId) {
-    const activeCase = await this.getCaseById(caseId);
-    if (!activeCase) throw new Error('Case not found');
+    const cases = await this.getCases();
+    let targetCase = null;
 
-    if (activeCase.documents) {
-      activeCase.documents = activeCase.documents.filter(d => d.id !== docId);
+    if (caseId) {
+      targetCase = cases.find(c => c.id === caseId);
     }
-    await this.updateCase(caseId, activeCase);
+
+    if (!targetCase) {
+      targetCase = cases.find(c => (c.documents || []).some(d => String(d.id) === String(docId)));
+    }
+
+    if (!targetCase) {
+      targetCase = cases.find(c => c.caseTitle === 'General Documents' || c.id === 'general-docs');
+    }
+
+    if (!targetCase) return false;
+
+    if (targetCase.documents) {
+      const targetDoc = targetCase.documents.find(d => String(d.id) === String(docId));
+      const targetName = (targetDoc?.name || targetDoc?.filename || '').toLowerCase();
+
+      targetCase.documents = targetCase.documents.filter(d => {
+        if (String(d.id) === String(docId)) return false;
+        if (targetName && (d.name || '').toLowerCase() === targetName) return false;
+        if (targetName && (d.filename || '').toLowerCase() === targetName) return false;
+        return true;
+      });
+    }
+
+    await this.updateCase(targetCase.id, targetCase);
+
+    // Also purge from any other case matter
+    for (const otherCase of cases) {
+      if (otherCase.id !== targetCase.id && otherCase.documents) {
+        const initialLen = otherCase.documents.length;
+        otherCase.documents = otherCase.documents.filter(d => String(d.id) !== String(docId));
+        if (otherCase.documents.length !== initialLen) {
+          await this.updateCase(otherCase.id, otherCase);
+        }
+      }
+    }
+
     return true;
   }
 };

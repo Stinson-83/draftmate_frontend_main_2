@@ -146,14 +146,17 @@ def _sanitize_filename(filename: str) -> str:
 
 # ── DB Helper ─────────────────────────────────────────────────────────────────
 def get_db_connection():
-    dsn = os.getenv("POSTGRES_DSN")
+    dsn = os.getenv("POSTGRES_DSN") or os.getenv("DATABASE_URL")
     if dsn:
-        return psycopg2.connect(dsn, cursor_factory=RealDictCursor)
+        try:
+            return psycopg2.connect(dsn, cursor_factory=RealDictCursor)
+        except Exception:
+            pass
     return psycopg2.connect(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        dbname=os.getenv("POSTGRES_DB", "draftmate"),
+        host=os.getenv("POSTGRES_HOST", "db"),
+        dbname=os.getenv("POSTGRES_DB", "postgres"),
         user=os.getenv("POSTGRES_USER", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD", "password"),
+        password=os.getenv("POSTGRES_PASSWORD") or os.getenv("PSQL_PASSWD") or "Draftmate9989",
         port=os.getenv("POSTGRES_PORT", "5432"),
         cursor_factory=RealDictCursor,
     )

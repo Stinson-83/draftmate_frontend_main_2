@@ -34,66 +34,29 @@ const DocumentManagement = () => {
   const loadCases = useCallback(async () => {
     try {
       const casesData = await caseService.getCases();
+      const deletedIds = new Set(JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]'));
       
-      let drafts = [];
-      try {
-        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
-        const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          drafts = data.drafts || [];
-        }
-      } catch (err) {
-        console.warn("Failed to fetch drafts list for auto-sync:", err);
-      }
-      
-      const allDocIds = new Set();
+      // Deduplicate documents in existing cases by ID and by filename/name
       casesData.forEach(c => {
-        (c.documents || []).forEach(d => {
-          allDocIds.add(String(d.id));
-        });
-      });
-      
-      const unlinkedDrafts = drafts.filter(d => !allDocIds.has(String(d.id)) && !allDocIds.has(String(d.documentKey)));
-      
-      if (unlinkedDrafts.length > 0) {
-        let generalCase = casesData.find(c => c.caseTitle === 'General Documents' || c.id === 'general-docs');
-        if (!generalCase) {
-          generalCase = await caseService.createCase({
-            caseTitle: 'General Documents',
-            caseNumber: 'GEN-0001',
-            court: 'General Matters',
-            client: 'Self',
-            filingDate: new Date().toISOString().split('T')[0],
-            status: 'Open',
-            priority: 'Medium',
-            folders: [],
-            documents: []
+        if (c.documents && c.documents.length > 0) {
+          const seenIds = new Set();
+          const seenNames = new Set();
+          c.documents = c.documents.filter(d => {
+            const idKey = String(d.id);
+            const nameKey = (d.name || d.filename || '').toLowerCase().trim();
+            
+            if (deletedIds.has(idKey) || (nameKey && deletedIds.has(nameKey))) return false;
+            if (seenIds.has(idKey)) return false;
+            if (nameKey && seenNames.has(nameKey)) return false;
+            
+            seenIds.add(idKey);
+            if (nameKey) seenNames.add(nameKey);
+            return true;
           });
         }
-        
-        for (const draft of unlinkedDrafts) {
-          try {
-            await caseService.addCaseDocument(generalCase.id, {
-              id: draft.id || draft.documentKey,
-              name: draft.name || draft.filename,
-              filename: draft.filename,
-              size: '15 KB',
-              syncStatus: 'synced',
-              source: 'drafter'
-            });
-          } catch (docErr) {
-            console.warn("Failed to auto-sync draft:", docErr);
-          }
-        }
-        
-        const updatedCases = await caseService.getCases();
-        setCases(updatedCases);
-      } else {
-        setCases(casesData);
-      }
+      });
+
+      setCases(casesData);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load cases');
@@ -192,8 +155,30 @@ const DocumentManagement = () => {
     if (window.confirm("Are you sure you want to remove this document?")) {
       try {
         await caseService.deleteCaseDocument(selectedCaseId, docId);
+
+        // Record deleted document ID to prevent auto-sync resurrection
+        try {
+          const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
+          if (!deletedIds.includes(String(docId))) {
+            deletedIds.push(String(docId));
+            localStorage.setItem('draftmate_deleted_doc_ids', JSON.stringify(deletedIds));
+          }
+        } catch (e) {}
+
+        // Instantly update state without reloading
+        setCases(prevCases => {
+          return prevCases.map(c => {
+            if (c.documents) {
+              return {
+                ...c,
+                documents: c.documents.filter(d => String(d.id) !== String(docId))
+              };
+            }
+            return c;
+          });
+        });
+
         toast.success("Document removed");
-        loadCases();
       } catch (err) {
         toast.error("Failed to remove document");
       }

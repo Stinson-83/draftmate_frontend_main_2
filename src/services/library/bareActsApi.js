@@ -1,4 +1,5 @@
 import { API_CONFIG } from '../../services/endpoints';
+import * as localBareActsService from './localBareActsService';
 
 // 5-minute cache
 const CACHE_TTL = 5 * 60 * 1000; 
@@ -24,58 +25,65 @@ const clearCache = () => {
 
 const fetchBareActsEndpoint = async (endpoint) => {
   const url = `${API_CONFIG.LIBRARY.BASE_URL}${endpoint}`;
-  console.log("Fetching:", url);
-  const response = await fetch(url);
-  console.log("Response status:", response.status);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${endpoint}`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const json = await response.json();
+    return json.success ? json.data : null;
+  } catch (err) {
+    console.warn("Backend Bare Acts API unavailable, using local registry fallback:", err);
+    return null;
   }
-  const json = await response.json();
-  console.log("SEARCH RESPONSE", json); // STEP 1 - Full JSON response
-  return json.success ? json.data : null;
 };
 
 export const bareActsApi = {
   async getActs() {
-    console.log("Calling getActs...");
     const cached = getCached('acts');
     if (cached) return cached;
-    const data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACTS);
-    console.log("getActs data:", data);
+    let data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACTS);
+    if (!data || data.length === 0) {
+      data = localBareActsService.getActs();
+    }
     setCached('acts', data);
     return data;
   },
 
   async getActById(actId) {
-    console.log("Calling getActById with id:", actId);
     const cached = getCached(`act:${actId}`);
     if (cached) return cached;
-    const data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACT(actId));
-    console.log("getActById data:", data);
+    let data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACT(actId));
+    if (!data) {
+      data = localBareActsService.getActById(actId);
+    }
     setCached(`act:${actId}`, data);
     return data;
   },
 
   async getSections(actId, chapterId = null) {
-    console.log("Calling getSections...");
     const cached = getCached(`sections:${actId}:${chapterId}`);
     if (cached) return cached;
     let url = API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_SECTIONS(actId);
     if (chapterId) {
       url += `?chapter_id=${chapterId}`;
     }
-    const data = await fetchBareActsEndpoint(url);
+    let data = await fetchBareActsEndpoint(url);
+    if (!data || data.length === 0) {
+      data = localBareActsService.getSections(actId, chapterId);
+    }
     setCached(`sections:${actId}:${chapterId}`, data);
     return data;
   },
 
   async searchActs(query) {
-    console.log("Calling searchActs with query:", query);
     const cached = getCached(`search:acts:${query}`);
     if (cached) return cached;
     const url = `${API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.SEARCH_ACTS}?query=${encodeURIComponent(query)}`;
-    const data = await fetchBareActsEndpoint(url);
-    console.log("NORMALIZED", data); // STEP 2 - Normalized data
+    let data = await fetchBareActsEndpoint(url);
+    if (!data || data.length === 0) {
+      data = localBareActsService.searchActs(query);
+    }
     setCached(`search:acts:${query}`, data);
     return data;
   },
@@ -84,17 +92,21 @@ export const bareActsApi = {
     const cached = getCached(`search:sections:${query}`);
     if (cached) return cached;
     const url = `${API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.SEARCH_SECTIONS}?query=${encodeURIComponent(query)}`;
-    const data = await fetchBareActsEndpoint(url);
+    let data = await fetchBareActsEndpoint(url);
+    if (!data || data.length === 0) {
+      data = localBareActsService.searchSections(query);
+    }
     setCached(`search:sections:${query}`, data);
     return data;
   },
 
   async getCategories() {
-    console.log("Calling getCategories...");
     const cached = getCached('categories');
     if (cached) return cached;
-    const data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_CATEGORIES);
-    console.log("getCategories data:", data);
+    let data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_CATEGORIES);
+    if (!data || data.length === 0) {
+      data = localBareActsService.getCategories();
+    }
     setCached('categories', data);
     return data;
   },

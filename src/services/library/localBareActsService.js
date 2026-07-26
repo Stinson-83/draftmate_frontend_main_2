@@ -52,3 +52,22 @@ export const searchSections = (query) => {
     )
   );
 };
+
+export const getCategories = () => {
+  const cats = new Set(['All']);
+  allActs.forEach(act => {
+    if (act.category) cats.add(act.category);
+  });
+  return Array.from(cats);
+};
+
+export const searchActs = (query) => {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) return allActs;
+  return allActs.filter(act => 
+    act.name?.toLowerCase().includes(q) ||
+    act.shortName?.toLowerCase().includes(q) ||
+    act.actNumber?.toLowerCase().includes(q) ||
+    act.description?.toLowerCase().includes(q)
+  );
+};

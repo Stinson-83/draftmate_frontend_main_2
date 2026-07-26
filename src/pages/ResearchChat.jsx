@@ -155,45 +155,40 @@ const ResearchChat = () => {
     }, []);
 
     // Original Fetch Sessions
+    // Fetch Sessions with local storage fallback
     const fetchSessions = async () => {
+        let loadedSessions = [];
         try {
             setIsLoadingSessions(true);
             const data = await api.getSessions();
-            setSessions(data.sessions || []);
+            if (data && data.sessions && data.sessions.length > 0) {
+                loadedSessions = data.sessions;
+                localStorage.setItem('lexbot_sessions', JSON.stringify(data.sessions));
+            }
         } catch (error) {
-            console.error("Failed to fetch sessions:", error);
-            toast.error("Failed to load chat history");
-        } finally {
-            setIsLoadingSessions(false);
+            console.warn("Backend session history endpoint unavailable, using local storage fallback:", error);
         }
-    };
 
-    // Mock Fetch Sessions
-    // const fetchSessions = async () => {
-    //     setIsLoadingSessions(true);
-    //     setTimeout(() => {
-    //         setSessions([
-    //             { session_id: 'mock-1', title: 'Supreme Court Guidelines on Bail', created_at: new Date().toISOString() },
-    //             { session_id: 'mock-2', title: 'Section 138 NI Act Dispute', created_at: new Date(Date.now() - 86400000).toISOString() }, // Yesterday
-    //             { session_id: 'mock-3', title: 'Corporate Merger Due Diligence', created_at: new Date(Date.now() - 86400000 * 3).toISOString() } // 3 days ago
-    //         ]);
-    //         setIsLoadingSessions(false);
-    //     }, 800);
-    // };
+        if (loadedSessions.length === 0) {
+            try {
+                loadedSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
+            } catch (e) {
+                loadedSessions = [];
+            }
+        }
+        setSessions(loadedSessions);
+        setIsLoadingSessions(false);
+    };
 
     // Initialize
     useEffect(() => {
-        // hasInitializedRef prevents React StrictMode's double-invocation from
-        // calling loadSession after startNewChat already ran — which would race
-        // with the user's first message and wipe it from state.
         if (hasInitializedRef.current) return;
         hasInitializedRef.current = true;
 
-        // Fetch current LLM config on mount
         const fetchLLMConfig = async () => {
             try {
                 const config = await api.getLLMConfig();
-                if (config.current_model) {
+                if (config && config.current_model) {
                     setSelectedLLM(config.current_model);
                 }
             } catch (error) {
@@ -203,8 +198,6 @@ const ResearchChat = () => {
         fetchLLMConfig();
         fetchSessions();
 
-        // Check for existing session in URL or localStorage
-        // For now, let's start fresh or load if ID is present
         const storedSessionId = localStorage.getItem('last_chat_session_id');
         if (storedSessionId) {
             loadSession(storedSessionId);
@@ -216,6 +209,15 @@ const ResearchChat = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    // Save messages to local storage whenever messages change
+    useEffect(() => {
+        if (sessionId && messages.length > 0) {
+            try {
+                localStorage.setItem(`lexbot_messages_${sessionId}`, JSON.stringify(messages));
+            } catch (e) {}
+        }
+    }, [messages, sessionId]);
 
     // Group Sessions by Date
     const groupSessions = (sessions) => {
@@ -234,7 +236,7 @@ const ResearchChat = () => {
         lastWeek.setDate(lastWeek.getDate() - 7);
 
         sessions.forEach(session => {
-            const date = new Date(session.created_at);
+            const date = new Date(session.created_at || Date.now());
             if (date >= today) {
                 groups['Today'].push(session);
             } else if (date >= yesterday) {
@@ -251,25 +253,10 @@ const ResearchChat = () => {
 
     const sessionGroups = groupSessions(sessions);
 
-    // const startNewChat = () => {
-    //     const newId = crypto.randomUUID();
-    //     setSessionId(newId);
-    //     setMessages([
-    //         {
-    //             id: 1,
-    //             role: 'ai',
-    //             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
-    //         }
-    //     ]);
-    //     localStorage.setItem('last_chat_session_id', newId);
-    //     // Optionally clear URL param
-    //     window.history.replaceState({}, '', '/research');
-    // };
-
     const startNewChat = () => {
         const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
         setSessionId(newId);
-        setMessages([{
+        const initMsg = [{
             id: 1,
             role: 'ai',
             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
@@ -279,50 +266,70 @@ const ResearchChat = () => {
                 "Draft a Legal Notice for breach of contract.",
                 "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
             ]
-        }]);
+        }];
+        setMessages(initMsg);
 
         localStorage.setItem('last_chat_session_id', newId);
-        // Optionally clear URL param
+        try {
+            const existingSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
+            if (!existingSessions.some(s => s.session_id === newId)) {
+                existingSessions.unshift({
+                    session_id: newId,
+                    title: 'New Research Chat',
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('lexbot_sessions', JSON.stringify(existingSessions));
+                setSessions(existingSessions);
+            }
+        } catch (e) {}
         window.history.replaceState({}, '', '/research');
     };
 
     const loadSession = async (id) => {
+        setSessionId(id);
+        localStorage.setItem('last_chat_session_id', id);
+
+        let loadedMessages = [];
         try {
-            setSessionId(id);
-            localStorage.setItem('last_chat_session_id', id);
-
             const data = await api.getSessionHistory(id);
-
-            // Don't overwrite messages if the user has already sent a message
-            // and the bot is currently responding — that would wipe their message.
-            if (isStreamingRef.current) return;
-
-            if (data.messages && data.messages.length > 0) {
-                // Map backend messages to frontend format
-                const formattedMessages = data.messages.map((msg, idx) => ({
+            if (data && data.messages && data.messages.length > 0) {
+                loadedMessages = data.messages.map((msg, idx) => ({
                     id: msg.id || idx,
                     role: msg.role === 'assistant' ? 'ai' : msg.role,
                     content: msg.content,
                     sources: msg.metadata?.sources,
                 }));
-                setMessages(formattedMessages);
-            } else {
-                setMessages([{
-                    id: 1,
-                    role: 'ai',
-                    content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
-                    isIntro: true,
-                    followups: [
-                        "What are the latest Supreme Court judgments on Section 138 of NI Act?",
-                        "Draft a Legal Notice for breach of contract.",
-                        "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
-                    ]
-                }]);
             }
         } catch (error) {
-            console.error("Failed to load session:", error);
-            toast.error("Failed to load chat");
-            if (!isStreamingRef.current) startNewChat();
+            console.warn("Backend getSessionHistory unavailable, trying local cache:", error);
+        }
+
+        // Local cache fallback
+        if (loadedMessages.length === 0) {
+            try {
+                const cached = localStorage.getItem(`lexbot_messages_${id}`);
+                if (cached) {
+                    loadedMessages = JSON.parse(cached);
+                }
+            } catch (err) {}
+        }
+
+        if (isStreamingRef.current) return;
+
+        if (loadedMessages.length > 0) {
+            setMessages(loadedMessages);
+        } else {
+            setMessages([{
+                id: 1,
+                role: 'ai',
+                content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
+                isIntro: true,
+                followups: [
+                    "What are the latest Supreme Court judgments on Section 138 of NI Act?",
+                    "Draft a Legal Notice for breach of contract.",
+                    "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
+                ]
+            }]);
         }
     };
 

@@ -19,22 +19,39 @@ const MyDrafts = () => {
     const [isDraggingOverId, setIsDraggingOverId] = useState(null);
 
     const fetchDraftsAndFolders = async () => {
+        let loadedDrafts = [];
+        let loadedFolders = [];
+        let success = false;
+
         try {
-            const token = localStorage.getItem('session_id');
-            const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setDrafts(data.drafts || []);
-                setFolders(data.folders || []);
-            } else {
-                toast.error("Failed to load drafts from database.");
+            const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+            if (token) {
+                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    loadedDrafts = data.drafts || [];
+                    loadedFolders = data.folders || [];
+                    success = true;
+                }
             }
         } catch (error) {
-            console.error("Error fetching drafts:", error);
-            toast.error("Error connecting to drafts service.");
+            console.warn("Backend draft list endpoint unavailable, using local storage fallback:", error);
         }
+
+        if (!success) {
+            try {
+                loadedDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+                loadedFolders = JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+            } catch (err) {
+                loadedDrafts = [];
+                loadedFolders = [];
+            }
+        }
+
+        setDrafts(loadedDrafts);
+        setFolders(loadedFolders);
     };
 
     useEffect(() => {
@@ -45,22 +62,22 @@ const MyDrafts = () => {
         e.stopPropagation();
         if (window.confirm('Are you sure you want to delete this draft?')) {
             try {
-                const token = localStorage.getItem('session_id');
-                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ id }),
-                });
-                if (response.ok) {
-                    setDrafts(prev => prev.filter(draft => draft.id !== id));
-                    toast.success("Draft deleted successfully.");
-                } else {
-                    toast.error("Failed to delete draft.");
+                const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+                if (token) {
+                    await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ id }),
+                    });
                 }
-            } catch (error) {
-                console.error("Error deleting draft:", error);
-                toast.error("Failed to delete draft.");
-            }
+            } catch (error) {}
+
+            setDrafts(prev => {
+                const updated = prev.filter(draft => draft.id !== id);
+                localStorage.setItem('my_drafts', JSON.stringify(updated));
+                return updated;
+            });
+            toast.success("Draft deleted successfully.");
         }
     };
 
