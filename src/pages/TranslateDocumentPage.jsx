@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload, Split } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { caseService } from '../services/library/caseService';
 
 const SOURCE_LANGUAGE_OPTIONS = [
   { value: 'auto', label: 'Auto-detect' },

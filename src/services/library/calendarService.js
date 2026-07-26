@@ -16,7 +16,9 @@ const initializeStorage = () => {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[calendarService] Storage init notice:', e);
+    }
   }
 };
 

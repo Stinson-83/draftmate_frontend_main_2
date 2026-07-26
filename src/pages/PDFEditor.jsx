@@ -7,10 +7,10 @@ import {
     GripVertical, Printer, FileOutput, FilePlus2, Image, Save,
     FolderOpen, X
 } from 'lucide-react';
-import './PDFEditor.css';
 import { API_CONFIG } from '../services/endpoints';
 import PrintModal from '../components/PrintModal';
 import { useWatermarkStorage } from '../hooks/useWatermarkStorage';
+import { caseService } from '../services/library/caseService';
 
 const API_URL = API_CONFIG.PDF_EDITOR_API.BASE_URL;
 
@@ -350,7 +350,6 @@ const PDFEditor = () => {
         if (activeTool.id === 'split' && activeTool.mode === MODES.SPLITTER) filename = `${outputName}.zip`;
         a.download = filename;
         document.body.appendChild(a);
-        a.click();
         a.remove();
         toast.success("Done!");
     };

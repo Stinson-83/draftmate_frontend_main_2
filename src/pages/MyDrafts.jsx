@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
 import DateTimelineModal from '../components/DateTimelineModal';
+import { caseService } from '../services/library/caseService';
 
 const MyDrafts = () => {
     const navigate = useNavigate();
@@ -61,6 +62,7 @@ const MyDrafts = () => {
     const handleDeleteDraft = async (id, e) => {
         e.stopPropagation();
         if (window.confirm('Are you sure you want to delete this draft?')) {
+            const targetDraft = drafts.find(d => String(d.id) === String(id));
             try {
                 const token = localStorage.getItem('session_id') || localStorage.getItem('token');
                 if (token) {
@@ -72,8 +74,16 @@ const MyDrafts = () => {
                 }
             } catch (error) {}
 
+            // Delete from Document Management as well
+            try {
+                await caseService.deleteCaseDocument(null, id);
+                if (targetDraft?.name || targetDraft?.filename) {
+                    await caseService.deleteCaseDocument(null, targetDraft.name || targetDraft.filename);
+                }
+            } catch (dmsErr) {}
+
             setDrafts(prev => {
-                const updated = prev.filter(draft => draft.id !== id);
+                const updated = prev.filter(draft => String(draft.id) !== String(id));
                 localStorage.setItem('my_drafts', JSON.stringify(updated));
                 return updated;
             });

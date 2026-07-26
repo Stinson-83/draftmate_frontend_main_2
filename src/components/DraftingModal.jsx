@@ -223,17 +223,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             },
         });
 
-        if (caseId) {
-            caseService.addCaseDocument(caseId, {
-                id: documentKey,
-                name: fileName,
-                filename: fileName,
-                size: '15 KB',
-                syncStatus: 'synced',
-                source: 'drafter'
-            }).catch(err => console.warn("Failed to link compiled draft to case:", err));
-        }
-
         navigate('/dashboard/workspace', {
             state: {
                 documentKey,

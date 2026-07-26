@@ -12,6 +12,7 @@ import ModifyDraftModal from '../components/ModifyDraftModal';
 import EnhancementPreviewModal from '../components/EnhancementPreviewModal';
 import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
+import { caseService } from '../services/library/caseService';
 import './Editor.css';
 
 const Editor = () => {

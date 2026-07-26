@@ -111,7 +111,7 @@ const LibraryDashboard = () => {
           <p className="text-slate-600 dark:text-slate-400 mt-1">Your complete legal knowledge and practice management ecosystem.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {libraryCards.map((card, index) => (
             <Link
               key={index}

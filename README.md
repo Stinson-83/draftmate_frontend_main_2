@@ -184,25 +184,44 @@ DraftMate uses a modular microservices architecture for scalability:
 - AWS Account (for production deployment)
 - Google OAuth Credentials (for login)
 
-### Local Development Setup
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/draftmate.git
-   cd draftmate
-   ```
+### Local Development Commands
 
-2. **Set up environment variables**
-   Copy `.env.example` to `.env` and fill in all required values (see [Environment Variables](#environment-variables) section)
+Depending on what component your development team is working on, use the following commands:
 
-3. **Start all services with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
+#### 🎨 Frontend Only Development
+```bash
+npm run dev
+```
+- **URL**: `http://localhost:5173`
+- Runs the Vite development server with hot-reload for UI & page development.
 
-4. **Access the application**
-   - Frontend: http://localhost:5173
-   - API Docs: http://localhost:8010/docs (Library Service)
-   - API Docs: http://localhost:8007/docs (Advocate Profile)
+#### ⚙️ Full Backend Microservices & Databases (Recommended)
+```bash
+docker compose up --build -d
+```
+- **URL**: `http://localhost:8080`
+- Starts all 8 backend microservices, databases, and OnlyOffice document editor in background containers.
+
+#### ⚡ Full Stack (Frontend + Local Python Microservices)
+```bash
+npm run dev:all
+```
+- Runs Vite frontend and Python uvicorn backend microservices concurrently in one terminal.
+
+#### 🐍 Individual Backend Microservices (Local Python Dev)
+```bash
+# 1. Auth Service (Port 8009)
+cd backend/login_db
+uvicorn auth:app --host 0.0.0.0 --port 8009 --reload
+
+# 2. AI Legal Drafter Engine (Port 8003)
+cd backend/Drafter
+uvicorn Drafter:app --host 0.0.0.0 --port 8003 --reload
+
+# 3. AI Legal Research / Lex Bot (Port 8004)
+cd backend/Deep_research
+uvicorn lex_bot.app:app --host 0.0.0.0 --port 8004 --reload
+```
 
 ### Environment Variables
 Create a `.env` file in the root directory with the following variables:
@@ -325,8 +344,4 @@ For support, please:
 
 <p align="center">
   <strong>DraftMate - Legal Practice, Simplified.</strong>
-<<<<<<< HEAD
 </p>
-=======
-</p>
->>>>>>> 79bca21 (feat: implement Library Service, Judgment Library, Bare Acts API, AI integration, and Integration Settings)

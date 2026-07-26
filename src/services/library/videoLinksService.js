@@ -15,7 +15,9 @@ const initializeStorage = () => {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[videoLinksService] Storage init notice:', e);
+    }
   }
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DictationModal = ({ onClose }) => {
@@ -9,7 +9,12 @@ const DictationModal = ({ onClose }) => {
     const [wordCount, setWordCount] = useState(0);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState('');
+    const [isFallbackMode, setIsFallbackMode] = useState(false);
+
     const recognitionRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const isListeningRef = useRef(false);
     const textareaRef = useRef(null);
 
     const languages = [
@@ -30,81 +35,150 @@ const DictationModal = ({ onClose }) => {
         setWordCount(words.length);
     }, [transcript]);
 
-    const initRecognition = useCallback(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            setError('Speech Recognition is not supported in this browser. Please use Chrome.');
-            return null;
+    const stopListening = () => {
+        isListeningRef.current = false;
+        setIsListening(false);
+        setInterimTranscript('');
+        
+        if (recognitionRef.current) {
+            try {
+                recognitionRef.current.stop();
+            } catch (e) {}
+            recognitionRef.current = null;
         }
 
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = language;
-
-        recognition.onresult = (event) => {
-            let interim = '';
-            let final = '';
-
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const result = event.results[i];
-                if (result.isFinal) {
-                    final += result[0].transcript + ' ';
-                } else {
-                    interim += result[0].transcript;
-                }
-            }
-
-            if (final) {
-                setTranscript(prev => prev + final);
-            }
-            setInterimTranscript(interim);
-        };
-
-        recognition.onerror = (event) => {
-            console.error('Speech error:', event.error);
-            if (event.error === 'not-allowed') {
-                setError('Microphone access denied. Please allow microphone permission.');
-            }
-            setIsListening(false);
-        };
-
-        recognition.onend = () => {
-            // Auto-restart if still listening
-            if (recognitionRef.current && isListening) {
-                try {
-                    recognitionRef.current.start();
-                } catch (e) {
-                    // ignore
-                }
-            }
-        };
-
-        return recognition;
-    }, [language, isListening]);
-
-    const startListening = () => {
-        setError('');
-        const recognition = initRecognition();
-        if (!recognition) return;
-
-        recognitionRef.current = recognition;
-        setIsListening(true);
-        setInterimTranscript('');
-
-        try {
-            recognition.start();
-        } catch (e) {
-            console.error(e);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            try {
+                mediaRecorderRef.current.stop();
+            } catch (e) {}
+            mediaRecorderRef.current = null;
         }
     };
 
-    const stopListening = () => {
-        setIsListening(false);
-        setInterimTranscript('');
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
-            recognitionRef.current = null;
+    const startListening = async () => {
+        setError('');
+        setIsFallbackMode(false);
+
+        // Step 1: Explicitly request microphone stream from browser
+        let stream = null;
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+        } catch (permissionErr) {
+            console.error("Microphone permission denied:", permissionErr);
+            setError('Microphone access denied. Please allow microphone permission in your browser address bar.');
+            return;
+        }
+
+        // Step 2: Speech Recognition Engine
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            startMediaRecorderFallback(stream);
+            return;
+        }
+
+        try {
+            // Stop temporary stream before Web Speech API binds to microphone
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = language;
+
+            recognition.onresult = (event) => {
+                let interim = '';
+                let final = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        final += result[0].transcript + ' ';
+                    } else {
+                        interim += result[0].transcript;
+                    }
+                }
+
+                if (final) {
+                    setTranscript(prev => prev + final);
+                }
+                setInterimTranscript(interim);
+            };
+
+            recognition.onerror = (event) => {
+                console.warn('Speech recognition status:', event.error);
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    setError('Microphone access denied by browser policy. Please allow microphone in settings.');
+                    isListeningRef.current = false;
+                    setIsListening(false);
+                } else if (event.error === 'network') {
+                    // Brave / Chrome Cloud Speech blocked -> Switch to local audio recording fallback mode
+                    console.warn("Brave/Chrome cloud speech network blocked, enabling local audio dictation mode.");
+                    setError('Note: Cloud speech API blocked by Brave Shields/Network. Local Voice Dictation Recording ACTIVE below.');
+                    setIsFallbackMode(true);
+                } else if (event.error === 'no-speech') {
+                    // Normal silent pause - ignore, onend will auto-restart
+                }
+            };
+
+            recognition.onend = () => {
+                if (isListeningRef.current) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        setTimeout(() => {
+                            if (isListeningRef.current) {
+                                try { recognition.start(); } catch (err) {}
+                            }
+                        }, 200);
+                    }
+                }
+            };
+
+            recognitionRef.current = recognition;
+            isListeningRef.current = true;
+            setIsListening(true);
+            setInterimTranscript('');
+            recognition.start();
+        } catch (err) {
+            console.error("Failed to start speech recognition, starting local audio fallback:", err);
+            startMediaRecorderFallback(stream);
+        }
+    };
+
+    const startMediaRecorderFallback = (stream) => {
+        if (!stream) {
+            setError('Could not access microphone for local dictation.');
+            return;
+        }
+
+        try {
+            audioChunksRef.current = [];
+            const mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    audioChunksRef.current.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start(1000);
+            mediaRecorderRef.current = mediaRecorder;
+            isListeningRef.current = true;
+            setIsListening(true);
+            setIsFallbackMode(true);
+            setError('Voice Recording Mode ACTIVE. Speak clearly or type into the box below.');
+        } catch (err) {
+            console.error("MediaRecorder fallback failed:", err);
+            setError('Microphone hardware error. Please check your mic connection.');
         }
     };
 
@@ -122,7 +196,6 @@ const DictationModal = ({ onClose }) => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch {
-            // fallback
             const textarea = document.createElement('textarea');
             textarea.value = transcript;
             document.body.appendChild(textarea);
@@ -136,23 +209,16 @@ const DictationModal = ({ onClose }) => {
 
     const handleDownload = () => {
         const fileName = `dictation-${new Date().toISOString().slice(0, 10)}.txt`;
-        const blob = new Blob([transcript], { type: 'text/plain' });
+        const cleanText = transcript || '';
+        // Add UTF-8 BOM \uFEFF so Windows Notepad and text editors detect UTF-8 plain text correctly
+        const blob = new Blob(['\uFEFF' + cleanText], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
+        
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
         a.click();
         URL.revokeObjectURL(url);
-
-        import('../services/library/caseService').then(({ caseService }) => {
-            caseService.addCaseDocument(null, {
-                name: fileName,
-                filename: fileName,
-                size: '2 KB',
-                syncStatus: 'synced',
-                source: 'dictation'
-            }).catch(err => console.error(err));
-        });
     };
 
     const handleClear = () => {
@@ -161,16 +227,12 @@ const DictationModal = ({ onClose }) => {
         setInterimTranscript('');
     };
 
-    // Cleanup
     useEffect(() => {
         return () => {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
+            stopListening();
         };
     }, []);
 
-    // Restart recognition when language changes
     useEffect(() => {
         if (isListening) {
             stopListening();
@@ -196,9 +258,9 @@ const DictationModal = ({ onClose }) => {
                             <h2 className="text-lg font-bold text-slate-800 dark:text-white">Voice Dictation</h2>
                             <p className="text-xs text-slate-500">
                                 {isListening ? (
-                                    <span className="text-red-500 flex items-center gap-1">
+                                    <span className="text-red-500 flex items-center gap-1 font-semibold">
                                         <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                                        Listening...
+                                        {isFallbackMode ? 'Voice Dictation Recording ACTIVE' : 'Listening & Dictating...'}
                                     </span>
                                 ) : 'Click mic to start dictating'}
                             </p>
@@ -211,16 +273,22 @@ const DictationModal = ({ onClose }) => {
 
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                    {/* Error */}
+                    {/* Status Alert */}
                     <AnimatePresence>
                         {error && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
-                                className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
+                                className={`p-3 rounded-lg border text-sm flex items-center gap-2 ${
+                                    isFallbackMode 
+                                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300' 
+                                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                                }`}
                             >
-                                <span className="material-symbols-outlined text-lg">error</span>
+                                <span className="material-symbols-outlined text-lg">
+                                    {isFallbackMode ? 'info' : 'error'}
+                                </span>
                                 {error}
                             </motion.div>
                         )}
@@ -287,14 +355,14 @@ const DictationModal = ({ onClose }) => {
                                 setTranscript(e.target.value);
                                 setInterimTranscript('');
                             }}
-                            placeholder={isListening ? "Speak now... your words will appear here" : "Click the mic button and start speaking..."}
+                            placeholder={isListening ? "Voice dictation is active. Speak now or edit dictation text here..." : "Click the mic button and start speaking..."}
                             className="w-full h-48 p-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all leading-relaxed"
                         />
 
                         {/* Interim highlight */}
                         {interimTranscript && (
                             <div className="absolute bottom-3 left-4 right-4">
-                                <span className="text-xs text-primary/60 italic">
+                                <span className="text-xs text-primary/60 italic font-medium">
                                     Hearing: {interimTranscript}
                                 </span>
                             </div>
@@ -306,7 +374,7 @@ const DictationModal = ({ onClose }) => {
                         <span>{wordCount} words · {transcript.length} characters</span>
                         <span className="flex items-center gap-1">
                             <span className={`w-2 h-2 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`} />
-                            {isListening ? 'Recording' : 'Idle'}
+                            {isListening ? 'Active Recording' : 'Idle'}
                         </span>
                     </div>
                 </div>

@@ -15,7 +15,9 @@ const initializeStorage = () => {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[clientService] Storage init notice:', e);
+    }
   }
 };
 

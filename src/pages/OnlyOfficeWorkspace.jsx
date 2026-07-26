@@ -106,19 +106,25 @@ const OnlyOfficeWorkspace = () => {
     setComposerHasValue(Boolean(inputMessage.trim()));
   }, [inputMessage]);
 
-  const { documentKey, filename, onlyofficeConfig, variablesDetected } = useMemo(() => {
+  const { documentKey, filename, onlyofficeConfig, variablesDetected, isAutoDownload } = useMemo(() => {
     const state = location?.state || {};
+    const searchParams = new URLSearchParams(location?.search || '');
+    const queryDocKey = searchParams.get('documentKey');
+    const queryFilename = searchParams.get('filename');
+    const queryAutoDownload = searchParams.get('autodownload') === 'true';
+
     return {
-      documentKey: state.documentKey,
-      filename: state.filename,
+      documentKey: state.documentKey || queryDocKey,
+      filename: state.filename || queryFilename,
       onlyofficeConfig: state.onlyofficeConfig,
       variablesDetected: Array.isArray(state.variablesDetected) ? state.variablesDetected : [],
+      isAutoDownload: queryAutoDownload
     };
   }, [location]);
 
   const draftId = useMemo(() => {
-    return location?.state?.draftId || location?.state?.id;
-  }, [location]);
+    return location?.state?.draftId || location?.state?.id || documentKey;
+  }, [location, documentKey]);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -144,11 +150,66 @@ const OnlyOfficeWorkspace = () => {
   }, [draftId]);
 
   useEffect(() => {
-    if (!draftId && (!documentKey || !filename || !onlyofficeConfig)) {
-      toast.error("ONLYOFFICE workspace is missing required state.");
+    if (!draftId && !documentKey && (!filename || !onlyofficeConfig)) {
+      toast.error("Workspace is missing required state.");
       navigate('/dashboard', { replace: true });
     }
   }, [draftId, documentKey, filename, onlyofficeConfig, navigate]);
+
+  useEffect(() => {
+    if (isAutoDownload && (documentKey || filename)) {
+      const triggerDirectDownload = async () => {
+        let downloadTargetUrl = null;
+        
+        try {
+          const { caseService } = await import('../services/library/caseService');
+          const cases = await caseService.getCases();
+          for (const c of cases) {
+            const match = (c.documents || []).find(d => 
+              String(d.id) === String(documentKey) || 
+              (d.name || '').toLowerCase() === (filename || '').toLowerCase() ||
+              (d.filename || '').toLowerCase() === (filename || '').toLowerCase()
+            );
+            if (match && match.url) {
+              downloadTargetUrl = match.url;
+              break;
+            }
+          }
+        } catch (err) {}
+
+        if (!downloadTargetUrl) {
+          downloadTargetUrl = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${documentKey || 'doc'}/${filename || 'document.pdf'}`;
+        }
+
+        if (downloadTargetUrl.startsWith('data:')) {
+          try {
+            const parts = downloadTargetUrl.split(',');
+            const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: mime });
+            downloadTargetUrl = URL.createObjectURL(blob);
+          } catch (e) {}
+        }
+
+        const link = document.createElement('a');
+        link.href = downloadTargetUrl;
+        link.download = filename || 'shared_document';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          try { document.body.removeChild(link); } catch(e){}
+        }, 1000);
+        toast.success(`Downloading shared document: "${filename || 'document'}"`);
+      };
+
+      triggerDirectDownload();
+    }
+  }, [isAutoDownload, documentKey, filename]);
 
   useEffect(() => {
     const existingApi = window?.DocsAPI?.DocEditor;

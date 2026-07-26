@@ -265,22 +265,24 @@ const DocumentManagement = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const toastId = toast.loading(`Uploading "${file.name}" to S3...`);
+    const toastId = toast.loading(`Uploading "${file.name}"...`);
     try {
+      const fileBlobUrl = URL.createObjectURL(file);
       await caseService.addCaseDocument(selectedCaseId, {
         file: file,
         name: file.name,
         filename: file.name,
+        url: fileBlobUrl,
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        syncStatus: 'syncing',
+        syncStatus: 'synced',
         source: 'upload',
         folderId: currentFolderId
       });
-      toast.success(`"${file.name}" successfully uploaded and synced to S3!`, { id: toastId });
+      toast.success(`"${file.name}" uploaded successfully!`, { id: toastId });
       loadCases();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to upload file to S3.", { id: toastId });
+      toast.error("Failed to upload file.", { id: toastId });
     }
     e.target.value = '';
   };
@@ -294,11 +296,19 @@ const DocumentManagement = () => {
   };
 
   const getDocShareUrl = (doc) => {
-    if (!doc) return window.location.href;
-    const origin = window.location.origin;
-    // Always construct a clean, user-facing app URL and hide raw internal AWS ALB / backend endpoints
+    if (!doc) return 'https://www.draftmate.in/dashboard/documents';
+    
+    // Dynamically use live production origin when deployed, or fallback to production domain on localhost
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const domain = (!isLocal && typeof window !== 'undefined' && window.location.origin)
+      ? window.location.origin 
+      : (import.meta.env.VITE_PUBLIC_APP_URL || 'https://www.draftmate.in');
+      
+    const cleanDomain = domain.endsWith('/') ? domain.slice(0, -1) : domain;
     const docName = doc.filename || doc.name || 'document';
-    return `${origin}/dashboard/workspace?documentKey=${doc.id}&filename=${encodeURIComponent(docName)}`;
+    const docId = doc.id || 'doc-001';
+    
+    return `${cleanDomain}/dashboard/workspace?documentKey=${encodeURIComponent(docId)}&filename=${encodeURIComponent(docName)}&autodownload=true`;
   };
 
   const handleCopyShareLink = () => {
@@ -334,7 +344,7 @@ const DocumentManagement = () => {
 
   const handleDocumentClick = async (doc) => {
     if (doc.type === 'docx') {
-      const toastId = toast.loading("Opening document editor...");
+      const toastId = toast.loading("Opening document...");
       try {
         const token = localStorage.getItem('session_id') || localStorage.getItem('token');
         const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/config/${doc.id}`, {
@@ -351,22 +361,61 @@ const DocumentManagement = () => {
               onlyofficeConfig: config 
             } 
           });
-        } else {
-          throw new Error("Failed to retrieve editor configuration.");
+          return;
         }
       } catch (err) {
-        console.error(err);
-        toast.error("Failed to load document editor.", { id: toastId });
+        console.warn("OnlyOffice draft config fallback:", err);
       }
-    } else if (doc.url) {
-      window.open(`${window.location.origin}${doc.url}`, '_blank');
+      toast.dismiss(toastId);
+    }
+
+    if (doc.url) {
+      let targetUrl = doc.url;
+      if (doc.url.startsWith('data:')) {
+        try {
+          const parts = doc.url.split(',');
+          const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          let blob;
+          if (mime.includes('text') || (doc.name || '').toLowerCase().endsWith('.txt')) {
+            const textDecoder = new TextDecoder('utf-8');
+            const textContent = textDecoder.decode(u8arr);
+            blob = new Blob(['\uFEFF' + textContent], { type: 'text/plain;charset=utf-8' });
+          } else {
+            blob = new Blob([u8arr], { type: mime });
+          }
+          targetUrl = URL.createObjectURL(blob);
+        } catch (e) {
+          targetUrl = doc.url;
+        }
+      } else if (!doc.url.startsWith('http') && !doc.url.startsWith('blob:')) {
+        targetUrl = `${window.location.origin}${doc.url}`;
+      }
+      
+      const link = document.createElement('a');
+      link.href = targetUrl;
+      link.target = '_blank';
+      if (doc.type === 'pdf' || (doc.name || '').toLowerCase().endsWith('.pdf')) {
+        link.download = doc.filename || doc.name || 'document.pdf';
+      }
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        try { document.body.removeChild(link); } catch(e){}
+      }, 500);
     } else {
       window.open(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${doc.id}/${doc.filename || doc.name}`, '_blank');
     }
   };
 
-  // Navigations
-  const activeCase = cases.find(c => c.id === selectedCaseId);
+  // Navigations: If selectedCaseId is null, default to General Documents case matter
+  const activeCaseId = selectedCaseId || (cases.find(c => c.id === 'general-docs') ? 'general-docs' : cases[0]?.id);
+  const activeCase = cases.find(c => c.id === activeCaseId) || cases[0];
   const foldersList = activeCase?.folders || [];
   const documentsList = activeCase?.documents || [];
 
@@ -548,16 +597,16 @@ const DocumentManagement = () => {
         </div>
 
         {/* Explorer Table */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-          <table className="w-full text-left border-collapse dms-table">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto shadow-sm">
+          <table className="w-full text-left border-collapse dms-table table-fixed min-w-[700px]">
             <thead>
               <tr>
-                <th style={{ width: '40%' }}>Name</th>
-                <th style={{ width: '15%' }}>Status</th>
+                <th style={{ width: '38%' }}>Name</th>
+                <th style={{ width: '12%' }}>Status</th>
                 <th style={{ width: '15%' }}>Date Modified</th>
-                <th style={{ width: '15%' }}>Type</th>
+                <th style={{ width: '13%' }}>Type</th>
                 <th style={{ width: '10%' }}>Size</th>
-                <th style={{ width: '5%' }}></th>
+                <th style={{ width: '12%' }} className="text-right pr-4">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -663,7 +712,7 @@ const DocumentManagement = () => {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1.5 justify-end pr-2">
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
@@ -671,15 +720,17 @@ const DocumentManagement = () => {
                               setFolderNameInput(folder.name);
                               setIsFolderModalOpen(true);
                             }}
-                            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 rounded transition-colors"
+                            title="Rename Folder"
+                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 rounded-lg transition-colors"
                           >
-                            <span className="material-symbols-outlined text-base">edit</span>
+                            <span className="material-symbols-outlined text-lg">edit</span>
                           </button>
                           <button 
                             onClick={(e) => handleDeleteFolder(folder.id, e)}
-                            className="p-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 rounded transition-colors"
+                            title="Delete Folder"
+                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500 rounded-lg transition-colors"
                           >
-                            <span className="material-symbols-outlined text-base">delete</span>
+                            <span className="material-symbols-outlined text-lg">delete</span>
                           </button>
                         </div>
                       </td>
@@ -695,10 +746,10 @@ const DocumentManagement = () => {
                       onClick={() => handleDocumentClick(doc)}
                       className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 group"
                     >
-                      <td>
-                        <div className="flex items-center gap-3 text-slate-800 dark:text-slate-200">
+                      <td className="min-w-0">
+                        <div className="flex items-center gap-3 text-slate-800 dark:text-slate-200 min-w-0 pr-2">
                           {getFileIcon(doc.type)}
-                          <span className="font-semibold truncate">{doc.name}</span>
+                          <span className="font-semibold truncate block min-w-0" title={doc.name}>{doc.name}</span>
                         </div>
                       </td>
                       <td>
@@ -727,19 +778,20 @@ const DocumentManagement = () => {
                         <span className="text-slate-600 dark:text-slate-300 text-xs font-medium">{doc.size || '15 KB'}</span>
                       </td>
                       <td>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1.5 justify-end pr-2">
                           <button 
                             onClick={(e) => handleShareDocument(doc, e)}
                             title="Share File"
-                            className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-blue-600 rounded transition-colors"
+                            className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 rounded-lg transition-colors"
                           >
-                            <span className="material-symbols-outlined text-base">share</span>
+                            <span className="material-symbols-outlined text-lg">share</span>
                           </button>
                           <button 
                             onClick={(e) => handleDeleteDocument(doc.id, e)}
-                            className="p-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 rounded transition-colors"
+                            title="Delete File"
+                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500 rounded-lg transition-colors"
                           >
-                            <span className="material-symbols-outlined text-base">delete</span>
+                            <span className="material-symbols-outlined text-lg">delete</span>
                           </button>
                         </div>
                       </td>

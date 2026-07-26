@@ -25,7 +25,9 @@ const initializeStorage = () => {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[caseService] Seed storage cleanup notice:', e);
+    }
   }
 };
 
@@ -80,6 +82,7 @@ export const caseService = {
       if (resp.ok) {
         const data = await resp.json();
         const mapped = data.map(mapCaseToFrontend).map(filterDeletedDocs);
+
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
         return mapped;
       }
@@ -187,6 +190,15 @@ export const caseService = {
         let cases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         const idx = cases.findIndex(c => c.id === id);
         if (idx !== -1) {
+          if (caseData.documents && mapped.documents) {
+            mapped.documents = mapped.documents.map(mDoc => {
+              const localDoc = caseData.documents.find(d => String(d.id) === String(mDoc.id) || (d.name && d.name.toLowerCase() === (mDoc.name || '').toLowerCase()));
+              if (localDoc && localDoc.url && !mDoc.url) {
+                return { ...mDoc, url: localDoc.url };
+              }
+              return mDoc;
+            });
+          }
           cases[idx] = mapped;
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
         }
@@ -320,10 +332,22 @@ export const caseService = {
 
     let uploadedMetadata = null;
     
-    // If we have a native file object, upload it to the backend S3 endpoint
-    if (documentData.file) {
+    // Auto-create File object if text/content is provided without binary File payload
+    let targetFile = documentData.file;
+    if (!targetFile && (documentData.content || documentData.text)) {
+      const rawText = documentData.content || documentData.text || '';
+      const textContent = rawText.startsWith('data:') ? atob(rawText.split(',')[1] || '') : rawText;
+      const fileName = documentData.filename || documentData.name || 'document.txt';
+      const isPdf = fileName.toLowerCase().endsWith('.pdf');
+      const mimeType = isPdf ? 'application/pdf' : 'text/plain;charset=utf-8';
+      const fileBuffer = isPdf ? textContent : ('\uFEFF' + textContent);
+      targetFile = new File([fileBuffer], fileName, { type: mimeType });
+    }
+
+    // Upload binary file directly to AWS S3 backend storage endpoint
+    if (targetFile) {
       const formData = new FormData();
-      formData.append('file', documentData.file);
+      formData.append('file', targetFile);
       if (targetCaseId) {
         formData.append('case_id', targetCaseId);
       }
@@ -344,52 +368,59 @@ export const caseService = {
           uploadedMetadata = await resp.json();
         }
       } catch (err) {
-        console.warn("Backend S3 file upload failed, fallback to local indexing:", err);
+        console.warn("Backend S3 file upload warning, fallback to local indexing:", err);
       }
     }
 
-    // Smart Routing Logic based on Source / Feature
-    let targetFolderName = '';
-    const source = (documentData.source || '').toLowerCase();
-    const docName = (uploadedMetadata?.name || documentData.name || '').toLowerCase();
+    // Determine folder placement: Use explicit folderId if provided, otherwise apply smart folder routing
+    let targetFolderId = documentData.folderId;
 
-    if (source === 'drafter') {
-      targetFolderName = 'Drafter Documents';
-    } else if (source === 'dictation') {
-      targetFolderName = 'Dictations & Notes';
-    } else if (source === 'invoice') {
-      targetFolderName = 'Invoices & Receipts';
-    } else if (source === 'courtfee') {
-      targetFolderName = 'Calculations & Fees';
-    } else if (source === 'translate' || source === 'translation' || source === 'translator') {
-      targetFolderName = 'Translated Documents';
-    } else if (source === 'research' || source === 'judgment') {
-      targetFolderName = 'Research & Judgments';
-    } else if (source === 'upload') {
-      targetFolderName = 'Uploaded Documents';
-    } else {
-      // Fallback keyword-based routing
-      if (docName.includes('notice')) {
-        targetFolderName = 'Legal Notices';
-      } else if (docName.includes('agreement') || docName.includes('contract') || docName.includes('lease') || docName.includes('nda')) {
-        targetFolderName = 'Contracts & Agreements';
-      } else if (docName.includes('petition') || docName.includes('plaint') || docName.includes('writ') || docName.includes('appeal') || docName.includes('application')) {
-        targetFolderName = 'Pleadings & Court Filings';
+    if (targetFolderId === undefined) {
+      let targetFolderName = '';
+      const source = (documentData.source || '').toLowerCase();
+      const docName = (uploadedMetadata?.name || documentData.name || '').toLowerCase();
+
+      if (source === 'drafter') {
+        targetFolderName = 'Drafter Documents';
+      } else if (source === 'dictation') {
+        targetFolderName = 'Dictations & Notes';
+      } else if (source === 'invoice') {
+        targetFolderName = 'Invoices & Receipts';
+      } else if (source === 'courtfee') {
+        targetFolderName = 'Calculations & Fees';
+      } else if (source === 'translate' || source === 'translation' || source === 'translator') {
+        targetFolderName = 'Translated Documents';
+      } else if (source === 'pdfeditor' || source === 'pdf' || source === 'converter') {
+        targetFolderName = 'PDF & Converted Files';
+      } else if (source === 'research' || source === 'judgment') {
+        targetFolderName = 'Research & Judgments';
+      } else if (source === 'upload') {
+        targetFolderName = 'Uploaded Documents';
       } else {
-        targetFolderName = 'General Documents';
+        // Fallback keyword-based routing
+        if (docName.includes('notice')) {
+          targetFolderName = 'Legal Notices';
+        } else if (docName.includes('agreement') || docName.includes('contract') || docName.includes('lease') || docName.includes('nda')) {
+          targetFolderName = 'Contracts & Agreements';
+        } else if (docName.includes('petition') || docName.includes('plaint') || docName.includes('writ') || docName.includes('appeal') || docName.includes('application')) {
+          targetFolderName = 'Pleadings & Court Filings';
+        } else {
+          targetFolderName = 'General Documents';
+        }
       }
-    }
 
-    // Find or create the target folder
-    let folder = activeCase.folders.find(f => f.name.toLowerCase() === targetFolderName.toLowerCase());
-    if (!folder) {
-      folder = {
-        id: `folder-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        name: targetFolderName,
-        isSystem: true,
-        createdAt: new Date().toISOString()
-      };
-      activeCase.folders.push(folder);
+      // Find or create the target folder
+      let folder = activeCase.folders.find(f => f.name.toLowerCase() === targetFolderName.toLowerCase());
+      if (!folder) {
+        folder = {
+          id: `folder-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          name: targetFolderName,
+          isSystem: true,
+          createdAt: new Date().toISOString()
+        };
+        activeCase.folders.push(folder);
+      }
+      targetFolderId = folder.id;
     }
 
     // Check if document already exists by ID or filename to prevent duplicate rows
@@ -405,12 +436,20 @@ export const caseService = {
     if (existingIdx !== -1) {
       activeCase.documents[existingIdx] = {
         ...activeCase.documents[existingIdx],
+        name: uploadedMetadata?.name || documentData.name || activeCase.documents[existingIdx].name,
+        filename: uploadedMetadata?.filename || documentData.filename || activeCase.documents[existingIdx].filename,
+        url: uploadedMetadata?.url || documentData.url || activeCase.documents[existingIdx].url,
         syncStatus: 'synced',
+        folderId: targetFolderId !== undefined ? targetFolderId : activeCase.documents[existingIdx].folderId,
         lastModified: new Date().toISOString()
       };
       await this.updateCase(targetCaseId, activeCase);
       return activeCase.documents[existingIdx];
     }
+
+    const localBlobUrl = (targetFile && typeof URL !== 'undefined' && URL.createObjectURL) 
+      ? URL.createObjectURL(targetFile) 
+      : null;
 
     // Create the document
     const newDoc = {
@@ -422,9 +461,9 @@ export const caseService = {
       syncStatus: uploadedMetadata ? 'synced' : (documentData.syncStatus || 'syncing'),
       lastModified: new Date().toISOString(),
       source: documentData.source || 'upload',
-      url: uploadedMetadata?.url || documentData.url || null,
+      url: uploadedMetadata?.url || documentData.url || localBlobUrl || null,
       s3Key: uploadedMetadata?.s3_key || documentData.s3Key || null,
-      folderId: documentData.folderId || folder.id // Use target folder if none specified
+      folderId: targetFolderId !== undefined ? targetFolderId : null
     };
 
     activeCase.documents.push(newDoc);
@@ -447,47 +486,54 @@ export const caseService = {
   },
 
   async deleteCaseDocument(caseId, docId) {
+    const deletedIds = new Set(JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]'));
+    deletedIds.add(String(docId));
+
     const cases = await this.getCases();
     let targetCase = null;
 
     if (caseId) {
       targetCase = cases.find(c => c.id === caseId);
     }
-
     if (!targetCase) {
       targetCase = cases.find(c => (c.documents || []).some(d => String(d.id) === String(docId)));
     }
-
     if (!targetCase) {
       targetCase = cases.find(c => c.caseTitle === 'General Documents' || c.id === 'general-docs');
     }
 
-    if (!targetCase) return false;
-
-    if (targetCase.documents) {
+    if (targetCase && targetCase.documents) {
       const targetDoc = targetCase.documents.find(d => String(d.id) === String(docId));
-      const targetName = (targetDoc?.name || targetDoc?.filename || '').toLowerCase();
-
+      if (targetDoc) {
+        if (targetDoc.name) deletedIds.add(targetDoc.name.toLowerCase().trim());
+        if (targetDoc.filename) deletedIds.add(targetDoc.filename.toLowerCase().trim());
+      }
       targetCase.documents = targetCase.documents.filter(d => {
         if (String(d.id) === String(docId)) return false;
-        if (targetName && (d.name || '').toLowerCase() === targetName) return false;
-        if (targetName && (d.filename || '').toLowerCase() === targetName) return false;
+        if (targetDoc?.name && (d.name || '').toLowerCase().trim() === targetDoc.name.toLowerCase().trim()) return false;
+        if (targetDoc?.filename && (d.filename || '').toLowerCase().trim() === targetDoc.filename.toLowerCase().trim()) return false;
         return true;
       });
+      await this.updateCase(targetCase.id, targetCase);
     }
 
-    await this.updateCase(targetCase.id, targetCase);
+    localStorage.setItem('draftmate_deleted_doc_ids', JSON.stringify(Array.from(deletedIds)));
 
-    // Also purge from any other case matter
-    for (const otherCase of cases) {
-      if (otherCase.id !== targetCase.id && otherCase.documents) {
-        const initialLen = otherCase.documents.length;
-        otherCase.documents = otherCase.documents.filter(d => String(d.id) !== String(docId));
-        if (otherCase.documents.length !== initialLen) {
-          await this.updateCase(otherCase.id, otherCase);
-        }
-      }
-    }
+    // Purge from all cases in localStorage
+    const localCases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const updatedLocalCases = localCases.map(c => ({
+      ...c,
+      documents: (c.documents || []).filter(d => {
+        if (String(d.id) === String(docId)) return false;
+        const nameKey = (d.name || d.filename || '').toLowerCase().trim();
+        if (nameKey && deletedIds.has(nameKey)) return false;
+        return true;
+      })
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLocalCases));
+
+    window.dispatchEvent(new Event('cases_updated'));
+    window.dispatchEvent(new Event('case_documents_updated'));
 
     return true;
   }
