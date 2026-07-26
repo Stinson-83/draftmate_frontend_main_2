@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { bookmarkService } from '../../services/library/bookmarkService';
 
@@ -88,7 +89,6 @@ const SectionToolbar = ({ act, chapter, section, onAddNote, onAIExplain }) => {
   };
 
   const handleShare = () => {
-    // Basic share API or copy link
     const url = window.location.href;
     navigator.clipboard.writeText(url);
     toast.success('Link copied to clipboard');
@@ -96,7 +96,7 @@ const SectionToolbar = ({ act, chapter, section, onAddNote, onAIExplain }) => {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 opacity-0 group-hover:opacity-100 transition-opacity mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+      <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
         <button 
           onClick={handleBookmarkClick}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isBookmarked ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'}`}
@@ -134,23 +134,38 @@ const SectionToolbar = ({ act, chapter, section, onAddNote, onAIExplain }) => {
         </button>
       </div>
 
-      {/* Save Bookmark Modal */}
-      {showFolderModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-[#1e293b] rounded-2xl w-full max-w-sm overflow-hidden shadow-xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">Save Bookmark</h3>
-              <button onClick={() => setShowFolderModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                <span className="material-symbols-outlined">close</span>
+      {/* Save Bookmark Modal (Portaled to document.body for clean full-screen overlay) */}
+      {showFolderModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowFolderModal(false)}></div>
+          <div className="relative bg-white dark:bg-slate-800 rounded-3xl w-full max-w-md p-6 md:p-8 border border-slate-200 dark:border-slate-700 shadow-2xl text-left space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl">bookmark</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Bookmark Section</h3>
+                  <p className="text-xs text-slate-500 font-medium truncate max-w-[200px]">Section {section.number}: {section.title}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowFolderModal(false)} 
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
-            <div className="p-5 space-y-4">
+
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select Folder</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
+                  Select Folder
+                </label>
                 <select 
                   value={selectedFolder}
                   onChange={(e) => setSelectedFolder(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0f172a] text-slate-900 dark:text-white focus:ring-2 focus:ring-primary outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-medium text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all cursor-pointer"
                 >
                   {folders.map(f => (
                     <option key={f.id} value={f.id}>{f.name}</option>
@@ -161,51 +176,54 @@ const SectionToolbar = ({ act, chapter, section, onAddNote, onAIExplain }) => {
               {!isCreatingFolder ? (
                 <button 
                   onClick={() => setIsCreatingFolder(true)}
-                  className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1.5 transition-colors pt-1"
                 >
-                  <span className="material-symbols-outlined text-[16px]">add</span> Create new folder
+                  <span className="material-symbols-outlined text-lg">add_circle</span> Create new folder
                 </button>
               ) : (
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center pt-1">
                   <input 
                     type="text"
-                    placeholder="Folder name"
+                    placeholder="e.g. Evidence Cases"
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0f172a] text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary outline-none"
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-600 outline-none"
                     autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); }}
                   />
                   <button 
                     onClick={handleCreateFolder}
-                    className="px-3 py-2 bg-primary text-white rounded-lg text-sm font-medium"
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
                   >
-                    Save
+                    Create
                   </button>
                   <button 
                     onClick={() => { setIsCreatingFolder(false); setNewFolderName(''); }}
-                    className="p-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
-                    <span className="material-symbols-outlined text-[18px]">close</span>
+                    <span className="material-symbols-outlined text-lg">close</span>
                   </button>
                 </div>
               )}
             </div>
-            <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/30">
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
               <button 
                 onClick={() => setShowFolderModal(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSaveBookmark}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+                className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md shadow-blue-500/20"
               >
-                Save
+                Save Bookmark
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
