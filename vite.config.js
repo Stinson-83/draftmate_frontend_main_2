@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'node:url'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const backendTarget = env.BACKEND_API_URL || 'http://ecs-express-gateway-alb-220524834.ap-south-1.elb.amazonaws.com';
+  const backendTarget = env.BACKEND_API_URL || 'http://localhost:8080';
   const onlyofficeTarget = env.ONLYOFFICE_API_URL || 'http://localhost:8081';
 
   return {

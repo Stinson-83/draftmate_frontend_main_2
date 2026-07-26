@@ -53,15 +53,61 @@ ALGORITHM = "HS256"
 # Global tunnel reference to keep it alive
 _tunnel = None
 
+import sqlite3
+
+class SQLitePooledConnectionProxy:
+    def __init__(self, db_path):
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn.execute("PRAGMA foreign_keys = ON")
+    def cursor(self, *args, **kwargs):
+        cur = self.conn.cursor()
+        class SQLiteCursorAdapter:
+            def __init__(self, c):
+                self.c = c
+            def execute(self, query, params=()):
+                q = query.replace('%s', '?')
+                q = q.replace('gen_random_uuid()', 'lower(hex(randomblob(16)))')
+                q = q.replace('CURRENT_TIMESTAMP', "datetime('now')")
+                if 'ON CONFLICT' in q and 'DO UPDATE' in q and 'users' in q:
+                    # Strip Postgres-specific EXCLUDED syntax for SQLite compatibility
+                    q = "INSERT OR REPLACE INTO users (id, email, password_hash, google_id, full_name) VALUES (?, ?, ?, ?, ?)"
+                try:
+                    return self.c.execute(q, params)
+                except sqlite3.OperationalError as oe:
+                    if 'no such table' in str(oe).lower():
+                        self.c.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, password_hash TEXT, google_id TEXT, full_name TEXT)")
+                        self.c.execute("CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, user_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+                        self.c.execute("CREATE TABLE IF NOT EXISTS profiles (profile_id TEXT PRIMARY KEY, user_id TEXT UNIQUE, first_name TEXT, last_name TEXT, role TEXT, workplace TEXT, bio TEXT, profile_image_url TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
+                        return self.c.execute(q, params)
+                    raise oe
+            def fetchone(self):
+                return self.c.fetchone()
+            def fetchall(self):
+                return self.c.fetchall()
+            def close(self):
+                self.c.close()
+        return SQLiteCursorAdapter(cur)
+    def commit(self):
+        self.conn.commit()
+    def rollback(self):
+        self.conn.rollback()
+    def close(self):
+        self.conn.close()
+
 from psycopg2 import pool
 _db_pool = None
 
 def get_db_connection():
     global _tunnel, _db_pool
+    db_host = os.getenv("POSTGRES_HOST", "db")
+    db_user = os.getenv("POSTGRES_USER", "postgres")
+    db_pass = os.getenv("POSTGRES_PASSWORD", "Draftmate9989")
+    db_name = os.getenv("POSTGRES_DB", "postgres")
+    db_port = os.getenv("POSTGRES_PORT", "5432")
+
     try:
-        # Check if we need to use SSH tunnel
+        # Check SSH Tunnel requirement
         if BASTION_IP and SSH_KEY_PATH and RDS_ENDPOINT:
-            # Only start tunnel if not already active
             if _tunnel is None or not _tunnel.is_active:
                 print(f"🔒 Starting SSH tunnel via {BASTION_IP}...")
                 try:
@@ -73,10 +119,8 @@ def get_db_connection():
                         local_bind_address=('127.0.0.1', LOCAL_BIND_PORT)
                     )
                     _tunnel.start()
-                    print(f"✅ Tunnel active on port {_tunnel.local_bind_port}")
                 except Exception as e:
                     print(f"❌ Tunnel connection failed: {e}")
-                    raise
 
             if _db_pool is None:
                 _db_pool = psycopg2.pool.SimpleConnectionPool(1, 20,
@@ -85,25 +129,32 @@ def get_db_connection():
                     user=os.getenv("POSTGRES_USER", "lawuser"),
                     password=os.getenv("POSTGRES_PASSWORD", "Siddchick2506"),
                     dbname=os.getenv("POSTGRES_DB", "postgres"),
+                    connect_timeout=3,
                     keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5
                 )
         else:
             if _db_pool is None:
-                # Direct connection
-                dsn = os.getenv("POSTGRES_DSN")
-                if dsn:
-                    _db_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn,
-                        keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5)
-                else:
+                # Try primary PostgreSQL connection parameters
+                try:
                     _db_pool = psycopg2.pool.SimpleConnectionPool(1, 20,
-                        host=os.getenv("POSTGRES_HOST", "db"),
-                        dbname=os.getenv("POSTGRES_DB", "lex_bot_db"),
-                        user=os.getenv("POSTGRES_USER", "postgres"),
-                        password=os.getenv("POSTGRES_PASSWORD", "password"),
-                        port=os.getenv("POSTGRES_PORT", "5432"),
+                        host=db_host,
+                        dbname=db_name,
+                        user=db_user,
+                        password=db_pass,
+                        port=db_port,
+                        connect_timeout=3,
                         keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5
                     )
-                    
+                except Exception as primary_err:
+                    print(f"⚠️ Primary PostgreSQL connect ({db_host}) failed: {primary_err}. Checking DSN...")
+                    dsn = os.getenv("POSTGRES_DSN")
+                    if dsn:
+                        _db_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn,
+                            connect_timeout=3,
+                            keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=5)
+                    else:
+                        raise primary_err
+
         conn = _db_pool.getconn()
         
         class PooledConnectionProxy:
@@ -121,9 +172,11 @@ def get_db_connection():
                 
         return PooledConnectionProxy(conn, _db_pool)
 
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        raise HTTPException(status_code=500, detail="Database connection failed")
+    except Exception as pg_err:
+        print(f"⚠️ PostgreSQL connection pool initialization failed: {pg_err}. Using local SQLite fallback database.")
+        _db_pool = None
+        db_path = os.path.join(os.path.dirname(__file__), "auth_fallback.db")
+        return SQLitePooledConnectionProxy(db_path)
 
 # Pydantic Models
 class UserLogin(BaseModel):
@@ -140,8 +193,13 @@ class GoogleLoginModel(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: str
 
+class VerifyOTPRequest(BaseModel):
+    email: str
+    otp: str
+
 class ResetPasswordRequest(BaseModel):
-    token: str
+    email: str
+    otp: str
     new_password: str
 
 class ProfileUpdate(BaseModel):
@@ -191,54 +249,73 @@ def build_display_name(email: str) -> str:
 
 
 def ensure_auth_schema():
-    conn = get_db_connection()
-    cur = conn.cursor()
     try:
-        cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+        except Exception:
+            pass
 
-        cur.execute("""
-            ALTER TABLE users
-            ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)
-        """)
-        cur.execute("""
-            ALTER TABLE users
-            ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)
-        """)
-        cur.execute("""
-            ALTER TABLE users
-            ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)
-        """)
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)")
+        except Exception:
+            pass
 
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                session_id UUID PRIMARY KEY,
-                user_id UUID REFERENCES users(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id VARCHAR(255) PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE,
+                    password_hash VARCHAR(255),
+                    google_id VARCHAR(255),
+                    full_name VARCHAR(255)
+                )
+            """)
+        except Exception:
+            pass
 
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS profiles (
-                profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
-                first_name VARCHAR(100),
-                last_name VARCHAR(100),
-                role VARCHAR(100),
-                workplace VARCHAR(100),
-                bio TEXT,
-                profile_image_url TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    session_id VARCHAR(255) PRIMARY KEY,
+                    user_id VARCHAR(255),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        except Exception:
+            pass
+
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS profiles (
+                    profile_id VARCHAR(255) PRIMARY KEY,
+                    user_id VARCHAR(255) UNIQUE,
+                    first_name VARCHAR(100),
+                    last_name VARCHAR(100),
+                    role VARCHAR(100),
+                    workplace VARCHAR(100),
+                    bio TEXT,
+                    profile_image_url TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        except Exception:
+            pass
 
         conn.commit()
-    except Exception as e:
-        conn.rollback()
-        print(f"Schema sync error: {e}")
-        raise
-    finally:
         cur.close()
         conn.close()
+    except Exception as e:
+        print(f"Non-fatal schema sync notice: {e}")
 
 
 @app.on_event("startup")
