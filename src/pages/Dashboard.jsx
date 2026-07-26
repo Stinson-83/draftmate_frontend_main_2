@@ -227,12 +227,13 @@ export default function Dashboard() {
                 translationsCount = Math.max(transHist.length, jobs.length);
             } catch (e) {}
 
-            // Combine hearings from caseService nextHearingDate + hearingService + user calendar events
+            // Use hearingService as the single source of truth for hearings
             const hearingsList = [];
 
-            // 1. Hearings from Hearing Tracker service (e.g. "priya rai bribary")
+            // 1. Hearings from Hearing Tracker service
             hearingsListFromService.forEach(h => {
                 hearingsList.push({
+                    id: h.id,
                     time: h.hearingDate ? (h.hearingDate.includes('T') ? new Date(h.hearingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : h.hearingDate) : "10:00 AM",
                     court: h.court || "District Court",
                     case: h.caseTitle || h.title || "Hearing Matter",
@@ -241,27 +242,11 @@ export default function Dashboard() {
                 });
             });
 
-            // 2. Hearings from active cases
-            casesList.forEach(c => {
-                if (c.nextHearingDate) {
-                    // Check if not already added from hearingService
-                    const exists = hearingsList.some(existing => existing.case?.toLowerCase() === c.caseTitle?.toLowerCase());
-                    if (!exists) {
-                        hearingsList.push({
-                            time: c.hearingTime || "10:00 AM",
-                            court: c.court || "High Court",
-                            case: c.caseTitle,
-                            judge: c.assignedAdvocate || "Presiding Judge",
-                            status: "Upcoming"
-                        });
-                    }
-                }
-            });
-
-            // 3. User created calendar events
+            // 2. User created calendar events specifically marked for hearings
             events.forEach(ev => {
-                if (ev.isUserCreated) {
+                if (ev.isUserCreated && ev.type === 'hearing') {
                     hearingsList.push({
+                        id: ev.id,
                         time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
                         court: ev.location || ev.court || "District Court",
                         case: ev.title,

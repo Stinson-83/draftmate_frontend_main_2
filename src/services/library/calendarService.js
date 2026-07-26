@@ -4,8 +4,19 @@ import { diaryService } from './diaryService';
 const STORAGE_KEY = 'draftmate_calendar_events';
 
 const initializeStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockCalendarEvents));
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } else {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(e => e.id !== 'cal-1' && e.id !== 'cal-2' && e.id !== 'cal-3' && !e.title?.includes('Ramesh Sharma') && !e.title?.includes('Priya Enterprises') && !e.title?.includes('Sunita Verma'));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {}
   }
 };
 

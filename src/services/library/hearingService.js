@@ -3,8 +3,19 @@ import { mockHearings } from '../../data/mockHearings';
 const STORAGE_KEY = 'draftmate_hearings';
 
 const initializeStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockHearings));
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } else {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(h => h.id !== 'h1' && h.id !== 'h2' && h.id !== 'h3' && !h.caseTitle?.includes('Ramesh Sharma') && !h.caseTitle?.includes('Priya Enterprises') && !h.caseTitle?.includes('Sunita Verma'));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {}
   }
 };
 

@@ -3,8 +3,19 @@ import { mockVideoLinks } from '../../data/mockVideoLinks';
 const STORAGE_KEY = 'draftmate_video_links';
 
 const initializeStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockVideoLinks));
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } else {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(l => !l.caseTitle?.includes('Ramesh Sharma') && !l.caseTitle?.includes('Priya Enterprises'));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {}
   }
 };
 

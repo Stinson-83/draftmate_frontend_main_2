@@ -3,8 +3,19 @@ import { mockClients } from '../../data/mockClients';
 const STORAGE_KEY = 'draftmate_clients';
 
 const initializeStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockClients));
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } else {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(c => c.id !== 'client-1' && c.id !== 'client-2' && c.id !== 'client-3' && c.id !== 'client-4' && !c.name?.includes('Ramesh Sharma') && !c.name?.includes('Priya Enterprises') && !c.name?.includes('Sunita Verma'));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {}
   }
 };
 

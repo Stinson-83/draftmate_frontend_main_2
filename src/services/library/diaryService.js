@@ -2,10 +2,20 @@ import { mockDiaryEntries } from '../../data/mockDiary';
 
 const STORAGE_KEY = 'draftmate_diary_entries';
 
-// Initialize localStorage with mock data if empty
 const initializeStorage = () => {
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockDiaryEntries));
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (!existing) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+  } else {
+    try {
+      const parsed = JSON.parse(existing);
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(e => !e.caseTitle?.includes('Ramesh Sharma') && !e.caseTitle?.includes('Priya Enterprises') && !e.caseTitle?.includes('Sunita Verma'));
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {}
   }
 };
 

@@ -15,8 +15,10 @@ const Cases = () => {
   const loadCases = useCallback(async () => {
     try {
       const data = await caseService.getCases();
-      setCases(data);
-      setFilteredCases(data);
+      // Filter out internal system container bucket (General Documents) from legal cases view
+      const realCases = (data || []).filter(c => c.caseNumber !== 'GEN-0001' && c.caseTitle !== 'General Documents');
+      setCases(realCases);
+      setFilteredCases(realCases);
     } catch {
       toast.error('Failed to load cases');
     } finally {

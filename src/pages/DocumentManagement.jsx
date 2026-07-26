@@ -310,8 +310,10 @@ const DocumentManagement = () => {
 
   const getDocShareUrl = (doc) => {
     if (!doc) return window.location.href;
-    if (doc.url) return `${window.location.origin}${doc.url}`;
-    return `${window.location.origin}/dashboard/workspace?documentKey=${doc.id}&filename=${encodeURIComponent(doc.filename || doc.name)}`;
+    const origin = window.location.origin;
+    // Always construct a clean, user-facing app URL and hide raw internal AWS ALB / backend endpoints
+    const docName = doc.filename || doc.name || 'document';
+    return `${origin}/dashboard/workspace?documentKey=${doc.id}&filename=${encodeURIComponent(docName)}`;
   };
 
   const handleCopyShareLink = () => {
