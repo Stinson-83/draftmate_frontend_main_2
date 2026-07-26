@@ -25,6 +25,12 @@ const DocumentManagement = () => {
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [isDraggingOverId, setIsDraggingOverId] = useState(null);
 
+  // Share Modal States
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [sharingDoc, setSharingDoc] = useState(null);
+  const [shareEmailInput, setShareEmailInput] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const loadCases = useCallback(async () => {
     try {
       const casesData = await caseService.getCases();
@@ -292,6 +298,51 @@ const DocumentManagement = () => {
       toast.error("Failed to upload file to S3.", { id: toastId });
     }
     e.target.value = '';
+  };
+
+  const handleShareDocument = (doc, e) => {
+    if (e) e.stopPropagation();
+    setSharingDoc(doc);
+    setShareEmailInput('');
+    setCopiedLink(false);
+    setIsShareModalOpen(true);
+  };
+
+  const getDocShareUrl = (doc) => {
+    if (!doc) return window.location.href;
+    if (doc.url) return `${window.location.origin}${doc.url}`;
+    return `${window.location.origin}/dashboard/workspace?documentKey=${doc.id}&filename=${encodeURIComponent(doc.filename || doc.name)}`;
+  };
+
+  const handleCopyShareLink = () => {
+    const url = getDocShareUrl(sharingDoc);
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    toast.success("Share link copied to clipboard!");
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  const handleSendShareEmail = (e) => {
+    e.preventDefault();
+    if (!shareEmailInput || !shareEmailInput.includes('@')) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    toast.success(`Document "${sharingDoc?.name}" shared with ${shareEmailInput}!`);
+    setIsShareModalOpen(false);
+    setShareEmailInput('');
+  };
+
+  const handleNativeShare = () => {
+    if (navigator.share && sharingDoc) {
+      navigator.share({
+        title: sharingDoc.name,
+        text: `Check out "${sharingDoc.name}" on DraftMate Legal Platform`,
+        url: getDocShareUrl(sharingDoc),
+      }).catch(() => {});
+    } else {
+      handleCopyShareLink();
+    }
   };
 
   const handleDocumentClick = async (doc) => {
@@ -691,6 +742,13 @@ const DocumentManagement = () => {
                       <td>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
+                            onClick={(e) => handleShareDocument(doc, e)}
+                            title="Share File"
+                            className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-blue-600 rounded transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-base">share</span>
+                          </button>
+                          <button 
                             onClick={(e) => handleDeleteDocument(doc.id, e)}
                             className="p-1 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 rounded transition-colors"
                           >
@@ -767,8 +825,92 @@ const DocumentManagement = () => {
         </div>
       )}
 
+      {/* Share Document Modal */}
+      {isShareModalOpen && sharingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsShareModalOpen(false)}></div>
+          <div className="relative bg-white dark:bg-slate-800 rounded-3xl w-full max-w-lg p-6 md:p-8 border border-slate-200 dark:border-slate-700 shadow-2xl text-left space-y-6 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl">share</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Share Document</h3>
+                  <p className="text-xs text-slate-500 truncate max-w-xs">{sharingDoc.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
 
+            {/* Direct Link Section */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                Shareable Link
+              </label>
+              <div className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl">
+                <input
+                  type="text"
+                  readOnly
+                  value={getDocShareUrl(sharingDoc)}
+                  className="flex-1 px-3 py-1.5 bg-transparent text-sm text-slate-700 dark:text-slate-300 outline-none truncate font-mono"
+                />
+                <button
+                  onClick={handleCopyShareLink}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {copiedLink ? 'check' : 'content_copy'}
+                  </span>
+                  {copiedLink ? 'Copied!' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
 
+            {/* Email Share Section */}
+            <form onSubmit={handleSendShareEmail} className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                Share via Email
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="email"
+                  placeholder="colleague@lawfirm.com"
+                  value={shareEmailInput}
+                  onChange={(e) => setShareEmailInput(e.target.value)}
+                  className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-600"
+                />
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-base">send</span>
+                  Send
+                </button>
+              </div>
+            </form>
+
+            {/* Native Mobile / System Share Option */}
+            {typeof navigator !== 'undefined' && navigator.share && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleNativeShare}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-slate-100 dark:bg-slate-700/60 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-sm rounded-xl transition-colors"
+                >
+                  <span className="material-symbols-outlined text-lg">share_windows</span>
+                  More Share Options...
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
