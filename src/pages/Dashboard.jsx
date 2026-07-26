@@ -256,9 +256,15 @@ export default function Dashboard() {
                 }
             });
 
+            const realActiveCases = casesList.filter(c => 
+                c.caseNumber !== 'GEN-0001' && 
+                c.caseTitle !== 'General Documents' && 
+                !['Closed', 'Archived'].includes(c.status)
+            );
+
             setUpcomingHearings(hearingsList);
             setKpiStats({
-                casesCount: casesList.length,
+                casesCount: realActiveCases.length,
                 hearingsCount: hearingsList.length,
                 draftsCount,
                 researchesCount,
