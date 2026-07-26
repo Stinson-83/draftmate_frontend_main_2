@@ -480,14 +480,17 @@ def google_login(model: GoogleLoginModel):
     try:
         email = None
         google_id = None
+        id_info = None
+        user_info = None
         
         # 1. Try checking if it's a valid ID Token (JWT)
         try:
             CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
             id_info = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
-            email = id_info.get('email')
-            google_id = id_info.get('sub')
-        except ValueError:
+            if id_info:
+                email = id_info.get('email')
+                google_id = id_info.get('sub')
+        except Exception:
             # 2. If not a valid ID Token, assume it's an Access Token and check UserInfo endpoint
             import requests as http_requests
             userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -498,12 +501,14 @@ def google_login(model: GoogleLoginModel):
                 email = user_info.get('email')
                 google_id = user_info.get('sub')
             else:
-                 raise ValueError("Invalid access token")
+                raise ValueError("Invalid Google access token")
 
         if not email:
-             raise HTTPException(status_code=400, detail="Invalid token: no email found")
+            raise HTTPException(status_code=400, detail="Invalid token: no email found")
              
         email = email.strip().lower()
+        user_name = (id_info or {}).get('name') or (user_info or {}).get('name') or build_display_name(email)
+        user_picture = (id_info or {}).get('picture') or (user_info or {}).get('picture')
              
         # Check if user exists
         cur.execute("SELECT id FROM users WHERE LOWER(email) = %s", (email,))
@@ -517,27 +522,24 @@ def google_login(model: GoogleLoginModel):
         else:
             # Create new user
             user_id = str(uuid.uuid4())
-            display_name = user_info.get('name') if 'user_info' in locals() else id_info.get('name') if 'id_info' in locals() else build_display_name(email)
             placeholder_password = hash_password(str(uuid.uuid4()))
             cur.execute(
                 "INSERT INTO users (id, email, password_hash, google_id, full_name) VALUES (%s, %s, %s, %s, %s)",
-                (user_id, email, placeholder_password, google_id, display_name)
+                (user_id, email, placeholder_password, google_id, user_name)
             )
         
         # Ensure Profile exists for Google Login users
         cur.execute("SELECT profile_id FROM profiles WHERE user_id = %s", (user_id,))
         if not cur.fetchone():
-            name = id_info.get('name') if 'id_info' in locals() else user_info.get('name')
             first_name, last_name = "", ""
-            if name:
-                parts = name.split(None, 1)
+            if user_name:
+                parts = user_name.split(None, 1)
                 first_name = parts[0]
                 if len(parts) > 1:
                     last_name = parts[1]
-            picture = id_info.get('picture') if 'id_info' in locals() else user_info.get('picture')
             cur.execute(
                 "INSERT INTO profiles (user_id, first_name, last_name, profile_image_url) VALUES (%s, %s, %s, %s)",
-                (user_id, first_name, last_name, picture)
+                (user_id, first_name, last_name, user_picture)
             )
 
         # Create Session
@@ -553,15 +555,18 @@ def google_login(model: GoogleLoginModel):
             "session_id": session_id, 
             "user_id": user_id,
             "email": email,
-            "name": id_info.get('name') if 'id_info' in locals() else user_info.get('name'),
-            "picture": id_info.get('picture') if 'id_info' in locals() else user_info.get('picture'),
+            "name": user_name,
+            "picture": user_picture,
             # Fetch full profile from DB for caching
             "profile": get_profile_internal(cur, user_id)
         }
         
     except ValueError as e:
-         print(f"Token verification failed: {e}")
-         raise HTTPException(status_code=401, detail="Invalid Google token")
+        print(f"Token verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    except HTTPException as he:
+        conn.rollback()
+        raise he
     except Exception as e:
         conn.rollback()
         print(f"Google login error: {e}")
