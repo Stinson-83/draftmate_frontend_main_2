@@ -126,6 +126,10 @@ const OnlyOfficeWorkspace = () => {
     };
   }, [location]);
 
+  const uploadedDrafts = useMemo(() => {
+    return Array.isArray(location?.state?.uploadedDrafts) ? location.state.uploadedDrafts : [];
+  }, [location]);
+
   const draftId = useMemo(() => {
     return location?.state?.draftId || location?.state?.id || documentKey;
   }, [location, documentKey]);
@@ -971,6 +975,43 @@ const OnlyOfficeWorkspace = () => {
                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">DRAFTMATE WORKSPACE</div>
                 <div className="font-bold text-slate-800 truncate max-w-[200px] sm:max-w-[300px]">{filename || 'Untitled'}</div>
               </div>
+
+              {uploadedDrafts.length > 1 && (
+                <div className="flex items-center gap-1 ml-2 border-l border-[#B9D9EB] pl-3">
+                  <span className="text-[11px] font-semibold text-slate-500 hidden md:inline">Batch ({uploadedDrafts.length}):</span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto max-w-[240px] sm:max-w-xs no-scrollbar">
+                    {uploadedDrafts.map((doc, idx) => {
+                      const isActive = (doc.documentKey === documentKey || doc.filename === filename);
+                      return (
+                        <button
+                          key={doc.id || doc.documentKey || idx}
+                          type="button"
+                          onClick={() => {
+                            if (isActive) return;
+                            navigate('/dashboard/workspace', {
+                              replace: true,
+                              state: {
+                                documentKey: doc.documentKey,
+                                filename: doc.filename,
+                                onlyofficeConfig: doc.onlyofficeConfig,
+                                uploadedDrafts: uploadedDrafts,
+                              }
+                            });
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shrink-0 max-w-[130px] truncate ${
+                            isActive
+                              ? 'bg-blue-600 text-white font-bold shadow-sm'
+                              : 'bg-white border border-[#B9D9EB] text-slate-700 hover:bg-slate-100'
+                          }`}
+                          title={doc.filename}
+                        >
+                          📄 {doc.filename}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {draftId && (
                 <div className="relative inline-block text-left ml-2 shrink-0">
