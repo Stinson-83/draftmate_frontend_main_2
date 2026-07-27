@@ -69,6 +69,178 @@ const OnlyOfficeWorkspace = () => {
   const [shareAccess, setShareAccess] = useState('edit');
   const [isSharing, setIsSharing] = useState(false);
 
+  const [isHeaderSuggestionsOpen, setIsHeaderSuggestionsOpen] = useState(false);
+  const [headerSettings, setHeaderSettings] = useState({ headerText: '', footerText: '' });
+  const [headerTemplates, setHeaderTemplates] = useState([]);
+  const [headerApplyTo, setHeaderApplyTo] = useState('first_page');
+  const [footerApplyTo, setFooterApplyTo] = useState('first_page');
+  const [customHeaderPageInput, setCustomHeaderPageInput] = useState('1');
+  const [customFooterPageInput, setCustomFooterPageInput] = useState('1');
+  const [isApplyingHeader, setIsApplyingHeader] = useState(false);
+
+  const [cardPos, setCardPos] = useState({ top: 16, right: 16 });
+  const isCardDraggingRef = useRef(false);
+  const cardDragStartRef = useRef({ x: 0, y: 0, top: 16, right: 16 });
+
+  const handleCardHeaderMouseDown = (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    isCardDraggingRef.current = true;
+    cardDragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      top: cardPos.top,
+      right: cardPos.right
+    };
+    const handleMouseMove = (moveEvent) => {
+      if (!isCardDraggingRef.current) return;
+      const dx = moveEvent.clientX - cardDragStartRef.current.x;
+      const dy = moveEvent.clientY - cardDragStartRef.current.y;
+      setCardPos({
+        top: Math.max(8, cardDragStartRef.current.top + dy),
+        right: Math.max(8, cardDragStartRef.current.right - dx)
+      });
+    };
+    const handleMouseUp = () => {
+      isCardDraggingRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  useEffect(() => {
+    const loadSavedHeaders = () => {
+      let savedSettings = {};
+      try {
+        savedSettings = JSON.parse(localStorage.getItem('user_settings') || '{}');
+      } catch(e) {}
+
+      // Fallback default sample letterhead if user hasn't typed one yet in Document Settings
+      const sampleHeader = `<div style="text-align: center; font-family: 'Times New Roman', serif;">
+        <h2 style="margin: 0; font-size: 16px; color: #1e3a8a; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">ADVOCATE PREET KAKDIYA</h2>
+        <p style="margin: 2px 0; font-size: 11px; color: #475569; font-weight: 600;">Advocate, High Court & Supreme Court of India</p>
+        <p style="margin: 2px 0; font-size: 10px; color: #64748b;">Chambers 402, High Court Complex | Ph: +91 98765 43210 | Email: preet@draftmate.law</p>
+        <hr style="border: none; border-top: 2px solid #1e3a8a; margin-top: 6px;" />
+      </div>`;
+
+      const sampleFooter = `<div style="text-align: center; font-family: 'Times New Roman', serif; font-size: 9px; color: #64748b; border-top: 1px solid #cbd5e1; padding-top: 4px;">
+        <p style="margin: 0;">Confidential Legal Document — DraftMate Legal Suite</p>
+      </div>`;
+
+      setHeaderSettings({
+        headerText: savedSettings.headerText || sampleHeader,
+        footerText: savedSettings.footerText || sampleFooter,
+      });
+
+      try {
+        const savedTpl = JSON.parse(localStorage.getItem('user_document_templates') || '[]');
+        setHeaderTemplates(savedTpl);
+      } catch(e) {}
+    };
+
+    loadSavedHeaders();
+    window.addEventListener('user_settings_updated', loadSavedHeaders);
+    return () => window.removeEventListener('user_settings_updated', loadSavedHeaders);
+  }, []);
+
+
+
+  const handleApplyHeaderFooter = async ({ headerHtml, footerHtml, title = 'Header & Footer' }) => {
+    setIsHeaderSuggestionsOpen(false);
+    if ((!headerHtml || !headerHtml.trim()) && (!footerHtml || !footerHtml.trim())) {
+      toast.error('No header or footer content to apply.');
+      return;
+    }
+
+    // Unmount active ONLYOFFICE session FIRST so DocumentServer closes the file session cleanly
+    if (editorInstanceRef.current) {
+      try {
+        if (typeof editorInstanceRef.current.destroyEditor === 'function') {
+          editorInstanceRef.current.destroyEditor();
+        } else if (typeof editorInstanceRef.current.destroy === 'function') {
+          editorInstanceRef.current.destroy();
+        }
+      } catch(e) {}
+      editorInstanceRef.current = null;
+    }
+    if (canvasTargetRef.current) {
+      canvasTargetRef.current.innerHTML = '';
+    }
+
+    setIsApplyingHeader(true);
+    const toastId = toast.loading(`Applying ${title} to document...`);
+
+    try {
+      const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+      const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/header/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          filename: filename || 'document.docx',
+          header_html: headerHtml || null,
+          footer_html: footerHtml || null,
+          draft_id: draftId || null,
+          header_apply_to: headerApplyTo,
+          footer_apply_to: footerApplyTo,
+          header_custom_pages: customHeaderPageInput,
+          footer_custom_pages: customFooterPageInput,
+        }),
+      });
+
+      if (response.ok) {
+        const resData = await response.json();
+        toast.dismiss(toastId);
+        toast.success(`${title} applied successfully! Reloading editor...`);
+
+        // Safely destroy active ONLYOFFICE iframe session to prevent file conflict / save errors
+        if (editorInstanceRef.current) {
+          try {
+            if (typeof editorInstanceRef.current.destroyEditor === 'function') {
+              editorInstanceRef.current.destroyEditor();
+            } else if (typeof editorInstanceRef.current.destroy === 'function') {
+              editorInstanceRef.current.destroy();
+            }
+          } catch(e) {}
+          editorInstanceRef.current = null;
+        }
+
+        if (canvasTargetRef.current) {
+          canvasTargetRef.current.innerHTML = '';
+        }
+
+        const freshKey = resData.new_document_key || `hdr_${Date.now()}`;
+        setDynamicConfig(prev => {
+          const baseConfig = prev || onlyofficeConfig || {};
+          const docObj = baseConfig.document || {};
+          const rawUrl = docObj.url || `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${draftId ? draftId + '/' : ''}${filename}`;
+          const cleanUrl = rawUrl.split('?')[0];
+          const freshUrl = `${cleanUrl}?v=${Date.now()}`;
+          return {
+            ...baseConfig,
+            document: {
+              ...docObj,
+              key: freshKey,
+              url: freshUrl,
+            },
+          };
+        });
+      } else {
+        toast.dismiss(toastId);
+        toast.error('Failed to apply to document.');
+      }
+    } catch (err) {
+      console.error('Header/Footer apply error:', err);
+      toast.dismiss(toastId);
+      toast.error('Failed to apply to document.');
+    } finally {
+      setIsApplyingHeader(false);
+    }
+  };
+
   const startResize = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -124,6 +296,10 @@ const OnlyOfficeWorkspace = () => {
       variablesDetected: Array.isArray(state.variablesDetected) ? state.variablesDetected : [],
       isAutoDownload: queryAutoDownload
     };
+  }, [location]);
+
+  const uploadedDrafts = useMemo(() => {
+    return Array.isArray(location?.state?.uploadedDrafts) ? location.state.uploadedDrafts : [];
   }, [location]);
 
   const draftId = useMemo(() => {
@@ -313,12 +489,17 @@ const OnlyOfficeWorkspace = () => {
       return;
     }
 
-    if (editorInstanceRef.current && typeof editorInstanceRef.current.destroy === 'function') {
+    if (editorInstanceRef.current) {
       try {
-        editorInstanceRef.current.destroy();
+        if (typeof editorInstanceRef.current.destroyEditor === 'function') {
+          editorInstanceRef.current.destroyEditor();
+        } else if (typeof editorInstanceRef.current.destroy === 'function') {
+          editorInstanceRef.current.destroy();
+        }
       } catch (err) {
         console.error('Error destroying active editor instance:', err);
       }
+      editorInstanceRef.current = null;
     }
 
     const nextConfig = {
@@ -964,7 +1145,7 @@ const OnlyOfficeWorkspace = () => {
 
       {/* Left Area: Header and ONLYOFFICE Iframe */}
       <div className="flex-1 flex flex-col min-w-0 h-full border-r border-[#B9D9EB]">
-        <div className="shrink-0 border-b border-[#B9D9EB] bg-[#E3F0F7]/95 backdrop-blur">
+        <div className="shrink-0 border-b border-[#B9D9EB] bg-[#E3F0F7]/95 backdrop-blur relative z-[100]">
           <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
             <div className="min-w-0 flex items-center gap-3">
               <div>
@@ -972,11 +1153,51 @@ const OnlyOfficeWorkspace = () => {
                 <div className="font-bold text-slate-800 truncate max-w-[200px] sm:max-w-[300px]">{filename || 'Untitled'}</div>
               </div>
 
+              {uploadedDrafts.length > 1 && (
+                <div className="flex items-center gap-1 ml-2 border-l border-[#B9D9EB] pl-3">
+                  <span className="text-[11px] font-semibold text-slate-500 hidden md:inline">Batch ({uploadedDrafts.length}):</span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto max-w-[240px] sm:max-w-xs no-scrollbar">
+                    {uploadedDrafts.map((doc, idx) => {
+                      const isActive = (doc.documentKey === documentKey || doc.filename === filename);
+                      return (
+                        <button
+                          key={doc.id || doc.documentKey || idx}
+                          type="button"
+                          onClick={() => {
+                            if (isActive) return;
+                            navigate('/dashboard/workspace', {
+                              replace: true,
+                              state: {
+                                documentKey: doc.documentKey,
+                                filename: doc.filename,
+                                onlyofficeConfig: doc.onlyofficeConfig,
+                                uploadedDrafts: uploadedDrafts,
+                              }
+                            });
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all shrink-0 max-w-[130px] truncate ${
+                            isActive
+                              ? 'bg-blue-600 text-white font-bold shadow-sm'
+                              : 'bg-white border border-[#B9D9EB] text-slate-700 hover:bg-slate-100'
+                          }`}
+                          title={doc.filename}
+                        >
+                          📄 {doc.filename}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {draftId && (
                 <div className="relative inline-block text-left ml-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                    onClick={() => {
+                      setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                      setIsFolderDropdownOpen(false);
+                    }}
                     className="hover-lift inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-[#B9D9EB] text-xs font-semibold text-slate-700 shadow-sm transition-all"
                   >
                     <span className={`status-dot-pulse w-2.5 h-2.5 rounded-full ${
@@ -994,30 +1215,30 @@ const OnlyOfficeWorkspace = () => {
 
                   {isStatusDropdownOpen && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsStatusDropdownOpen(false)} />
-                      <div className="popup-anim absolute left-full top-1/2 -translate-y-1/2 ml-2 flex items-center gap-1.5 bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl px-2 py-1.5 whitespace-nowrap">
+                      <div className="fixed inset-0 z-[998]" onClick={() => setIsStatusDropdownOpen(false)} />
+                      <div className="popup-anim absolute left-0 top-full mt-1.5 flex flex-col bg-white border border-[#B9D9EB] shadow-2xl z-[999] rounded-xl p-1.5 whitespace-nowrap min-w-[175px]">
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('In progress')}
-                          className="btn-scale flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                          className={`btn-scale flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-[#E3F0F7] transition-colors font-medium ${currentStatus === 'In progress' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0" />
                           <span>In Progress</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('Review')}
-                          className="btn-scale flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                          className={`btn-scale flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-[#E3F0F7] transition-colors font-medium ${currentStatus === 'Review' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
                           <span>Work under Review</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('Completed')}
-                          className="btn-scale flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                          className={`btn-scale flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-[#E3F0F7] transition-colors font-medium ${currentStatus === 'Completed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
                           <span>Draft Completed</span>
                         </button>
                       </div>
@@ -1030,7 +1251,10 @@ const OnlyOfficeWorkspace = () => {
               <div className="relative inline-block text-left ml-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                  onClick={() => {
+                    setIsFolderDropdownOpen(!isFolderDropdownOpen);
+                    setIsStatusDropdownOpen(false);
+                  }}
                   className="hover-lift inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-[#B9D9EB] text-xs font-semibold text-slate-700 shadow-sm transition-all"
                   title="Choose Save Location in My Drafts"
                 >
@@ -1043,8 +1267,8 @@ const OnlyOfficeWorkspace = () => {
 
                 {isFolderDropdownOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsFolderDropdownOpen(false)} />
-                    <div className="popup-anim absolute left-0 top-full mt-1.5 w-60 bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl py-1.5 text-xs">
+                    <div className="fixed inset-0 z-[998]" onClick={() => setIsFolderDropdownOpen(false)} />
+                    <div className="popup-anim absolute left-0 top-full mt-1.5 w-60 bg-white border border-[#B9D9EB] shadow-2xl z-[999] rounded-xl py-1.5 text-xs">
                       <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
                         Save Location in My Drafts
                       </div>
@@ -1073,6 +1297,19 @@ const OnlyOfficeWorkspace = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsHeaderSuggestionsOpen(prev => !prev)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm border ${
+                  isHeaderSuggestionsOpen
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-slate-700 border-[#B9D9EB] hover:bg-[#E3F0F7]'
+                }`}
+                title="Apply Saved Letterhead & Footer"
+              >
+                <span className="material-symbols-outlined text-base">design_services</span>
+                <span>Letterhead</span>
+              </button>
               {draftId && (
                 <button
                   type="button"
@@ -1108,6 +1345,84 @@ const OnlyOfficeWorkspace = () => {
 
         <div className="flex-1 min-h-0 relative">
           <div ref={canvasTargetRef} id="onlyoffice-canvas-target-node" className="h-full w-full bg-white" />
+
+          {/* Ultra-Clean Drag & Drop Letterhead Panel */}
+          {isHeaderSuggestionsOpen && (
+            <div
+              style={{ top: `${cardPos.top}px`, right: `${cardPos.right}px` }}
+              className="popup-anim absolute z-30 w-72 rounded-xl border border-[#B9D9EB] bg-white shadow-2xl overflow-hidden flex flex-col"
+            >
+              {/* Header (Move Panel Handle) */}
+              <div
+                onMouseDown={handleCardHeaderMouseDown}
+                className="border-b border-[#B9D9EB]/70 bg-[#F7FBFD] px-3.5 py-2 flex items-center justify-between cursor-move select-none"
+                title="Drag header to move panel"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-slate-400 text-sm">drag_indicator</span>
+                  <span className="text-xs font-bold text-slate-800">Drag to Insert</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsHeaderSuggestionsOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 text-xs font-bold px-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body Content - ONLY Draggable Items */}
+              <div className="p-3 space-y-2.5 bg-white">
+                {/* Header Draggable Box */}
+                {headerSettings.headerText && (
+                  <div>
+                    <div className="text-[10px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px] text-blue-600">drag_pan</span>
+                      <span>Header (Drag onto document)</span>
+                    </div>
+                    <div
+                      draggable="true"
+                      onDragStart={(e) => {
+                        const cleanHtml = headerSettings.headerText || '';
+                        const plainText = cleanHtml.replace(/<[^>]+>/g, '');
+                        e.dataTransfer.setData('text/html', cleanHtml);
+                        e.dataTransfer.setData('text/plain', plainText);
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      className="cursor-grab active:cursor-grabbing bg-[#F8FAFC] hover:bg-blue-50/80 p-2.5 rounded-lg border border-slate-200 hover:border-blue-500 max-h-28 overflow-y-auto text-[11px] font-serif text-slate-700 leading-snug border-l-2 border-l-blue-600 transition-all shadow-xs select-none"
+                      title="🖐 Drag & drop onto document"
+                    >
+                      <div dangerouslySetInnerHTML={{ __html: headerSettings.headerText }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer Draggable Box */}
+                {headerSettings.footerText && (
+                  <div>
+                    <div className="text-[10px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px] text-blue-600">drag_pan</span>
+                      <span>Footer (Drag onto document)</span>
+                    </div>
+                    <div
+                      draggable="true"
+                      onDragStart={(e) => {
+                        const cleanHtml = headerSettings.footerText || '';
+                        const plainText = cleanHtml.replace(/<[^>]+>/g, '');
+                        e.dataTransfer.setData('text/html', cleanHtml);
+                        e.dataTransfer.setData('text/plain', plainText);
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
+                      className="cursor-grab active:cursor-grabbing bg-[#F8FAFC] hover:bg-blue-50/80 p-2 rounded-lg border border-slate-200 hover:border-blue-500 max-h-20 overflow-y-auto text-[10px] font-serif text-slate-600 leading-snug border-l-2 border-l-slate-400 transition-all shadow-xs select-none"
+                      title="🖐 Drag & drop onto document"
+                    >
+                      <div dangerouslySetInnerHTML={{ __html: headerSettings.footerText }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {showAutoFormatPopup && selectionPreview ? (
             <div className="popup-anim absolute top-4 right-4 z-30 w-[min(360px,calc(100%-2rem))] rounded-xl border border-[#B9D9EB] bg-white shadow-2xl overflow-hidden">
               <div className="border-b border-[#B9D9EB]/70 bg-[#F7FBFD] px-3 py-2.5">
