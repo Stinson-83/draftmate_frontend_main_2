@@ -1017,7 +1017,10 @@ const OnlyOfficeWorkspace = () => {
                 <div className="relative inline-block text-left ml-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                    onClick={() => {
+                      setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                      setIsFolderDropdownOpen(false);
+                    }}
                     className="hover-lift inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-[#B9D9EB] text-xs font-semibold text-slate-700 shadow-sm transition-all"
                   >
                     <span className={`status-dot-pulse w-2.5 h-2.5 rounded-full ${
@@ -1036,29 +1039,29 @@ const OnlyOfficeWorkspace = () => {
                   {isStatusDropdownOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsStatusDropdownOpen(false)} />
-                      <div className="popup-anim absolute left-full top-1/2 -translate-y-1/2 ml-2 flex items-center gap-1.5 bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl px-2 py-1.5 whitespace-nowrap">
+                      <div className="popup-anim absolute left-0 top-full mt-1.5 flex flex-col bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl p-1.5 whitespace-nowrap min-w-[175px]">
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('In progress')}
-                          className="btn-scale flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                          className={`btn-scale flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-[#E3F0F7] transition-colors font-medium ${currentStatus === 'In progress' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 shrink-0" />
                           <span>In Progress</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('Review')}
-                          className="btn-scale flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                          className={`btn-scale flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-[#E3F0F7] transition-colors font-medium ${currentStatus === 'Review' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
                           <span>Work under Review</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('Completed')}
-                          className="btn-scale flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-[#E3F0F7] transition-colors font-medium"
+                          className={`btn-scale flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-[#E3F0F7] transition-colors font-medium ${currentStatus === 'Completed' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700'}`}
                         >
-                          <span className="w-2 h-2 rounded-full bg-green-500" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-green-500 shrink-0" />
                           <span>Draft Completed</span>
                         </button>
                       </div>
@@ -1071,7 +1074,10 @@ const OnlyOfficeWorkspace = () => {
               <div className="relative inline-block text-left ml-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                  onClick={() => {
+                    setIsFolderDropdownOpen(!isFolderDropdownOpen);
+                    setIsStatusDropdownOpen(false);
+                  }}
                   className="hover-lift inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-[#B9D9EB] text-xs font-semibold text-slate-700 shadow-sm transition-all"
                   title="Choose Save Location in My Drafts"
                 >
