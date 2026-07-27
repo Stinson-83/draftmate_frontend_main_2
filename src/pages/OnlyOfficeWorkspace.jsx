@@ -968,7 +968,7 @@ const OnlyOfficeWorkspace = () => {
 
       {/* Left Area: Header and ONLYOFFICE Iframe */}
       <div className="flex-1 flex flex-col min-w-0 h-full border-r border-[#B9D9EB]">
-        <div className="shrink-0 border-b border-[#B9D9EB] bg-[#E3F0F7]/95 backdrop-blur">
+        <div className="shrink-0 border-b border-[#B9D9EB] bg-[#E3F0F7]/95 backdrop-blur relative z-[100]">
           <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
             <div className="min-w-0 flex items-center gap-3">
               <div>
@@ -1038,8 +1038,8 @@ const OnlyOfficeWorkspace = () => {
 
                   {isStatusDropdownOpen && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={() => setIsStatusDropdownOpen(false)} />
-                      <div className="popup-anim absolute left-0 top-full mt-1.5 flex flex-col bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl p-1.5 whitespace-nowrap min-w-[175px]">
+                      <div className="fixed inset-0 z-[998]" onClick={() => setIsStatusDropdownOpen(false)} />
+                      <div className="popup-anim absolute left-0 top-full mt-1.5 flex flex-col bg-white border border-[#B9D9EB] shadow-2xl z-[999] rounded-xl p-1.5 whitespace-nowrap min-w-[175px]">
                         <button
                           type="button"
                           onClick={() => handleUpdateStatus('In progress')}
@@ -1090,8 +1090,8 @@ const OnlyOfficeWorkspace = () => {
 
                 {isFolderDropdownOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsFolderDropdownOpen(false)} />
-                    <div className="popup-anim absolute left-0 top-full mt-1.5 w-60 bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl py-1.5 text-xs">
+                    <div className="fixed inset-0 z-[998]" onClick={() => setIsFolderDropdownOpen(false)} />
+                    <div className="popup-anim absolute left-0 top-full mt-1.5 w-60 bg-white border border-[#B9D9EB] shadow-2xl z-[999] rounded-xl py-1.5 text-xs">
                       <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
                         Save Location in My Drafts
                       </div>
