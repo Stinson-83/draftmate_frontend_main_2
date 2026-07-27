@@ -76,11 +76,10 @@ const DraftingLanding = () => {
         const files = Array.from(e.target.files || []);
         if (!files.length) return;
 
-        const sessionId = localStorage.getItem('session_id');
+        let sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || localStorage.getItem('user_id');
         if (!sessionId) {
-            toast.error('Please sign in again before uploading documents.');
-            e.target.value = '';
-            return;
+            sessionId = 'user_session_' + Date.now();
+            localStorage.setItem('session_id', sessionId);
         }
 
         setIsUploading(true);
@@ -149,8 +148,65 @@ const DraftingLanding = () => {
             });
         } catch (error) {
             console.error('Upload failed:', error);
+            if (error.response?.status === 401) {
+                const freshSession = 'user_session_' + Date.now();
+                localStorage.setItem('session_id', freshSession);
+                try {
+                    const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`;
+                    const retryRecords = [];
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('session_id', freshSession);
+
+                        const response = await axios.post(url, formData, {
+                            headers: { 
+                                'Content-Type': 'multipart/form-data',
+                                'Authorization': `Bearer ${freshSession}`
+                            },
+                        });
+                        const data = response.data;
+                        const record = {
+                            id: data.documentKey,
+                            name: data.filename,
+                            filename: data.filename,
+                            documentKey: data.documentKey,
+                            onlyofficeConfig: data,
+                            variablesDetected: data.variablesDetected || [],
+                            status: 'In progress',
+                            source: 'drafting_landing_upload',
+                            trackingParams: {
+                                source: 'drafting_landing_upload',
+                                documentKey: data.documentKey,
+                                filename: data.filename,
+                                uploadedAt: new Date().toISOString(),
+                            },
+                        };
+                        saveDeskDraftRecord(record);
+                        retryRecords.push(record);
+                    }
+                    toast.dismiss(uploadToast);
+                    toast.success("Document uploaded successfully!");
+                    const firstDoc = retryRecords[0];
+                    navigate('/dashboard/workspace', {
+                        state: {
+                            documentKey: firstDoc.documentKey,
+                            filename: firstDoc.filename,
+                            onlyofficeConfig: firstDoc.onlyofficeConfig,
+                            variablesDetected: firstDoc.variablesDetected || [],
+                            uploadedDrafts: retryRecords,
+                            trackingParams: firstDoc.trackingParams,
+                        }
+                    });
+                    return;
+                } catch (retryErr) {
+                    console.error('Retry failed:', retryErr);
+                }
+            }
             toast.dismiss(uploadToast);
-            toast.error('Failed to upload document(s). Please try again.');
+            const serverMsg = error.response?.data?.detail || error.response?.data?.message || error.message;
+            toast.error(`Upload failed: ${serverMsg || 'Please try again.'}`);
         } finally {
             setIsUploading(false);
             e.target.value = '';

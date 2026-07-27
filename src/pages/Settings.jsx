@@ -537,6 +537,7 @@ const DocumentSettings = () => {
 
     const handleSave = () => {
         localStorage.setItem('user_settings', JSON.stringify(settings));
+        window.dispatchEvent(new Event('user_settings_updated'));
         toast.success('Document settings saved successfully!');
     };
 
@@ -550,6 +551,7 @@ const DocumentSettings = () => {
         const updatedTemplates = [...savedTemplates, newTemplate];
         setSavedTemplates(updatedTemplates);
         localStorage.setItem('user_document_templates', JSON.stringify(updatedTemplates));
+        window.dispatchEvent(new Event('user_settings_updated'));
         setIsSaveModalOpen(false);
         toast.success(`Template "${name}" saved!`);
     };
