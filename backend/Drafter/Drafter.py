@@ -1818,7 +1818,11 @@ async def onlyoffice_forcesave(request: ForceSaveRequest, authorization: Optiona
 
 
 @app.get("/v2/draft/config/{draft_id}")
-async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(default=None)):
+async def get_draft_config(
+    draft_id: str,
+    request: Request,
+    authorization: Optional[str] = Header(default=None)
+):
     try:
         user_id = await verify_token(authorization)
         
@@ -1862,13 +1866,21 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
         
         document_key = hashlib.sha256(f"{raw_document_key}{mtime_suffix}".encode("utf-8")).hexdigest()
          
+        # Dynamically build public_url from incoming request host headers
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        host = request.headers.get("x-forwarded-host", request.headers.get("host", "127.0.0.1:8080"))
+        public_url = f"{scheme}://{host}/drafter"
+
+        serve_url = f"{public_url}/v2/draft/serve/{draft_id}/{quote(file_name)}"
+        callback_url = f"{public_url}/v2/draft/callback/{draft_id}"
+
         # 3. Build OnlyOffice config
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{file_name}",
+                "url": serve_url,
                 "permissions": {
                     "edit": access_level == "edit",
                     "download": True,
@@ -1877,7 +1889,7 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
+                "callbackUrl": callback_url,
                 "mode": "edit" if access_level == "edit" else "view",
                 "user": {
                     "id": user_id,
@@ -2081,25 +2093,42 @@ async def upload_document_to_case(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/v2/draft/serve/{sub_dir}/{filename}")
+@app.get("/v2/draft/serve/{filename}")
 @app.get("/v2/document/serve/{sub_dir}/{filename}")
-async def serve_document(sub_dir: str, filename: str):
+async def serve_document(filename: str, sub_dir: Optional[str] = None):
     shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
     if not shared_storage_path:
         raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
         
-    safe_sub_dir = os.path.basename(sub_dir.replace("\\", "/"))
+    safe_sub_dir = os.path.basename((sub_dir or "").replace("\\", "/")) if sub_dir else ""
     safe_name = os.path.basename((filename or "").replace("\\", "/"))
-    if not safe_name or not safe_sub_dir:
+    if not safe_name:
         raise HTTPException(status_code=400, detail="Invalid path parameter.")
         
-    file_path = os.path.join(shared_storage_path, safe_sub_dir, safe_name)
-    s3_key = f"{safe_sub_dir}/{safe_name}"
+    if safe_sub_dir:
+        file_path = os.path.join(shared_storage_path, safe_sub_dir, safe_name)
+        s3_key = f"{safe_sub_dir}/{safe_name}"
+    else:
+        file_path = os.path.join(shared_storage_path, safe_name)
+        s3_key = safe_name
     
-    ensure_file_exists_locally(s3_key, file_path)
+    try:
+        ensure_file_exists_locally(s3_key, file_path)
+    except Exception as s3_err:
+        logger.warning(f"S3 file fetch warning: {s3_err}")
+
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found.")
+        # Fallback search if sub_dir is missing or different
+        matching_files = [
+            os.path.join(dp, f) for dp, dn, filenames in os.walk(shared_storage_path) for f in filenames if f == safe_name
+        ]
+        if matching_files:
+            file_path = matching_files[0]
+        else:
+            raise HTTPException(status_code=404, detail=f"File not found: {safe_name}")
         
-    ext = safe_name.split('.')[-1].lower() if '.' in safe_name else ''
+    ext = safe_name.split('.')[-1].lower() if '.' in safe_name else 'docx'
     media_types = {
         'pdf': 'application/pdf',
         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -2110,7 +2139,7 @@ async def serve_document(sub_dir: str, filename: str):
         'jpeg': 'image/jpeg',
         'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     }
-    media_type = media_types.get(ext, 'application/octet-stream')
+    media_type = media_types.get(ext, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     
     return FileResponse(
         path=file_path,
