@@ -58,6 +58,10 @@ const OnlyOfficeWorkspace = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarInput, setSidebarInput] = useState('');
 
+  const [folders, setFolders] = useState([]);
+  const [selectedFolderId, setSelectedFolderId] = useState(location?.state?.folderId || null);
+  const [isFolderDropdownOpen, setIsFolderDropdownOpen] = useState(false);
+
   const [dynamicConfig, setDynamicConfig] = useState(null);
   const [configLoading, setConfigLoading] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -148,6 +152,57 @@ const OnlyOfficeWorkspace = () => {
     };
     fetchConfig();
   }, [draftId]);
+
+  useEffect(() => {
+    const fetchFolders = async () => {
+      try {
+        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+        if (token) {
+          const resp = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data.folders)) {
+              setFolders(data.folders);
+              return;
+            }
+          }
+        }
+      } catch (err) {}
+      try {
+        const localFolders = JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+        setFolders(localFolders);
+      } catch (err) {}
+    };
+    fetchFolders();
+  }, []);
+
+  const handleMoveFolder = async (targetFolderId) => {
+    setIsFolderDropdownOpen(false);
+    setSelectedFolderId(targetFolderId);
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+      const updated = saved.map(d => (String(d.id) === String(draftId) || String(d.documentKey) === String(documentKey)) ? { ...d, folderId: targetFolderId } : d);
+      localStorage.setItem('my_drafts', JSON.stringify(updated));
+      window.dispatchEvent(new Event('my_drafts_updated'));
+    } catch(e) {}
+
+    if (draftId) {
+      try {
+        const token = localStorage.getItem('session_id');
+        await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id: draftId, folder_id: targetFolderId || "null" }),
+        });
+      } catch (err) {}
+    }
+
+    const folderName = targetFolderId ? folders.find(f => f.id === targetFolderId)?.name || 'Folder' : 'Main Folder';
+    toast.success(`Save location updated to "${folderName}" in My Drafts`);
+  };
 
   useEffect(() => {
     if (!draftId && !documentKey && (!filename || !onlyofficeConfig)) {
@@ -970,6 +1025,52 @@ const OnlyOfficeWorkspace = () => {
                   )}
                 </div>
               )}
+
+              {/* Save Location in My Drafts Dropdown */}
+              <div className="relative inline-block text-left ml-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsFolderDropdownOpen(!isFolderDropdownOpen)}
+                  className="hover-lift inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-[#B9D9EB] text-xs font-semibold text-slate-700 shadow-sm transition-all"
+                  title="Choose Save Location in My Drafts"
+                >
+                  <span className="material-symbols-outlined text-sm text-blue-600">folder_open</span>
+                  <span>
+                    {selectedFolderId ? (folders.find(f => f.id === selectedFolderId)?.name || 'Folder') : 'My Drafts (Main)'}
+                  </span>
+                  <span className="material-symbols-outlined text-xs text-slate-400">arrow_drop_down</span>
+                </button>
+
+                {isFolderDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsFolderDropdownOpen(false)} />
+                    <div className="popup-anim absolute left-0 top-full mt-1.5 w-60 bg-white border border-[#B9D9EB] shadow-xl z-50 rounded-xl py-1.5 text-xs">
+                      <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                        Save Location in My Drafts
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveFolder(null)}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#E3F0F7] transition-colors ${!selectedFolderId ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}
+                      >
+                        <span className="flex items-center gap-2">📁 Main Folder (Root)</span>
+                        {!selectedFolderId && <span className="text-blue-600 font-bold">✓</span>}
+                      </button>
+                      {folders.map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleMoveFolder(f.id)}
+                          className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#E3F0F7] transition-colors ${selectedFolderId === f.id ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700'}`}
+                        >
+                          <span className="flex items-center gap-2 truncate">📂 {f.name}</span>
+                          {selectedFolderId === f.id && <span className="text-blue-600 font-bold">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {draftId && (

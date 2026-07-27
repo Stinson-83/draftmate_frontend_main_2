@@ -170,7 +170,7 @@ export default function AdvocateOnboarding() {
 
   const canProceed = () => {
     if (step === 1) {
-      return formData.bar_council_number && formData.years_experience && formData.consultation_fee && formData.location && formData.court_affiliation;
+      return formData.years_experience && formData.consultation_fee && formData.location && formData.court_affiliation;
     }
     if (step === 2) return formData.practice_areas.length > 0;
     if (step === 3) return formData.bio.trim().length > 20;
@@ -181,10 +181,10 @@ export default function AdvocateOnboarding() {
     <div className="space-y-5">
       <h3 className="text-lg font-bold text-slate-900">Professional Details</h3>
       <div>
-        <Label htmlFor="bar_council_number">Bar Council Number *</Label>
+        <Label htmlFor="bar_council_number">Bar Council Number / Enrollment ID (Optional)</Label>
         <Input id="bar_council_number" name="bar_council_number"
           value={formData.bar_council_number} onChange={handleChange}
-          placeholder="e.g. D/1234/2010" required />
+          placeholder="e.g. D/1234/2010 (Optional)" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>

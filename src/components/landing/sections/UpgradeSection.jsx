@@ -9,7 +9,7 @@ import BookDemoModal from "../BookDemoModal";
 const BENEFITS = [
   "Draft any Indian legal document in under 2 minutes",
   "Verified citations from Supreme Court & High Courts",
-  "Zero hallucinations — guaranteed accuracy",
+  "Zero hallucinations",
   "Auto-updated with BNS, DPDPA and latest laws",
   "Lex Bot research assistant included",
   "Full data privacy — attorney-client privilege level",
@@ -127,9 +127,9 @@ export default function UpgradeSection() {
         </ScrollReveal>
       </div>
       {/* Render the Book Demo Modal */}
-      <BookDemoModal 
-        isOpen={isDemoModalOpen} 
-        onClose={() => setIsDemoModalOpen(false)} 
+      <BookDemoModal
+        isOpen={isDemoModalOpen}
+        onClose={() => setIsDemoModalOpen(false)}
       />
     </section>
   );

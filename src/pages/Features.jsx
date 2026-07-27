@@ -456,6 +456,9 @@ const Features = () => {
     { icon: 'library_books',   title: 'Lex Bot Research Assistant',     description: 'Your personal legal research companion. Ask complex queries about Indian law and get precise answers with verified citations from SC & HCs.', color: '#8B5CF6' },
     { icon: 'verified',        title: 'Verified Case Citations',         description: 'Every citation is real and verified. Our AI only references actual judgments from authentic sources, eliminating hallucinated case laws.', color: '#10B981' },
     { icon: 'picture_as_pdf',  title: 'Smart PDF Editor',               description: 'Upload case files and chat with them. Extract summaries, key arguments, and relevant sections instantly with AI-powered analysis.', color: '#F59E0B' },
+    { icon: 'gavel',           title: 'eCourts Live Case Tracker',      description: 'Track case status, next hearing dates, cause lists, and auto-download latest orders directly synced with eCourts.', color: '#6366F1' },
+    { icon: 'translate',       title: 'Vernacular Legal Translator',   description: 'Instant multi-language AI translation for court pleadings (Vernacular to English/Hindi) with side-by-side comparative editor.', color: '#E11D48' },
+    { icon: 'menu_book',       title: 'Bare Acts & Judgment Library',   description: 'Search 500k+ Supreme Court & High Court precedents alongside updated Bare Acts including BNS, BNSS, and BSA.', color: '#059669' },
     { icon: 'psychology',      title: 'Personalized Writing Style',      description: 'The AI learns your unique drafting tone and vocabulary over time. Every document sounds exactly like you wrote it.', color: '#EC4899' },
     { icon: 'calculate',       title: 'Legal Calculators & Tools',       description: 'Built-in calculators for Court Fees, Limitation Periods, Interest and more — based on current Indian acts, regularly updated.', color: '#06B6D4' },
   ];
@@ -598,7 +601,7 @@ const Features = () => {
         <div className="relative z-10 max-w-6xl mx-auto">
           <SectionHeader
             badge="Core Features"
-            title={<>Six Powerful Tools to<br /><span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Transform Your Practice</span></>}
+            title={<>Powerful Next-Gen Tools to<br /><span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Transform Your Practice</span></>}
             subtitle="Everything an Indian advocate needs — in one intelligent platform."
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

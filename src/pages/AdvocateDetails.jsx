@@ -19,7 +19,6 @@ const AdvocateDetails = () => {
   const experienceLevels = ["0-2 Years", "3-5 Years", "6-10 Years", "10+ Years"];
 
   const handleSubmit = async () => {
-    if (!barCouncil.trim()) return toast.error("Please enter your Bar Council ID");
     if (!practiceArea) return toast.error("Please select your practice area");
     if (!experience) return toast.error("Please select your experience");
 
@@ -51,11 +50,11 @@ const AdvocateDetails = () => {
           </p>
 
           <div className="form-group">
-            <label className="form-label">Bar Council ID / Enrollment Number</label>
+            <label className="form-label">Bar Council ID / Enrollment Number (Optional)</label>
             <input
               type="text"
               className="form-input"
-              placeholder="e.g., MH/12345/2020"
+              placeholder="e.g., MH/12345/2020 (Optional)"
               value={barCouncil}
               onChange={(e) => setBarCouncil(e.target.value)}
             />

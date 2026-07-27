@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, FileText, Lock, Loader2, PenTool, Square, X } from 'lucide-react';
+import { Check, FileText, Lock, Loader2, PenTool, Square, X, Folder } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
@@ -29,7 +29,34 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const [loadingMessage, setLoadingMessage] = useState('Loading...');
     const [allQuestions, setAllQuestions] = useState({});
     const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
+    const [availableFolders, setAvailableFolders] = useState([]);
+    const [selectedFolderId, setSelectedFolderId] = useState(null);
     const fileInputRef = useRef(null);
+
+    useEffect(() => {
+        const loadFolders = async () => {
+            try {
+                const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+                if (token) {
+                    const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (Array.isArray(data.folders)) {
+                            setAvailableFolders(data.folders);
+                            return;
+                        }
+                    }
+                }
+            } catch (err) {}
+            try {
+                const localFolders = JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+                setAvailableFolders(localFolders);
+            } catch (err) {}
+        };
+        loadFolders();
+    }, []);
 
     useEffect(() => {
         if (initialEntryMode === 'dashboard') {
@@ -51,6 +78,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             name: record.name || record.filename || record.title || 'Untitled Draft',
             filename: record.filename || record.title || record.name || 'Untitled Draft.docx',
             documentKey: record.documentKey || record.id || '',
+            folderId: selectedFolderId || record.folderId || null,
             lastModified: record.lastModified || new Date().toISOString(),
             status: record.status || 'In progress',
             trackingParams: record.trackingParams || {
@@ -210,6 +238,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             name: fileName,
             filename: fileName,
             documentKey,
+            folderId: selectedFolderId || null,
             onlyofficeConfig,
             variablesDetected: data?.variablesDetected || [],
             status: 'In progress',
@@ -227,6 +256,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             state: {
                 documentKey,
                 filename: fileName,
+                folderId: selectedFolderId || null,
                 onlyofficeConfig,
                 variablesDetected: data?.variablesDetected || [],
                 trackingParams: {
@@ -767,6 +797,22 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                         )}
                     </ul>
                 </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                <div className="text-xs uppercase font-semibold tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Folder size={14} className="text-primary" /> Save Location in My Drafts
+                </div>
+                <select
+                    value={selectedFolderId || ''}
+                    onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                    <option value="">📁 Main Folder (Root)</option>
+                    {availableFolders.map((f) => (
+                        <option key={f.id} value={f.id}>📂 {f.name}</option>
+                    ))}
+                </select>
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
