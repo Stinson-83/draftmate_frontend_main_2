@@ -50,23 +50,9 @@ const Judgments = () => {
     return () => { isSubscribed = false; };
   }, [searchTerm, selectedCategory, selectedCourt]);
 
-  // Filtered judgments with client-side fallback matching
+  // 100% Real-time Indian Kanoon API results
   const filteredJudgments = useMemo(() => {
     let filtered = judgments;
-    if (searchTerm.trim()) {
-      const q = searchTerm.trim().toLowerCase();
-      const clientMatch = filtered.filter(j => 
-        (j.title && j.title.toLowerCase().includes(q)) ||
-        (j.summary && j.summary.toLowerCase().includes(q)) ||
-        (j.citation && j.citation.toLowerCase().includes(q)) ||
-        (j.category && j.category.toLowerCase().includes(q)) ||
-        (j.court && j.court.toLowerCase().includes(q)) ||
-        (j.tags && j.tags.some(t => t.toLowerCase().includes(q)))
-      );
-      if (clientMatch.length > 0) {
-        filtered = clientMatch;
-      }
-    }
     if (selectedCategory !== 'All') {
       const matchCat = filtered.filter(j => j.category === selectedCategory || (j.tags && j.tags.includes(selectedCategory)));
       if (matchCat.length > 0) filtered = matchCat;
@@ -76,7 +62,7 @@ const Judgments = () => {
       if (matchCourt.length > 0) filtered = matchCourt;
     }
     return filtered;
-  }, [judgments, searchTerm, selectedCategory, selectedCourt]);
+  }, [judgments, selectedCategory, selectedCourt]);
 
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto flex flex-col">
