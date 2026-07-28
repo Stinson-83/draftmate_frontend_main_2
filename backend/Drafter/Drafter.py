@@ -1134,15 +1134,12 @@ async def serve_draft(draft_id: str, filename: str):
         if os.path.isfile(root_path):
             file_path = root_path
         else:
-            try:
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                doc = Document()
-                doc.add_paragraph("")
-                doc.save(file_path)
-                upload_file_to_s3_background(file_path, s3_key)
-            except Exception as create_err:
-                logger.error(f"Failed to auto-generate blank docx: {create_err}")
-                raise HTTPException(status_code=404, detail="File not found.")
+            # Wait 1.5 seconds for in-flight S3 upload/sync if just created
+            import time
+            time.sleep(1.5)
+            ensure_file_exists_locally(s3_key, file_path)
+            if not os.path.isfile(file_path):
+                raise HTTPException(status_code=404, detail="Requested draft document is still compiling or not found.")
 
     return FileResponse(
         path=file_path,
@@ -1419,8 +1416,9 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
         sandboxed_path = os.path.join(draft_dir, file_name)
         os.rename(output_path, sandboxed_path)
         
-        # Upload to S3 in background
-        upload_file_to_s3_background(sandboxed_path, f"{draft_id}/{file_name}")
+        # Upload to S3 synchronously so all ECS cluster instances immediately find the compiled draft
+        from s3_helper import upload_file_to_s3
+        upload_file_to_s3(sandboxed_path, f"{draft_id}/{file_name}")
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
 
