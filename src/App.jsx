@@ -179,8 +179,6 @@ function App() {
               <Route path="/terms" element={<TermsOfUse />} />
               <Route path="/blogs" element={<ComingSoon title="Blog" />} />
               <Route path="/advocates" element={<AdvocateDiscovery />} />
-              <Route path="/advocate/login" element={<Navigate to="/dashboard/profile" replace />} />
-              <Route path="/advocate/signup" element={<Navigate to="/dashboard/profile" replace />} />
               <Route path="/advocate/onboarding" element={<AdvocateOnboarding />} />
               <Route path="/advocate/:slug" element={<AdvocateProfile />} />
               <Route path="/admin/verifications" element={<AdminDashboard />} />
