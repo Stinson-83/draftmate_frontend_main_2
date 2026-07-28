@@ -1409,9 +1409,7 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
             document_type=request.document_type,
         )
         
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
 
         import uuid
         draft_id = str(uuid.uuid4())
@@ -1518,9 +1516,7 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
     try:
         user_id = await verify_token(authorization)
 
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
 
         import uuid
         draft_id = str(uuid.uuid4())
@@ -1625,9 +1621,7 @@ async def upload_draft(
     try:
         user_id = await verify_token(authorization)
         
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
             
         import uuid
         draft_id = str(uuid.uuid4())
@@ -2119,9 +2113,7 @@ async def upload_document_to_case(
 @app.get("/v2/draft/serve/{filename}")
 @app.get("/v2/document/serve/{sub_dir}/{filename}")
 async def serve_document(filename: str, sub_dir: Optional[str] = None):
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-    if not shared_storage_path:
-        raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
         
     safe_sub_dir = os.path.basename((sub_dir or "").replace("\\", "/")) if sub_dir else ""
     safe_name = os.path.basename((filename or "").replace("\\", "/"))
