@@ -73,8 +73,9 @@ const normalizeJudgment = (apiJudgment) => ({
 });
 
 const normalizeJudgmentList = (apiResults) => {
-    if (!apiResults?.data?.results) return [];
-    return apiResults.data.results.map(normalizeJudgment);
+    if (!apiResults) return [];
+    const results = apiResults?.data?.results || apiResults?.results || (Array.isArray(apiResults) ? apiResults : []);
+    return results.map(normalizeJudgment);
 };
 
 /**

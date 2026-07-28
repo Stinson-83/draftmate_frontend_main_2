@@ -68,7 +68,7 @@ class IndianKanoonService:
     
     def __init__(self):
         """Initialize the service with environment variables."""
-        self.api_token = os.getenv("INDIANKANOON_API_TOKEN", "").strip()
+        self.api_token = (os.getenv("INDIANKANOON_API_TOKEN", "") or os.getenv("IKApi", "")).strip()
         self.base_url = os.getenv("INDIANKANOON_BASE_URL", "https://api.indiankanoon.org").rstrip("/")
         
         if not self.api_token:

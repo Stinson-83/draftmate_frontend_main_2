@@ -12,39 +12,54 @@ const Judgments = () => {
   const [activeTab, setActiveTab]             = useState('all'); // 'all' | 'saved'
   const [savedRefresh, setSavedRefresh]       = useState(0);
   const [judgments, setJudgments]             = useState([]);
-  const [isLoading, setIsLoading]             = useState(false);
+  const [isLoading, setIsLoading]             = useState(true);
   const [apiError, setApiError]               = useState(null);
 
-  // Fetch from API when search term changes
+  // 100% Real-time Indian Kanoon API fetch on mount, search term change, or category change
   useEffect(() => {
+    let isSubscribed = true;
+
     const fetchData = async () => {
-      if (!searchTerm.trim()) {
-        setJudgments([]);
-        return;
-      }
       setIsLoading(true);
       setApiError(null);
+
+      // Determine real-time search query for Indian Kanoon API
+      const query = searchTerm.trim() 
+        ? searchTerm.trim() 
+        : (selectedCategory !== 'All' ? selectedCategory : 'Supreme Court judgment');
+
       try {
-        const results = await searchJudgments(searchTerm);
-        setJudgments(results);
+        const results = await searchJudgments(query);
+        if (isSubscribed) {
+          setJudgments(results || []);
+        }
       } catch (e) {
-        setApiError('Failed to load judgments');
-        console.error(e);
+        console.error('Real-time Kanoon API search error:', e);
+        if (isSubscribed) {
+          setApiError('Failed to fetch real-time judgments from Indian Kanoon.');
+          setJudgments([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (isSubscribed) {
+          setIsLoading(false);
+        }
       }
     };
-    fetchData();
-  }, [searchTerm]);
 
-  // Keep existing filtering for categories/courts
+    fetchData();
+    return () => { isSubscribed = false; };
+  }, [searchTerm, selectedCategory, selectedCourt]);
+
+  // Filtered judgments
   const filteredJudgments = useMemo(() => {
     let filtered = judgments;
     if (selectedCategory !== 'All') {
-      filtered = filtered.filter(j => j.category === selectedCategory);
+      const matchCat = filtered.filter(j => j.category === selectedCategory);
+      if (matchCat.length > 0) filtered = matchCat;
     }
     if (selectedCourt !== 'All') {
-      filtered = filtered.filter(j => j.court === selectedCourt);
+      const matchCourt = filtered.filter(j => j.court === selectedCourt);
+      if (matchCourt.length > 0) filtered = matchCourt;
     }
     return filtered;
   }, [judgments, selectedCategory, selectedCourt]);
@@ -54,7 +69,7 @@ const Judgments = () => {
       <div className="max-w-7xl mx-auto w-full space-y-6 flex-1">
 
         {/* ── Header ── */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Judgment Library</h1>
             <p className="text-slate-600 dark:text-slate-400 mt-1">
@@ -62,39 +77,27 @@ const Judgments = () => {
             </p>
           </div>
 
-          {/* Search */}
-          <div className="w-full md:w-96 relative z-10">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 z-20">search</span>
-            <input
-              type="text"
-              placeholder="Search by party, citation, or keyword..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all shadow-sm"
-            />
+          {/* ── Tabs ── */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
+            {[['all', 'All Judgments'], ['saved', 'Saved']].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === key
+                    ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* ── Tabs ── */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
-          {[['all', 'All Judgments'], ['saved', 'Saved']].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === key
-                  ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Filters ── */}
+        {/* ── Category & Court Filter Row ── */}
         {activeTab === 'all' && (
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-4 items-center">
             {/* Category pills */}
             <div className="flex overflow-x-auto pb-1 scrollbar-none gap-2 flex-1">
               {judgmentCategories.map(cat => (
@@ -125,6 +128,30 @@ const Judgments = () => {
           </div>
         )}
 
+        {/* ── Full-Width Search Bar Below Filters ── */}
+        {activeTab === 'all' && (
+          <div className="w-full relative z-10 shadow-sm rounded-2xl">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl z-20">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Search by party, citation, court, or keyword..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-10 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-base"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 z-20"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* ── Judgment Grid ── */}
         {activeTab === 'all' ? (
           isLoading ? (
@@ -138,15 +165,15 @@ const Judgments = () => {
               action={{ label: 'Retry', onClick: () => setSearchTerm(s => s) }} 
             />
           ) : filteredJudgments.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredJudgments.map(j => (
                 <JudgmentCard key={j.id} judgment={j} onSaveToggle={() => setSavedRefresh(p => p + 1)} />
               ))}
             </div>
           ) : (
             <EmptyState 
-              message={searchTerm.trim() ? "No judgments match your search." : "Start typing to search for judgments."} 
-              sub={searchTerm.trim() ? "Try a different keyword, court, or category." : "Search for cases from Indian Kanoon."} 
+              message={searchTerm.trim() ? "No judgments match your search." : "No judgments found for selected filters."} 
+              sub="Try a different keyword, court, or category." 
             />
           )
         ) : (

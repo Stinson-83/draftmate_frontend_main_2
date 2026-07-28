@@ -258,9 +258,7 @@ function App() {
                 <Route path="help" element={<HelpCenter />} />
                 <Route path="billing" element={<Billing />} />
                 <Route path="notifications" element={<Notifications />} />
-                <Route path="advocate-profile" element={
-                  <RequireAdvocateAuth><AdvocateDashboard /></RequireAdvocateAuth>
-                } />
+                <Route path="advocate-profile" element={<AdvocateDashboard />} />
                 <Route path="chat" element={<Placeholder title="AI Chat" />} />
 
                 {/* Sidebar items — real pages */}
@@ -268,10 +266,8 @@ function App() {
 
                 <Route path="cases" element={<Navigate to="/dashboard/documents" replace />} />
                 <Route path="documents" element={<DocumentManagement />} />
-                {/* Visibility & Reach -> existing advocate dashboard (profile + analytics/reach) */}
-                <Route path="profile" element={
-                  <RequireAdvocateAuth><AdvocateDashboard /></RequireAdvocateAuth>
-                } />
+                {/* Visibility & Reach -> direct Lawyer Profile editing without auth guard */}
+                <Route path="profile" element={<AdvocateDashboard />} />
                 <Route path="ecourt" element={<CaseTracking />} />
 
                 {/* Catch-all relative to dashboard */}
