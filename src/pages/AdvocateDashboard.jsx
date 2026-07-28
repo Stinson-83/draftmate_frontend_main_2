@@ -110,26 +110,20 @@ export default function AdvocateDashboard() {
     };
 
     const DEFAULT_PROFILE = {
-        title: 'Adv. Preet Kakdiya',
-        bar_council_number: 'MAH/12345/2020',
-        years_experience: '5',
-        consultation_fee: '1500',
-        location: 'Mumbai, Maharashtra',
-        court_affiliation: 'High Court of Bombay & Supreme Court of India',
-        office_address: 'Suite 402, Nariman Point, Mumbai, Maharashtra 400021',
-        bio: 'Experienced Advocate specializing in Constitutional, Criminal, and Civil Litigation before the High Court and Supreme Court of India.',
-        languages: ['English', 'Hindi', 'Gujarati'],
-        practice_areas: ['Criminal Law', 'Constitutional Law', 'Civil Law'],
-        experience: [
-            { company: 'Kakdiya & Associates', role: 'Senior Managing Partner', start_date: '2020-01-01', end_date: '', is_current: true, description: 'Heading litigation team across Constitutional and Criminal cases.' }
-        ],
-        education: [
-            { institution: 'Government Law College, Mumbai', degree: 'LL.B', field_of_study: 'Law', start_year: '2015', end_year: '2020' }
-        ],
-        certifications: [
-            { title: 'Bar Council of India Certification', type: 'Bar Enrollment', date_achieved: '2020-06-15' }
-        ],
-        profile_completion_score: 95,
+        title: '',
+        bar_council_number: '',
+        years_experience: '',
+        consultation_fee: '',
+        location: '',
+        court_affiliation: '',
+        office_address: '',
+        bio: '',
+        languages: [],
+        practice_areas: [],
+        experience: [],
+        education: [],
+        certifications: [],
+        profile_completion_score: 0,
     };
 
     useEffect(() => {
@@ -139,16 +133,30 @@ export default function AdvocateDashboard() {
 
             // 1. Check local storage first
             const savedLocal = localStorage.getItem('lawyer_profile');
-            let initialProf = savedLocal ? JSON.parse(savedLocal) : DEFAULT_PROFILE;
+            let initialProf = DEFAULT_PROFILE;
+
+            if (savedLocal) {
+                try {
+                    const parsed = JSON.parse(savedLocal);
+                    // If local storage has the old mock default name, reset it to blank
+                    if (parsed && parsed.title !== 'Adv. Preet Kakdiya') {
+                        initialProf = parsed;
+                    } else {
+                        localStorage.removeItem('lawyer_profile');
+                    }
+                } catch {
+                    localStorage.removeItem('lawyer_profile');
+                }
+            }
             
             // Ensure array fields exist
-            initialProf.experience = Array.isArray(initialProf.experience) ? initialProf.experience : DEFAULT_PROFILE.experience;
-            initialProf.education = Array.isArray(initialProf.education) ? initialProf.education : DEFAULT_PROFILE.education;
-            initialProf.certifications = Array.isArray(initialProf.certifications) ? initialProf.certifications : DEFAULT_PROFILE.certifications;
-            initialProf.languages = Array.isArray(initialProf.languages) ? initialProf.languages : DEFAULT_PROFILE.languages;
+            initialProf.experience = Array.isArray(initialProf.experience) ? initialProf.experience : [];
+            initialProf.education = Array.isArray(initialProf.education) ? initialProf.education : [];
+            initialProf.certifications = Array.isArray(initialProf.certifications) ? initialProf.certifications : [];
+            initialProf.languages = Array.isArray(initialProf.languages) ? initialProf.languages : [];
             
             setProfile(initialProf);
-            setPracticeAreas(Array.isArray(initialProf.practice_areas) ? initialProf.practice_areas : DEFAULT_PROFILE.practice_areas);
+            setPracticeAreas(Array.isArray(initialProf.practice_areas) ? initialProf.practice_areas : []);
             if (initialProf.profile_image_url) setImagePreview(initialProf.profile_image_url);
 
             // 2. Optional background sync with backend if token exists
@@ -426,35 +434,35 @@ export default function AdvocateDashboard() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label>Full Name / Title</Label>
-                                    <Input name="title" value={profile?.title || ''} onChange={handleChange} />
+                                    <Input name="title" value={profile?.title || ''} onChange={handleChange} placeholder="e.g. Adv. Rajesh Sharma" />
                                 </div>
                                 <div>
                                     <Label>Bar Council Number</Label>
-                                    <Input name="bar_council_number" value={profile?.bar_council_number || ''} onChange={handleChange} />
+                                    <Input name="bar_council_number" value={profile?.bar_council_number || ''} onChange={handleChange} placeholder="e.g. MAH/12345/2020" />
                                 </div>
                                 <div>
                                     <Label>Years of Experience</Label>
                                     <Input type="number" name="years_experience" min="0"
-                                        value={profile?.years_experience || ''} onChange={handleChange} />
+                                        value={profile?.years_experience || ''} onChange={handleChange} placeholder="e.g. 5" />
                                 </div>
                                 <div>
                                     <Label>Consultation Fee (₹)</Label>
                                     <Input type="number" name="consultation_fee" min="0"
-                                        value={profile?.consultation_fee || ''} onChange={handleChange} />
+                                        value={profile?.consultation_fee || ''} onChange={handleChange} placeholder="e.g. 1500" />
                                 </div>
                                 <div>
                                     <Label>Location (City, State)</Label>
-                                    <Input name="location" value={profile?.location || ''} onChange={handleChange} />
+                                    <Input name="location" value={profile?.location || ''} onChange={handleChange} placeholder="e.g. Mumbai, Maharashtra" />
                                 </div>
                                 <div>
                                     <Label>Court Affiliation</Label>
-                                    <Input name="court_affiliation" value={profile?.court_affiliation || ''} onChange={handleChange} />
+                                    <Input name="court_affiliation" value={profile?.court_affiliation || ''} onChange={handleChange} placeholder="e.g. High Court of Bombay & Supreme Court" />
                                 </div>
                                 <div className="md:col-span-2">
                                     <Label>Office Address</Label>
                                     <Textarea name="office_address"
                                         value={profile?.office_address || ''} onChange={handleChange}
-                                        placeholder="Enter your office address"
+                                        placeholder="e.g. Suite 402, Nariman Point, Mumbai, Maharashtra 400021"
                                         className="resize-none" />
                                 </div>
                             </div>
