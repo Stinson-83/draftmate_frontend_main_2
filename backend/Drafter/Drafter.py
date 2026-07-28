@@ -1840,35 +1840,54 @@ async def get_draft_config(
         user_id = await verify_token(authorization)
         shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
         
-        # 1. Verify access via auth service
-        try:
-            async with httpx.AsyncClient() as client:
-                access_resp = await client.get(
-                    f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/verify_access/{draft_id}?user_id={user_id}",
-                    timeout=5.0
-                )
-                access_resp.raise_for_status()
-                access_data = access_resp.json()
-        except Exception as exc:
-            logger.error(f"Failed to contact auth service for access verification: {exc}")
-            raise HTTPException(status_code=502, detail=f"Failed to contact auth service: {exc}")
+        # 1. Verify access via auth service (with retry for resilience under load)
+        access_data = None
+        last_exc = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient() as client:
+                    access_resp = await client.get(
+                        f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/verify_access/{draft_id}?user_id={user_id}",
+                        timeout=8.0
+                    )
+                    access_resp.raise_for_status()
+                    access_data = access_resp.json()
+                    break
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(f"Auth access check attempt {attempt+1}/3 failed: {exc}")
+                if attempt < 2:
+                    import asyncio
+                    await asyncio.sleep(0.5 * (attempt + 1))
+        if access_data is None:
+            logger.error(f"All attempts to contact auth service failed: {last_exc}")
+            raise HTTPException(status_code=502, detail=f"Auth service unavailable. Please retry.")
              
         access_level = access_data.get("access_level", "none")
         if access_level == "none":
             raise HTTPException(status_code=403, detail="You do not have access to this draft.")
              
-        # 2. Get draft metadata from auth service
-        try:
-            async with httpx.AsyncClient() as client:
-                draft_resp = await client.get(
-                    f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
-                    timeout=5.0
-                )
-                draft_resp.raise_for_status()
-                draft_data = draft_resp.json()
-        except Exception as exc:
-            logger.error(f"Failed to fetch draft metadata from auth service: {exc}")
-            raise HTTPException(status_code=502, detail=f"Failed to fetch draft info: {exc}")
+        # 2. Get draft metadata from auth service (with retry for resilience under load)
+        draft_data = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient() as client:
+                    draft_resp = await client.get(
+                        f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
+                        timeout=8.0
+                    )
+                    draft_resp.raise_for_status()
+                    draft_data = draft_resp.json()
+                    break
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(f"Auth draft metadata attempt {attempt+1}/3 failed: {exc}")
+                if attempt < 2:
+                    import asyncio
+                    await asyncio.sleep(0.5 * (attempt + 1))
+        if draft_data is None:
+            logger.error(f"All attempts to fetch draft metadata failed: {last_exc}")
+            raise HTTPException(status_code=502, detail=f"Draft metadata unavailable. Please retry.")
              
         file_name = draft_data.get("filename")
         raw_document_key = draft_data.get("documentKey") or draft_id
