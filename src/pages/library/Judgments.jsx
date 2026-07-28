@@ -24,9 +24,12 @@ const Judgments = () => {
       setApiError(null);
 
       // Determine real-time search query for Indian Kanoon API
-      const query = searchTerm.trim() 
-        ? searchTerm.trim() 
-        : (selectedCategory !== 'All' ? selectedCategory : 'Supreme Court judgment');
+      let query = 'Supreme Court 2024';
+      if (searchTerm.trim().length >= 3) {
+        query = searchTerm.trim();
+      } else if (selectedCategory !== 'All') {
+        query = `${selectedCategory} Supreme Court`;
+      }
 
       try {
         const results = await searchJudgments(query);
