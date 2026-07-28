@@ -21,7 +21,7 @@ import logging
 import hashlib
 import json
 from typing import Any, Dict, List, Optional, Set, Tuple
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, quote
 
 import httpx
 import jwt
@@ -32,10 +32,32 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Mm, Pt
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices
+
+logger = logging.getLogger(__name__)
+
+def get_backend_public_url(request: Optional[Any] = None) -> str:
+    env_url = (
+        os.getenv("BACKEND_PUBLIC_URL")
+        or os.getenv("PUBLIC_DRAFTER_URL")
+        or os.getenv("FRONTEND_URL_PROD")
+    )
+    if env_url and env_url.strip():
+        base = env_url.strip().rstrip("/")
+        return f"{base}/drafter" if not base.endswith("/drafter") else base
+
+    if request:
+        try:
+            scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+            host = request.headers.get("x-forwarded-host", request.headers.get("host", "127.0.0.1:8080"))
+            return f"{scheme}://{host}/drafter"
+        except Exception as err:
+            logger.debug(f"Request header resolution fallback notice: {err}")
+
+    return "http://ecs-express-gateway-alb-220524834.ap-south-1.elb.amazonaws.com/drafter"
 
 import sys
 import re
@@ -1595,6 +1617,7 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
 @app.post("/v2/draft/upload")
 async def upload_draft(
     background_tasks: BackgroundTasks,
+    req: Request,
     file: UploadFile = File(...),
     session_id: Optional[str] = Form(None),
     authorization: Optional[str] = Header(default=None)
@@ -1741,17 +1764,18 @@ async def upload_draft(
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
+        public_url = get_backend_public_url(req)
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
                 "key": document_key,
                 "title": safe_name,
-                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{safe_name}",
+                "url": f"{public_url}/v2/draft/serve/{draft_id}/{quote(safe_name)}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{public_url}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1866,10 +1890,7 @@ async def get_draft_config(
         
         document_key = hashlib.sha256(f"{raw_document_key}{mtime_suffix}".encode("utf-8")).hexdigest()
          
-        # Dynamically build public_url from incoming request host headers
-        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
-        host = request.headers.get("x-forwarded-host", request.headers.get("host", "127.0.0.1:8080"))
-        public_url = f"{scheme}://{host}/drafter"
+        public_url = get_backend_public_url(request)
 
         serve_url = f"{public_url}/v2/draft/serve/{draft_id}/{quote(file_name)}"
         callback_url = f"{public_url}/v2/draft/callback/{draft_id}"
