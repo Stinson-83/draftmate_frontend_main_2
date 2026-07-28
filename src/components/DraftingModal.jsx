@@ -231,13 +231,15 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
     const navigateToWorkspace = (data, recordMeta = {}) => {
         const fileName = data?.filename || data?.document?.title || recordMeta.filename || slugifyFileName(prompt || 'AI Draft');
+        const draftId = data?.draft_id || data?.id || data?.draftId || '';
         const documentKey = data?.documentKey || data?.document?.key || recordMeta.documentKey || '';
         const onlyofficeConfig = data?.onlyofficeConfig || data;
 
         persistWorkspaceDraft({
-            id: documentKey,
+            id: draftId || documentKey,
             name: fileName,
             filename: fileName,
+            draftId: draftId || documentKey,
             documentKey,
             folderId: selectedFolderId || null,
             onlyofficeConfig,
@@ -255,6 +257,8 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
         navigate('/dashboard/workspace', {
             state: {
+                draftId: draftId || documentKey,
+                id: draftId || documentKey,
                 documentKey,
                 filename: fileName,
                 folderId: selectedFolderId || null,

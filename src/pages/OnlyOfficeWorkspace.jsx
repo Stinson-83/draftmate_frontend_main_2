@@ -303,11 +303,15 @@ const OnlyOfficeWorkspace = () => {
   }, [location]);
 
   const draftId = useMemo(() => {
-    return location?.state?.draftId || location?.state?.id || documentKey;
+    return location?.state?.draftId || location?.state?.id || location?.state?.onlyofficeConfig?.draft_id || documentKey;
   }, [location, documentKey]);
 
   useEffect(() => {
     const fetchConfig = async () => {
+      if (location?.state?.onlyofficeConfig) {
+        setDynamicConfig(location.state.onlyofficeConfig);
+        return;
+      }
       if (!draftId) return;
       setConfigLoading(true);
       try {
@@ -327,7 +331,7 @@ const OnlyOfficeWorkspace = () => {
       }
     };
     fetchConfig();
-  }, [draftId]);
+  }, [draftId, location]);
 
   useEffect(() => {
     const fetchFolders = async () => {
