@@ -211,6 +211,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         });
 
         return [
+            `Jurisdiction & Applicable Laws: India (Indian Courts, BNS, BNSS, BSA, IPC, CrPC, Indian Contract Act)`,
             `Matter: ${prompt.trim()}`,
             answerLines.length > 0 ? `Clarifications:\n${answerLines.map((line) => `- ${line}`).join('\n\n')}` : 'Clarifications: none',
         ].join('\n\n');

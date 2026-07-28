@@ -445,8 +445,8 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
     if ans_doc_type:
         document_type = ans_doc_type
 
-    jurisdiction = "Not specified"
-    for candidate in ["india", "indian", "delhi", "mumbai", "maharashtra", "karnataka", "tamil nadu", "california", "new york"]:
+    jurisdiction = "India"
+    for candidate in ["india", "indian", "delhi", "mumbai", "maharashtra", "karnataka", "tamil nadu"]:
         if candidate in text:
             jurisdiction = candidate.title()
             break
@@ -475,8 +475,6 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
 
     questions: List[ClarifyingQuestion] = []
     missing_key_inputs = []
-    if jurisdiction == "Not specified" and not ans_jurisdiction:
-        missing_key_inputs.append("jurisdiction")
     if document_type == "Legal Document" and not ans_doc_type:
         missing_key_inputs.append("document_type")
     if rep_position == "Not specified" and not ans_position:
@@ -485,14 +483,6 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
         missing_key_inputs.append("commercial_terms")
 
     if missing_key_inputs:
-        if "jurisdiction" in missing_key_inputs:
-            questions.append(
-                _build_clarifying_question(
-                    "jurisdiction",
-                    "Which jurisdiction should govern this draft?",
-                    [("India", "India"), ("United States", "United States"), ("Other / mixed", "Other / mixed")],
-                )
-            )
         if "document_type" in missing_key_inputs:
             questions.append(
                 _build_clarifying_question(
@@ -525,13 +515,13 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
         jurisdiction=jurisdiction,
         representation_position=rep_position,
         key_legal_positions=[
-            "Use market-standard allocation of risk where the prompt is silent.",
-            "Preserve internal consistency across definitions, remedies, and termination rights.",
+            "Use Indian law standards and risk allocation where the prompt is silent.",
+            "Preserve internal consistency across definitions, remedies, and statutory references.",
         ],
     )
     assumptions = [
-        "Market-standard boilerplate will be used for missing administrative clauses.",
-        "Ambiguous commercial inputs will be resolved conservatively in favor of internal consistency.",
+        "Indian standard legal boilerplate will be used for missing administrative clauses.",
+        "Ambiguous commercial inputs will be resolved conservatively under Indian contract principles.",
     ]
 
     sufficient = len(questions) == 0
@@ -553,16 +543,22 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
 def _build_intake_prompt(initial_prompt: str, accumulated_answers: Dict[str, Any], current_round_index: int) -> str:
     answers_text = _flatten_answers(accumulated_answers)
     return f"""
-You are a Senior Transactional Lawyer performing intake analysis for a legal drafting workflow.
+You are a Senior Indian Legal Advocate and Transactional Specialist performing intake analysis for an Indian legal drafting workflow.
+
+CRITICAL JURISDICTION INSTRUCTION:
+- DraftMate is an AI legal platform built EXCLUSIVELY for INDIAN LAW and INDIAN COURTS.
+- ALL legal drafting and intake questions MUST be grounded in the Laws of India (Constitution of India, Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), Bharatiya Sakshya Adhiniyam (BSA), IPC, CrPC, CPC, Indian Contract Act, Supreme Court of India, High Courts, District & Sessions Courts, Magistrate Courts, NCLT, Consumer Fora, etc.).
+- NEVER generate questions or options referencing US States (e.g. California, Texas, New York), US Federal Courts, US legal terminology, or foreign jurisdictions.
+- If asking about Court or Forum, options MUST be Indian judicial forums (e.g., Supreme Court of India, High Court, Sessions / Magistrate Court, Consumer Court / NCLT).
 
 Follow these steps:
-1. Document Identification.
-2. Requirement Extraction.
+1. Document Identification under Indian Law.
+2. Requirement Extraction under Indian Legal Standards.
 3. Gap Analysis.
 
 If critical structural or commercial risk information is missing, return up to 5 concise clarifying questions.
-Prefer multiple-choice questions with 3-4 options.
-If the matter is sufficiently clear or market-standard provisions can close the gaps, return sufficiency_met true,
+Prefer multiple-choice questions with 3-4 options tailored specifically for Indian law and practice.
+If the matter is sufficiently clear or Indian market-standard provisions can close the gaps, return sufficiency_met true,
 and include:
 - Step 6 assumptions
 - Step 8 draft summary basis
