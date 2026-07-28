@@ -56,58 +56,7 @@ export default function AdvocateDashboard() {
     const [verificationDoc, setVerificationDoc] = useState(null);
     const [practiceAreas, setPracticeAreas] = useState([]);
 
-    // Inline Auth State for unauthenticated advocates accessing Lawyer Profile
-    const [authMode, setAuthMode] = useState('login');
-    const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-    const [registerForm, setRegisterForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
-    const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-    const handleInlineLogin = async (e) => {
-        e.preventDefault();
-        setIsAuthenticating(true);
-        const tid = toast.loading('Signing in as Advocate...');
-        try {
-            const data = await advocateAuth.login(loginForm);
-            advocateAuth.saveTokens(data);
-            toast.dismiss(tid);
-            toast.success('Advocate sign in successful!');
-            setLoadError(null);
-            fetchAll();
-        } catch (err) {
-            toast.dismiss(tid);
-            toast.error(err.message || 'Login failed');
-        } finally {
-            setIsAuthenticating(false);
-        }
-    };
-
-    const handleInlineRegister = async (e) => {
-        e.preventDefault();
-        if (registerForm.password.length < 8) {
-            toast.error('Password must be at least 8 characters.');
-            return;
-        }
-        setIsAuthenticating(true);
-        const tid = toast.loading('Creating your advocate profile...');
-        try {
-            const data = await advocateAuth.register({
-                email: registerForm.email,
-                password: registerForm.password,
-                first_name: registerForm.firstName,
-                last_name: registerForm.lastName,
-            });
-            advocateAuth.saveTokens(data);
-            toast.dismiss(tid);
-            toast.success('Advocate account created successfully!');
-            setLoadError(null);
-            fetchAll();
-        } catch (err) {
-            toast.dismiss(tid);
-            toast.error(err.message || 'Registration failed');
-        } finally {
-            setIsAuthenticating(false);
-        }
-    };
 
     const DEFAULT_PROFILE = {
         title: '',

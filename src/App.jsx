@@ -49,8 +49,6 @@ import PaymentStatus from './pages/PaymentStatus';
 import AdvocateProfile from './pages/AdvocateProfile';
 import AdvocateDiscovery from './pages/AdvocateDiscovery';
 import AdvocateDashboard from './pages/AdvocateDashboard';
-import AdvocateLogin from './pages/AdvocateLogin';
-import AdvocateSignup from './pages/AdvocateSignup';
 import AdvocateOnboarding from './pages/AdvocateOnboarding';
 import AdminDashboard from './pages/AdminDashboard';
 import TranslateDocumentPage from './pages/TranslateDocumentPage';
@@ -128,16 +126,6 @@ function App() {
     return children;
   };
 
-  // Requires a valid advocate JWT specifically
-  const RequireAdvocateAuth = ({ children }) => {
-    const advocateToken = localStorage.getItem('advocate_token');
-    const sessionId = localStorage.getItem('session_id');
-    if (!advocateToken && !sessionId) {
-      return <Navigate to="/advocate/login" replace />;
-    }
-    return children;
-  };
-
   if (!import.meta.env.VITE_CLIENT_ID) {
     return (
       <div className="flex h-screen items-center justify-center bg-red-50 text-red-800 p-4">
@@ -191,11 +179,9 @@ function App() {
               <Route path="/terms" element={<TermsOfUse />} />
               <Route path="/blogs" element={<ComingSoon title="Blog" />} />
               <Route path="/advocates" element={<AdvocateDiscovery />} />
-              <Route path="/advocate/login" element={<AdvocateLogin />} />
-              <Route path="/advocate/signup" element={<AdvocateSignup />} />
-              <Route path="/advocate/onboarding" element={
-                <RequireAdvocateAuth><AdvocateOnboarding /></RequireAdvocateAuth>
-              } />
+              <Route path="/advocate/login" element={<Navigate to="/dashboard/profile" replace />} />
+              <Route path="/advocate/signup" element={<Navigate to="/dashboard/profile" replace />} />
+              <Route path="/advocate/onboarding" element={<AdvocateOnboarding />} />
               <Route path="/advocate/:slug" element={<AdvocateProfile />} />
               <Route path="/admin/verifications" element={<AdminDashboard />} />
 
