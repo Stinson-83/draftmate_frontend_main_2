@@ -1694,8 +1694,9 @@ async def upload_draft(
         with open(output_path, "rb") as f:
             docx_bytes = f.read()
 
-        # Upload to S3 in background
+        # Upload to S3 in background under both draft_id/safe_name and safe_name keys
         upload_file_to_s3_background(output_path, f"{draft_id}/{safe_name}")
+        upload_file_to_s3_background(output_path, safe_name)
 
         # Copy file to lex_bot upload directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2129,6 +2130,8 @@ async def serve_document(filename: str, sub_dir: Optional[str] = None):
     
     try:
         ensure_file_exists_locally(s3_key, file_path)
+        if not os.path.isfile(file_path) and safe_name != s3_key:
+            ensure_file_exists_locally(safe_name, file_path)
     except Exception as s3_err:
         logger.warning(f"S3 file fetch warning: {s3_err}")
 
