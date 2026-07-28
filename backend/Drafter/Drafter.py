@@ -1849,6 +1849,7 @@ async def get_draft_config(
 ):
     try:
         user_id = await verify_token(authorization)
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
         
         # 1. Verify access via auth service
         try:
