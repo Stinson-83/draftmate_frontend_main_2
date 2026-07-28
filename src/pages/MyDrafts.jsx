@@ -19,6 +19,13 @@ const MyDrafts = () => {
     const [folderNameInput, setFolderNameInput] = useState('');
     const [isDraggingOverId, setIsDraggingOverId] = useState(null);
 
+    const [deleteModalState, setDeleteModalState] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: null
+    });
+
     const fetchDraftsAndFolders = async () => {
         let loadedDrafts = [];
         let loadedFolders = [];
@@ -59,36 +66,43 @@ const MyDrafts = () => {
         fetchDraftsAndFolders();
     }, []);
 
-    const handleDeleteDraft = async (id, e) => {
+    const performDeleteDraft = async (id) => {
+        const targetDraft = drafts.find(d => String(d.id) === String(id));
+        try {
+            const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+            if (token) {
+                await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ id }),
+                });
+            }
+        } catch (error) {}
+
+        // Delete from Document Management as well
+        try {
+            await caseService.deleteCaseDocument(null, id);
+            if (targetDraft?.name || targetDraft?.filename) {
+                await caseService.deleteCaseDocument(null, targetDraft.name || targetDraft.filename);
+            }
+        } catch (dmsErr) {}
+
+        setDrafts(prev => {
+            const updated = prev.filter(draft => String(draft.id) !== String(id));
+            localStorage.setItem('my_drafts', JSON.stringify(updated));
+            return updated;
+        });
+        toast.success("Draft deleted successfully.");
+    };
+
+    const handleDeleteDraft = (id, e) => {
         e.stopPropagation();
-        if (window.confirm('Are you sure you want to delete this draft?')) {
-            const targetDraft = drafts.find(d => String(d.id) === String(id));
-            try {
-                const token = localStorage.getItem('session_id') || localStorage.getItem('token');
-                if (token) {
-                    await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ id }),
-                    });
-                }
-            } catch (error) {}
-
-            // Delete from Document Management as well
-            try {
-                await caseService.deleteCaseDocument(null, id);
-                if (targetDraft?.name || targetDraft?.filename) {
-                    await caseService.deleteCaseDocument(null, targetDraft.name || targetDraft.filename);
-                }
-            } catch (dmsErr) {}
-
-            setDrafts(prev => {
-                const updated = prev.filter(draft => String(draft.id) !== String(id));
-                localStorage.setItem('my_drafts', JSON.stringify(updated));
-                return updated;
-            });
-            toast.success("Draft deleted successfully.");
-        }
+        setDeleteModalState({
+            isOpen: true,
+            title: 'Delete Draft',
+            message: 'Are you sure you want to delete this draft? This action cannot be undone.',
+            onConfirm: () => performDeleteDraft(id)
+        });
     };
 
     const handleOpenDraft = (draft) => {
@@ -154,29 +168,36 @@ const MyDrafts = () => {
         setFolderNameInput('');
     };
 
-    const handleDeleteFolder = async (id, e) => {
-        e.stopPropagation();
-        if (window.confirm('Are you sure you want to delete this folder? All drafts inside will be moved to root.')) {
-            try {
-                const token = localStorage.getItem('session_id');
-                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/folder/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ id }),
-                });
-                if (response.ok) {
-                    setFolders(prev => prev.filter(f => f.id !== id));
-                    setDrafts(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d));
-                    if (currentFolder === id) setCurrentFolder(null);
-                    toast.success("Folder deleted successfully.");
-                } else {
-                    toast.error("Failed to delete folder.");
-                }
-            } catch (error) {
-                console.error("Error deleting folder:", error);
+    const performDeleteFolder = async (id) => {
+        try {
+            const token = localStorage.getItem('session_id');
+            const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/folder/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ id }),
+            });
+            if (response.ok) {
+                setFolders(prev => prev.filter(f => f.id !== id));
+                setDrafts(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d));
+                if (currentFolder === id) setCurrentFolder(null);
+                toast.success("Folder deleted successfully.");
+            } else {
                 toast.error("Failed to delete folder.");
             }
+        } catch (error) {
+            console.error("Error deleting folder:", error);
+            toast.error("Failed to delete folder.");
         }
+    };
+
+    const handleDeleteFolder = (id, e) => {
+        e.stopPropagation();
+        setDeleteModalState({
+            isOpen: true,
+            title: 'Delete Folder',
+            message: 'Are you sure you want to delete this folder? All drafts inside will be moved to root.',
+            onConfirm: () => performDeleteFolder(id)
+        });
     };
 
     const handleDragStart = (e, draftId) => {
@@ -846,6 +867,46 @@ const MyDrafts = () => {
                     </div>
                 )}
             </div>
+
+            {/* Custom Delete Confirmation Modal */}
+            {deleteModalState.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 animate-scaleUp">
+                        <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                {deleteModalState.title}
+                            </h3>
+                        </div>
+
+                        <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                            {deleteModalState.message}
+                        </p>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setDeleteModalState({ isOpen: false, title: '', message: '', onConfirm: null })}
+                                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-xl transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (deleteModalState.onConfirm) deleteModalState.onConfirm();
+                                    setDeleteModalState({ isOpen: false, title: '', message: '', onConfirm: null });
+                                }}
+                                className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-xl shadow-md transition-all"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Date Timeline Modal */}
             {showTimeline && currentFolder && (
