@@ -11,4 +11,101 @@ export const judgmentCategories = [
 
 export const judgmentCourts = ['All', 'Supreme Court', 'High Court', 'Tribunal', 'Consumer Forum', 'NCLT', 'NCLAT'];
 
-export const mockJudgments = [];
+export const mockJudgments = [
+  {
+    id: 'ik_rent_01',
+    title: 'Rattan Arya & Anr v. State of Tamil Nadu & Ors',
+    court: 'Supreme Court of India',
+    citation: '1986 AIR 1444, 1986 SCR (2) 596',
+    date: '1986-04-11',
+    year: '1986',
+    judges: ['O. Chinnappa Reddy', 'V. Khalid'],
+    summary: 'Landmark Supreme Court decision under Rent Control Act examining tenant rights, eviction provisions, and reasonableness of rent control laws.',
+    ratiodecidendi: 'Rent control legislation must balance the protection of tenants against arbitrary eviction with the legitimate rights of property owners.',
+    pdfUrl: 'https://indiankanoon.org/doc/1826045/',
+    source: 'Indian Kanoon',
+    category: 'Property Law',
+    tags: ['Rent Control', 'Eviction', 'Tenancy'],
+    isSaved: false
+  },
+  {
+    id: 'ik_rent_02',
+    title: 'Prabhakaran Nair & Ors v. State of Tamil Nadu',
+    court: 'Supreme Court of India',
+    citation: '1987 AIR 2117, 1988 SCR (1) 1',
+    date: '1987-09-24',
+    year: '1987',
+    judges: ['S. Sabyasachi Mukharji'],
+    summary: 'Key decision on tenant eviction under Tamil Nadu Buildings (Lease and Rent Control) Act and validity of statutory tenancy protections.',
+    ratiodecidendi: 'The purpose of rent control laws is to prevent exploitation of tenants in urban areas facing acute accommodation shortage.',
+    pdfUrl: 'https://indiankanoon.org/doc/593821/',
+    source: 'Indian Kanoon',
+    category: 'Property Law',
+    tags: ['Rent Control', 'Tenancy', 'Property'],
+    isSaved: false
+  },
+  {
+    id: 'ik_bail_01',
+    title: 'Arnesh Kumar v. State of Bihar & Anr',
+    court: 'Supreme Court of India',
+    citation: '(2014) 8 SCC 273',
+    date: '2014-07-02',
+    year: '2014',
+    judges: ['Chandramauli Kr. Prasad', 'Pinaki Chandra Ghose'],
+    summary: 'Landmark guidelines on arrest and bail under Section 498A IPC and offences punishable with imprisonment up to 7 years.',
+    ratiodecidendi: 'Arrest should not be automatic upon registration of FIR; police must satisfy necessity criteria under Section 41 CrPC.',
+    pdfUrl: 'https://indiankanoon.org/doc/29810164/',
+    source: 'Indian Kanoon',
+    category: 'Criminal Law',
+    tags: ['Bail', 'Arrest', 'CrPC'],
+    isSaved: false
+  },
+  {
+    id: 'ik_bail_02',
+    title: 'Satender Kumar Antil v. Central Bureau of Investigation',
+    court: 'Supreme Court of India',
+    citation: '(2022) 10 SCC 51',
+    date: '2022-07-11',
+    year: '2022',
+    judges: ['S. Abdul Nazeer', 'J.K. Maheshwari'],
+    summary: 'Comprehensive guidelines issued to streamline bail process and prevent unnecessary pre-trial detention in India.',
+    ratiodecidendi: 'Bail is the rule and jail is the exception. Prolonged incarceration without trial violates Article 21 of the Constitution.',
+    pdfUrl: 'https://indiankanoon.org/doc/171542193/',
+    source: 'Indian Kanoon',
+    category: 'Criminal Law',
+    tags: ['Bail', 'CrPC', 'Fundamental Rights'],
+    isSaved: false
+  },
+  {
+    id: 'ik_const_01',
+    title: 'Kesavananda Bharati v. State of Kerala',
+    court: 'Supreme Court of India',
+    citation: '(1973) 4 SCC 225',
+    date: '1973-04-24',
+    year: '1973',
+    judges: ['S.M. Sikri', 'J.M. Shelat', 'K.S. Hegde'],
+    summary: 'Historic 13-judge bench decision establishing the Basic Structure Doctrine of the Indian Constitution.',
+    ratiodecidendi: 'Parliament has wide powers to amend the Constitution under Article 368, but cannot alter or destroy its Basic Structure.',
+    pdfUrl: 'https://indiankanoon.org/doc/257870/',
+    source: 'Indian Kanoon',
+    category: 'Constitutional Law',
+    tags: ['Basic Structure', 'Constitution', 'Landmark'],
+    isSaved: false
+  },
+  {
+    id: 'ik_corp_01',
+    title: 'Tata Consultancy Services v. Cyrus Investments Pvt Ltd',
+    court: 'Supreme Court of India',
+    citation: '(2021) 9 SCC 449',
+    date: '2021-03-26',
+    year: '2021',
+    judges: ['S.A. Bobde', 'A.S. Bopanna', 'V. Ramasubramanian'],
+    summary: 'Landmark corporate governance decision under Companies Act 2013 on oppression and mismanagement.',
+    ratiodecidendi: 'Removal of a Chairman does not automatically amount to oppression of minority shareholders unless fraud or illegality is established.',
+    pdfUrl: 'https://indiankanoon.org/doc/117293402/',
+    source: 'Indian Kanoon',
+    category: 'Corporate Law',
+    tags: ['Company Law', 'NCLAT', 'Corporate Governance'],
+    isSaved: false
+  }
+];
