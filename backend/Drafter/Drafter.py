@@ -21,7 +21,7 @@ import logging
 import hashlib
 import json
 from typing import Any, Dict, List, Optional, Set, Tuple
-from urllib.parse import urlparse, urlunparse, quote
+from urllib.parse import urlparse, urlunparse, quote, unquote
 
 import httpx
 import jwt
@@ -2110,14 +2110,14 @@ async def upload_document_to_case(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/v2/draft/serve/{sub_dir}/{filename}")
-@app.get("/v2/draft/serve/{filename}")
-@app.get("/v2/document/serve/{sub_dir}/{filename}")
-async def serve_document(filename: str, sub_dir: Optional[str] = None):
+async def _internal_serve_file(filename: str, sub_dir: Optional[str] = None):
     shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+    
+    raw_filename = unquote(filename or "")
+    raw_sub_dir = unquote(sub_dir or "") if sub_dir else ""
         
-    safe_sub_dir = os.path.basename((sub_dir or "").replace("\\", "/")) if sub_dir else ""
-    safe_name = os.path.basename((filename or "").replace("\\", "/"))
+    safe_sub_dir = os.path.basename(raw_sub_dir.replace("\\", "/")) if raw_sub_dir else ""
+    safe_name = os.path.basename(raw_filename.replace("\\", "/"))
     if not safe_name:
         raise HTTPException(status_code=400, detail="Invalid path parameter.")
         
@@ -2129,23 +2129,25 @@ async def serve_document(filename: str, sub_dir: Optional[str] = None):
         s3_key = safe_name
     
     try:
-        ensure_file_exists_locally(s3_key, file_path)
+        if not os.path.isfile(file_path):
+            ensure_file_exists_locally(s3_key, file_path)
         if not os.path.isfile(file_path) and safe_name != s3_key:
             ensure_file_exists_locally(safe_name, file_path)
     except Exception as s3_err:
-        logger.warning(f"S3 file fetch warning: {s3_err}")
+        logger.warning(f"S3 file fetch warning for s3_key={s3_key}: {s3_err}")
 
     if not os.path.isfile(file_path):
-        # Fallback search if sub_dir is missing or different
+        # Fallback search if sub_dir is missing or different on disk
         matching_files = [
             os.path.join(dp, f) for dp, dn, filenames in os.walk(shared_storage_path) for f in filenames if f == safe_name
         ]
         if matching_files:
             file_path = matching_files[0]
         else:
+            logger.error(f"File not found on disk or S3: safe_name={safe_name}, s3_key={s3_key}, file_path={file_path}")
             raise HTTPException(status_code=404, detail=f"File not found: {safe_name}")
         
-    ext = safe_name.split('.')[-1].lower() if '.' in safe_name else 'docx'
+    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else 'docx'
     media_types = {
         'pdf': 'application/pdf',
         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -2163,6 +2165,16 @@ async def serve_document(filename: str, sub_dir: Optional[str] = None):
         media_type=media_type,
         filename=safe_name,
     )
+
+@app.get("/v2/draft/serve/{sub_dir}/{filename}")
+@app.get("/v2/document/serve/{sub_dir}/{filename}")
+async def serve_document_with_dir(sub_dir: str, filename: str):
+    return await _internal_serve_file(filename=filename, sub_dir=sub_dir)
+
+@app.get("/v2/draft/serve/{filename}")
+@app.get("/v2/document/serve/{filename}")
+async def serve_document_single(filename: str):
+    return await _internal_serve_file(filename=filename, sub_dir=None)
 
 
 if __name__ == "__main__":
