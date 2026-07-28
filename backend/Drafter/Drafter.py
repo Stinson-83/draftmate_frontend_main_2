@@ -43,7 +43,6 @@ def get_backend_public_url(request: Optional[Any] = None) -> str:
     env_url = (
         os.getenv("BACKEND_PUBLIC_URL")
         or os.getenv("PUBLIC_DRAFTER_URL")
-        or os.getenv("FRONTEND_URL_PROD")
     )
     if env_url and env_url.strip():
         base = env_url.strip().rstrip("/")
@@ -52,8 +51,9 @@ def get_backend_public_url(request: Optional[Any] = None) -> str:
     if request:
         try:
             scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
-            host = request.headers.get("x-forwarded-host", request.headers.get("host", "127.0.0.1:8080"))
-            return f"{scheme}://{host}/drafter"
+            host = request.headers.get("x-forwarded-host", request.headers.get("host", ""))
+            if host and "draftmate.in" not in host and "localhost" not in host:
+                return f"{scheme}://{host}/drafter"
         except Exception as err:
             logger.debug(f"Request header resolution fallback notice: {err}")
 
