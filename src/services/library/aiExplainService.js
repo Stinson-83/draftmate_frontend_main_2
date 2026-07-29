@@ -162,7 +162,7 @@ function parseSectionExplanation(text) {
  * Helper function to call Gemini API directly for judgment summarization
  */
 async function callGeminiAPI(prompt) {
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBoeifSuiyad7PJJbWzhZwzdYcgGbm-upY';
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
   const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
 
   const requestBody = {

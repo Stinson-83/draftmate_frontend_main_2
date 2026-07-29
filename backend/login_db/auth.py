@@ -101,7 +101,7 @@ def get_db_connection():
     global _tunnel, _db_pool
     db_host = os.getenv("POSTGRES_HOST", "db")
     db_user = os.getenv("POSTGRES_USER", "postgres")
-    db_pass = os.getenv("POSTGRES_PASSWORD", "Draftmate9989")
+    db_pass = os.getenv("POSTGRES_PASSWORD", "")
     db_name = os.getenv("POSTGRES_DB", "postgres")
     db_port = os.getenv("POSTGRES_PORT", "5432")
 

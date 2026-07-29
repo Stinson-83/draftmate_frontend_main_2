@@ -156,7 +156,7 @@ def get_db_connection():
         host=os.getenv("POSTGRES_HOST", "db"),
         dbname=os.getenv("POSTGRES_DB", "postgres"),
         user=os.getenv("POSTGRES_USER", "postgres"),
-        password=os.getenv("POSTGRES_PASSWORD") or os.getenv("PSQL_PASSWD") or "Draftmate9989",
+        password=os.getenv("POSTGRES_PASSWORD") or os.getenv("PSQL_PASSWD") or "",
         port=os.getenv("POSTGRES_PORT", "5432"),
         cursor_factory=RealDictCursor,
     )

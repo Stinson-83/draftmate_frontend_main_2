@@ -202,7 +202,7 @@ class IndianKanoonService:
         Fallback search method using Serper API targeting Indian Kanoon live documents
         when the official API token returns 403 / 401 / 429 or is unconfigured.
         """
-        serper_key = os.getenv("SERPER_API_KEY", "333db6072fa13726ed321432c56e6b66fa55aae1").strip()
+        serper_key = os.getenv("SERPER_API_KEY", "").strip()
         if not serper_key:
             return []
 
