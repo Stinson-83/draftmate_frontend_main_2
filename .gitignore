@@ -61,3 +61,11 @@ supervisord_auth_snippet.conf
 # Translation storage
 backend/translator/storage/
 
+# AWS Task Definition files (contain live credentials/ARNs - never commit)
+task-def-current.json
+loadtest/clean-task-def.json
+
+# Loadtest scratch and generated files
+loadtest/check_db_tables.py
+loadtest/trivy-report.html
+loadtest/__pycache__/
