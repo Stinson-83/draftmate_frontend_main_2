@@ -10,6 +10,7 @@ import logging
 import re
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from dotenv import load_dotenv
 
 import httpx
 from httpx import HTTPStatusError, TimeoutException, RequestError
@@ -68,6 +69,10 @@ class IndianKanoonService:
     
     def __init__(self):
         """Initialize the service with environment variables."""
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), '.env')
+        load_dotenv(env_path)
+        load_dotenv()
+
         self.api_token = (os.getenv("INDIANKANOON_API_TOKEN", "") or os.getenv("IKApi", "")).strip()
         self.base_url = os.getenv("INDIANKANOON_BASE_URL", "https://api.indiankanoon.org").rstrip("/")
         
