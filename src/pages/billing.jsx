@@ -304,7 +304,13 @@ export default function Billing() {
                             Loading billing history...
                           </td>
                         </tr>
-                      ) : (billingHistory.length > 0 ? billingHistory : MOCK_HISTORY).map((invoice, idx) => (
+                      ) : billingHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-10 text-center text-slate-400 font-medium">
+                            No payment records found. Your transactions will appear here after your first payment.
+                          </td>
+                        </tr>
+                      ) : billingHistory.map((invoice, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-4 py-4 text-blue-600 font-bold">{invoice.id}</td>
                           <td className="px-4 py-4 text-slate-500">{invoice.date}</td>
