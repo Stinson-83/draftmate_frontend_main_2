@@ -11,12 +11,14 @@ import Navbar from '../components/landing/sections/Navbar';
 import Footer from '../components/landing/sections/Footer';
 import ScrollReveal from '../components/landing/ScrollReveal';
 import LenisProvider from '../components/landing/LenisProvider';
+import { createOrder, doPayment } from '../services/RazorpayService';
 
 /* ─────────────────────────────────────────────────────────────
    Data Structures
 ───────────────────────────────────────────────────────────── */
 const PLANS = [
   {
+    id: "BASIC_MONTHLY",
     name: "DraftMate Basic",
     for: "Law Students & Independent Practitioner",
     priceMonthly: 699,
@@ -36,6 +38,7 @@ const PLANS = [
     highlight: false
   },
   {
+    id: "PRO_MONTHLY",
     name: "DraftMate Professional",
     for: "Lawyers & Professionals",
     badge: "Most Popular",
@@ -56,6 +59,7 @@ const PLANS = [
     highlight: true
   },
   {
+    id: "INSTITUTION",
     name: "DraftMate Institution",
     for: "Firms & Universities",
     custom: true,
@@ -76,9 +80,9 @@ const PLANS = [
 ];
 
 const TOP_UPS = [
-  { name: "Pack A", price: 199, credits: "1,000", highlight: false },
-  { name: "Pack B", price: 399, credits: "1,500", badge: "Most Popular", highlight: true },
-  { name: "Pack C", price: 499, credits: "2,000", highlight: false }
+  { id: "pack_a", name: "Pack A", price: 199, credits: "1,000", highlight: false },
+  { id: "pack_b", name: "Pack B", price: 399, credits: "1,500", badge: "Most Popular", highlight: true },
+  { id: "pack_c", name: "Pack C", price: 499, credits: "2,000", highlight: false }
 ];
 
 const COMPARISON = [
@@ -235,7 +239,28 @@ export default function Pricing() {
                   {plan.custom ? (
                     <InstitutionModalTrigger />
                   ) : (
-                    <button className={`w-full py-4 rounded-2xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 group mb-8 ${
+                    <button 
+                      onClick={async () => {
+                        try {
+                          const targetPlanId = isAnnual ? `${plan.id}_ANNUAL` : plan.id;
+                          const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || 'demo_session';
+                          const orderData = await createOrder(targetPlanId, sessionId);
+                          await doPayment(
+                            orderData,
+                            (result) => {
+                              alert("🎉 Payment Successful! Account upgraded to PRO.");
+                              window.location.reload();
+                            },
+                            (err) => {
+                              alert("Payment Cancelled: " + (err.message || "User dismissed modal"));
+                            }
+                          );
+                        } catch (e) {
+                          console.error("Order Creation Error:", e);
+                          alert("Failed to initiate order. Please try again.");
+                        }
+                      }}
+                      className={`w-full py-4 rounded-2xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 group mb-8 ${
                       plan.highlight 
                         ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-500/30 hover:opacity-90" 
                         : "bg-slate-50 text-[#0F1C2E] border border-slate-200 hover:bg-slate-100 hover:border-slate-300"
@@ -337,6 +362,25 @@ export default function Pricing() {
                     </div>
                     
                     <motion.button 
+                      onClick={async () => {
+                        try {
+                          const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || 'demo_session';
+                          const orderData = await createOrder(pack.id, sessionId);
+                          await doPayment(
+                            orderData,
+                            (result) => {
+                              alert(`🎉 Payment Successful! Added ${pack.credits} credits to your account balance.`);
+                              window.location.reload();
+                            },
+                            (err) => {
+                              alert("Payment Cancelled: " + (err.message || "User dismissed modal"));
+                            }
+                          );
+                        } catch (e) {
+                          console.error("Top-Up Order Error:", e);
+                          alert("Failed to initiate top-up order. Please try again.");
+                        }
+                      }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className={`w-full py-3 rounded-xl font-semibold transition-all relative z-10 shadow-sm ${
