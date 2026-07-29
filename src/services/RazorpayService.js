@@ -54,6 +54,18 @@ export const getSubscriptionStatus = async (sessionId) => {
     }
 };
 
+export const getBillingHistory = async (sessionId) => {
+    try {
+        const response = await fetch(`${API_URL}/subscriptions/history?session_id=${sessionId}`);
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error("Get Billing History Error:", error);
+        return [];
+    }
+};
+
+
 export const doPayment = async (orderData, onSuccess, onError) => {
     const res = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
 

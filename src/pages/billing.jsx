@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck, Clock, HelpCircle, User, CreditCard, 
   ChevronRight, Check, Zap, Download, AlertCircle, Building2, Briefcase, GraduationCap
 } from 'lucide-react';
+import { getBillingHistory, createOrder, doPayment } from '../services/RazorpayService';
 
 /* ─────────────────────────────────────────────────────────────
    Data Extracted from Pricing.jsx
@@ -47,12 +48,77 @@ const MOCK_HISTORY = [
    Main Billing Component
 ───────────────────────────────────────────────────────────── */
 export default function Billing() {
-  const [activeTab, setActiveTab] = useState('details'); // Defaulting to details as requested to view
+  const [activeTab, setActiveTab] = useState('details');
   const [isAnnual, setIsAnnual] = useState(false);
   const [coupon, setCoupon] = useState('');
+  const [billingHistory, setBillingHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [paying, setPaying] = useState(false);
   
   // State for Account Details selection
   const [accountType, setAccountType] = useState('personal');
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      setIsLoadingHistory(true);
+      const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || '';
+      if (sessionId) {
+        const data = await getBillingHistory(sessionId);
+        if (data && data.length > 0) {
+          setBillingHistory(data);
+        } else {
+          setBillingHistory([]);
+        }
+      }
+      setIsLoadingHistory(false);
+    };
+    fetchHistory();
+  }, []);
+
+  const handlePlanPurchase = async (plan) => {
+    if (paying) return;
+    const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || '';
+    if (!sessionId) { alert('Please log in first.'); return; }
+    const planId = plan.name.includes('Professional')
+      ? (isAnnual ? 'PRO_ANNUAL' : 'PRO_MONTHLY')
+      : 'BASIC_MONTHLY';
+    try {
+      setPaying(true);
+      const orderData = await createOrder(planId, sessionId);
+      await doPayment(
+        orderData,
+        () => { alert('Payment successful! Your plan is now active.'); window.location.reload(); },
+        (err) => { alert('Payment failed or cancelled.'); console.error(err); }
+      );
+    } catch (e) {
+      alert('Could not initiate payment. Please try again.');
+      console.error(e);
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleTopUpPurchase = async (pack) => {
+    if (paying) return;
+    const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || '';
+    if (!sessionId) { alert('Please log in first.'); return; }
+    const packIdMap = { 'Pack A': 'pack_a', 'Pack B': 'pack_b', 'Pack C': 'pack_c' };
+    const planId = packIdMap[pack.name] || 'pack_a';
+    try {
+      setPaying(true);
+      const orderData = await createOrder(planId, sessionId);
+      await doPayment(
+        orderData,
+        () => { alert(`Credits purchased! ${pack.credits} credits added to your wallet.`); window.location.reload(); },
+        (err) => { alert('Payment failed or cancelled.'); console.error(err); }
+      );
+    } catch (e) {
+      alert('Could not initiate payment. Please try again.');
+      console.error(e);
+    } finally {
+      setPaying(false);
+    }
+  };
 
   const TABS = [
     { id: 'subscription', label: 'Subscription', icon: ShieldCheck },
@@ -156,8 +222,13 @@ export default function Billing() {
                           <span className="text-sm font-medium text-slate-500">/month</span>
                         </div>
 
-                        <button className={`w-full py-3 rounded-xl text-sm font-bold transition-all mb-4 ${plan.highlight ? 'bg-[#0F1C2E] text-white hover:bg-slate-800 shadow-md' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
-                          {plan.buttonText}
+                        <button
+                          onClick={() => handlePlanPurchase(plan)}
+                          disabled={paying}
+                          className={`w-full py-3 rounded-xl text-sm font-bold transition-all mb-4 ${
+                            paying ? 'opacity-60 cursor-not-allowed' : ''
+                          } ${plan.highlight ? 'bg-[#0F1C2E] text-white hover:bg-slate-800 shadow-md' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
+                          {paying ? 'Processing...' : plan.buttonText}
                         </button>
 
                         {isAnnual && (
@@ -195,8 +266,13 @@ export default function Billing() {
                         <div className={`text-sm font-bold flex items-center gap-1.5 mb-5 ${pack.highlight ? 'text-cyan-400' : 'text-blue-600'}`}>
                           <Zap className="w-4 h-4" fill="currentColor" /> {pack.credits} Credits
                         </div>
-                        <button className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${pack.highlight ? 'bg-white text-[#0F1C2E] hover:bg-slate-100' : 'bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100'}`}>
-                          Buy Pack
+                        <button
+                          onClick={() => handleTopUpPurchase(pack)}
+                          disabled={paying}
+                          className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+                            paying ? 'opacity-60 cursor-not-allowed' : ''
+                          } ${pack.highlight ? 'bg-white text-[#0F1C2E] hover:bg-slate-100' : 'bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100'}`}>
+                          {paying ? 'Processing...' : 'Buy Pack'}
                         </button>
                       </div>
                     ))}
@@ -222,19 +298,29 @@ export default function Billing() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm font-medium">
-                      {MOCK_HISTORY.map((invoice, idx) => (
+                      {isLoadingHistory ? (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-8 text-center text-slate-400 font-medium">
+                            Loading billing history...
+                          </td>
+                        </tr>
+                      ) : (billingHistory.length > 0 ? billingHistory : MOCK_HISTORY).map((invoice, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-4 py-4 text-blue-600 font-bold">{invoice.id}</td>
                           <td className="px-4 py-4 text-slate-500">{invoice.date}</td>
                           <td className="px-4 py-4 text-[#0F1C2E]">{invoice.plan}</td>
                           <td className="px-4 py-4 text-slate-700">{invoice.amount}</td>
                           <td className="px-4 py-4">
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-bold border border-emerald-100 uppercase tracking-wider">
-                              <Check className="w-3 h-3" /> Paid
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${
+                              invoice.status?.toUpperCase() === 'SUCCESS' || invoice.status?.toUpperCase() === 'PAID' 
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                : 'bg-amber-50 text-amber-600 border-amber-100'
+                            }`}>
+                              <Check className="w-3 h-3" /> {invoice.status}
                             </span>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                            <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Download Receipt">
                               <Download className="w-4 h-4" />
                             </button>
                           </td>

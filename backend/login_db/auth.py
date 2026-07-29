@@ -968,23 +968,26 @@ def verify_draft_access(draft_id: str, user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Check if user is owner by matching id or document_key safely as text
+        # Check if user is owner
         cur.execute("SELECT created_by FROM drafts WHERE id::text = %s OR document_key = %s", (draft_id, draft_id))
         res = cur.fetchone()
         if res:
-            if str(res[0]) == user_id or os.getenv("DEV_BYPASS_AUTH", "false").lower() == "true":
+            if str(res[0]) == str(user_id):
                 return {"access_level": "edit"}
             
-        # Check ACL
+        # Check ACL permissions for shared drafts
         cur.execute("SELECT access_level FROM draft_access WHERE draft_id::text = %s AND user_id = %s", (draft_id, user_id))
-        res = cur.fetchone()
-        if res:
-            return {"access_level": res[0]}
+        res_acl = cur.fetchone()
+        if res_acl:
+            return {"access_level": res_acl[0]}
             
-        return {"access_level": "edit"}
+        # Strictly reject unauthorized users trying to access another user's draft ID
+        raise HTTPException(status_code=403, detail="Access Denied: You do not have permission to view or edit this draft.")
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Verify draft access error: {e}")
-        return {"access_level": "edit"}
+        raise HTTPException(status_code=403, detail="Access Denied: Ownership verification failed.")
     finally:
         cur.close()
         conn.close()

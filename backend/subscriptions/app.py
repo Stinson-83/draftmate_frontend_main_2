@@ -192,6 +192,37 @@ def get_current_status(session_id: str):
 
 
 
+@app.get("/history")
+def get_billing_history(session_id: str):
+    user_id = get_user_from_session(session_id)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT order_id, amount, currency, status, payment_time, plan_id, reference_id
+            FROM payments
+            WHERE user_id = %s
+            ORDER BY payment_time DESC NULLS LAST, id DESC
+        """, (user_id,))
+        rows = cur.fetchall()
+        history = []
+        for row in rows:
+            history.append({
+                "id": f"INV-{str(row[0])[-8:]}",
+                "order_id": row[0],
+                "amount": f"₹{row[1]}",
+                "currency": row[2] or "INR",
+                "status": row[3],
+                "date": row[4].strftime("%b %d, %Y") if row[4] else "Recent",
+                "plan": (row[5] or "Subscription").replace('_', ' ').title(),
+                "reference_id": row[6]
+            })
+        return history
+    finally:
+        cur.close()
+        conn.close()
+
+
 @app.post("/create-order")
 def create_order(data: CreateOrderModel):
     user_id = get_user_from_session(data.session_id)
