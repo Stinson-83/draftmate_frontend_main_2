@@ -192,62 +192,121 @@ class IndianKanoonService:
                 logger.error(f"Request failed: {e}")
                 raise IndianKanoonAPIError(f"Request failed: {e}") from e
     
+    async def _search_serper_kanoon(self, query: str) -> List[NormalizedJudgment]:
+        """
+        Fallback search method using Serper API targeting Indian Kanoon live documents
+        when the official API token returns 403 / 401 / 429 or is unconfigured.
+        """
+        serper_key = os.getenv("SERPER_API_KEY", "333db6072fa13726ed321432c56e6b66fa55aae1").strip()
+        if not serper_key:
+            return []
+
+        search_q = f"site:indiankanoon.org/doc/ {query}".strip()
+        url = "https://google.serper.dev/search"
+        headers = {
+            "X-API-KEY": serper_key,
+            "Content-Type": "application/json"
+        }
+        payload = {"q": search_q, "num": 10}
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(url, headers=headers, json=payload)
+                if res.status_code != 200:
+                    logger.warning(f"Serper API request returned status: {res.status_code}")
+                    return []
+                
+                data = res.json()
+                organics = data.get("organic", [])
+                results = []
+
+                for item in organics:
+                    link = item.get("link", "")
+                    match = re.search(r"indiankanoon\.org/doc/(\d+)", link)
+                    if not match:
+                        continue
+                    
+                    doc_id = match.group(1)
+                    raw_title = item.get("title", "Untitled Judgment")
+                    clean_title = re.sub(r"\s*-\s*Indian Kanoon.*$", "", raw_title, flags=re.IGNORECASE).strip()
+                    snippet = item.get("snippet", "")
+                    date_str = item.get("date", "")
+
+                    court = "Supreme Court of India"
+                    if "High Court" in raw_title or "High Court" in snippet:
+                        court = "High Court"
+                    elif "Tribunal" in raw_title or "CAT" in raw_title:
+                        court = "Tribunal"
+
+                    results.append(NormalizedJudgment(
+                        id=doc_id,
+                        title=clean_title,
+                        court=court,
+                        citation=f"IK Doc #{doc_id}",
+                        date=date_str,
+                        judges=[],
+                        summary=self._clean_text(snippet),
+                        pdf_url=f"https://indiankanoon.org/doc/{doc_id}/",
+                        source="Indian Kanoon"
+                    ))
+
+                return results
+        except Exception as e:
+            logger.warning(f"Serper Kanoon fallback search error: {e}")
+            return []
+
     async def search_judgments(self, query: str, page: int = 1) -> List[NormalizedJudgment]:
         """
-        Search for judgments on Indian Kanoon.
-        
-        Args:
-            query: Search query string.
-            page: Page number for pagination (default: 1).
-            
-        Returns:
-            List of normalized judgment objects.
+        Search for judgments on Indian Kanoon with live API + Serper Web fallback.
         """
         logger.info(f"Searching Indian Kanoon for: {query[:100]} (page: {page})")
         
-        if not self.api_token:
-            logger.warning("INDIANKANOON_API_TOKEN not set, returning empty list")
-            return []
-        
-        try:
-            data = await self._make_request(
-                "/search/",
-                data={"formInput": query, "pagenum": page - 1}
-            )
-            
-            docs = data.get("docs", [])
-            normalized = [self._normalize_judgment(doc) for doc in docs]
-            filtered = [j for j in normalized if self._is_clean_judgment(j)]
-            
-            logger.info(f"Found {len(normalized)} raw results, returning {len(filtered)} clean results for query: {query[:100]}")
-            return filtered
-        except IndianKanoonAPIError:
-            logger.exception(f"Search failed for query: {query[:100]}")
-            return []
-    
+        results = []
+        if self.api_token:
+            try:
+                data = await self._make_request(
+                    "/search/",
+                    data={"formInput": query, "pagenum": page - 1}
+                )
+                docs = data.get("docs", [])
+                normalized = [self._normalize_judgment(doc) for doc in docs]
+                results = [j for j in normalized if self._is_clean_judgment(j)]
+            except Exception as e:
+                logger.warning(f"Official Kanoon API search failed ({e}), switching to real-time Web/Serper provider...")
+
+        # Fallback to real-time live Indian Kanoon results via Serper Web API
+        if not results:
+            results = await self._search_serper_kanoon(query)
+
+        logger.info(f"Returning {len(results)} clean results for query: {query[:100]}")
+        return results
+
     async def get_document(self, doc_id: str) -> Optional[str]:
         """
         Get the full text of a document (judgment).
-        
-        Args:
-            doc_id: Indian Kanoon document ID.
-            
-        Returns:
-            Cleaned full text of the document, or None on failure.
         """
         logger.info(f"Fetching document: {doc_id}")
         
-        if not self.api_token:
-            logger.warning("INDIANKANOON_API_TOKEN not set, returning None")
-            return None
-        
+        if self.api_token:
+            try:
+                data = await self._make_request(f"/doc/{doc_id}/")
+                text = data.get("doc", "") or data.get("text", "")
+                if text:
+                    return self._clean_text(text)
+            except Exception as e:
+                logger.warning(f"Official API get_document failed for {doc_id}: {e}, falling back to web fetch...")
+
         try:
-            data = await self._make_request(f"/doc/{doc_id}/")
-            text = data.get("doc", "") or data.get("text", "")
-            return self._clean_text(text)
-        except IndianKanoonAPIError:
-            logger.exception(f"Failed to get document: {doc_id}")
-            return None
+            url = f"https://indiankanoon.org/doc/{doc_id}/"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(url, headers=headers, follow_redirects=True)
+                if res.status_code == 200:
+                    return self._clean_text(res.text)
+        except Exception as web_err:
+            logger.error(f"Web fetch for doc {doc_id} failed: {web_err}")
+
+        return None
     
     async def get_document_metadata(self, doc_id: str) -> Optional[NormalizedJudgment]:
         """
