@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, FileText, Lock, Loader2, PenTool, Square, X } from 'lucide-react';
+import { Check, FileText, Lock, Loader2, PenTool, Square, X, UploadCloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
@@ -28,6 +28,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const [loadingMessage, setLoadingMessage] = useState('Loading...');
     const [allQuestions, setAllQuestions] = useState({});
     const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
+    const [selectedFiles, setSelectedFiles] = useState([]);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -445,10 +446,163 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             return;
         }
 
-        if (choice === 'empty') {
-            createWorkspaceEmptyDocument();
+        if (choice === 'docs_with_ai') {
+            setSelectedFiles([]);
+            setPrompt('');
+            setIntakeStep('docs_with_ai');
+            return;
         }
     };
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        if (selectedFiles.length + files.length > 5) {
+            toast.error("You can upload a maximum of 5 files.");
+            return;
+        }
+        setSelectedFiles(prev => [...prev, ...files]);
+    };
+
+    const handleRemoveFile = (index) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleDocsWithAiSubmit = async () => {
+        if (selectedFiles.length === 0) {
+            toast.error("Please upload at least one document.");
+            return;
+        }
+        if (!prompt.trim()) {
+            toast.error("Please provide instructions for the AI.");
+            return;
+        }
+
+        setIsLoading(true);
+        setLoadingMessage("Synthesizing documents and draft...");
+
+        try {
+            const formData = new FormData();
+            selectedFiles.forEach((file) => {
+                formData.append('files', file);
+            });
+            formData.append('prompt', prompt);
+
+            const response = await fetch(`${DRAFTER_API_URL}/v2/draft/compile_with_documents`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${sessionToken}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                let detail = 'Failed to generate draft from documents.';
+                try {
+                    const errorData = await response.json();
+                    detail = errorData?.detail || detail;
+                } catch {
+                    detail = response.statusText || detail;
+                }
+                throw new Error(detail);
+            }
+
+            const data = await response.json();
+            navigateToWorkspace(data, { source: 'docs_with_ai' });
+            toast.success("Draft generated successfully from documents!");
+            onClose();
+        } catch (error) {
+            console.error('Multi-document compile error:', error);
+            toast.error(error.message || 'Failed to generate draft.');
+        } finally {
+            setIsLoading(false);
+            setLoadingMessage('Loading...');
+        }
+    };
+
+    const renderDocsWithAiView = () => (
+        <div className="step-content fade-in">
+            <div className="modal-header">
+                <div className="icon-badge">
+                    <PenTool size={20} />
+                </div>
+                <h2 className="modal-title">Documents with AI</h2>
+            </div>
+            <p className="modal-subtitle">
+                Upload up to 5 reference documents and provide a prompt detailing how you want your draft structured.
+            </p>
+
+            <div className="input-area" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div 
+                    className="file-dropzone" 
+                    onClick={() => fileInputRef.current.click()}
+                    style={{
+                        border: '2px dashed var(--border-color, #cbd5e1)',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        transition: 'border-color 0.2s',
+                    }}
+                >
+                    <UploadCloud className="h-8 w-8 text-slate-400" style={{ margin: '0 auto 12px auto' }} />
+                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #64748b)' }}>
+                        Click to upload files (PDF, DOCX)
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted, #94a3b8)' }}>
+                        Up to 5 files
+                    </p>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        multiple 
+                        accept=".pdf,.docx,.doc,.rtf,.txt"
+                        style={{ display: 'none' }} 
+                    />
+                </div>
+
+                {selectedFiles.length > 0 && (
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px' }}>
+                        {selectedFiles.map((file, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px' }}>
+                                <span style={{ fontSize: '13px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                                    {file.name}
+                                </span>
+                                <button 
+                                    onClick={() => handleRemoveFile(idx)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <textarea
+                    placeholder="Provide your prompt/instructions here..."
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={4}
+                />
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '24px' }}>
+                <button
+                    className="btn btn-ghost"
+                    onClick={() => {
+                        setIntakeStep('selection');
+                    }}
+                >
+                    Back
+                </button>
+                <button className="btn btn-primary" onClick={handleDocsWithAiSubmit}>
+                    Generate
+                </button>
+            </div>
+        </div>
+    );
 
     const handlePromptSubmit = async () => {
         if (!prompt.trim()) {
@@ -552,13 +706,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     </div>
                 </button>
 
-                <button className="option-card" onClick={() => handleSelectionChoice('empty')}>
+                <button className="option-card" onClick={() => handleSelectionChoice('docs_with_ai')}>
                     <div className="icon-box upload">
-                        <FileText size={24} />
+                        <UploadCloud size={24} />
                     </div>
                     <div className="text-content">
-                        <h3>Start Empty Document</h3>
-                        <p>Create an empty workspace immediately and begin editing without intake.</p>
+                        <h3>Documents with AI</h3>
+                        <p>Upload reference documents and write a prompt to generate a tailored legal draft.</p>
                     </div>
                 </button>
             </div>
@@ -836,6 +990,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
                 {intakeStep === 'loading' || isLoading ? renderLoadingView() : null}
                 {!isLoading && intakeStep === 'selection' ? renderSelectionView() : null}
+                {!isLoading && intakeStep === 'docs_with_ai' ? renderDocsWithAiView() : null}
                 {!isLoading && intakeStep === 'prompt_input' ? renderPromptInputView() : null}
                 {!isLoading && intakeStep === 'clarifying' ? renderClarifyingView() : null}
                 {!isLoading && intakeStep === 'summary' ? renderSummaryView() : null}

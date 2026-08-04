@@ -1220,6 +1220,167 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/v2/draft/compile_with_documents")
+async def compile_with_documents(
+    prompt: str = Form(...),
+    files: List[UploadFile] = File(...),
+    authorization: Optional[str] = Header(default=None)
+):
+    try:
+        user_id = await verify_token(authorization)
+        
+        if not files:
+            raise HTTPException(status_code=400, detail="At least one file is required.")
+        if not prompt.strip():
+            raise HTTPException(status_code=400, detail="Prompt is required.")
+
+        extracted_texts = []
+        for file in files:
+            file_bytes = await file.read()
+            filename = file.filename or "uploaded_file"
+            
+            # Simple text extraction based on file extension
+            if filename.lower().endswith(".docx"):
+                import io
+                from docx import Document as DocReader
+                try:
+                    doc = DocReader(io.BytesIO(file_bytes))
+                    text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+                    if text.strip():
+                        extracted_texts.append(f"--- Document Content ({filename}) ---\n{text}")
+                except Exception as e:
+                    logger.error(f"Failed docx extraction for {filename}: {e}")
+            elif filename.lower().endswith(".pdf") or file_bytes.startswith(b"%PDF"):
+                try:
+                    import fitz
+                    pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                    text = ""
+                    for page in pdf_doc:
+                        text += page.get_text()
+                    if text.strip():
+                        extracted_texts.append(f"--- Document Content ({filename}) ---\n{text}")
+                except Exception as e:
+                    logger.error(f"Failed pdf extraction for {filename}: {e}")
+            else:
+                # Text/plain fallback
+                try:
+                    text = file_bytes.decode("utf-8", errors="ignore")
+                    if text.strip():
+                        extracted_texts.append(f"--- Document Content ({filename}) ---\n{text}")
+                except Exception as e:
+                    logger.error(f"Failed txt extraction for {filename}: {e}")
+
+        combined_reference_context = "\n\n".join(extracted_texts).strip()
+        if not combined_reference_context:
+            raise HTTPException(status_code=400, detail="No readable text found in the uploaded documents.")
+
+        # Let's call the AI legal drafter with combined context
+        ai_data = generate_legal_draft(
+            case_context=prompt,
+            legal_documents=combined_reference_context,
+            document_type="Legal Document"
+        )
+        
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+        if not shared_storage_path:
+            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+
+        import uuid
+        draft_id = str(uuid.uuid4())
+        draft_dir = os.path.join(shared_storage_path, draft_id)
+        os.makedirs(draft_dir, exist_ok=True)
+
+        file_target_name = f"AI_Generated_Draft_{int(time.time())}.docx"
+        output_path = build_docx_with_controls(ai_data=ai_data, file_target_name=file_target_name)
+        file_name = os.path.basename(output_path)
+        
+        # Move generated file to the sandboxed path
+        sandboxed_path = os.path.join(draft_dir, file_name)
+        os.rename(output_path, sandboxed_path)
+
+        document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
+
+        # Copy file to lex_bot upload directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+        os.makedirs(lex_bot_upload_dir, exist_ok=True)
+        lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
+        with open(sandboxed_path, "rb") as sf:
+            with open(lex_bot_path, "wb") as lf:
+                lf.write(sf.read())
+
+        metadata = ai_data.get("metadata") or {}
+        placeholders_list = metadata.get("placeholders_detected") or []
+
+        # Register draft metadata in PostgreSQL db via auth service
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/register",
+                    json={
+                        "draft_id": draft_id,
+                        "name": file_name,
+                        "filename": file_name,
+                        "document_key": document_key,
+                        "created_by": user_id,
+                        "variables_detected": placeholders_list,
+                        "status": "In progress"
+                    },
+                    timeout=10.0
+                )
+        except Exception as reg_err:
+            logger.warning(f"Failed to register draft in DB: {reg_err}")
+
+        params: Dict[str, Any] = {
+            "document": {
+                "fileType": "docx",
+                "key": document_key,
+                "title": file_name,
+                "url": f"http://drafter-service:8003/v2/draft/serve/{draft_id}/{file_name}",
+                "permissions": {"edit": True, "download": True, "print": True},
+            },
+            "documentType": "word",
+            "editorConfig": {
+                "callbackUrl": f"http://drafter-service:8003/v2/draft/callback/{draft_id}",
+                "mode": "edit",
+                "user": {
+                    "id": user_id,
+                    "name": f"User {user_id[:4]}" if len(user_id) >= 4 else f"User {user_id}"
+                },
+                "coauthoring": {
+                    "mode": "fast",
+                    "change": True
+                },
+                "customization": {
+                    "forcesave": True,
+                    "chat": True,
+                    "uiTheme": "theme-light",
+                    "logo": {
+                        "image": "",
+                        "imageDark": "",
+                        "url": ""
+                    }
+                },
+                "plugins": {
+                    "autostart": [
+                        "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
+                    ],
+                    "pluginsData": []
+                }
+            },
+        }
+        params["token"] = _jwt_encode(params)
+        params["documentKey"] = document_key
+        params["filename"] = file_name
+        params["variablesDetected"] = placeholders_list
+        params["draftId"] = draft_id
+
+        return params
+    except Exception as e:
+        logger.exception("Draft compilation from documents failed.")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/v2/draft/create")
 async def create_empty_draft(authorization: Optional[str] = Header(default=None)):
     try:
