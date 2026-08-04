@@ -138,6 +138,49 @@ def _strict_validate_production_schema(payload: Any) -> Dict[str, Any]:
     return payload
 
 
+ENRICH_PROMPT_SYSTEM_INSTRUCTION = """
+You are an expert Legal Counsel and Master Draftsman.
+Your task is to enrich and enhance the raw input prompt or case facts provided by the user.
+Transform it into a comprehensive, professional, and detailed drafting instruction set.
+
+GUIDELINES:
+1. Maintain ALL core facts, party names, locations, dates, jurisdictions, and specific requests. Do not hallucinate or omit user facts.
+2. Expand the prompt to cover standard legal objectives, structural requirements, boilerplate clauses, risk allocations, and drafting nuances for this specific category of document.
+3. Output ONLY the enriched prompt. Do not wrap in markdown or add conversational responses.
+"""
+
+
+def enrich_user_prompt(raw_prompt: str) -> str:
+    """
+    Uses Gemini to enrich and structure the user's raw prompt into a professional,
+    high-quality legal drafting instruction set while preserving all original facts.
+    """
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        logger.warning("GOOGLE_API_KEY is not set. Skipping prompt enrichment.")
+        return raw_prompt
+
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=ENRICH_PROMPT_SYSTEM_INSTRUCTION,
+            generation_config=genai.GenerationConfig(
+                temperature=0.2,
+                max_output_tokens=2048,
+            ),
+        )
+        response = model.generate_content(raw_prompt)
+        enriched = _extract_response_text(response)
+        if enriched.strip():
+            logger.info("Prompt enriched successfully.")
+            return enriched.strip()
+    except Exception as e:
+        logger.error(f"Failed to enrich user prompt: {e}")
+    
+    return raw_prompt
+
+
 def generate_production_json_draft(case_context: str, document_type: str = "Legal Document") -> dict:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -213,6 +256,12 @@ def generate_legal_draft(
     legal_documents: Optional[str] = None,
     document_type: Optional[str] = None,
 ) -> dict:
+    if case_context:
+        enriched_case = enrich_user_prompt(case_context)
+        logger.info("Original prompt: %s", case_context)
+        logger.info("Enriched prompt: %s", enriched_case)
+        case_context = enriched_case
+
     combined_context_parts: List[str] = []
     if case_context:
         combined_context_parts.append("CASE_CONTEXT:\n" + case_context)
