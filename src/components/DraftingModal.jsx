@@ -29,6 +29,9 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const [allQuestions, setAllQuestions] = useState({});
     const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
     const [selectedFiles, setSelectedFiles] = useState([]);
+    const [otherInputs, setOtherInputs] = useState({});
+    const [isEditingSummary, setIsEditingSummary] = useState(false);
+    const [editedSummary, setEditedSummary] = useState(INITIAL_SUMMARY);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -40,6 +43,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     useEffect(() => {
         setPrompt(initialPrompt || '');
     }, [initialPrompt]);
+
+    useEffect(() => {
+        if (intakeStep === 'summary') {
+            setEditedSummary(draftSummary);
+            setIsEditingSummary(false);
+        }
+    }, [intakeStep, draftSummary]);
 
     const sessionToken = localStorage.getItem('session_id') || '';
     const DRAFTER_API_URL = API_CONFIG.DRAFTER.BASE_URL;
@@ -178,7 +188,14 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const buildAnswerContext = (currentAnswers = answers) => {
         const answerLines = Object.entries(currentAnswers).map(([key, value]) => {
             const questionText = allQuestions[key] || key;
-            const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+            let displayValue = '';
+            if (value === 'others_option') {
+                displayValue = otherInputs[key] || '';
+            } else if (value === 'skip_option') {
+                displayValue = '[Skipped]';
+            } else {
+                displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+            }
             return `Question: ${questionText}\n  Answer: ${displayValue}`;
         });
 
@@ -334,7 +351,15 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             const formattedAnswers = {};
             Object.entries(currentAnswers).forEach(([key, val]) => {
                 const questionText = allQuestions[key] || key;
-                formattedAnswers[questionText] = val;
+                let displayVal = '';
+                if (val === 'others_option') {
+                    displayVal = otherInputs[key] || '';
+                } else if (val === 'skip_option') {
+                    displayVal = '[Skipped]';
+                } else {
+                    displayVal = val;
+                }
+                formattedAnswers[questionText] = displayVal;
             });
 
             const response = await fetch(`${DRAFTER_API_URL}/v2/draft/intake/analyze`, {
@@ -790,10 +815,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                             {question.helperText ? (
                                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{question.helperText}</p>
                             ) : null}
-
-                            {hasOptions ? (
+                             {hasOptions ? (
                                 <div className="mt-4 grid gap-2">
-                                    {question.options.map((option) => {
+                                    {[
+                                        ...question.options,
+                                        { label: 'Others', value: 'others_option' },
+                                        { label: 'Skip', value: 'skip_option' }
+                                    ].map((option) => {
                                         const optionKey = String(option.value);
                                         const checked = question.multiple
                                             ? Array.isArray(currentValue) && currentValue.includes(optionKey)
@@ -825,6 +853,18 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                                             </label>
                                         );
                                     })}
+                                    {currentValue === 'others_option' && (
+                                        <textarea
+                                            className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                            rows={2}
+                                            value={otherInputs[question.id] || ''}
+                                            placeholder="Enter your custom details here..."
+                                            onChange={(e) => {
+                                                const text = e.target.value;
+                                                setOtherInputs(prev => ({ ...prev, [question.id]: text }));
+                                            }}
+                                        />
+                                    )}
                                 </div>
                             ) : (
                                 <textarea
@@ -856,92 +896,263 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         </div>
     );
 
-    const renderSummaryView = () => (
-        <div className="step-content fade-in">
-            <div className="modal-header">
-                <div className="icon-badge">
-                    <Check size={20} />
+    const renderSummaryView = () => {
+        const basis = isEditingSummary ? editedSummary.basis : draftSummary.basis;
+        const assumptions = isEditingSummary ? editedSummary.assumptions : draftSummary.assumptions;
+
+        const handleMetadataChange = (field, value) => {
+            setEditedSummary(prev => ({
+                ...prev,
+                basis: {
+                    ...prev.basis,
+                    [field]: value
+                }
+            }));
+        };
+
+        const handleListChange = (listName, index, value) => {
+            setEditedSummary(prev => {
+                const nextList = [...prev[listName]];
+                nextList[index] = value;
+                return { ...prev, [listName]: nextList };
+            });
+        };
+
+        const handleAddListItem = (listName) => {
+            setEditedSummary(prev => ({
+                ...prev,
+                [listName]: [...prev[listName], '']
+            }));
+        };
+
+        const handleRemoveListItem = (listName, index) => {
+            setEditedSummary(prev => ({
+                ...prev,
+                [listName]: prev[listName].filter((_, i) => i !== index)
+            }));
+        };
+
+        const handleSaveEdits = () => {
+            setDraftSummary(editedSummary);
+            setIsEditingSummary(false);
+            toast.success("Summary updated successfully!");
+        };
+
+        return (
+            <div className="step-content fade-in">
+                <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="icon-badge">
+                            <Check size={20} />
+                        </div>
+                        <h2 className="modal-title">Draft summary</h2>
+                    </div>
+                    {!isEditingSummary && (
+                        <button 
+                            className="btn btn-ghost btn-sm" 
+                            onClick={() => setIsEditingSummary(true)}
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                            Edit
+                        </button>
+                    )}
                 </div>
-                <h2 className="modal-title">Draft summary</h2>
-            </div>
 
-            <p className="modal-subtitle">
-                Review the generated basis and assumptions before we compile the final document.
-            </p>
+                <p className="modal-subtitle">
+                    {isEditingSummary ? "Customize the generated basis and assumptions before compilation." : "Review the generated basis and assumptions before we compile the final document."}
+                </p>
 
-            <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Draft Basis</h3>
-                    <div className="mt-3 space-y-3 text-sm">
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Document Type</div>
-                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.documentType || 'Legal Document'}</div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white" style={{ marginBottom: '12px' }}>Draft Basis</h3>
+                        <div className="space-y-3 text-sm">
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Document Type</div>
+                                {isEditingSummary ? (
+                                    <input 
+                                        type="text"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={basis.documentType || ''}
+                                        onChange={(e) => handleMetadataChange('documentType', e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="mt-1 text-slate-900 dark:text-white">{basis.documentType || 'Legal Document'}</div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Jurisdiction</div>
+                                {isEditingSummary ? (
+                                    <input 
+                                        type="text"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={basis.jurisdiction || ''}
+                                        onChange={(e) => handleMetadataChange('jurisdiction', e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="mt-1 text-slate-900 dark:text-white">{basis.jurisdiction || 'Not specified'}</div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Representation Position</div>
+                                {isEditingSummary ? (
+                                    <input 
+                                        type="text"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={basis.representationPosition || ''}
+                                        onChange={(e) => handleMetadataChange('representationPosition', e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="mt-1 text-slate-900 dark:text-white">{basis.representationPosition || 'Not specified'}</div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Key Legal Positions</div>
+                                {isEditingSummary ? (
+                                    <div className="mt-2 space-y-2">
+                                        {basis.keyLegalPositions.map((item, idx) => (
+                                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <input 
+                                                    type="text"
+                                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={item}
+                                                    onChange={(e) => {
+                                                        const nextList = [...basis.keyLegalPositions];
+                                                        nextList[idx] = e.target.value;
+                                                        setEditedSummary(prev => ({
+                                                            ...prev,
+                                                            basis: { ...prev.basis, keyLegalPositions: nextList }
+                                                        }));
+                                                    }}
+                                                />
+                                                <button 
+                                                    onClick={() => {
+                                                        const nextList = basis.keyLegalPositions.filter((_, i) => i !== idx);
+                                                        setEditedSummary(prev => ({
+                                                            ...prev,
+                                                            basis: { ...prev.basis, keyLegalPositions: nextList }
+                                                        }));
+                                                    }}
+                                                    style={{ color: '#ef4444', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button 
+                                            className="btn btn-ghost btn-sm"
+                                            onClick={() => {
+                                                setEditedSummary(prev => ({
+                                                    ...prev,
+                                                    basis: { ...prev.basis, keyLegalPositions: [...prev.basis.keyLegalPositions, ''] }
+                                                }));
+                                            }}
+                                            style={{ padding: '4px 8px', fontSize: '11px', marginTop: '4px' }}
+                                        >
+                                            + Add Position
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <ul className="mt-2 space-y-2">
+                                        {toStringList(basis.keyLegalPositions).length > 0 ? (
+                                            toStringList(basis.keyLegalPositions).map((item) => (
+                                                <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
+                                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                                    <span>{item}</span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="text-slate-500 dark:text-slate-400">No key positions identified yet.</li>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Jurisdiction</div>
-                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.jurisdiction || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Representation Position</div>
-                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.representationPosition || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Key Legal Positions</div>
-                            <ul className="mt-2 space-y-2">
-                                {toStringList(draftSummary.basis.keyLegalPositions).length > 0 ? (
-                                    toStringList(draftSummary.basis.keyLegalPositions).map((item) => (
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white" style={{ marginBottom: '12px' }}>Assumptions Used</h3>
+                        {isEditingSummary ? (
+                            <div className="space-y-2">
+                                {assumptions.map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <input 
+                                            type="text"
+                                            className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            value={item}
+                                            onChange={(e) => handleListChange('assumptions', idx, e.target.value)}
+                                        />
+                                        <button 
+                                            onClick={() => handleRemoveListItem('assumptions', idx)}
+                                            style={{ color: '#ef4444', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button 
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => handleAddListItem('assumptions')}
+                                    style={{ padding: '4px 8px', fontSize: '11px', marginTop: '4px' }}
+                                >
+                                    + Add Assumption
+                                </button>
+                            </div>
+                        ) : (
+                            <ul className="mt-3 space-y-2 text-sm">
+                                {toStringList(assumptions).length > 0 ? (
+                                    toStringList(assumptions).map((item) => (
                                         <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
-                                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                                             <span>{item}</span>
                                         </li>
                                     ))
                                 ) : (
-                                    <li className="text-slate-500 dark:text-slate-400">No key positions identified yet.</li>
+                                    <li className="text-slate-500 dark:text-slate-400">
+                                        Market-standard assumptions will be applied by the draft engine.
+                                    </li>
                                 )}
                             </ul>
-                        </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Assumptions Used</h3>
-                    <ul className="mt-3 space-y-2 text-sm">
-                        {toStringList(draftSummary.assumptions).length > 0 ? (
-                            toStringList(draftSummary.assumptions).map((item) => (
-                                <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
-                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                    <span>{item}</span>
-                                </li>
-                            ))
-                        ) : (
-                            <li className="text-slate-500 dark:text-slate-400">
-                                Market-standard assumptions will be applied by the draft engine.
-                            </li>
-                        )}
-                    </ul>
+                <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Captured context</div>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                        {prompt.trim()}
+                    </p>
+                </div>
+
+                <div className="modal-actions">
+                    {isEditingSummary ? (
+                        <>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setIsEditingSummary(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button className="btn btn-primary" onClick={handleSaveEdits}>
+                                Save Summary
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setIntakeStep('clarifying')}
+                            >
+                                Review Questions
+                            </button>
+                            <button className="btn btn-primary" onClick={handleGenerateAndOpen}>
+                                Generate & Open in Workspace
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
-
-            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Captured context</div>
-                <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                    {prompt.trim()}
-                </p>
-            </div>
-
-            <div className="modal-actions">
-                <button
-                    className="btn btn-ghost"
-                    onClick={() => setIntakeStep('clarifying')}
-                >
-                    Review Questions
-                </button>
-                <button className="btn btn-primary" onClick={handleGenerateAndOpen}>
-                    Generate & Open in Workspace
-                </button>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderLoadingView = () => (
     <div
