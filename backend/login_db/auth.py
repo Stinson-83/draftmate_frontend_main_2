@@ -1182,6 +1182,18 @@ def delete_draft(draft: DraftDelete, user_id: str = Depends(get_user_id_from_hea
             
         cur.execute("DELETE FROM drafts WHERE id = %s", (draft.id,))
         conn.commit()
+
+        # Remove document directory and files from EFS storage (/app/shared_drafts/{draft_id})
+        try:
+            import shutil
+            shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+            draft_efs_dir = os.path.join(shared_storage_path, str(draft.id))
+            if os.path.exists(draft_efs_dir):
+                shutil.rmtree(draft_efs_dir, ignore_errors=True)
+                print(f"🗑️ EFS Storage: Deleted folder {draft_efs_dir}")
+        except Exception as efs_err:
+            print(f"EFS directory cleanup notice for {draft.id}: {efs_err}")
+
         return {"ok": True}
     except HTTPException as he:
         raise he

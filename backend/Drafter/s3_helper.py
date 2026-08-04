@@ -1,77 +1,46 @@
 import os
+import shutil
 import logging
-import threading
-import boto3
-from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "draftmate-drafts-251200161381")
-AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
-
-_s3_client = None
+SHARED_STORAGE_PATH = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
 
 def get_s3_client():
-    global _s3_client
-    if _s3_client is None:
-        if not S3_BUCKET_NAME:
-            return None
-        try:
-            # Under AWS Fargate, boto3 automatically uses IAM Task Role if AWS credentials are not in env.
-            # Locally, it will use ~/.aws/credentials.
-            _s3_client = boto3.client("s3", region_name=AWS_REGION)
-        except Exception as e:
-            logger.warning(f"Could not initialize S3 client: {e}. S3 backup disabled.")
-            return None
-    return _s3_client
+    return None
 
 def upload_file_to_s3(local_path: str, s3_key: str):
-    client = get_s3_client()
-    if not client:
-        return False
+    """EFS storage handler: ensures file is stored on persistent shared EFS volume."""
     try:
-        logger.info(f"Uploading {local_path} to s3://{S3_BUCKET_NAME}/{s3_key}")
-        client.upload_file(local_path, S3_BUCKET_NAME, s3_key)
+        if not os.path.exists(local_path):
+            return False
+        dest_path = os.path.join(SHARED_STORAGE_PATH, s3_key)
+        if os.path.abspath(local_path) != os.path.abspath(dest_path):
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            shutil.copy2(local_path, dest_path)
+            logger.info(f"EFS Storage: Saved file {local_path} to {dest_path}")
         return True
-    except ClientError as e:
-        logger.error(f"Failed to upload to S3: {e}")
-        return False
     except Exception as e:
-        logger.error(f"Unexpected error during S3 upload: {e}")
+        logger.error(f"EFS storage save error: {e}")
         return False
 
 def upload_file_to_s3_background(local_path: str, s3_key: str):
-    """Fire-and-forget background thread for S3 upload so we don't block API requests"""
-    if not get_s3_client():
-        return
-    thread = threading.Thread(target=upload_file_to_s3, args=(local_path, s3_key))
-    thread.daemon = True
-    thread.start()
+    upload_file_to_s3(local_path, s3_key)
 
 def download_file_from_s3(s3_key: str, local_path: str):
-    client = get_s3_client()
-    if not client:
-        return False
     try:
-        logger.info(f"Downloading s3://{S3_BUCKET_NAME}/{s3_key} to {local_path}")
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        client.download_file(S3_BUCKET_NAME, s3_key, local_path)
-        return True
-    except ClientError as e:
-        # 404 is normal if file has not been uploaded yet
-        if e.response.get("Error", {}).get("Code") == "404":
-            logger.info(f"File {s3_key} not found in S3 bucket.")
-        else:
-            logger.error(f"Failed to download from S3: {e}")
+        source_path = os.path.join(SHARED_STORAGE_PATH, s3_key)
+        if os.path.isfile(source_path):
+            if os.path.abspath(source_path) != os.path.abspath(local_path):
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                shutil.copy2(source_path, local_path)
+            return True
         return False
     except Exception as e:
-        logger.error(f"Unexpected error during S3 download: {e}")
+        logger.error(f"EFS storage read error: {e}")
         return False
 
 def ensure_file_exists_locally(s3_key: str, local_path: str):
-    """Checks local disk first. If missing, pulls from S3."""
     if os.path.isfile(local_path):
         return True
-    # Try downloading from S3
     return download_file_from_s3(s3_key, local_path)
