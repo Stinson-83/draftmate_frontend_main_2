@@ -1261,9 +1261,135 @@ def update_draft(draft: DraftUpdate, user_id: str = Depends(get_user_id_from_hea
         cur.close()
         conn.close()
 
+
+# =======================================================================
+# INTERNAL DRAFT API FOR DRAFTER SERVICE & ONLYOFFICE VERSIONING
+# =======================================================================
+
+class DraftRegister(BaseModel):
+    draft_id: str
+    name: str
+    filename: str
+    document_key: str
+    created_by: str
+    variables_detected: Optional[List[Any]] = []
+    status: Optional[str] = "In progress"
+
+
+@app.post("/internal/draft/register")
+def register_draft(draft: DraftRegister):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        import json
+        variables_json = json.dumps(draft.variables_detected or [])
+        cur.execute("""
+            INSERT INTO drafts (id, name, filename, document_key, created_by, variables_detected, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                filename = EXCLUDED.filename,
+                variables_detected = EXCLUDED.variables_detected,
+                updated_at = CURRENT_TIMESTAMP
+        """, (draft.draft_id, draft.name, draft.filename, draft.document_key, draft.created_by, variables_json, draft.status))
+        
+        cur.execute("""
+            INSERT INTO draft_access (draft_id, user_id, access_level)
+            VALUES (%s, %s, 'edit')
+            ON CONFLICT (draft_id, user_id) DO NOTHING
+        """, (draft.draft_id, draft.created_by))
+        
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Register draft error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/draft/touch/{draft_id}")
+def touch_draft(draft_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        import uuid
+        import hashlib
+        new_key = hashlib.sha256(str(uuid.uuid4()).encode('utf-8')).hexdigest()
+        cur.execute("UPDATE drafts SET updated_at = CURRENT_TIMESTAMP, document_key = %s WHERE id = %s", (new_key, draft_id))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Touch draft error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/draft/verify_access/{draft_id}")
+def verify_draft_access(draft_id: str, user_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT created_by FROM drafts WHERE id::text = %s OR document_key = %s", (draft_id, draft_id))
+        res = cur.fetchone()
+        if res:
+            if str(res[0]) == str(user_id):
+                return {"access_level": "edit"}
+            
+        cur.execute("SELECT access_level FROM draft_access WHERE draft_id::text = %s AND user_id = %s", (draft_id, user_id))
+        res_acl = cur.fetchone()
+        if res_acl:
+            return {"access_level": res_acl[0]}
+            
+        raise HTTPException(status_code=403, detail="Access Denied: You do not have permission to view or edit this draft.")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Verify draft access error: {e}")
+        raise HTTPException(status_code=403, detail="Access Denied: Ownership verification failed.")
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/draft/get/{draft_id}")
+def get_draft_internal(draft_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, name, filename, document_key, created_by, folder_id, variables_detected, status FROM drafts WHERE id::text = %s OR document_key = %s", (draft_id, draft_id))
+        r = cur.fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Draft not found")
+        return {
+            "id": str(r[0]),
+            "name": r[1],
+            "filename": r[2],
+            "documentKey": r[3],
+            "createdBy": str(r[4]),
+            "folderId": r[5],
+            "variablesDetected": r[6] if r[6] is not None else [],
+            "status": r[7]
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Get draft internal error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     import uvicorn
     print("Registered Routes:")
     for route in app.routes:
         print(f"Path: {route.path} | Name: {route.name} | Methods: {route.methods}")
     uvicorn.run(app, host="0.0.0.0", port=8009)
+

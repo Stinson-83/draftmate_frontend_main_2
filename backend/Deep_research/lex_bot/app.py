@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI):
     # Initialize LangSmith tracing (if API key is set)
     setup_langsmith()
     
-    AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8009")
+    AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://127.0.0.1:8009")
     logger.info(f"🔗 Auth Service URL: {AUTH_SERVICE_URL}")
     
     # Start SSH Tunnel (if configured)
@@ -357,7 +357,7 @@ _runtime_config = {
 # ============ Auth Dependency ============
 import httpx
 
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth:8009")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://127.0.0.1:8009")
 
 async def verify_token(request: Request):
     """

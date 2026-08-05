@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, FileText, Lock, Loader2, PenTool, Square, X, Folder } from 'lucide-react';
+import { Check, FileText, Lock, Loader2, PenTool, Square, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
-import { caseService } from '../services/library/caseService';
 import PromptQualityBar from './PromptQualityBar';
 import './DraftingModal.css';
 
@@ -17,7 +16,7 @@ const INITIAL_SUMMARY = {
     assumptions: [],
 };
 
-const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', onDraftCreated, caseId }) => {
+const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', onDraftCreated }) => {
     const navigate = useNavigate();
     const isDashboardEntryMode = initialEntryMode === 'dashboard';
     const [intakeStep, setIntakeStep] = useState(isDashboardEntryMode ? 'selection' : 'prompt_input');
@@ -29,34 +28,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const [loadingMessage, setLoadingMessage] = useState('Loading...');
     const [allQuestions, setAllQuestions] = useState({});
     const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
-    const [availableFolders, setAvailableFolders] = useState([]);
-    const [selectedFolderId, setSelectedFolderId] = useState(null);
     const fileInputRef = useRef(null);
-
-    useEffect(() => {
-        const loadFolders = async () => {
-            try {
-                const token = localStorage.getItem('session_id') || localStorage.getItem('token');
-                if (token) {
-                    const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (Array.isArray(data.folders)) {
-                            setAvailableFolders(data.folders);
-                            return;
-                        }
-                    }
-                }
-            } catch (err) {}
-            try {
-                const localFolders = JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
-                setAvailableFolders(localFolders);
-            } catch (err) {}
-        };
-        loadFolders();
-    }, []);
 
     useEffect(() => {
         if (initialEntryMode === 'dashboard') {
@@ -78,7 +50,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             name: record.name || record.filename || record.title || 'Untitled Draft',
             filename: record.filename || record.title || record.name || 'Untitled Draft.docx',
             documentKey: record.documentKey || record.id || '',
-            folderId: selectedFolderId || record.folderId || null,
             lastModified: record.lastModified || new Date().toISOString(),
             status: record.status || 'In progress',
             trackingParams: record.trackingParams || {
@@ -211,7 +182,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         });
 
         return [
-            `Jurisdiction & Applicable Laws: India (Indian Courts, BNS, BNSS, BSA, IPC, CrPC, Indian Contract Act)`,
             `Matter: ${prompt.trim()}`,
             answerLines.length > 0 ? `Clarifications:\n${answerLines.map((line) => `- ${line}`).join('\n\n')}` : 'Clarifications: none',
         ].join('\n\n');
@@ -231,17 +201,14 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
     const navigateToWorkspace = (data, recordMeta = {}) => {
         const fileName = data?.filename || data?.document?.title || recordMeta.filename || slugifyFileName(prompt || 'AI Draft');
-        const draftId = data?.draft_id || data?.id || data?.draftId || '';
         const documentKey = data?.documentKey || data?.document?.key || recordMeta.documentKey || '';
         const onlyofficeConfig = data?.onlyofficeConfig || data;
 
         persistWorkspaceDraft({
-            id: draftId || documentKey,
+            id: documentKey,
             name: fileName,
             filename: fileName,
-            draftId: draftId || documentKey,
             documentKey,
-            folderId: selectedFolderId || null,
             onlyofficeConfig,
             variablesDetected: data?.variablesDetected || [],
             status: 'In progress',
@@ -257,11 +224,8 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
         navigate('/dashboard/workspace', {
             state: {
-                draftId: draftId || documentKey,
-                id: draftId || documentKey,
                 documentKey,
                 filename: fileName,
-                folderId: selectedFolderId || null,
                 onlyofficeConfig,
                 variablesDetected: data?.variablesDetected || [],
                 trackingParams: {
@@ -689,7 +653,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                                                 className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${checked
                                                     ? 'border-primary bg-primary/5 dark:bg-primary/10'
                                                     : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                                                    }`}
+                                                }`}
                                             >
                                                 <input
                                                     type={question.multiple ? 'checkbox' : 'radio'}
@@ -804,22 +768,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                 </div>
             </div>
 
-            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
-                <div className="text-xs uppercase font-semibold tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Folder size={14} className="text-primary" /> Save Location in My Drafts
-                </div>
-                <select
-                    value={selectedFolderId || ''}
-                    onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                    className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                    <option value="">📁 Main Folder (Root)</option>
-                    {availableFolders.map((f) => (
-                        <option key={f.id} value={f.id}>📂 {f.name}</option>
-                    ))}
-                </select>
-            </div>
-
             <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
                 <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Captured context</div>
                 <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
@@ -842,47 +790,17 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     );
 
     const renderLoadingView = () => (
-        <div
-            className="step-content fade-in"
-            style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '400px',
-                textAlign: 'center',
-            }}
-        >
-            <Loader2
-                size={52}
-                className="spinner"
-                style={{ marginBottom: '20px' }}
-            />
-            <h2 className="modal-title" style={{ textAlign: 'center', maxWidth: '100%' }}>
-                {loadingMessage}
-            </h2>
-            <p className="modal-subtitle" style={{ marginBottom: '8px' }}>
-                Please wait while DraftMate prepares your workspace.
-            </p>
-
-            {/* Animated dots */}
-            <div className="loading-dots">
-                <span />
-                <span />
-                <span />
-            </div>
-
-            {/* Progress bar */}
-            <div className="loading-progress-bar">
-                <div className="loading-progress-fill" />
-            </div>
+        <div className="step-content fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
+            <Loader2 size={48} className="spinner" style={{ marginBottom: '16px', color: '#4f46e5' }} />
+            <h2 className="modal-title">{loadingMessage}</h2>
+            <p className="modal-subtitle">Please wait while DraftMate prepares your workspace.</p>
         </div>
     );
 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()}>
-                <button type="button" className="close-btn" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+                <button className="close-btn" onClick={onClose}>
                     <X size={20} />
                 </button>
 
