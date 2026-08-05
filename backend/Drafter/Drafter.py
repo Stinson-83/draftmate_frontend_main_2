@@ -72,28 +72,30 @@ PLACEHOLDER_REGEX = re.compile(r'\b[A-Z][A-Z0-9_]{3,}\b')
 
 
 def get_internal_backend_url() -> str:
-    override = os.getenv("ONLYOFFICE_CALLBACK_HOST", "").strip().rstrip("/")
-    if override:
-        return override
+    """
+    Returns the absolute base URL of the backend service.
+    Guarantees compatibility between Docker Compose networks and AWS ECS Fargate awsvpc.
+    """
+    # 1. Check for explicit environmental overrides first
+    raw_override = os.getenv("ONLYOFFICE_CALLBACK_HOST") or os.getenv("EXTERNAL_SERVER_URL")
+    if raw_override:
+        clean_url = raw_override.strip().rstrip('/')
+        # Security Strip: Remove trailing '/drafter' suffix if accidentally hardcoded in ECS env
+        if clean_url.endswith('/drafter'):
+            clean_url = clean_url[:-8]
+        return clean_url
 
-    ext_url = os.getenv("EXTERNAL_SERVER_URL") or os.getenv("PUBLIC_URL") or os.getenv("APP_URL")
-    if ext_url and "localhost" not in ext_url and "127.0.0.1" not in ext_url:
-        return ext_url.strip().rstrip('/') + '/drafter'
-
+    # 2. Local Docker Compose Bridge network discovery
     import socket
-    try:
-        socket.getaddrinfo("backend", 8080)
-        return "http://backend:8080/drafter"
-    except Exception:
-        pass
+    for target_host in ["backend", "drafter-service"]:
+        try:
+            socket.getaddrinfo(target_host, 8080, proto=socket.IPPROTO_TCP)
+            return f"http://{target_host}:8080"
+        except Exception:
+            continue
 
-    try:
-        socket.getaddrinfo("drafter-service", 8003)
-        return "http://drafter-service:8003"
-    except Exception:
-        pass
-
-    return "http://backend:8080/drafter"
+    # 3. AWS ECS Fargate (awsvpc network mode) localhost loopback fallback
+    return "http://127.0.0.1:8080"
 
 def extract_and_cache_docx(file_path: str):
     try:
@@ -1225,12 +1227,12 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"{internal_url}/v2/draft/serve/{draft_id}/{quote(file_name)}",
+                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(file_name)}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1322,12 +1324,12 @@ async def create_empty_draft(request: Request, authorization: Optional[str] = He
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"{internal_url}/v2/draft/serve/{draft_id}/{quote(file_name)}",
+                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(file_name)}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1514,12 +1516,12 @@ async def upload_draft(
                 "fileType": "docx",
                 "key": document_key,
                 "title": safe_name,
-                "url": f"{internal_url}/v2/draft/serve/{draft_id}/{quote(safe_name)}",
+                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(safe_name)}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1663,7 +1665,7 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"{internal_url}/v2/draft/serve/{draft_id}/{quote(file_name)}",
+                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(file_name)}",
                 "permissions": {
                     "edit": access_level == "edit",
                     "download": True,
@@ -1672,7 +1674,7 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
                 "mode": "edit" if access_level == "edit" else "view",
                 "user": {
                     "id": user_id,
