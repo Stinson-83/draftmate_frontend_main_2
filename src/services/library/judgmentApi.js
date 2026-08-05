@@ -165,13 +165,17 @@ export const downloadDocument = async (docId, judgmentObj = {}, fullText = '') =
       const blob = await response.blob();
       if (blob && (blob.type.includes('pdf') || blob.size > 1000)) {
         const url = URL.createObjectURL(blob);
+
+        // 1. Open official PDF directly in a new browser tab for viewing
+        window.open(url, '_blank');
+
+        // 2. Trigger automatic local PDF file download
         const link = document.createElement('a');
         link.href = url;
         link.download = `${safeFilename}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
         return;
       }
     }
