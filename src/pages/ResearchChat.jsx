@@ -20,10 +20,10 @@ import DraftingModal from '../components/DraftingModal';
 import { processCitations, CitationLink } from '../utils/citationUtils';
 
 const LLM_OPTIONS = [
-    { value: 'gemini-2.5-flash', label: 'Lex - Fast', description: 'High speed responses' },
-    { value: 'gemini-2.5-pro', label: 'Themis - Advanced', description: 'Deep reasoning & analysis' },
-    { value: 'gpt-4o', label: 'Neeti - Reasoning', description: 'Complex problem solving' },
-    { value: 'gpt-4o-mini', label: 'Vidhi - Fast & Efficient', description: 'Balanced performance' },
+    { value: 'gemini-2.5-flash', label: 'Fast', description: 'High speed responses' },
+    { value: 'gemini-2.5-pro', label: 'Advanced', description: 'Deep reasoning & analysis' },
+    { value: 'gpt-4o', label: 'Reasoning', description: 'Complex problem solving' },
+    { value: 'gpt-4o-mini', label: 'Fast & Efficient', description: 'Balanced performance' },
 ];
 
 const NODE_LABELS = {
@@ -42,11 +42,19 @@ const NODE_LABELS = {
 
 const ResearchProgressTimeline = ({ activeNodes }) => {
     const stages = [
-        { id: 'router', label: 'Analyzing Query' },
-        { id: 'research_agent', label: 'Gathering Facts' },
-        { id: 'citation_agent', label: 'Verifying Citations' },
-        { id: 'manager_aggregate', label: 'Compiling Research' }
+        { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
+        { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
+        { ids: ['citation_agent', 'strategy_agent', 'explainer_agent'], label: 'Verifying Citations' },
+        { ids: ['manager_aggregate', 'memory_store'], label: 'Compiling Research' }
     ];
+
+    let activeStageIndex = 0;
+    stages.forEach((stage, idx) => {
+        const hasNode = activeNodes.some(n => stage.ids.includes(n.node));
+        if (hasNode) {
+            activeStageIndex = Math.max(activeStageIndex, idx);
+        }
+    });
 
     return (
         <div className="bg-white border border-blue-100 rounded-2xl p-6 mb-6 shadow-[0_4px_20px_rgba(37,99,235,0.04)] relative overflow-hidden">
@@ -60,11 +68,12 @@ const ResearchProgressTimeline = ({ activeNodes }) => {
             </div>
             <div className="flex items-center justify-between w-full overflow-x-auto pb-2 scrollbar-hide">
                 {stages.map((stage, idx) => {
-                    const isCompleted = activeNodes.some(n => n.node === stage.id && n.status === 'completed');
-                    const isRunning = activeNodes.some(n => n.node === stage.id && n.status === 'running');
+                    const isNodeCompleted = activeNodes.some(n => stage.ids.includes(n.node) && n.status === 'completed');
+                    const isCompleted = idx < activeStageIndex || isNodeCompleted;
+                    const isRunning = (idx === activeStageIndex && !isCompleted) || activeNodes.some(n => stage.ids.includes(n.node) && n.status === 'running');
 
                     return (
-                        <React.Fragment key={stage.id}>
+                        <React.Fragment key={stage.label}>
                             <div className="flex flex-col items-center gap-2 min-w-[90px] shrink-0">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${isCompleted ? 'bg-blue-600 border-blue-600 text-white' :
                                     isRunning ? 'border-blue-500 text-blue-500 animate-pulse' : 'border-slate-200 text-slate-300'
@@ -155,40 +164,45 @@ const ResearchChat = () => {
     }, []);
 
     // Original Fetch Sessions
-    // Fetch Sessions with local storage fallback
     const fetchSessions = async () => {
-        let loadedSessions = [];
         try {
             setIsLoadingSessions(true);
             const data = await api.getSessions();
-            if (data && data.sessions && data.sessions.length > 0) {
-                loadedSessions = data.sessions;
-                localStorage.setItem('lexbot_sessions', JSON.stringify(data.sessions));
-            }
+            setSessions(data.sessions || []);
         } catch (error) {
-            console.warn("Backend session history endpoint unavailable, using local storage fallback:", error);
+            console.error("Failed to fetch sessions:", error);
+            toast.error("Failed to load chat history");
+        } finally {
+            setIsLoadingSessions(false);
         }
-
-        if (loadedSessions.length === 0) {
-            try {
-                loadedSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
-            } catch (e) {
-                loadedSessions = [];
-            }
-        }
-        setSessions(loadedSessions);
-        setIsLoadingSessions(false);
     };
+
+    // Mock Fetch Sessions
+    // const fetchSessions = async () => {
+    //     setIsLoadingSessions(true);
+    //     setTimeout(() => {
+    //         setSessions([
+    //             { session_id: 'mock-1', title: 'Supreme Court Guidelines on Bail', created_at: new Date().toISOString() },
+    //             { session_id: 'mock-2', title: 'Section 138 NI Act Dispute', created_at: new Date(Date.now() - 86400000).toISOString() }, // Yesterday
+    //             { session_id: 'mock-3', title: 'Corporate Merger Due Diligence', created_at: new Date(Date.now() - 86400000 * 3).toISOString() } // 3 days ago
+    //         ]);
+    //         setIsLoadingSessions(false);
+    //     }, 800);
+    // };
 
     // Initialize
     useEffect(() => {
+        // hasInitializedRef prevents React StrictMode's double-invocation from
+        // calling loadSession after startNewChat already ran — which would race
+        // with the user's first message and wipe it from state.
         if (hasInitializedRef.current) return;
         hasInitializedRef.current = true;
 
+        // Fetch current LLM config on mount
         const fetchLLMConfig = async () => {
             try {
                 const config = await api.getLLMConfig();
-                if (config && config.current_model) {
+                if (config.current_model) {
                     setSelectedLLM(config.current_model);
                 }
             } catch (error) {
@@ -198,6 +212,8 @@ const ResearchChat = () => {
         fetchLLMConfig();
         fetchSessions();
 
+        // Check for existing session in URL or localStorage
+        // For now, let's start fresh or load if ID is present
         const storedSessionId = localStorage.getItem('last_chat_session_id');
         if (storedSessionId) {
             loadSession(storedSessionId);
@@ -209,15 +225,6 @@ const ResearchChat = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
-
-    // Save messages to local storage whenever messages change
-    useEffect(() => {
-        if (sessionId && messages.length > 0) {
-            try {
-                localStorage.setItem(`lexbot_messages_${sessionId}`, JSON.stringify(messages));
-            } catch (e) {}
-        }
-    }, [messages, sessionId]);
 
     // Group Sessions by Date
     const groupSessions = (sessions) => {
@@ -236,7 +243,7 @@ const ResearchChat = () => {
         lastWeek.setDate(lastWeek.getDate() - 7);
 
         sessions.forEach(session => {
-            const date = new Date(session.created_at || Date.now());
+            const date = new Date(session.created_at);
             if (date >= today) {
                 groups['Today'].push(session);
             } else if (date >= yesterday) {
@@ -253,10 +260,25 @@ const ResearchChat = () => {
 
     const sessionGroups = groupSessions(sessions);
 
+    // const startNewChat = () => {
+    //     const newId = crypto.randomUUID();
+    //     setSessionId(newId);
+    //     setMessages([
+    //         {
+    //             id: 1,
+    //             role: 'ai',
+    //             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
+    //         }
+    //     ]);
+    //     localStorage.setItem('last_chat_session_id', newId);
+    //     // Optionally clear URL param
+    //     window.history.replaceState({}, '', '/research');
+    // };
+
     const startNewChat = () => {
-        const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
+        const newId = crypto.randomUUID();
         setSessionId(newId);
-        const initMsg = [{
+        setMessages([{
             id: 1,
             role: 'ai',
             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
@@ -266,70 +288,50 @@ const ResearchChat = () => {
                 "Draft a Legal Notice for breach of contract.",
                 "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
             ]
-        }];
-        setMessages(initMsg);
+        }]);
 
         localStorage.setItem('last_chat_session_id', newId);
-        try {
-            const existingSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
-            if (!existingSessions.some(s => s.session_id === newId)) {
-                existingSessions.unshift({
-                    session_id: newId,
-                    title: 'New Research Chat',
-                    created_at: new Date().toISOString()
-                });
-                localStorage.setItem('lexbot_sessions', JSON.stringify(existingSessions));
-                setSessions(existingSessions);
-            }
-        } catch (e) {}
+        // Optionally clear URL param
         window.history.replaceState({}, '', '/research');
     };
 
     const loadSession = async (id) => {
-        setSessionId(id);
-        localStorage.setItem('last_chat_session_id', id);
-
-        let loadedMessages = [];
         try {
+            setSessionId(id);
+            localStorage.setItem('last_chat_session_id', id);
+
             const data = await api.getSessionHistory(id);
-            if (data && data.messages && data.messages.length > 0) {
-                loadedMessages = data.messages.map((msg, idx) => ({
+
+            // Don't overwrite messages if the user has already sent a message
+            // and the bot is currently responding — that would wipe their message.
+            if (isStreamingRef.current) return;
+
+            if (data.messages && data.messages.length > 0) {
+                // Map backend messages to frontend format
+                const formattedMessages = data.messages.map((msg, idx) => ({
                     id: msg.id || idx,
                     role: msg.role === 'assistant' ? 'ai' : msg.role,
                     content: msg.content,
                     sources: msg.metadata?.sources,
                 }));
+                setMessages(formattedMessages);
+            } else {
+                setMessages([{
+                    id: 1,
+                    role: 'ai',
+                    content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
+                    isIntro: true,
+                    followups: [
+                        "What are the latest Supreme Court judgments on Section 138 of NI Act?",
+                        "Draft a Legal Notice for breach of contract.",
+                        "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
+                    ]
+                }]);
             }
         } catch (error) {
-            console.warn("Backend getSessionHistory unavailable, trying local cache:", error);
-        }
-
-        // Local cache fallback
-        if (loadedMessages.length === 0) {
-            try {
-                const cached = localStorage.getItem(`lexbot_messages_${id}`);
-                if (cached) {
-                    loadedMessages = JSON.parse(cached);
-                }
-            } catch (err) {}
-        }
-
-        if (isStreamingRef.current) return;
-
-        if (loadedMessages.length > 0) {
-            setMessages(loadedMessages);
-        } else {
-            setMessages([{
-                id: 1,
-                role: 'ai',
-                content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
-                isIntro: true,
-                followups: [
-                    "What are the latest Supreme Court judgments on Section 138 of NI Act?",
-                    "Draft a Legal Notice for breach of contract.",
-                    "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
-                ]
-            }]);
+            console.error("Failed to load session:", error);
+            toast.error("Failed to load chat");
+            if (!isStreamingRef.current) startNewChat();
         }
     };
 
@@ -923,10 +925,10 @@ const ResearchChat = () => {
                             </div>
                         )}
 
-                        <div className="relative flex items-center gap-2 bg-white border border-slate-200 rounded-[28px] shadow-lg shadow-slate-200/40 focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-300 transition-all p-2 pl-3">
+                        <div className="relative flex items-end gap-2 bg-white border border-slate-200 rounded-[28px] shadow-lg shadow-slate-200/40 focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-300 transition-all p-2 pl-3">
 
                             {/* Plus Menu (Dropdown logic) */}
-                            <div className="relative">
+                            <div className="relative mb-1">
                                 <button
                                     onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
                                     className={`flex-none p-2 rounded-full transition-colors ${isPlusMenuOpen ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:bg-slate-100'}`}
@@ -965,7 +967,7 @@ const ResearchChat = () => {
                             />
 
                             {/* Dynamic Model & Thinking Selector */}
-                            <div className="relative flex items-center">
+                            <div className="relative mb-1.5 flex items-center">
                                 <button
                                     onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold transition-colors mr-2 whitespace-nowrap"
@@ -1042,7 +1044,7 @@ const ResearchChat = () => {
                         </div>
                         <div className="text-center mt-3">
                             <p className="text-[10px] font-medium text-slate-400 flex items-center justify-center gap-1.5">
-                                <span className="material-symbols-outlined text-[12px]">info</span> AI can do mistakes, so Human intervention is required.
+                                <span className="material-symbols-outlined text-[12px]">info</span> AI can make mistakes. Always verify outputs before relying on them.
                             </p>
                         </div>
                     </div>

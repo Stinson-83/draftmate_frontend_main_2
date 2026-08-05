@@ -51,9 +51,11 @@ const JudgmentCard = ({ judgment, onSaveToggle }) => {
           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
             {judgment.court}
           </span>
-          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-            {judgment.category}
-          </span>
+          {judgment.category && !judgment.category.toLowerCase().includes('kanoon') && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+              {judgment.category}
+            </span>
+          )}
         </div>
         <button
           onClick={handleSaveToggle}
@@ -85,7 +87,7 @@ const JudgmentCard = ({ judgment, onSaveToggle }) => {
       {/* Footer */}
       <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
         <div className="flex flex-wrap gap-1">
-          {judgment.tags.slice(0, 2).map(tag => (
+          {judgment.tags.filter(tag => !tag.toLowerCase().includes('kanoon')).slice(0, 2).map(tag => (
             <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 font-medium">
               {tag}
             </span>
