@@ -28,7 +28,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Mm, Pt
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices
@@ -71,10 +71,21 @@ except ImportError:
 PLACEHOLDER_REGEX = re.compile(r'\b[A-Z][A-Z0-9_]{3,}\b')
 
 
-def get_internal_backend_url() -> str:
+def get_internal_backend_url(request: Optional[Request] = None) -> str:
     override = os.getenv("ONLYOFFICE_CALLBACK_HOST", "").strip().rstrip("/")
     if override:
         return override
+
+    ext_url = os.getenv("EXTERNAL_SERVER_URL") or os.getenv("PUBLIC_URL") or os.getenv("APP_URL")
+    if ext_url:
+        return ext_url.strip().rstrip('/') + '/drafter'
+
+    if request:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+        proto = request.headers.get("x-forwarded-proto", "http")
+        if host:
+            host = host.split(",")[0].strip()
+            return f"{proto}://{host}/drafter"
 
     import socket
     try:
@@ -1269,7 +1280,7 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
 
 
 @app.post("/v2/draft/create")
-async def create_empty_draft(authorization: Optional[str] = Header(default=None)):
+async def create_empty_draft(request: Request, authorization: Optional[str] = Header(default=None)):
     try:
         user_id = await verify_token(authorization)
 
@@ -1282,26 +1293,16 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
         draft_dir = os.path.join(shared_storage_path, draft_id)
         os.makedirs(draft_dir, exist_ok=True)
 
-        file_name = f"Empty_Draft_{int(time.time())}.docx"
-        output_path = os.path.join(draft_dir, file_name)
+        file_name = "Untitled_Draft.docx"
+        file_path = os.path.join(draft_dir, file_name)
 
         from docx import Document
         doc = Document()
-        doc.add_paragraph("")
-        doc.save(output_path)
-
-        with open(output_path, "rb") as f:
-            file_bytes = f.read()
+        doc.add_heading("Untitled Legal Draft", level=1)
+        doc.add_paragraph("Start drafting your legal document here...")
+        doc.save(file_path)
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
-
-        # Copy empty file to lex_bot upload directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
-        os.makedirs(lex_bot_upload_dir, exist_ok=True)
-        lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
-        with open(lex_bot_path, "wb") as f:
-            f.write(file_bytes)
 
         # Register draft metadata in PostgreSQL db via auth service
         try:
@@ -1322,7 +1323,7 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
-        internal_url = get_internal_backend_url()
+        internal_url = get_internal_backend_url(request)
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
@@ -1369,6 +1370,7 @@ async def create_empty_draft(authorization: Optional[str] = Header(default=None)
 
 @app.post("/v2/draft/upload")
 async def upload_draft(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     session_id: Optional[str] = Form(None),
@@ -1513,7 +1515,7 @@ async def upload_draft(
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
-        internal_url = get_internal_backend_url()
+        internal_url = get_internal_backend_url(request)
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
@@ -1591,7 +1593,7 @@ async def onlyoffice_forcesave(request: ForceSaveRequest, authorization: Optiona
 
 
 @app.get("/v2/draft/config/{draft_id}")
-async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(default=None)):
+async def get_draft_config(draft_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
     try:
         user_id = await verify_token(authorization)
         
@@ -1660,9 +1662,9 @@ async def get_draft_config(draft_id: str, authorization: Optional[str] = Header(
             document_key = hashlib.sha256(f"{draft_id}_{file_mtime}".encode("utf-8")).hexdigest()
         else:
             document_key = f"{document_key}_{file_mtime}"
-         
+          
         # 3. Build OnlyOffice config
-        internal_url = get_internal_backend_url()
+        internal_url = get_internal_backend_url(request)
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
