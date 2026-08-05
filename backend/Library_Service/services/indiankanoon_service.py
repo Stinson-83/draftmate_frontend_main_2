@@ -344,6 +344,47 @@ class IndianKanoonService:
             logger.error(f"Web fetch for doc {doc_id} failed: {web_err}")
 
         return None
+
+    async def get_document_pdf(self, doc_id: str, pdf_type: str = "pdf") -> Optional[bytes]:
+        """
+        Fetch official PDF bytes for a document from Indian Kanoon server-to-server.
+        """
+        logger.info(f"Fetching PDF for document ID: {doc_id} (type: {pdf_type})")
+        url = f"https://indiankanoon.org/doc/{doc_id}/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Referer": url
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+                res1 = await client.get(url, headers=headers)
+                if res1.status_code != 200:
+                    logger.warning(f"Initial doc fetch for PDF returned status {res1.status_code}")
+                    return None
+
+                match = re.search(r'name=["\']csrfmiddlewaretoken["\'] value=["\']([^"\']+)["\']', res1.text)
+                csrf_token = match.group(1) if match else ""
+
+                data = {
+                    "type": pdf_type,
+                }
+                if csrf_token:
+                    data["csrfmiddlewaretoken"] = csrf_token
+
+                res2 = await client.post(url, data=data, headers=headers)
+                content_type = res2.headers.get("content-type", "").lower()
+                
+                if res2.status_code == 200 and ("application/pdf" in content_type or res2.content.startswith(b"%PDF")):
+                    logger.info(f"Successfully fetched PDF for doc {doc_id} (size: {len(res2.content)} bytes)")
+                    return res2.content
+                else:
+                    logger.warning(f"PDF POST request returned status {res2.status_code}, content-type: {content_type}")
+        except Exception as e:
+            logger.error(f"Failed to fetch PDF for doc {doc_id}: {e}")
+
+        return None
     
     async def get_document_metadata(self, doc_id: str) -> Optional[NormalizedJudgment]:
         """

@@ -151,10 +151,35 @@ export const getMetadata = async (docId) => {
 };
 
 /**
- * Direct file download without external redirect
+ * Direct file download (fetches official PDF or fallback formatted .doc)
  */
-export const downloadDocument = (docId, judgmentObj = {}, fullText = '') => {
+export const downloadDocument = async (docId, judgmentObj = {}, fullText = '') => {
   const title = judgmentObj.title || `Judgment_${docId}`;
+  const safeFilename = title.replace(/[^a-zA-Z0-9 _-]/g, '_').substring(0, 80);
+
+  // 1. Fetch official PDF from backend API (programmatic "Get in PDF" fetch)
+  try {
+    const pdfUrl = `${LIBRARY_BASE_URL}${API_CONFIG.LIBRARY.ENDPOINTS.INDIAN_KANOON.DOCUMENT(docId)}/pdf`;
+    const response = await fetch(pdfUrl);
+    if (response.ok) {
+      const blob = await response.blob();
+      if (blob && (blob.type.includes('pdf') || blob.size > 1000)) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${safeFilename}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Official PDF stream failed, falling back to formatted document generation:', err);
+  }
+
+  // 2. Fallback to formatted .doc Word file generation if PDF stream fails
   const citation = judgmentObj.citation || '';
   const court = judgmentObj.court || '';
   const bench = judgmentObj.bench || (judgmentObj.judges?.length > 0 ? judgmentObj.judges.join(', ') : '');
@@ -191,7 +216,6 @@ export const downloadDocument = (docId, judgmentObj = {}, fullText = '') => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  const safeFilename = title.replace(/[^a-zA-Z0-9 _-]/g, '_').substring(0, 80);
   link.download = `${safeFilename}.doc`;
   document.body.appendChild(link);
   link.click();
