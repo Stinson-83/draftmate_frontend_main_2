@@ -199,7 +199,7 @@ const OnlyOfficeWorkspace = () => {
     };
   }, [navigate]);
 
-  const activeConfig = dynamicConfig || onlyofficeConfig;
+  const activeConfig = draftId ? dynamicConfig : (dynamicConfig || onlyofficeConfig);
 
   useEffect(() => {
     console.log("[OnlyOfficeWorkspace] Editor init useEffect triggered. docsApiReady =", docsApiReady, "activeConfig =", activeConfig);
