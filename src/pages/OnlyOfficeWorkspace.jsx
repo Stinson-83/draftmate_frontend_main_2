@@ -938,7 +938,14 @@ const OnlyOfficeWorkspace = () => {
       return;
     }
 
-    const plainText = headerHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const linesArray = headerHtml
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
 
     // 1. INSTANT SMOOTH REAL-TIME UPDATE (Zero reload, 0ms)
     if (editorInstanceRef.current && typeof editorInstanceRef.current.callCommand === 'function') {
@@ -948,16 +955,18 @@ const OnlyOfficeWorkspace = () => {
           var oSection = oDocument.GetFinalSection ? oDocument.GetFinalSection() : (oDocument.GetSections ? oDocument.GetSections()[0] : null);
           if (oSection) {
             var oHeader = oSection.GetHeader("default", true);
-            var oParagraph = oHeader.GetElement(0);
-            if (!oParagraph) {
-              oParagraph = Api.CreateParagraph();
-              oHeader.AddElement(oParagraph);
+            oHeader.RemoveAllElements();
+            var lines = Asc.scope.lines;
+            for (var i = 0; i < lines.length; i++) {
+              if (lines[i]) {
+                var oParagraph = Api.CreateParagraph();
+                oParagraph.AddText(lines[i]);
+                oParagraph.SetJc("center");
+                oHeader.AddElement(oParagraph);
+              }
             }
-            oParagraph.RemoveAllElements();
-            oParagraph.AddText(Asc.scope.headerText);
-            oParagraph.SetJustification("center");
           }
-        }, false, null, { headerText: plainText });
+        }, false, null, { lines: linesArray });
         toast.success("Saved Header inserted smoothly!");
       } catch (cmdErr) {
         console.error("ONLYOFFICE callCommand error:", cmdErr);
@@ -994,7 +1003,14 @@ const OnlyOfficeWorkspace = () => {
       return;
     }
 
-    const plainText = footerHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const linesArray = footerHtml
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
 
     // 1. INSTANT SMOOTH REAL-TIME UPDATE (Zero reload, 0ms)
     if (editorInstanceRef.current && typeof editorInstanceRef.current.callCommand === 'function') {
@@ -1004,16 +1020,18 @@ const OnlyOfficeWorkspace = () => {
           var oSection = oDocument.GetFinalSection ? oDocument.GetFinalSection() : (oDocument.GetSections ? oDocument.GetSections()[0] : null);
           if (oSection) {
             var oFooter = oSection.GetFooter("default", true);
-            var oParagraph = oFooter.GetElement(0);
-            if (!oParagraph) {
-              oParagraph = Api.CreateParagraph();
-              oFooter.AddElement(oParagraph);
+            oFooter.RemoveAllElements();
+            var lines = Asc.scope.lines;
+            for (var i = 0; i < lines.length; i++) {
+              if (lines[i]) {
+                var oParagraph = Api.CreateParagraph();
+                oParagraph.AddText(lines[i]);
+                oParagraph.SetJc("center");
+                oFooter.AddElement(oParagraph);
+              }
             }
-            oParagraph.RemoveAllElements();
-            oParagraph.AddText(Asc.scope.footerText);
-            oParagraph.SetJustification("center");
           }
-        }, false, null, { footerText: plainText });
+        }, false, null, { lines: linesArray });
         toast.success("Saved Footer inserted smoothly!");
       } catch (cmdErr) {
         console.error("ONLYOFFICE callCommand error:", cmdErr);
