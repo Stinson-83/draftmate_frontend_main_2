@@ -95,18 +95,50 @@ class IndianKanoonService:
     
     def _clean_text(self, text: str) -> str:
         """
-        Strip HTML tags and clean up whitespace from text.
-        
-        Args:
-            text: Raw text from API response (may contain HTML).
-            
-        Returns:
-            Cleaned plain text.
+        Strip HTML tags, embedded CSS/JS code blocks, and site header boilerplate.
         """
         if not text:
             return ""
+        
+        # 1. Remove script, style, header, nav, footer tags and their contents
+        text = re.sub(r"(?i)<script[\s\S]*?</script>", " ", text)
+        text = re.sub(r"(?i)<style[\s\S]*?</style>", " ", text)
+        text = re.sub(r"(?i)<noscript[\s\S]*?</noscript>", " ", text)
+        text = re.sub(r"(?i)<header[\s\S]*?</header>", " ", text)
+        text = re.sub(r"(?i)<nav[\s\S]*?</nav>", " ", text)
+
+        # 2. Remove all remaining HTML tags
         text = re.sub(r"<[^>]+>", " ", text)
-        text = re.sub(r"\s{2,}", " ", text)
+
+        # 3. Remove leftover CSS code blocks or variable declarations
+        text = re.sub(r"(?i):\s*root\s*\{[^}]*\}", " ", text)
+        text = re.sub(r"(?i)@[a-z-]+\s+[^{]+\{[^}]*\}", " ", text)
+        text = re.sub(r"(?i)(\.[a-zA-Z0-9_-]+|\#[a-zA-Z0-9_-]+)\s*\{[^}]*\}", " ", text)
+        text = re.sub(r"(?i)--[a-zA-Z0-9_-]+:\s*[^;\}]+;?", " ", text)
+
+        # 4. Remove website header & navigation boilerplate
+        boilerplate = [
+            r"(?i)Skip to main content",
+            r"(?i)Indian Kanoon\s*-\s*Search engine for Indian Law",
+            r"(?i)Search laws,\s*court judgments and everything",
+            r"(?i)Unlock Advanced Research with PRISM",
+            r"(?i)Free features\s+Premium\s+Prism AI\s+IKademy\s+Pricing\s+Login",
+            r"(?i)Mobile Navigation",
+            r"(?i)Know your Kanoon",
+            r"(?i)Doc Gen Hub",
+            r"(?i)Counter Argument",
+            r"(?i)Case Predict AI",
+            r"(?i)Talk with IK Doc",
+            r"(?i)Tools for analyzing structure and cite text of judgments",
+            r"(?i)Get in PDF",
+            r"(?i)Print it!",
+            r"(?i)Download Court Copy"
+        ]
+        for pat in boilerplate:
+            text = re.sub(pat, " ", text)
+
+        # 5. Normalize whitespace
+        text = re.sub(r"\s+", " ", text)
         return text.strip()
     
     def _normalize_judgment(self, doc: Dict[str, Any]) -> NormalizedJudgment:
