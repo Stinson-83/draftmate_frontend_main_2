@@ -71,21 +71,14 @@ except ImportError:
 PLACEHOLDER_REGEX = re.compile(r'\b[A-Z][A-Z0-9_]{3,}\b')
 
 
-def get_internal_backend_url(request: Optional[Request] = None) -> str:
+def get_internal_backend_url() -> str:
     override = os.getenv("ONLYOFFICE_CALLBACK_HOST", "").strip().rstrip("/")
     if override:
         return override
 
     ext_url = os.getenv("EXTERNAL_SERVER_URL") or os.getenv("PUBLIC_URL") or os.getenv("APP_URL")
-    if ext_url:
+    if ext_url and "localhost" not in ext_url and "127.0.0.1" not in ext_url:
         return ext_url.strip().rstrip('/') + '/drafter'
-
-    if request:
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host")
-        proto = request.headers.get("x-forwarded-proto", "http")
-        if host:
-            host = host.split(",")[0].strip()
-            return f"{proto}://{host}/drafter"
 
     import socket
     try:
@@ -1323,7 +1316,7 @@ async def create_empty_draft(request: Request, authorization: Optional[str] = He
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
-        internal_url = get_internal_backend_url(request)
+        internal_url = get_internal_backend_url()
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
@@ -1515,7 +1508,7 @@ async def upload_draft(
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
-        internal_url = get_internal_backend_url(request)
+        internal_url = get_internal_backend_url()
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
@@ -1664,7 +1657,7 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
             document_key = f"{document_key}_{file_mtime}"
           
         # 3. Build OnlyOffice config
-        internal_url = get_internal_backend_url(request)
+        internal_url = get_internal_backend_url()
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
