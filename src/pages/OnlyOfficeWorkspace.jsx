@@ -928,6 +928,118 @@ const OnlyOfficeWorkspace = () => {
     }
   };
 
+  const handleInsertHeader = () => {
+    const savedSettings = localStorage.getItem('user_settings');
+    const parsed = savedSettings ? JSON.parse(savedSettings) : {};
+    const headerHtml = parsed.headerText || '';
+
+    if (!headerHtml || !headerHtml.trim()) {
+      toast.info("No saved header found. Set your letterhead in Settings -> Document Settings.");
+      return;
+    }
+
+    const plainText = headerHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 1. INSTANT SMOOTH REAL-TIME UPDATE (Zero reload, 0ms)
+    if (editorInstanceRef.current && typeof editorInstanceRef.current.callCommand === 'function') {
+      try {
+        editorInstanceRef.current.callCommand(function() {
+          var oDocument = Api.GetDocument();
+          var oSection = oDocument.GetFinalSection ? oDocument.GetFinalSection() : (oDocument.GetSections ? oDocument.GetSections()[0] : null);
+          if (oSection) {
+            var oHeader = oSection.GetHeader("default", true);
+            var oParagraph = oHeader.GetElement(0);
+            if (!oParagraph) {
+              oParagraph = Api.CreateParagraph();
+              oHeader.AddElement(oParagraph);
+            }
+            oParagraph.RemoveAllElements();
+            oParagraph.AddText(Asc.scope.headerText);
+            oParagraph.SetJustification("center");
+          }
+        }, false, null, { headerText: plainText });
+        toast.success("Saved Header inserted smoothly!");
+      } catch (cmdErr) {
+        console.error("ONLYOFFICE callCommand error:", cmdErr);
+      }
+    } else {
+      toast.error("Editor canvas is not ready yet.");
+    }
+
+    // 2. Silent background persistence to disk (No UI reload or re-render)
+    if (draftId) {
+      const token = localStorage.getItem('session_id');
+      fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/header-footer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          draft_id: draftId,
+          target: 'header',
+          content_html: headerHtml,
+        }),
+      }).catch(err => console.error("Background header save failed:", err));
+    }
+  };
+
+  const handleInsertFooter = () => {
+    const savedSettings = localStorage.getItem('user_settings');
+    const parsed = savedSettings ? JSON.parse(savedSettings) : {};
+    const footerHtml = parsed.footerText || '';
+
+    if (!footerHtml || !footerHtml.trim()) {
+      toast.info("No saved footer found. Set your footer in Settings -> Document Settings.");
+      return;
+    }
+
+    const plainText = footerHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 1. INSTANT SMOOTH REAL-TIME UPDATE (Zero reload, 0ms)
+    if (editorInstanceRef.current && typeof editorInstanceRef.current.callCommand === 'function') {
+      try {
+        editorInstanceRef.current.callCommand(function() {
+          var oDocument = Api.GetDocument();
+          var oSection = oDocument.GetFinalSection ? oDocument.GetFinalSection() : (oDocument.GetSections ? oDocument.GetSections()[0] : null);
+          if (oSection) {
+            var oFooter = oSection.GetFooter("default", true);
+            var oParagraph = oFooter.GetElement(0);
+            if (!oParagraph) {
+              oParagraph = Api.CreateParagraph();
+              oFooter.AddElement(oParagraph);
+            }
+            oParagraph.RemoveAllElements();
+            oParagraph.AddText(Asc.scope.footerText);
+            oParagraph.SetJustification("center");
+          }
+        }, false, null, { footerText: plainText });
+        toast.success("Saved Footer inserted smoothly!");
+      } catch (cmdErr) {
+        console.error("ONLYOFFICE callCommand error:", cmdErr);
+      }
+    } else {
+      toast.error("Editor canvas is not ready yet.");
+    }
+
+    // 2. Silent background persistence to disk (No UI reload or re-render)
+    if (draftId) {
+      const token = localStorage.getItem('session_id');
+      fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/header-footer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          draft_id: draftId,
+          target: 'footer',
+          content_html: footerHtml,
+        }),
+      }).catch(err => console.error("Background footer save failed:", err));
+    }
+  };
+
   const downloadUrl = draftId 
     ? `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${draftId}/${filename || 'document.docx'}` 
     : `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${filename || 'document.docx'}`;
@@ -1000,6 +1112,26 @@ const OnlyOfficeWorkspace = () => {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleInsertHeader}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                title="Insert Saved Header / Letterhead from Document Settings"
+              >
+                <span className="material-symbols-outlined text-sm">vertical_align_top</span>
+                <span>Header</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleInsertFooter}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                title="Insert Saved Footer from Document Settings"
+              >
+                <span className="material-symbols-outlined text-sm">vertical_align_bottom</span>
+                <span>Footer</span>
+              </button>
+
               {draftId && (
                 <button
                   type="button"

@@ -1585,6 +1585,86 @@ async def onlyoffice_forcesave(request: ForceSaveRequest, authorization: Optiona
     return {"ok": True}
 
 
+class HeaderFooterRequest(BaseModel):
+    draft_id: str
+    target: str  # "header" or "footer"
+    content_html: str
+
+
+def _apply_html_to_docx_container(container, html_content: str):
+    import docx
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from bs4 import BeautifulSoup
+
+    container.is_linked_to_previous = False
+    soup = BeautifulSoup(html_content or "", "html.parser")
+    
+    block_elements = soup.find_all(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6"])
+    
+    for p in container.paragraphs:
+        p.text = ""
+        
+    if not block_elements:
+        text = soup.get_text("\n").strip()
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        for idx, line in enumerate(lines):
+            p = container.paragraphs[idx] if idx < len(container.paragraphs) else container.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(line)
+            run.font.name = "Calibri"
+            run.font.size = docx.shared.Pt(10)
+        return
+
+    created_count = 0
+    for idx, elem in enumerate(block_elements):
+        elem_text = elem.get_text().strip()
+        if not elem_text:
+            continue
+        p = container.paragraphs[created_count] if created_count < len(container.paragraphs) else container.add_paragraph()
+        created_count += 1
+        
+        style_attr = elem.get("style", "").lower()
+        if "center" in style_attr:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif "right" in style_attr:
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        elif "left" in style_attr:
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        else:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+        run = p.add_run(elem_text)
+        run.font.name = "Calibri"
+        if "bold" in style_attr or elem.name in ["h1", "h2", "h3", "strong", "b"]:
+            run.bold = True
+
+
+@app.post("/v2/draft/header-footer")
+async def apply_header_footer(req: HeaderFooterRequest, authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+    draft_dir = os.path.join(shared_storage_path, req.draft_id)
+    
+    if not os.path.isdir(draft_dir):
+        raise HTTPException(status_code=404, detail="Draft directory not found.")
+        
+    files = [f for f in os.listdir(draft_dir) if f.lower().endswith(".docx")]
+    if not files:
+        raise HTTPException(status_code=404, detail="No DOCX file found for draft.")
+        
+    target_file = os.path.join(draft_dir, files[0])
+    
+    import docx
+    doc = docx.Document(target_file)
+    section = doc.sections[0]
+    
+    container = section.header if req.target.lower() == "header" else section.footer
+    _apply_html_to_docx_container(container, req.content_html)
+    doc.save(target_file)
+    
+    return {"ok": True, "target": req.target}
+
+
 @app.get("/v2/draft/config/{draft_id}")
 async def get_draft_config(draft_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
     try:
