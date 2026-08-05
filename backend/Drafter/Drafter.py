@@ -1190,9 +1190,8 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
 
-        # Copy file to lex_bot upload directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+        # Copy file to lex_bot upload directory (outside Python source tree to prevent uvicorn reloads)
+        lex_bot_upload_dir = "/app/shared_drafts/lex_bot_uploads"
         os.makedirs(lex_bot_upload_dir, exist_ok=True)
         lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
         with open(sandboxed_path, "rb") as sf:
@@ -1449,9 +1448,8 @@ async def upload_draft(
         with open(output_path, "rb") as f:
             docx_bytes = f.read()
 
-        # Copy file to lex_bot upload directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+        # Copy file to lex_bot upload directory (outside Python source tree to prevent uvicorn reloads)
+        lex_bot_upload_dir = "/app/shared_drafts/lex_bot_uploads"
         os.makedirs(lex_bot_upload_dir, exist_ok=True)
         lex_bot_path = os.path.join(lex_bot_upload_dir, safe_name)
         with open(lex_bot_path, "wb") as f:
@@ -1827,4 +1825,5 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
 
 
 if __name__ == "__main__":
-    uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=True)
+    import uvicorn
+    uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=False)

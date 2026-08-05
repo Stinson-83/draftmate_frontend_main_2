@@ -240,4 +240,4 @@ async def get_draft_pdf(draft_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.legal_workflow.app:app", host="0.0.0.0", port=8010, reload=True)
+    uvicorn.run("backend.legal_workflow.app:app", host="0.0.0.0", port=8010, reload=False)
