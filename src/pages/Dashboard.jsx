@@ -265,6 +265,9 @@ export default function Dashboard() {
             const realActiveCases = casesList.filter(c => 
                 c.caseNumber !== 'GEN-0001' && 
                 c.caseTitle !== 'General Documents' && 
+                c.caseType !== 'Folder' &&
+                !c.caseNumber?.startsWith('DIR-') &&
+                !c.caseNumber?.startsWith('FLD-') &&
                 !['Closed', 'Archived'].includes(c.status)
             );
 

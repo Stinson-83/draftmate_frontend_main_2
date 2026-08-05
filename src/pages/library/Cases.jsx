@@ -15,8 +15,14 @@ const Cases = () => {
   const loadCases = useCallback(async () => {
     try {
       const data = await caseService.getCases();
-      // Filter out internal system container bucket (General Documents) from legal cases view
-      const realCases = (data || []).filter(c => c.caseNumber !== 'GEN-0001' && c.caseTitle !== 'General Documents');
+      // Filter out internal system containers and document folders from legal cases view
+      const realCases = (data || []).filter(c => 
+        c.caseNumber !== 'GEN-0001' && 
+        c.caseTitle !== 'General Documents' && 
+        c.caseType !== 'Folder' &&
+        !c.caseNumber?.startsWith('DIR-') &&
+        !c.caseNumber?.startsWith('FLD-')
+      );
       setCases(realCases);
       setFilteredCases(realCases);
     } catch {

@@ -98,6 +98,7 @@ const DocumentManagement = () => {
           await caseService.createCase({
             caseTitle: folderNameInput.trim(),
             caseNumber: `DIR-${Math.floor(1000 + Math.random() * 9000)}`,
+            caseType: 'Folder',
             court: 'General Files',
             client: 'Self',
             filingDate: new Date().toISOString().split('T')[0],
