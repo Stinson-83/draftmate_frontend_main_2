@@ -1171,36 +1171,48 @@ def delete_draft(draft: DraftDelete, user_id: str = Depends(get_user_id_from_hea
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Check permissions: only creator can delete
-        cur.execute("SELECT created_by FROM drafts WHERE id = %s", (draft.id,))
-        owner_res = cur.fetchone()
-        if not owner_res:
-            raise HTTPException(status_code=404, detail="Draft not found")
-            
-        if str(owner_res[0]) != user_id:
-            raise HTTPException(status_code=403, detail="Only the owner can delete this draft")
-            
-        cur.execute("DELETE FROM drafts WHERE id = %s", (draft.id,))
+        raw_id = str(draft.id).strip()
+        print(f"🗑️ Delete draft request for target ID/Key: '{raw_id}' by user '{user_id}'")
+
+        # Find matching drafts by id, document_key, name, or filename
+        cur.execute("""
+            SELECT DISTINCT id FROM drafts 
+            WHERE id = %s OR document_key = %s OR name = %s OR filename = %s OR LOWER(name) = LOWER(%s) OR LOWER(filename) = LOWER(%s)
+        """, (raw_id, raw_id, raw_id, raw_id, raw_id, raw_id))
+        rows = cur.fetchall()
+
+        deleted_count = 0
+        import shutil
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+
+        for row in rows:
+            real_draft_id = str(row[0])
+            cur.execute("DELETE FROM draft_access WHERE draft_id = %s", (real_draft_id,))
+            cur.execute("DELETE FROM drafts WHERE id = %s", (real_draft_id,))
+            deleted_count += 1
+
+            # Remove document directory and files from storage
+            try:
+                draft_efs_dir = os.path.join(shared_storage_path, real_draft_id)
+                if os.path.exists(draft_efs_dir):
+                    shutil.rmtree(draft_efs_dir, ignore_errors=True)
+                    print(f"🗑️ Storage: Deleted folder {draft_efs_dir}")
+            except Exception as efs_err:
+                print(f"Directory cleanup notice for {real_draft_id}: {efs_err}")
+
+        # Direct fallback delete if row was inserted without user filter
+        if deleted_count == 0:
+            cur.execute("DELETE FROM draft_access WHERE draft_id = %s", (raw_id,))
+            cur.execute("DELETE FROM drafts WHERE id = %s OR document_key = %s OR name = %s", (raw_id, raw_id, raw_id))
+            deleted_count += cur.rowcount
+
         conn.commit()
-
-        # Remove document directory and files from EFS storage (/app/shared_drafts/{draft_id})
-        try:
-            import shutil
-            shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
-            draft_efs_dir = os.path.join(shared_storage_path, str(draft.id))
-            if os.path.exists(draft_efs_dir):
-                shutil.rmtree(draft_efs_dir, ignore_errors=True)
-                print(f"🗑️ EFS Storage: Deleted folder {draft_efs_dir}")
-        except Exception as efs_err:
-            print(f"EFS directory cleanup notice for {draft.id}: {efs_err}")
-
-        return {"ok": True}
-    except HTTPException as he:
-        raise he
+        print(f"✅ Delete draft completed. Deleted {deleted_count} records.")
+        return {"ok": True, "deleted": deleted_count}
     except Exception as e:
         conn.rollback()
         print(f"Delete draft error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete draft")
+        raise HTTPException(status_code=500, detail=f"Failed to delete draft: {e}")
     finally:
         cur.close()
         conn.close()

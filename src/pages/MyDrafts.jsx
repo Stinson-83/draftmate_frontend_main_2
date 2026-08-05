@@ -68,30 +68,46 @@ const MyDrafts = () => {
 
     const performDeleteDraft = async (id) => {
         const targetDraft = drafts.find(d => String(d.id) === String(id));
-        try {
-            const token = localStorage.getItem('session_id') || localStorage.getItem('token');
-            if (token) {
-                await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ id }),
-                });
-            }
-        } catch (error) {}
+        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+        const deleteTargets = Array.from(new Set([id, targetDraft?.documentKey, targetDraft?.filename, targetDraft?.name].filter(Boolean)));
 
-        // Delete from Document Management as well
+        for (const targetId of deleteTargets) {
+            try {
+                if (token) {
+                    await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ id: targetId }),
+                    });
+                }
+            } catch (error) {}
+
+            try {
+                await caseService.deleteCaseDocument(null, targetId);
+            } catch (dmsErr) {}
+        }
+
+        // Save to deleted IDs in localStorage so local fallbacks never resurrect it
         try {
-            await caseService.deleteCaseDocument(null, id);
-            if (targetDraft?.name || targetDraft?.filename) {
-                await caseService.deleteCaseDocument(null, targetDraft.name || targetDraft.filename);
-            }
-        } catch (dmsErr) {}
+            const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
+            deleteTargets.forEach(tid => {
+                const s = String(tid).trim().toLowerCase();
+                if (s && !deletedIds.includes(s)) deletedIds.push(s);
+            });
+            localStorage.setItem('draftmate_deleted_doc_ids', JSON.stringify(deletedIds));
+        } catch (e) {}
 
         setDrafts(prev => {
-            const updated = prev.filter(draft => String(draft.id) !== String(id));
+            const updated = prev.filter(d => 
+                String(d.id) !== String(id) && 
+                (!targetDraft?.documentKey || d.documentKey !== targetDraft.documentKey) &&
+                (!targetDraft?.name || d.name !== targetDraft.name)
+            );
             localStorage.setItem('my_drafts', JSON.stringify(updated));
             return updated;
         });
+
+        window.dispatchEvent(new Event('my_drafts_updated'));
         toast.success("Draft deleted successfully.");
     };
 
