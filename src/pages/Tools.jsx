@@ -998,33 +998,7 @@ const Tools = () => {
                 </div>
             )
         },
-        {
-            id: 'translator',
-            icon: 'translate',
-            title: 'Document Translator',
-            description: 'Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file.',
-            onClick: () => navigate('/dashboard/translate'),
-            accentColor: '#06b6d4',
-            category: 'PDF Tools'
-        },
-        {
-            id: 'lex-bot',
-            icon: 'balance',
-            title: 'Lex Bot',
-            description: 'Do accurate legal research by talking to our AI.',
-            onClick: () => navigate('/dashboard/research'),
-            accentColor: '#8b5cf6',
-            category: 'Research'
-        },
-        {
-            id: 'case-search',
-            icon: 'gavel',
-            title: 'Case Search',
-            description: 'Search Indian Kanoon database for legal cases and precedence.',
-            onClick: () => navigate('/dashboard/case-search'),
-            accentColor: '#ef4444',
-            category: 'Research'
-        },
+
         {
             id: 'chat-pdf',
             icon: 'picture_as_pdf',
