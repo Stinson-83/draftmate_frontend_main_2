@@ -1657,6 +1657,14 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
             document_key = hashlib.sha256(f"{draft_id}_{file_mtime}".encode("utf-8")).hexdigest()
         else:
             document_key = f"{document_key}_{file_mtime}"
+
+        # Append file size so a corrupted/replaced file always busts ONLYOFFICE's cache
+        # even if mtime is unchanged (e.g., overwritten by forcesave at the same second).
+        try:
+            file_size = os.path.getsize(target_file) if os.path.isfile(target_file) else 0
+            document_key = f"{document_key}_{file_size}"
+        except Exception:
+            pass
           
         # 3. Build OnlyOffice config
         internal_url = get_internal_backend_url()
