@@ -38,12 +38,18 @@ const JudgmentCard = ({ judgment, onRemove, onSaveNote, onShare, onDownload }) =
     <div className="flex flex-col p-5 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 hover:shadow-md transition-all group">
       <div className="flex justify-between items-start gap-3 mb-3">
         <div className="flex flex-wrap gap-2">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-            {judgment.court}
-          </span>
-          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-            {judgment.category}
-          </span>
+          {judgment.court && (
+            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+              {judgment.court}
+            </span>
+          )}
+          {judgment.category && 
+           !judgment.category.toLowerCase().includes('kanoon') && 
+           judgment.category.trim().toLowerCase() !== judgment.court?.trim().toLowerCase() && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+              {judgment.category}
+            </span>
+          )}
         </div>
       </div>
 

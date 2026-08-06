@@ -48,10 +48,14 @@ const JudgmentCard = ({ judgment, onSaveToggle }) => {
       {/* Top row */}
       <div className="flex justify-between items-start gap-3 mb-3">
         <div className="flex flex-wrap gap-2">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-            {judgment.court}
-          </span>
-          {judgment.category && !judgment.category.toLowerCase().includes('kanoon') && (
+          {judgment.court && (
+            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+              {judgment.court}
+            </span>
+          )}
+          {judgment.category && 
+           !judgment.category.toLowerCase().includes('kanoon') && 
+           judgment.category.trim().toLowerCase() !== judgment.court?.trim().toLowerCase() && (
             <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
               {judgment.category}
             </span>
