@@ -58,6 +58,19 @@ const MyDrafts = () => {
             }
         }
 
+        // Always filter out locally-deleted drafts so they never resurrect after navigation
+        try {
+            const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
+            if (deletedIds.length > 0) {
+                loadedDrafts = loadedDrafts.filter(d => {
+                    const candidates = [d.id, d.documentKey, d.filename, d.name]
+                        .filter(Boolean)
+                        .map(v => String(v).trim().toLowerCase());
+                    return !candidates.some(c => deletedIds.includes(c));
+                });
+            }
+        } catch (e) {}
+
         setDrafts(loadedDrafts);
         setFolders(loadedFolders);
     };
