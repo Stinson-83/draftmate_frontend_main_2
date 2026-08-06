@@ -218,11 +218,7 @@ const JudgmentDetails = () => {
               {judgment.court && (
                 <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">{judgment.court}</span>
               )}
-              {judgment.category && 
-               !judgment.category.toLowerCase().includes('kanoon') && 
-               judgment.category.trim().toLowerCase() !== judgment.court?.trim().toLowerCase() && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.category}</span>
-              )}
+              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Indian Kanoon</span>
               <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.citation}</span>
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white leading-tight">{judgment.title}</h1>

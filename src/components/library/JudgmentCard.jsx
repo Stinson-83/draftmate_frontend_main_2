@@ -53,13 +53,9 @@ const JudgmentCard = ({ judgment, onSaveToggle }) => {
               {judgment.court}
             </span>
           )}
-          {judgment.category && 
-           !judgment.category.toLowerCase().includes('kanoon') && 
-           judgment.category.trim().toLowerCase() !== judgment.court?.trim().toLowerCase() && (
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-              {judgment.category}
-            </span>
-          )}
+          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+            Indian Kanoon
+          </span>
         </div>
         <button
           onClick={handleSaveToggle}
