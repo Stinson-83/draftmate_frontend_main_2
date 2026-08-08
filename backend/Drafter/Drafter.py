@@ -378,8 +378,13 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
             questions.append(
                 _build_clarifying_question(
                     "jurisdiction",
-                    "Which jurisdiction should govern this draft?",
-                    [("India", "India"), ("United States", "United States"), ("Other / mixed", "Other / mixed")],
+                    "Which jurisdiction's laws should govern this document?",
+                    [
+                        ("Maharashtra (Mumbai)", "Maharashtra"),
+                        ("Delhi", "Delhi"),
+                        ("Karnataka (Bengaluru)", "Karnataka"),
+                        ("Other Indian State / Union Territory", "Other India"),
+                    ],
                 )
             )
         if "document_type" in missing_key_inputs:
@@ -442,7 +447,17 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
 def _build_intake_prompt(initial_prompt: str, accumulated_answers: Dict[str, Any], current_round_index: int) -> str:
     answers_text = _flatten_answers(accumulated_answers)
     return f"""
-You are a Senior Transactional Lawyer performing intake analysis for a legal drafting workflow.
+You are a Senior Indian Transactional Lawyer performing intake analysis for a legal drafting workflow.
+
+IMPORTANT CONTEXT: This platform (Draftmate) is exclusively for Indian legal practice.
+- All jurisdiction options MUST be Indian states, High Courts, or Indian legal frameworks.
+- Do NOT suggest US states (e.g., Delaware, New York, California) or UK/EU jurisdictions.
+- Use Indian legal terminology: refer to Acts (e.g., Indian Contract Act 1872, Companies Act 2013,
+  Transfer of Property Act 1882, Specific Relief Act 1963, Arbitration & Conciliation Act 1996).
+- For jurisdiction questions, offer Indian options such as: Maharashtra, Delhi, Karnataka,
+  Tamil Nadu, Gujarat, Telangana, Rajasthan, West Bengal, or 'Pan-India / Central'.
+- For dispute resolution, refer to Indian courts (High Courts, District Courts, NCLT, NCDRC)
+  or Indian arbitration bodies (DIAC, MCIA, Mumbai Centre for International Arbitration).
 
 Follow these steps:
 1. Document Identification.
@@ -450,9 +465,9 @@ Follow these steps:
 3. Gap Analysis.
 
 If critical structural or commercial risk information is missing, return up to 5 concise clarifying questions.
-Prefer multiple-choice questions with 3-4 options.
-If the matter is sufficiently clear or market-standard provisions can close the gaps, return sufficiency_met true,
-and include:
+Prefer multiple-choice questions with 3-4 options relevant to Indian law and practice.
+If the matter is sufficiently clear or Indian market-standard provisions can close the gaps,
+return sufficiency_met true, and include:
 - Step 6 assumptions
 - Step 8 draft summary basis
 
@@ -1255,7 +1270,9 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
                     "autostart": [
                         "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
                     ],
-                    "pluginsData": []
+                    "pluginsData": [
+                        "/plugins/assistant/config.json"
+                    ]
                 }
             },
         }
@@ -1704,7 +1721,9 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
                     "autostart": [
                         "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
                     ],
-                    "pluginsData": []
+                    "pluginsData": [
+                        "/plugins/assistant/config.json"
+                    ]
                 }
             },
         }

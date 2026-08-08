@@ -237,8 +237,17 @@ const OnlyOfficeWorkspace = () => {
       }
     }
 
+    const pluginConfigUrl = `${window.location.origin}/plugins/assistant/config.json`;
+
     const nextConfig = {
       ...activeConfig,
+      editorConfig: {
+        ...(activeConfig?.editorConfig || {}),
+        plugins: {
+          autostart: ['asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}'],
+          pluginsData: [pluginConfigUrl],
+        },
+      },
       events: {
         ...(activeConfig?.events || {}),
         onDocumentReady: (...args) => {
