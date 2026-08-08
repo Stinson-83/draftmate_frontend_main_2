@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 const libraryCards = [
   {
@@ -102,6 +103,22 @@ const libraryCards = [
   },
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 24, scale: 0.96 },
+  visible: {
+    opacity: 1, y: 0, scale: 1,
+    transition: { type: 'spring', stiffness: 280, damping: 22 }
+  }
+};
+
 const LibraryDashboard = () => {
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto">
@@ -111,28 +128,43 @@ const LibraryDashboard = () => {
           <p className="text-slate-600 dark:text-slate-400 mt-1">Your complete legal knowledge and practice management ecosystem.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"
+        >
           {libraryCards.map((card, index) => (
-            <Link
+            <motion.div
               key={index}
-              to={card.path}
-              className="flex flex-col p-6 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all group"
+              variants={cardVariants}
+              whileHover={{ y: -6, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="h-full"
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${card.color}`}>
-                <span className="material-symbols-outlined text-[24px]">{card.icon}</span>
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
-                {card.title}
-              </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 flex-1">
-                {card.description}
-              </p>
-              <div className="mt-4 flex items-center text-sm font-medium text-slate-400 group-hover:text-primary transition-colors">
-                Open <span className="material-symbols-outlined text-[18px] ml-1">arrow_forward</span>
-              </div>
-            </Link>
+              <Link
+                to={card.path}
+                className="relative flex flex-col h-full p-6 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 dark:hover:border-blue-400/50 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group overflow-hidden"
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 ${card.color}`}>
+                  <span className="material-symbols-outlined text-[24px]">{card.icon}</span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  {card.title}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 flex-1">
+                  {card.description}
+                </p>
+                <div className="mt-4 flex items-center text-sm font-semibold text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Open <span className="material-symbols-outlined text-[18px] ml-1 transition-transform duration-300 group-hover:translate-x-1.5">arrow_forward</span>
+                </div>
+
+                {/* Bottom Blue Accent Line on Hover */}
+                <span className="absolute bottom-0 left-0 right-0 h-[3.5px] bg-blue-600 dark:bg-blue-500 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300 ease-out" />
+              </Link>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </div>
   );
