@@ -686,28 +686,38 @@ const OnlyOfficeWorkspace = () => {
 
   const handleExplainSelection = () => {
     const selectedText = selectionPreview.trim() || activeSelectionText.trim();
+    if (selectedText) {
+      handleSendMessage(`Explain this selection: "${selectedText}"`);
+      return;
+    }
+
     pendingSelectionActionRef.current = 'explain';
     sendToPlugin({ type: 'ONLYOFFICE_GET_SELECTION' });
 
-    if (selectedText) {
-      handleSendMessage(`Explain this selection: "${selectedText}"`);
-      pendingSelectionActionRef.current = null;
-    } else {
-      toast.info('Please select text inside the document first.');
-    }
+    setTimeout(() => {
+      if (pendingSelectionActionRef.current === 'explain') {
+        pendingSelectionActionRef.current = null;
+        toast.info('Please select text inside the document first.');
+      }
+    }, 1500);
   };
 
   const handleFindRelevantCases = () => {
     const selectedText = selectionPreview.trim() || activeSelectionText.trim();
+    if (selectedText) {
+      fetchRelevantCases(selectedText);
+      return;
+    }
+
     pendingSelectionActionRef.current = 'cases';
     sendToPlugin({ type: 'ONLYOFFICE_GET_SELECTION' });
 
-    if (selectedText) {
-      fetchRelevantCases(selectedText);
-      pendingSelectionActionRef.current = null;
-    } else {
-      toast.info('Please select text inside the document first.');
-    }
+    setTimeout(() => {
+      if (pendingSelectionActionRef.current === 'cases') {
+        pendingSelectionActionRef.current = null;
+        toast.info('Please select text inside the document first.');
+      }
+    }, 1500);
   };
 
   const handleInsertText = (textToInsert) => {
