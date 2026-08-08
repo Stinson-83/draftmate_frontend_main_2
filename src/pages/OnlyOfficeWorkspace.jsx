@@ -576,15 +576,6 @@ const OnlyOfficeWorkspace = () => {
             setStatusMessage(nodeNames[evt.node]);
           }
         },
-        onNodeStream: (evt) => {
-          if (evt.chunk) {
-            accumulatedResponse += evt.chunk;
-            const currentText = accumulatedResponse;
-            setMessages((prev) => prev.map((m) =>
-              m.id === assistantMsgId ? { ...m, content: currentText } : m
-            ));
-          }
-        },
         onToken: (chunk, accumulated) => {
           accumulatedResponse = accumulated;
           setMessages((prev) => prev.map((m) =>
