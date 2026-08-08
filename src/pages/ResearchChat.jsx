@@ -340,8 +340,19 @@ const ResearchChat = () => {
     //     window.history.replaceState({}, '', '/research');
     // };
 
+    const safeUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            try {
+                return crypto.randomUUID();
+            } catch (e) {
+                // fallback
+            }
+        }
+        return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
+    };
+
     const startNewChat = () => {
-        const newId = crypto.randomUUID();
+        const newId = safeUUID();
         setSessionId(newId);
         setMessages([{
             id: 1,
