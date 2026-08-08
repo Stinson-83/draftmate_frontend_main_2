@@ -40,7 +40,7 @@ const NODE_LABELS = {
     'memory_store': 'Committing insights to memory'
 };
 
-const ResearchProgressTimeline = ({ activeNodes, isTyping }) => {
+const ResearchProgressTimeline = ({ activeNodes, isTyping, isComplete }) => {
     const stages = [
         { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
         { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
@@ -56,33 +56,43 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping }) => {
         }
     });
 
-    const [progress, setProgress] = useState(10);
+    // If answer tokens are streaming in or research is complete, advance to stage 3 / 100%
+    const isStreamingAnswer = activeNodes.some(n => n.node === 'explainer_agent' || n.node === 'manager_aggregate') || isComplete;
+    if (isStreamingAnswer && activeStageIndex < 3) {
+        activeStageIndex = 3;
+    }
+
+    const [progress, setProgress] = useState(15);
 
     useEffect(() => {
         let targetProgress = 15;
-        if (activeStageIndex === 0) targetProgress = 30;
-        else if (activeStageIndex === 1) targetProgress = 60;
-        else if (activeStageIndex === 2) targetProgress = 85;
-        else if (activeStageIndex === 3) targetProgress = 98;
-
-        if (!isTyping && activeNodes.length > 0) {
+        if (isComplete) {
             targetProgress = 100;
+        } else if (activeStageIndex === 0) {
+            targetProgress = 35;
+        } else if (activeStageIndex === 1) {
+            targetProgress = 65;
+        } else if (activeStageIndex === 2) {
+            targetProgress = 85;
+        } else if (activeStageIndex >= 3) {
+            targetProgress = 98;
         }
 
         const interval = setInterval(() => {
             setProgress((prev) => {
                 if (prev < targetProgress) {
-                    const step = Math.max(0.5, (targetProgress - prev) * 0.12);
+                    const step = Math.max(0.5, (targetProgress - prev) * 0.15);
                     return Math.min(targetProgress, prev + step);
                 }
                 return prev;
             });
-        }, 50);
+        }, 40);
 
         return () => clearInterval(interval);
-    }, [activeStageIndex, activeNodes, isTyping]);
+    }, [activeStageIndex, activeNodes, isTyping, isComplete]);
 
     const displayPercent = Math.round(progress);
+    const isFullyDone = displayPercent >= 100 || isComplete;
 
     return (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 shadow-2xl relative overflow-hidden text-white backdrop-blur-md">
@@ -91,19 +101,27 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping }) => {
 
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-ping" />
+                    <div className={`w-2.5 h-2.5 rounded-full ${isFullyDone ? 'bg-emerald-400' : 'bg-blue-500 animate-ping'}`} />
                     <h3 className="text-xs font-bold uppercase tracking-widest text-slate-300 flex items-center gap-2">
                         Autonomous Research Pipeline
                     </h3>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex items-end gap-1 h-3">
-                        <div className="w-1 bg-blue-400 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
-                        <div className="w-1 bg-indigo-400 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
-                        <div className="w-1 bg-purple-400 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
-                    </div>
-                    <span className="text-xs font-mono font-bold text-blue-400 bg-blue-950/80 border border-blue-800/60 px-2.5 py-1 rounded-full shadow-inner">
-                        {displayPercent}%
+                    {!isFullyDone ? (
+                        <div className="flex items-end gap-1 h-3">
+                            <div className="w-1 bg-blue-400 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
+                            <div className="w-1 bg-indigo-400 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
+                            <div className="w-1 bg-purple-400 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
+                        </div>
+                    ) : (
+                        <span className="material-symbols-outlined text-emerald-400 text-sm">verified</span>
+                    )}
+                    <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full shadow-inner ${
+                        isFullyDone
+                            ? 'text-emerald-300 bg-emerald-950/80 border border-emerald-800/60'
+                            : 'text-blue-400 bg-blue-950/80 border border-blue-800/60'
+                    }`}>
+                        {displayPercent}% {isFullyDone ? 'COMPLETE' : ''}
                     </span>
                 </div>
             </div>
@@ -112,7 +130,11 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping }) => {
             <div className="relative my-5 px-1">
                 <div className="h-2.5 bg-slate-800 rounded-full w-full relative overflow-hidden shadow-inner border border-slate-700/60">
                     <div
-                        className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 rounded-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(59,130,246,0.9)]"
+                        className={`h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(59,130,246,0.9)] ${
+                            isFullyDone
+                                ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400'
+                                : 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500'
+                        }`}
                         style={{ width: `${progress}%` }}
                     />
                 </div>
@@ -126,8 +148,8 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping }) => {
             <div className="grid grid-cols-4 gap-2 pt-2">
                 {stages.map((stage, idx) => {
                     const stageThreshold = (idx + 1) * 25;
-                    const isPassed = progress >= stageThreshold - 15;
-                    const isCurrent = progress >= (idx * 25) && progress < stageThreshold;
+                    const isPassed = progress >= stageThreshold - 15 || isFullyDone;
+                    const isCurrent = !isFullyDone && progress >= (idx * 25) && progress < stageThreshold;
 
                     return (
                         <div key={stage.label} className="flex flex-col items-center text-center">
@@ -967,7 +989,7 @@ const ResearchChat = () => {
                     <div className="max-w-4xl mx-auto w-full">
 
                         {/* Progress Timeline & Tasks UI */}
-                        {isTyping && <ResearchProgressTimeline activeNodes={activeNodes} isTyping={isTyping} />}
+                        {(isTyping || activeNodes.length > 0) && <ResearchProgressTimeline activeNodes={activeNodes} isTyping={isTyping} isComplete={!isTyping} />}
                         {isTyping && <SubQueryTasks isTyping={isTyping} input={input} />}
 
                         {/* File Preview */}
