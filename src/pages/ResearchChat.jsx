@@ -40,7 +40,7 @@ const NODE_LABELS = {
     'memory_store': 'Committing insights to memory'
 };
 
-const ResearchProgressTimeline = ({ activeNodes, isTyping, isComplete, hasAnswer }) => {
+const ResearchProgressTimeline = ({ activeNodes, streamLength }) => {
     const stages = [
         { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
         { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
@@ -56,34 +56,29 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping, isComplete, hasAnswer
         }
     });
 
-    // If answer tokens are streaming in, hasAnswer is true, or research is complete, advance to stage 4 / 100%
-    const isStreamingAnswer = hasAnswer || isComplete || activeNodes.some(n => n.node === 'explainer_agent' || n.node === 'manager_aggregate');
-    if (isStreamingAnswer) {
-        activeStageIndex = 3;
-    }
+    // Advance stages dynamically based on stream token length
+    if (streamLength > 50) activeStageIndex = Math.max(activeStageIndex, 1);
+    if (streamLength > 200) activeStageIndex = Math.max(activeStageIndex, 2);
+    if (streamLength > 500) activeStageIndex = Math.max(activeStageIndex, 3);
 
     const [progress, setProgress] = useState(15);
 
     useEffect(() => {
-        let targetProgress = 15;
-        if (isComplete) {
-            targetProgress = 100;
-        } else if (isStreamingAnswer) {
-            targetProgress = 98;
-        } else if (activeStageIndex === 0) {
-            targetProgress = 35;
+        let targetProgress = 20;
+        if (streamLength > 0) {
+            targetProgress = Math.min(99, 35 + Math.floor(streamLength / 8));
         } else if (activeStageIndex === 1) {
-            targetProgress = 65;
+            targetProgress = 45;
         } else if (activeStageIndex === 2) {
-            targetProgress = 85;
-        } else if (activeStageIndex >= 3) {
-            targetProgress = 98;
+            targetProgress = 70;
+        } else if (activeStageIndex === 3) {
+            targetProgress = 90;
         }
 
         const interval = setInterval(() => {
             setProgress((prev) => {
                 if (prev < targetProgress) {
-                    const step = Math.max(0.8, (targetProgress - prev) * 0.18);
+                    const step = Math.max(1, (targetProgress - prev) * 0.2);
                     return Math.min(targetProgress, prev + step);
                 }
                 return prev;
@@ -91,38 +86,29 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping, isComplete, hasAnswer
         }, 30);
 
         return () => clearInterval(interval);
-    }, [activeStageIndex, activeNodes, isTyping, isComplete, isStreamingAnswer]);
+    }, [activeStageIndex, streamLength]);
 
     const displayPercent = Math.round(progress);
-    const isFullyDone = displayPercent >= 100 || isComplete;
 
     return (
-        <div className="bg-white border border-blue-100 rounded-2xl p-5 mb-6 shadow-[0_4px_25px_rgba(37,99,235,0.06)] relative overflow-hidden text-slate-800 backdrop-blur-md">
+        <div className="bg-white border border-blue-100 rounded-2xl p-5 mb-6 shadow-[0_4px_25px_rgba(37,99,235,0.06)] relative overflow-hidden text-slate-800 backdrop-blur-md animate-fade-in">
             <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-blue-50/50 to-transparent pointer-events-none" />
 
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isFullyDone ? 'bg-emerald-500' : 'bg-blue-600 animate-ping'}`} />
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
                     <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
                         Autonomous Research Pipeline
                     </h3>
                 </div>
                 <div className="flex items-center gap-3">
-                    {!isFullyDone ? (
-                        <div className="flex items-end gap-1 h-3">
-                            <div className="w-1 bg-blue-600 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
-                            <div className="w-1 bg-indigo-600 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
-                            <div className="w-1 bg-purple-600 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
-                        </div>
-                    ) : (
-                        <span className="material-symbols-outlined text-emerald-600 text-sm">verified</span>
-                    )}
-                    <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full shadow-sm border ${
-                        isFullyDone
-                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                            : 'text-blue-700 bg-blue-50 border-blue-200'
-                    }`}>
-                        {displayPercent}% {isFullyDone ? 'COMPLETE' : ''}
+                    <div className="flex items-end gap-1 h-3">
+                        <div className="w-1 bg-blue-600 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
+                        <div className="w-1 bg-indigo-600 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
+                        <div className="w-1 bg-purple-600 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
+                    </div>
+                    <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full shadow-sm border text-blue-700 bg-blue-50 border-blue-200">
+                        {displayPercent}%
                     </span>
                 </div>
             </div>
@@ -131,11 +117,7 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping, isComplete, hasAnswer
             <div className="relative my-5 px-1">
                 <div className="h-2.5 bg-slate-100 rounded-full w-full relative overflow-hidden border border-slate-200/80 shadow-inner">
                     <div
-                        className={`h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(37,99,235,0.4)] ${
-                            isFullyDone
-                                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500'
-                                : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600'
-                        }`}
+                        className="h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(37,99,235,0.4)] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600"
                         style={{ width: `${progress}%` }}
                     />
                 </div>
@@ -149,8 +131,8 @@ const ResearchProgressTimeline = ({ activeNodes, isTyping, isComplete, hasAnswer
             <div className="grid grid-cols-4 gap-2 pt-1">
                 {stages.map((stage, idx) => {
                     const stageThreshold = (idx + 1) * 25;
-                    const isPassed = progress >= stageThreshold - 15 || isFullyDone;
-                    const isCurrent = !isFullyDone && progress >= (idx * 25) && progress < stageThreshold;
+                    const isPassed = progress >= stageThreshold - 10;
+                    const isCurrent = progress >= (idx * 25) && progress < stageThreshold;
 
                     return (
                         <div key={stage.label} className="flex flex-col items-center text-center">
@@ -990,7 +972,13 @@ const ResearchChat = () => {
                     <div className="max-w-4xl mx-auto w-full">
 
                         {/* Progress Timeline & Tasks UI */}
-                        {(isTyping || activeNodes.length > 0) && <ResearchProgressTimeline activeNodes={activeNodes} isTyping={isTyping} isComplete={!isTyping} />}
+                        {/* Progress Timeline & Tasks UI - auto-hides once reply arrives */}
+                        {isTyping && (
+                            <ResearchProgressTimeline
+                                activeNodes={activeNodes}
+                                streamLength={messages[messages.length - 1]?.role === 'ai' ? (messages[messages.length - 1]?.content?.length || 0) : 0}
+                            />
+                        )}
                         {isTyping && <SubQueryTasks isTyping={isTyping} input={input} />}
 
                         {/* File Preview */}
