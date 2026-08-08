@@ -644,6 +644,8 @@ async def _stream_chat(request: ChatRequest, user_id: str):
                             content = chunk.content if hasattr(chunk, "content") else str(chunk)
                             if content:
                                 yield f"data: {json.dumps({'event': 'node_stream', 'node': active_node, 'chunk': content})}\n\n"
+                                if active_node in ("explainer_agent", "manager_aggregate"):
+                                    yield f"data: {json.dumps({'event': 'token', 'chunk': content, 'accumulated': ''})}\n\n"
                                 
                 elif kind == "on_chain_end" and not event.get("parent_ids"):
                     result = event.get("data", {}).get("output")

@@ -623,16 +623,30 @@ const OnlyOfficeWorkspace = () => {
             setStatusMessage(nodeNames[evt.node]);
           }
         },
+        onNodeStream: (evt) => {
+          if (evt.node === 'explainer_agent' || evt.node === 'manager_aggregate') {
+            if (evt.chunk && typeof evt.chunk === 'string') {
+              accumulatedResponse += evt.chunk;
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantMsgId ? { ...m, content: accumulatedResponse } : m
+              ));
+            }
+          }
+        },
         onToken: (chunk, accumulated) => {
-          accumulatedResponse = accumulated;
+          if (accumulated) {
+            accumulatedResponse = accumulated;
+          } else if (chunk) {
+            accumulatedResponse += chunk;
+          }
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, content: accumulated } : m
+            m.id === assistantMsgId ? { ...m, content: accumulatedResponse } : m
           ));
         },
         onAnswer: (content) => {
-          accumulatedResponse = content;
+          accumulatedResponse = content || accumulatedResponse;
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, content: content, isStreaming: false } : m
+            m.id === assistantMsgId ? { ...m, content: accumulatedResponse, isStreaming: false } : m
           ));
         },
         onDone: () => {
