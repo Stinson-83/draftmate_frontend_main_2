@@ -936,6 +936,53 @@ const CalculatorHub = ({ onClose, onOpenCourtFee }) => {
 
 
 // ════════ MAIN TOOLS COMPONENT ════════
+// ════════ E-SIGNATURE MODAL ════════
+const ESignatureModal = ({ onClose }) => {
+    return (
+        <AnimatePresence>
+            <motion.div
+                variants={modalOverlayVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="tools-modal-overlay"
+                onClick={(e) => e.target === e.currentTarget && onClose()}
+            >
+                <motion.div
+                    variants={modalContentVariants}
+                    className="tools-modal-content max-w-lg p-6 text-center space-y-6"
+                >
+                    <div className="w-16 h-16 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-sm">
+                        <span className="material-symbols-outlined text-3xl">draw</span>
+                    </div>
+
+                    <div className="space-y-2">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                            Digital E-Signature & Signing
+                        </h2>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Execute agreements, affidavits, and legal contracts with legally binding Aadhaar-based eSign and secure digital signatures (IT Act compliant).
+                        </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-sky-50/60 dark:bg-sky-900/10 border border-sky-200/60 dark:border-sky-800/40 text-xs text-sky-700 dark:text-sky-300 font-medium">
+                        ✨ Fully compliant under Section 3A & Schedule II of the Indian Information Technology (IT) Act, 2000.
+                    </div>
+
+                    <div className="flex justify-center gap-3 pt-2">
+                        <button
+                            onClick={onClose}
+                            className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-sm transition-all shadow-md"
+                        >
+                            Got It
+                        </button>
+                    </div>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+};
+
 const Tools = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -944,6 +991,7 @@ const Tools = () => {
     const [isCourtFeeModalOpen, setIsCourtFeeModalOpen] = useState(false);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [isDictationModalOpen, setIsDictationModalOpen] = useState(false);
+    const [isESignatureModalOpen, setIsESignatureModalOpen] = useState(false);
     const [isCalculatorHubOpen, setIsCalculatorHubOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState('');
@@ -1033,6 +1081,15 @@ const Tools = () => {
             description: 'Dictate your legal notes using voice-to-text. Supports Hindi & English.',
             onClick: () => setIsDictationModalOpen(true),
             accentColor: '#f43f5e',
+            category: 'Utilities'
+        },
+        {
+            id: 'esignature',
+            icon: 'draw',
+            title: 'Digital E-Signature & Signing',
+            description: 'Execute agreements, affidavits, and legal contracts with legally binding Aadhaar-based eSign and secure digital signatures (IT Act compliant).',
+            onClick: () => setIsESignatureModalOpen(true),
+            accentColor: '#0284c7',
             category: 'Utilities'
         }
     ];
@@ -1474,6 +1531,7 @@ const Tools = () => {
             {isCourtFeeModalOpen && <CourtFeeModal onClose={() => setIsCourtFeeModalOpen(false)} />}
             {isInvoiceModalOpen && <InvoiceModal onClose={() => setIsInvoiceModalOpen(false)} />}
             {isDictationModalOpen && <DictationModal onClose={() => setIsDictationModalOpen(false)} />}
+            {isESignatureModalOpen && <ESignatureModal onClose={() => setIsESignatureModalOpen(false)} />}
             {isCalculatorHubOpen && (
                 <CalculatorHub
                     onClose={() => setIsCalculatorHubOpen(false)}
