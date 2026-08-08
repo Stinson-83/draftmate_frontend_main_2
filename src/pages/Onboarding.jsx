@@ -1,355 +1,337 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import logo from '../assets/draftmate_logo.png';
+// src/pages/Onboarding.jsx
+
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import fullLogo from "../assets/FULL_LOGO.svg"; // Γ£à Added import
+import "./Onboarding.css";
+
+const roles = [
+  {
+    id: "law_student",
+    title: "Law Student",
+    watermark: "JURIS",
+    accent: "#3b82f6",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.25 18L5 11l5-2.5L16.5 4l5.25 3.5v7.5L16.5 20l-8-2.5-3.25-.5Z" />
+        <path d="m5 11 10 5.5" />
+        <path d="M2.25 18v-5.5" />
+        <path d="M21.75 12v5.5" />
+        <path d="M11.5 8.5 16.5 4" />
+        <path d="M12.5 21.5 16.5 20" />
+      </svg>
+    ),
+  },
+  {
+    id: "advocate",
+    title: "Advocate / Legal Pro",
+    watermark: "LEX",
+    accent: "#2563eb",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22V8" />
+        <path d="M5 22V16" />
+        <path d="M19 22V12" />
+        <path d="M2 16h20" />
+        <path d="M18.5 7.5a4.5 4.5 0 0 0-7.79-2.5" />
+        <path d="M13.26 10.33a4.5 4.5 0 0 0 7.42-2.38" />
+      </svg>
+    ),
+  },
+  {
+    id: "law_firm",
+    title: "Law Firm Member",
+    watermark: "FIRM",
+    accent: "#1d4ed8",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22v-8" />
+        <path d="M8.5 10.5 4 8" />
+        <path d="M15.5 10.5 20 8" />
+        <path d="M12 2v4" />
+        <path d="m2 14 10 8 10-8" />
+        <path d="m2 10 10 4 10-4" />
+      </svg>
+    ),
+  },
+  {
+    id: "ca_cs",
+    title: "CA / CS / Compliance",
+    watermark: "AUDIT",
+    accent: "#1e40af",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+        <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+        <path d="M9 14l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    id: "non_legal",
+    title: "Non-Legal User",
+    watermark: "USER",
+    accent: "#3b82f6",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <line x1="10" y1="9" x2="8" y2="9" />
+      </svg>
+    ),
+  },
+];
+
+// Γ£à Role to Route Mapping
+const ROLE_ROUTES = {
+  law_student: "/onboarding/student-details",
+  advocate: "/onboarding/advocate-details",
+  law_firm: "/onboarding/firm-details",
+  ca_cs: "/onboarding/ca-details",
+  non_legal: "/onboarding/user-details",
+};
 
 const Onboarding = () => {
-    const navigate = useNavigate();
-    const [step, setStep] = useState(1);
-    const [formData, setFormData] = useState({
-        role: 'professional',
-        firstName: '',
-        lastName: '',
-        workplace: '',
-        designation: '',
-        usage: []
-    });
+  const navigate = useNavigate();
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      setMousePos({
+        x: (e.clientX / window.innerWidth - 0.5) * 20,
+        y: (e.clientY / window.innerHeight - 0.5) * 20,
+      });
     };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
-    const handleRoleSelect = (role) => {
-        setFormData(prev => ({ ...prev, role }));
-    };
+  const handleSelectRole = (roleId) => {
+    setSelectedRole(roleId);
+  };
 
-    const handleUsageToggle = (option) => {
-        setFormData(prev => {
-            const usage = prev.usage.includes(option)
-                ? prev.usage.filter(item => item !== option)
-                : [...prev.usage, option];
-            return { ...prev, usage };
-        });
-    };
+  const triggerExitAndNavigate = (path) => {
+    setIsExiting(true);
+    setTimeout(() => navigate(path), 800);
+  };
 
-    const handleContinue = () => {
-        if (step < 3) {
-            setStep(step + 1);
-        } else {
-            // Finish onboarding - Save to localStorage for Dashboard/Settings
-            const userProfile = {
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                name: `${formData.firstName} ${formData.lastName}`.trim(),
-                role: formData.designation || (formData.role === 'professional' ? 'Legal Professional' : 'Law Student'),
-                workplace: formData.workplace,
-                usage: formData.usage,
-                email: 'user@example.com', // Mock email
-                image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCf79wuBAV_uurpxIHNj8aieGbEhEXhNnnRbN4i6y6PB0cDQAIRL9j87KI1_P114LVgr1D83UM0cCNfd5rdo7Lgoukm2J7UpdQlshSXI1k296RyvODHng12-_Tgx2DvQBf07mko3b0GUnUqoofVCNHdDorsXylCZ2ZYcheYqOrU1fK68F4Io3yKaBeUc1s9moLHx_8V9HmPO4qleggBYJCVjxMsWblqTXMqk29SbcNjAAARdb2_y7Y7m6e7d39-tfL7WBs3YUvm84U"
-            };
-            localStorage.setItem('user_profile', JSON.stringify(userProfile));
-            window.dispatchEvent(new Event('user_profile_updated')); // Notify other components
-            navigate('/dashboard/home');
-        }
-    };
+  // Γ£à UPDATED handleContinue - routes to specific details page based on role
+  const handleContinue = async () => {
+    if (!selectedRole) {
+      toast.error("Please select a role to continue.");
+      return;
+    }
 
-    const handleBack = () => {
-        if (step > 1) {
-            setStep(step - 1);
-        } else {
-            navigate('/login');
-        }
-    };
+    setIsLoading(true);
+    const loadingToast = toast.loading("Personalizing your experience...");
 
-    const usageOptions = [
-        { id: 'drafting', icon: 'edit_document', label: 'Legal Drafting', desc: 'Contracts, notices, agreements' },
-        { id: 'research', icon: 'library_books', label: 'Legal Research', desc: 'Case laws, statutes, precedents' },
-        { id: 'analysis', icon: 'analytics', label: 'Document Analysis', desc: 'Review and summarize documents' },
-        { id: 'management', icon: 'folder_open', label: 'Case Management', desc: 'Organize files and clients' },
-        { id: 'compliance', icon: 'gavel', label: 'Compliance', desc: 'Regulatory checks and audits' }
-    ];
+    try {
+      // Save selected role to localStorage
+      const userProfile = JSON.parse(
+        localStorage.getItem("user_profile") || "{}"
+      );
+      userProfile.professional_background = selectedRole;
+      localStorage.setItem("user_profile", JSON.stringify(userProfile));
 
-    return (
-        <div className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white flex h-screen overflow-hidden antialiased transition-colors duration-200">
-            {/* Left Panel: Branding & Context */}
-            <aside className="hidden lg:flex w-5/12 relative flex-col justify-between bg-slate-900 text-white overflow-hidden">
-                {/* Background Image with Overlay */}
-                <div className="absolute inset-0 z-0">
-                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 to-blue-600/80 z-10 mix-blend-multiply"></div>
-                    <div className="w-full h-full bg-cover bg-center opacity-40 mix-blend-overlay" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuDb2CRzdwCjgYV-YgFxXs0c9EyHTaII2XLWdFig24IWoNTtUrvlJ8iEZPqC5MEdXQotRvXZMKk358BJ7g6_RtCV-mkRVf1MD66Jlup6o-zNdQihZj_YDV0uECvP3RgluhQS0B0Tm1gbsPn8GwOIM326M358BJ7g6_RtCV-mkRVf1MD66Jlup6o-zNdQihZj_YDV0uECvP3RgluhQS0B0Tm1gbsPn8GwOIM326M9bqBX4qz8V3lfzA37oq39Z_mSSxqk-MPck87U2WhNLevJgNN5GhwQ_d9BXDjzlRj350e1cxoasNQPKTW-Nf1R_jKxQqhE8q9oNM9oWvLpDwfdit3t3DBvc")' }}></div>
-                </div>
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
-                {/* Content */}
-                <div className="relative z-20 flex flex-col h-full justify-between p-12 lg:p-16">
-                    {/* Brand */}
-                    <div className="flex items-center gap-3">
-                        <Link to="/" className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center text-white border border-white/20 hover:bg-white/20 transition-colors">
-                            <img src={logo} alt="DraftMate" className="w-full h-full object-contain p-1" />
-                        </Link>
-                        <h1 className="text-2xl font-bold tracking-tight">DraftMate</h1>
-                    </div>
+      toast.dismiss(loadingToast);
+      toast.success("Profile updated!");
 
-                    {/* Quote */}
-                    <div className="max-w-md">
-                        <span className="material-symbols-outlined text-4xl text-blue-400/80 mb-4">format_quote</span>
-                        <p className="text-xl md:text-2xl font-medium leading-relaxed mb-6 text-slate-100">
-                            "Streamlining our practice management has never been easier. DraftMate allows us to focus on what matters most—our clients."
-                        </p>
-                        <div className="flex items-center gap-4">
-                            <div
-                                className="w-12 h-12 rounded-full bg-slate-700 bg-cover bg-center border-2 border-blue-600"
-                                style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAJ1wh3__wbJ26Y-fW35aiho512Jc600fmj4966iQj3xpZ1OKGejXqiP4smdQpqRHOaibwb-E-7oIXaRK3gg3TRz9X6V4sOzbLpFnsYqIw_gEKZRjQDPEYxVOlVW8vQEMHi6Ho7IAF_7EA0Ocyi17fkyXgNRU2mHx6QBMnCVsJB2Sb-pFmAfA9Au5M0P37vbXq8ZGQf4_tyDrnHvnGkSeYmtwaZJHprvCNMgYKVFLm5-_-C1R8iLE4bKr9wYWH5qIbPIoq-WlumkXw")' }}
-                            ></div>
-                            <div>
-                                <p className="font-bold text-white">Sarah Jenkins</p>
-                                <p className="text-sm text-slate-400">Senior Partner, Jenkins & Co.</p>
-                            </div>
-                        </div>
-                    </div>
+      // Γ£à Route to the corresponding details page based on selected role
+      const nextRoute = ROLE_ROUTES[selectedRole] || "/dashboard/home";
+      triggerExitAndNavigate(nextRoute);
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error(error.message || "Something went wrong");
+      setIsLoading(false);
+    }
+  };
 
-                    {/* Footer */}
-                    <div className="text-sm text-slate-400">
-                        © 2024 DraftMate Inc.
-                    </div>
-                </div>
-            </aside>
+  const handleSkip = () => {
+    triggerExitAndNavigate("/dashboard/home");
+  };
 
-            {/* Right Panel: Onboarding Form */}
-            <main className="flex-1 flex flex-col h-full overflow-y-auto relative">
-                {/* Top Navigation */}
-                <nav className="flex justify-end items-center px-8 py-6 w-full absolute top-0 z-10">
-                    <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-                        Already have an account?
-                        <a href="#" className="text-blue-600 hover:text-blue-700 ml-1 transition-colors" onClick={(e) => { e.preventDefault(); navigate('/login'); }}>Sign in</a>
-                    </div>
-                </nav>
+  return (
+    <div className={`onboarding-container ${isExiting ? "exiting" : ""}`}>
+      <div className="law-bg-decor" aria-hidden="true">
+        <svg
+          className="bg-decor bg-decor-scales"
+          viewBox="0 0 200 200"
+          style={{
+            transform: `translate(${mousePos.x * 0.5}px, ${mousePos.y * 0.5}px)`,
+          }}
+        >
+          <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="100" y1="30" x2="100" y2="170" />
+            <line x1="70" y1="170" x2="130" y2="170" />
+            <line x1="40" y1="60" x2="160" y2="60" />
+            <line x1="100" y1="30" x2="40" y2="60" strokeDasharray="2,3" />
+            <line x1="100" y1="30" x2="160" y2="60" strokeDasharray="2,3" />
+            <path d="M 20 60 Q 40 110 60 60 Z" />
+            <path d="M 140 60 Q 160 110 180 60 Z" />
+            <circle cx="100" cy="30" r="5" fill="currentColor" />
+          </g>
+        </svg>
 
-                {/* Main Content Container */}
-                <div className="flex-1 flex flex-col justify-center w-full max-w-2xl mx-auto px-6 py-20 lg:px-12">
-                    {/* Progress Indicator */}
-                    <div className="mb-8">
-                        <div className="flex justify-between items-end mb-2">
-                            <span className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wider">Step {step} of 3</span>
-                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{Math.round((step / 3) * 100)}% Completed</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-300"
-                                style={{ width: `${(step / 3) * 100}%` }}
-                            ></div>
-                        </div>
-                    </div>
+        <svg
+          className="bg-decor bg-decor-gavel"
+          viewBox="0 0 200 200"
+          style={{
+            transform: `translate(${mousePos.x * -0.7}px, ${mousePos.y * -0.7}px) rotate(-20deg)`,
+          }}
+        >
+          <g fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="50" y="70" width="80" height="40" rx="6" />
+            <line x1="90" y1="110" x2="140" y2="160" />
+            <rect x="30" y="155" width="100" height="12" rx="2" />
+          </g>
+        </svg>
 
-                    {/* Page Header */}
-                    <div className="mb-10">
-                        <h2 className="text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-3">
-                            {step === 1 && "Welcome to DraftMate"}
-                            {step === 2 && "Professional Details"}
-                            {step === 3 && "Tailor Your Experience"}
-                        </h2>
-                        <p className="text-lg text-slate-500 dark:text-slate-400 leading-relaxed">
-                            {step === 1 && "Tell us a bit about yourself so we can tailor your experience."}
-                            {step === 2 && "Help us customize your workspace with your professional details."}
-                            {step === 3 && "What do you plan to use this website for? Select all that apply."}
-                        </p>
-                    </div>
+        <svg
+          className="bg-decor bg-decor-columns"
+          viewBox="0 0 300 200"
+          style={{
+            transform: `translate(${mousePos.x * 0.4}px, ${mousePos.y * 0.4}px)`,
+          }}
+        >
+          <g fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="20" y="20" width="260" height="12" />
+            <rect x="10" y="32" width="280" height="8" />
+            {[50, 110, 170, 230].map((x) => (
+              <g key={x}>
+                <rect x={x} y="40" width="30" height="10" />
+                <line x1={x + 6} y1="50" x2={x + 6} y2="180" />
+                <line x1={x + 15} y1="50" x2={x + 15} y2="180" />
+                <line x1={x + 24} y1="50" x2={x + 24} y2="180" />
+                <rect x={x - 4} y="180" width="38" height="10" />
+              </g>
+            ))}
+          </g>
+        </svg>
 
-                    {/* Step 1: Basic Info */}
-                    {step === 1 && (
-                        <div className="flex flex-col gap-8 animate-fade-in-up">
-                            {/* Role Selection */}
-                            <div className="flex flex-col gap-3">
-                                <label className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">I am a...</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <label className="relative group cursor-pointer" onClick={() => handleRoleSelect('professional')}>
-                                        <input
-                                            type="radio"
-                                            name="role"
-                                            value="professional"
-                                            className="peer sr-only"
-                                            checked={formData.role === 'professional'}
-                                            onChange={() => { }}
-                                        />
-                                        <div className="p-5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 peer-checked:border-blue-600 peer-checked:bg-blue-600/5 dark:peer-checked:bg-blue-600/10 transition-all duration-200 h-full flex flex-col gap-4 shadow-sm hover:shadow-md">
-                                            <div className="flex justify-between items-start">
-                                                <div className="w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                                    <span className="material-symbols-outlined text-2xl">gavel</span>
-                                                </div>
-                                                <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
-                                                    <span className="material-symbols-outlined text-white text-sm opacity-0 peer-checked:opacity-100 font-bold">check</span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <p className="text-base font-bold text-slate-900 dark:text-white mb-1">Working Professional</p>
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">I practice law at a firm, agency, or independently.</p>
-                                            </div>
-                                        </div>
-                                    </label>
+        <svg
+          className="bg-decor bg-decor-doc"
+          viewBox="0 0 200 240"
+          style={{
+            transform: `translate(${mousePos.x * -0.5}px, ${mousePos.y * -0.5}px)`,
+          }}
+        >
+          <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M30 20 L130 20 L170 60 L170 220 L30 220 Z" />
+            <path d="M130 20 L130 60 L170 60" />
+            <line x1="50" y1="90" x2="150" y2="90" />
+            <line x1="50" y1="110" x2="150" y2="110" />
+            <line x1="50" y1="130" x2="130" y2="130" />
+            <line x1="50" y1="160" x2="150" y2="160" />
+            <line x1="50" y1="180" x2="120" y2="180" />
+            <circle cx="130" cy="200" r="14" />
+          </g>
+        </svg>
 
-                                    <label className="relative group cursor-pointer" onClick={() => handleRoleSelect('student')}>
-                                        <input
-                                            type="radio"
-                                            name="role"
-                                            value="student"
-                                            className="peer sr-only"
-                                            checked={formData.role === 'student'}
-                                            onChange={() => { }}
-                                        />
-                                        <div className="p-5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 peer-checked:border-blue-600 peer-checked:bg-blue-600/5 dark:peer-checked:bg-blue-600/10 transition-all duration-200 h-full flex flex-col gap-4 shadow-sm hover:shadow-md">
-                                            <div className="flex justify-between items-start">
-                                                <div className="w-12 h-12 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                                                    <span className="material-symbols-outlined text-2xl">school</span>
-                                                </div>
-                                                <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
-                                                    <span className="material-symbols-outlined text-white text-sm opacity-0 peer-checked:opacity-100 font-bold">check</span>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <p className="text-base font-bold text-slate-900 dark:text-white mb-1">Law Student</p>
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">I am currently studying at a law school or university.</p>
-                                            </div>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* Text Inputs */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="firstName">First Name</label>
-                                    <input
-                                        className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 px-4 shadow-sm placeholder:text-slate-400 transition-colors"
-                                        id="firstName"
-                                        name="firstName"
-                                        value={formData.firstName}
-                                        onChange={handleChange}
-                                        placeholder="e.g. Jonathan"
-                                        type="text"
-                                    />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="lastName">Last Name</label>
-                                    <input
-                                        className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 px-4 shadow-sm placeholder:text-slate-400 transition-colors"
-                                        id="lastName"
-                                        name="lastName"
-                                        value={formData.lastName}
-                                        onChange={handleChange}
-                                        placeholder="e.g. Suits"
-                                        type="text"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 2: Professional Details */}
-                    {step === 2 && (
-                        <div className="flex flex-col gap-8 animate-fade-in-up">
-                            <div className="flex flex-col gap-4">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="workplace">
-                                        {formData.role === 'student' ? 'University / Law School Name' : 'Firm / Organization Name'}
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">domain</span>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 pl-12 pr-4 shadow-sm placeholder:text-slate-400 transition-colors"
-                                            id="workplace"
-                                            name="workplace"
-                                            value={formData.workplace}
-                                            onChange={handleChange}
-                                            placeholder={formData.role === 'student' ? "e.g. Harvard Law School" : "e.g. Pearson Hardman"}
-                                            type="text"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-sm font-semibold text-slate-900 dark:text-white" htmlFor="designation">
-                                        {formData.role === 'student' ? 'Year of Study' : 'Role / Designation'}
-                                    </label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined">badge</span>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 h-12 pl-12 pr-4 shadow-sm placeholder:text-slate-400 transition-colors"
-                                            id="designation"
-                                            name="designation"
-                                            value={formData.designation}
-                                            onChange={handleChange}
-                                            placeholder={formData.role === 'student' ? "e.g. 2nd Year" : "e.g. Senior Associate"}
-                                            type="text"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 3: Usage Intent */}
-                    {step === 3 && (
-                        <div className="flex flex-col gap-4 animate-fade-in-up">
-                            <div className="grid grid-cols-1 gap-4">
-                                {usageOptions.map((option) => (
-                                    <label key={option.id} className="relative group cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="peer sr-only"
-                                            checked={formData.usage.includes(option.id)}
-                                            onChange={() => handleUsageToggle(option.id)}
-                                        />
-                                        <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 peer-checked:border-blue-600 peer-checked:bg-blue-600/5 dark:peer-checked:bg-blue-600/10 transition-all duration-200 shadow-sm hover:shadow-md">
-                                            <div className="flex-none size-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center">
-                                                <span className="material-symbols-outlined">{option.icon}</span>
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="text-base font-bold text-slate-900 dark:text-white">{option.label}</h3>
-                                                <p className="text-sm text-slate-500 dark:text-slate-400">{option.desc}</p>
-                                            </div>
-                                            <div className="size-6 rounded-full border-2 border-slate-300 dark:border-slate-600 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-white text-sm opacity-0 peer-checked:opacity-100 font-bold">check</span>
-                                            </div>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center justify-between pt-6 mt-8 border-t border-slate-100 dark:border-slate-800">
-                        <button
-                            className="px-6 py-3 rounded-lg text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            type="button"
-                            onClick={handleBack}
-                        >
-                            Back
-                        </button>
-                        <button
-                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all"
-                            type="button"
-                            onClick={handleContinue}
-                        >
-                            <span>{step === 3 ? "Finish & Go to Dashboard" : "Continue"}</span>
-                            <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
-                        </button>
-                    </div>
-
-                    {/* Trust Signals */}
-                    <div className="flex justify-center gap-6 mt-4 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                            <span className="material-symbols-outlined text-sm">lock</span>
-                            <span>256-bit Encryption</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                            <span className="material-symbols-outlined text-sm">verified_user</span>
-                            <span>ISO 27001 Certified</span>
-                        </div>
-                    </div>
-                </div>
-            </main>
+        <div className="particles">
+          {Array.from({ length: 18 }).map((_, i) => (
+            <span
+              key={i}
+              className="particle"
+              style={{
+                left: `${(i * 53) % 100}%`,
+                animationDelay: `${(i * 0.7) % 8}s`,
+                animationDuration: `${10 + (i % 6)}s`,
+              }}
+            />
+          ))}
         </div>
-    );
+      </div>
+
+      {/* Γ£à UPDATED HEADER with fullLogo */}
+      <header className="onboarding-header anim-fade-down">
+        <a href="/" className="onboarding-logo">
+          <img src={fullLogo} alt="DraftMate" className="logo-image" />
+        </a>
+        <div className="onboarding-header-actions">
+          <button onClick={handleSkip} className="skip-btn" disabled={isLoading}>
+            Skip for now
+          </button>
+          <button
+            onClick={handleContinue}
+            disabled={!selectedRole || isLoading}
+            className="continue-btn"
+          >
+            {isLoading ? (
+              <>
+                <svg className="spinner" viewBox="0 0 50 50">
+                  <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5"></circle>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              <>
+                Continue
+                <svg className="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 5l7 7-7 7" />
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
+      </header>
+
+      <main className="onboarding-content">
+        <div className="hand-icon anim-wave">👋</div>
+        <h1 className="onboarding-title anim-fade-up" style={{ animationDelay: "0.2s" }}>
+          Welcome to <span className="title-gradient">DraftMate!</span>
+        </h1>
+        <p className="onboarding-subtitle anim-fade-up" style={{ animationDelay: "0.3s" }}>
+          Let's personalize your experience. Choose the option that best describes you.
+        </p>
+
+        <div className="roles-grid">
+          {roles.map((role, index) => (
+            <div
+              key={role.id}
+              className={`role-card anim-scale-in ${selectedRole === role.id ? "selected" : ""}`}
+              style={{
+                animationDelay: `${0.4 + index * 0.08}s`,
+                "--accent": role.accent,
+              }}
+              onClick={() => handleSelectRole(role.id)}
+              tabIndex={0}
+              onKeyPress={(e) => e.key === "Enter" && handleSelectRole(role.id)}
+            >
+              <span className="card-watermark">{role.watermark}</span>
+              <span className="card-shimmer" />
+              <span className="card-glow" />
+              <div className="role-card-icon">{role.icon}</div>
+              <h3 className="role-card-title">{role.title}</h3>
+              <div className="checkmark-container">
+                <svg className="checkmark-icon" viewBox="0 0 24 24">
+                  <path d="M20 6 9 17l-5-5"></path>
+                </svg>
+              </div>
+              <span className="card-ripple" />
+            </div>
+          ))}
+        </div>
+
+        <p className="onboarding-hint anim-fade-up" style={{ animationDelay: "1s" }}>
+          {selectedRole
+            ? "Great choice! Click Continue to proceed →"
+            : "You can always change this later in your settings."}
+        </p>
+      </main>
+
+      <div className="exit-overlay">
+        <div className="exit-burst" />
+      </div>
+    </div>
+  );
 };
 
 export default Onboarding;

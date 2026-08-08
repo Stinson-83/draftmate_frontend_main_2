@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -6,8 +7,11 @@ import {
     Briefcase, Calendar as CalendarIcon, FileText, Zap, MapPin, Scale, ChevronRight,
     Plus, Search, ArrowUpRight, CheckCircle2, AlertCircle, Languages,
     ShieldCheck, Share2, ChevronLeft, CalendarDays, Gavel, X, Filter,
-    Folder, FolderPlus, Library, Layers, PlayCircle
+    Folder, FolderPlus, Library, Layers, PlayCircle, Tag, Clock, AlignLeft
 } from 'lucide-react';
+import { caseService } from '../services/library/caseService';
+import { hearingService } from '../services/library/hearingService';
+import { API_CONFIG } from '../services/endpoints';
 
 /* ─────────────────────────────────────────────────────────────
    Premium Glow Styles & Component
@@ -131,84 +135,189 @@ export default function Dashboard() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState('Month');
 
-    const [userName, setUserName] = useState("Devendra");
+    const [userName, setUserName] = useState("");
+    const [userProfile, setUserProfile] = useState({
+        firstName: '',
+        lastName: '',
+        bio: 'Welcome to your intelligent AI Legal Workspace. Complete your profile in settings to list practice areas and experience.',
+        role: 'Lawyer / Legal Pro',
+        image: ''
+    });
+
+    const [kpiStats, setKpiStats] = useState({
+        casesCount: 0,
+        hearingsCount: 0,
+        draftsCount: 0,
+        researchesCount: 0,
+        translationsCount: 0
+    });
+    const [upcomingHearings, setUpcomingHearings] = useState([]);
+    const [allDrafts, setAllDrafts] = useState([]);
+
+    const [events, setEvents] = useState(() => {
+        try {
+            const saved = localStorage.getItem('draftmate_calendar_events');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
 
     useEffect(() => {
+        const loadDashboardData = async () => {
+            let casesList = [];
+            try {
+                const casesData = await caseService.getCases();
+                casesList = casesData || [];
+            } catch (e) {
+                console.warn("Failed to fetch cases count:", e);
+            }
+
+            // Fallback to localStorage if backend cases array is empty but local storage has cases
+            if (casesList.length === 0) {
+                try {
+                    const localCases = JSON.parse(localStorage.getItem('draftmate_cases') || '[]');
+                    casesList = localCases;
+                } catch (e) {}
+            }
+
+            let hearingsListFromService = [];
+            try {
+                hearingsListFromService = await hearingService.getHearings();
+            } catch (e) {
+                try {
+                    hearingsListFromService = JSON.parse(localStorage.getItem('draftmate_hearings') || '[]');
+                } catch (err) {}
+            }
+
+            let draftsCount = 0;
+            try {
+                const token = localStorage.getItem('session_id');
+                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const savedDrafts = data.drafts || [];
+                    draftsCount = savedDrafts.length;
+                    setAllDrafts(savedDrafts);
+                } else {
+                    const localDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+                    draftsCount = localDrafts.length;
+                    setAllDrafts(localDrafts);
+                }
+            } catch (e) {
+                const localDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+                draftsCount = localDrafts.length;
+                setAllDrafts(localDrafts);
+            }
+
+            let researchesCount = 0;
+            try {
+                const resHist = JSON.parse(localStorage.getItem('research_history') || '[]');
+                const lexSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
+                const lastRes = localStorage.getItem('last_research_session') ? 1 : 0;
+                researchesCount = Math.max(resHist.length, lexSessions.length, lastRes);
+            } catch (e) {}
+
+            let translationsCount = 0;
+            try {
+                const transHist = JSON.parse(localStorage.getItem('translation_history') || '[]');
+                const jobs = JSON.parse(localStorage.getItem('translator_jobs') || '[]');
+                translationsCount = Math.max(transHist.length, jobs.length);
+            } catch (e) {}
+
+            // Use hearingService as the single source of truth for hearings
+            const hearingsList = [];
+
+            // 1. Hearings from Hearing Tracker service
+            hearingsListFromService.forEach(h => {
+                hearingsList.push({
+                    id: h.id,
+                    time: h.hearingDate ? (h.hearingDate.includes('T') ? new Date(h.hearingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : h.hearingDate) : "10:00 AM",
+                    court: h.court || "District Court",
+                    case: h.caseTitle || h.title || "Hearing Matter",
+                    judge: h.judge || "Hon'ble Judge",
+                    status: h.status || "Scheduled"
+                });
+            });
+
+            // 2. User created calendar events specifically marked for hearings
+            events.forEach(ev => {
+                if (ev.isUserCreated && ev.type === 'hearing') {
+                    hearingsList.push({
+                        id: ev.id,
+                        time: ev.time ? (ev.time.includes('AM') || ev.time.includes('PM') ? ev.time : `${ev.time} AM`) : "10:00 AM",
+                        court: ev.location || ev.court || "District Court",
+                        case: ev.title,
+                        judge: ev.judge || "Hon'ble Judge",
+                        status: "Upcoming"
+                    });
+                }
+            });
+
+            const cleanHearingsList = hearingsList.filter(h => 
+                h.id !== 'h1' && h.id !== 'cal-1' && 
+                !h.case?.includes('Ramesh Sharma') && 
+                !h.case?.includes('Priya Enterprises')
+            );
+
+            const realActiveCases = casesList.filter(c => 
+                c.caseNumber !== 'GEN-0001' && 
+                c.caseTitle !== 'General Documents' && 
+                c.caseType !== 'Folder' &&
+                !c.caseNumber?.startsWith('DIR-') &&
+                !c.caseNumber?.startsWith('FLD-') &&
+                !['Closed', 'Archived'].includes(c.status)
+            );
+
+            setUpcomingHearings(cleanHearingsList);
+            setKpiStats({
+                casesCount: realActiveCases.length,
+                hearingsCount: cleanHearingsList.length,
+                draftsCount,
+                researchesCount,
+                translationsCount
+            });
+        };
+
         const loadProfile = () => {
             const saved = localStorage.getItem('user_profile');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // Combine first and last name, or fallback to "Devendra"
+                setUserProfile(prev => ({ ...prev, ...parsed }));
+                
                 const fullName = [parsed.firstName, parsed.lastName].filter(Boolean).join(" ");
-                if (fullName) setUserName(fullName);
-            }
-        };
-
-        const handleDraftUpdate = async () => {
-            try {
-                const token = localStorage.getItem('session_id');
-                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error("Failed to load drafts from database.");
+                if (fullName) {
+                    setUserName(fullName);
+                } else if (parsed.name) {
+                    setUserName(parsed.name);
+                } else if (parsed.email) {
+                    const prefix = parsed.email.split('@')[0];
+                    setUserName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
                 }
-                const data = await response.json();
-                const savedDrafts = data.drafts || [];
-                const processedDrafts = savedDrafts.map((draft) => {
-                    const status = draft.status || 'In progress';
-                    const trackingParams = draft.trackingParams || {
-                        documentKey: draft.documentKey || draft.id || '',
-                        filename: ensureDocxFilename(draft.filename || draft.name || 'Untitled Draft'),
-                        source: draft.source || 'db_draft',
-                        folderId: draft.folderId ?? null,
-                    };
-
-                    return {
-                        id: draft.id,
-                        title: draft.name || trackingParams.filename || 'Untitled Draft',
-                        filename: ensureDocxFilename(draft.filename || draft.name || trackingParams.filename || 'Untitled Draft'),
-                        documentKey: draft.documentKey || draft.id || trackingParams.documentKey || '',
-                        modified: new Date(draft.lastModified || Date.now()).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        }),
-                        status,
-                        statusColor: buildStatusColor(status),
-                        content: draft.content,
-                        placeholders: draft.placeholders,
-                        rawName: draft.name,
-                        onlyofficeConfig: draft.onlyofficeConfig || null,
-                        variablesDetected: draft.variablesDetected || [],
-                        trackingParams,
-                    };
-                });
-
-                setAllDrafts(processedDrafts);
-            } catch (error) {
-                console.error('Failed to load drafts for dashboard', error);
-                setAllDrafts([]);
             }
         };
-        loadProfile(); // Initial load
-        window.addEventListener('user_profile_updated', loadProfile);
-        return () => window.removeEventListener('user_profile_updated', loadProfile);
-    }, []);
 
-    const [events, setEvents] = useState([
-        {
-            id: 1,
-            title: "Sharma vs Gupta Builders",
-            date: "2026-06-14",
-            time: "10:00",
-            type: "hearing",
-            color: "bg-blue-500"
-        }
-    ]);
+        loadProfile();
+        loadDashboardData();
+
+        window.addEventListener('user_profile_updated', loadProfile);
+        window.addEventListener('my_drafts_updated', loadDashboardData);
+        window.addEventListener('case_documents_updated', loadDashboardData);
+        window.addEventListener('cases_updated', loadDashboardData);
+        window.addEventListener('hearings_updated', loadDashboardData);
+        window.addEventListener('storage', loadDashboardData);
+
+        return () => {
+            window.removeEventListener('user_profile_updated', loadProfile);
+            window.removeEventListener('my_drafts_updated', loadDashboardData);
+            window.removeEventListener('case_documents_updated', loadDashboardData);
+            window.removeEventListener('cases_updated', loadDashboardData);
+            window.removeEventListener('hearings_updated', loadDashboardData);
+            window.removeEventListener('storage', loadDashboardData);
+        };
+    }, [events]);
 
     const handleNavigate = (direction) => {
         const newDate = new Date(currentDate);
@@ -260,8 +369,18 @@ export default function Dashboard() {
 
             {/* ── ROW 2: SUMMARY KPI ── */}
             <div className="bg-white rounded-[24px] border border-slate-200 p-6 shadow-[0_8px_30px_rgb(37,99,235,0.04)] flex flex-wrap md:flex-nowrap items-center justify-between gap-6 overflow-x-auto scrollbar-hide">
-                {KPIS.map((kpi, i) => (
-                    <div key={i} className="flex items-center gap-4 min-w-[140px] shrink-0">
+                {[
+                    { label: "Active Cases", value: kpiStats.casesCount, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50", path: "/dashboard/library/cases" },
+                    { label: "Hearings", value: kpiStats.hearingsCount, icon: CalendarIcon, color: "text-rose-600", bg: "bg-rose-50", path: "/dashboard/library/hearings" },
+                    { label: "Drafts", value: kpiStats.draftsCount, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50", path: "/dashboard/drafts" },
+                    { label: "Researches Done", value: kpiStats.researchesCount, icon: Zap, color: "text-cyan-600", bg: "bg-cyan-50", path: "/dashboard/research" },
+                    { label: "Doc Translated", value: kpiStats.translationsCount, icon: Languages, color: "text-yellow-600", bg: "bg-yellow-50", path: "/dashboard/translate" },
+                ].map((kpi, i) => (
+                    <div 
+                        key={i} 
+                        onClick={() => navigate(kpi.path)}
+                        className="flex items-center gap-4 min-w-[140px] shrink-0 cursor-pointer hover:opacity-80 transition-all"
+                    >
                         <div className={`w-10 h-10 rounded-xl ${kpi.bg} ${kpi.color} flex items-center justify-center shrink-0`}>
                             <kpi.icon className="w-5 h-5" />
                         </div>
@@ -387,24 +506,31 @@ export default function Dashboard() {
                             <h2 className="text-sm font-bold text-[#0F1C2E]">Upcoming Hearings</h2>
                         </div>
                         <div className="p-2 flex-1 flex flex-col gap-2 z-10 max-h-[420px] overflow-y-auto draftmate-scroll">
-                            {HEARINGS.map((hearing, i) => (
-                                <div key={i} className="flex flex-col gap-2 p-4 bg-white/80 hover:bg-white rounded-xl transition-all cursor-pointer group border border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-md">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-sm font-black text-[#0F1C2E]">{hearing.time.split(' ')[0]}</span>
-                                            <span className="text-[10px] font-bold text-slate-500">{hearing.time.split(' ')[1]}</span>
+                            {upcomingHearings.length > 0 ? (
+                                upcomingHearings.map((hearing, i) => (
+                                    <div key={i} className="flex flex-col gap-2 p-4 bg-white/80 hover:bg-white rounded-xl transition-all cursor-pointer group border border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-md">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="text-sm font-black text-[#0F1C2E]">{hearing.time.split(' ')[0]}</span>
+                                                <span className="text-[10px] font-bold text-slate-500">{hearing.time.split(' ')[1] || 'AM'}</span>
+                                            </div>
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-bold ${hearing.status === 'Upcoming' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                {hearing.status === 'Upcoming' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} {hearing.status}
+                                            </span>
                                         </div>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-bold ${hearing.status === 'Upcoming' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                            {hearing.status === 'Upcoming' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} {hearing.status}
-                                        </span>
+                                        <h3 className="font-bold text-[#0F1C2E] text-sm group-hover:text-blue-600 transition-colors">{hearing.case}</h3>
+                                        <div className="flex flex-col gap-1 text-[11px] font-medium text-slate-500 mt-1">
+                                            <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {hearing.court}</span>
+                                            <span className="flex items-center gap-1.5"><Scale className="w-3 h-3" /> {hearing.judge}</span>
+                                        </div>
                                     </div>
-                                    <h3 className="font-bold text-[#0F1C2E] text-sm group-hover:text-blue-600 transition-colors">{hearing.case}</h3>
-                                    <div className="flex flex-col gap-1 text-[11px] font-medium text-slate-500 mt-1">
-                                        <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {hearing.court}</span>
-                                        <span className="flex items-center gap-1.5"><Scale className="w-3 h-3" /> {hearing.judge}</span>
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center p-8 text-center my-auto">
+                                    <CalendarIcon className="w-8 h-8 text-slate-300 mb-2" />
+                                    <p className="text-xs font-semibold text-slate-400">No upcoming hearings scheduled</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </section>
                 </div>
@@ -517,28 +643,32 @@ export default function Dashboard() {
                 <div className="relative z-10 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-8 flex-1">
                         <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden shadow-md shrink-0 border-2 border-white">
-                            <img src="https://i.pravatar.cc/150?img=11" alt="Profile" className="w-full h-full object-cover" />
+                            <img 
+                                src={userProfile.image || `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6"><circle cx="12" cy="12" r="12" fill="%23eff6ff"/><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="%233b82f6"/></svg>`} 
+                                alt="Profile" 
+                                className="w-full h-full object-cover" 
+                            />
                             <div className="absolute bottom-1.5 right-1.5 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
                         </div>
                         <div className="flex-1 max-w-3xl">
                             <div className="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-4 mb-1.5">
-                                <h2 className="text-2xl md:text-3xl font-bold text-[#0F1C2E]">Julian Vance</h2>
-                                <span className="text-[10px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">Partner • Senior Counsel</span>
+                                <h2 className="text-2xl md:text-3xl font-bold text-[#0F1C2E]">{userName || 'DraftMate User'}</h2>
+                                <span className="text-[10px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">{userProfile.role || 'Lawyer / Legal Pro'}</span>
                             </div>
                             <p className="text-sm text-slate-600 mb-5 leading-relaxed max-w-2xl font-medium">
-                                Specializing in Corporate Arbitration and IP Litigation. Active member of the Bar Association for 12 years.
+                                {userProfile.bio || 'Welcome to your intelligent AI Legal Workspace. Edit your profile to list your practice areas, bio, experience and court affiliations.'}
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 <span className="inline-flex items-center gap-1.5 bg-white text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
                                     <ShieldCheck className="w-4 h-4 text-blue-600" /> Tier 1 Practitioner
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 bg-white text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
-                                    <Gavel className="w-4 h-4 text-slate-500" /> 142 Cases Won
+                                    <Gavel className="w-4 h-4 text-slate-500" /> Professional Member
                                 </span>
                             </div>
                         </div>
                     </div>
-
+ 
                     <div className="flex flex-row md:flex-col items-center md:items-end justify-center gap-4 shrink-0 mt-2 md:mt-0 pr-4 md:pr-12 relative z-10">
                         <button onClick={() => navigate('/dashboard/settings')} className="text-slate-600 hover:text-blue-600 text-xs font-bold transition-colors px-2">Edit Profile</button>
                         <button onClick={() => navigate('/dashboard/settings')} className="bg-white border border-slate-200 hover:border-blue-300 hover:text-blue-600 text-[#0F1C2E] px-8 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">Settings</button>
@@ -667,6 +797,8 @@ function CreateEventModalTrigger({ onAdd }) {
     const [title, setTitle] = useState("");
     const [date, setDate] = useState("");
     const [time, setTime] = useState("");
+    const [description, setDescription] = useState("");
+    const [eventType, setEventType] = useState("hearing");
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -678,135 +810,18 @@ function CreateEventModalTrigger({ onAdd }) {
             title,
             date,
             time,
-            type: "event",
-            color: "bg-blue-500",
+            description,
+            type: eventType,
+            color: eventType === "hearing" ? "bg-blue-500" : "bg-amber-500",
         });
 
         setTitle("");
         setDate("");
         setTime("");
+        setDescription("");
+        setEventType("hearing");
 
         setOpen(false);
-    };
-
-    const handleWorkspaceDraftOpen = (draft) => {
-        const filename = ensureDocxFilename(draft.filename || draft.title || draft.rawName || 'Untitled Draft');
-        const documentKey = draft.documentKey || draft.id || filename;
-        const onlyofficeConfig = buildWorkspaceConfig({
-            ...draft,
-            filename,
-            documentKey,
-        });
-
-        navigate('/dashboard/workspace', {
-            state: {
-                draftId: draft.id,
-                id: draft.id,
-                documentKey,
-                filename,
-                onlyofficeConfig,
-                variablesDetected: draft.variablesDetected || [],
-                trackingParams: draft.trackingParams || {
-                    documentKey,
-                    filename,
-                    source: draft.trackingParams?.source || 'my_desk',
-                    folderId: draft.trackingParams?.folderId ?? null,
-                },
-            },
-        });
-    };
-
-    const handleCreateNewDraft = () => {
-        setIsDraftingModalOpen(true);
-    };
-
-    const handleExistingDocumentClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileUpload = async (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const ext = `.${(file.name.split('.').pop() || '').toLowerCase()}`;
-        if (!['.docx', '.pdf'].includes(ext)) {
-            toast.error('Only .docx and .pdf files are supported.');
-            event.target.value = '';
-            return;
-        }
-
-        const sessionId = localStorage.getItem('session_id');
-        if (!sessionId) {
-            toast.error('Please sign in again before uploading a document.');
-            event.target.value = '';
-            return;
-        }
-
-        setIsUploadingDocument(true);
-
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('session_id', sessionId);
-
-            const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${sessionId}`,
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                let detail = 'Failed to upload document.';
-                try {
-                    const errorData = await response.json();
-                    detail = errorData?.detail || detail;
-                } catch {
-                    detail = response.statusText || detail;
-                }
-                throw new Error(detail);
-            }
-
-            const data = await response.json();
-
-            saveDeskDraftRecord({
-                id: data.documentKey,
-                name: data.filename,
-                filename: data.filename,
-                documentKey: data.documentKey,
-                onlyofficeConfig: data,
-                variablesDetected: data.variablesDetected || [],
-                status: 'In progress',
-                source: 'dashboard_upload',
-                trackingParams: {
-                    source: 'dashboard_upload',
-                    documentKey: data.documentKey,
-                    filename: data.filename,
-                    uploadedAt: new Date().toISOString(),
-                },
-            });
-
-            navigate('/dashboard/workspace', {
-                state: {
-                    documentKey: data.documentKey,
-                    filename: data.filename,
-                    onlyofficeConfig: data,
-                    variablesDetected: data.variablesDetected || [],
-                    trackingParams: {
-                        source: 'dashboard_upload',
-                        documentKey: data.documentKey,
-                        filename: data.filename,
-                    },
-                },
-            });
-        } catch (error) {
-            console.error('Upload failed:', error);
-            toast.error(error.message || 'Failed to upload and open document.');
-        } finally {
-            setIsUploadingDocument(false);
-            event.target.value = '';
-        }
     };
 
     return (
@@ -818,16 +833,28 @@ function CreateEventModalTrigger({ onAdd }) {
                 <Plus className="w-4 h-4" /> Create Event
             </button>
 
-            {open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-[28px] w-full max-w-md p-6 shadow-2xl border border-slate-200">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-black text-[#0F1C2E]">
+            {open && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+                    {/* Overlay */}
+                    <div 
+                        onClick={() => setOpen(false)}
+                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300"
+                    />
+
+                    {/* Modal Card */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ type: "spring", duration: 0.4 }}
+                        className="bg-white dark:bg-slate-900 rounded-[24px] w-full max-w-md p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 relative z-[10000] flex flex-col gap-5 text-slate-800 dark:text-white"
+                    >
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-black text-[#0F1C2E] dark:text-white">
                                 Create New Event
                             </h2>
                             <button
                                 onClick={() => setOpen(false)}
-                                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-400 flex items-center justify-center transition-colors"
+                                className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-300 flex items-center justify-center transition-colors"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -835,7 +862,8 @@ function CreateEventModalTrigger({ onAdd }) {
 
                         <form className="space-y-4" onSubmit={handleSubmit}>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                    <Tag className="w-3.5 h-3.5 text-blue-500" />
                                     Event Title*
                                 </label>
                                 <input
@@ -843,62 +871,103 @@ function CreateEventModalTrigger({ onAdd }) {
                                     placeholder="e.g. Client Meeting"
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500 text-sm font-medium"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white transition-all"
                                     required
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
-                                <button type="button" className="bg-white text-blue-600 font-bold text-xs py-2.5 rounded-lg shadow-sm border border-slate-200">Court Hearing</button>
-                                <button type="button" className="text-slate-400 font-bold text-xs py-2.5 rounded-lg hover:text-slate-600">Non-Court Event</button>
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                    <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                                    Event Type
+                                </label>
+                                <div className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventType("hearing")}
+                                        className={`py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                                            eventType === "hearing"
+                                                ? "bg-white dark:bg-slate-750 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/20"
+                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        Court Hearing
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventType("event")}
+                                        className={`py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                                            eventType === "event"
+                                                ? "bg-white dark:bg-slate-750 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/20"
+                                                : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                        }`}
+                                    >
+                                        Non-Court Event
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date</label>
+                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                        <CalendarIcon className="w-3.5 h-3.5 text-blue-500" />
+                                        Date*
+                                    </label>
                                     <input
                                         type="date"
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:border-blue-500 text-sm font-medium"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white transition-all"
                                         required
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Time</label>
+                                    <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-blue-500" />
+                                        Time*
+                                    </label>
                                     <input
                                         type="time"
                                         value={time}
                                         onChange={(e) => setTime(e.target.value)}
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:border-blue-500 text-sm font-medium"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white transition-all"
                                         required
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Description</label>
-                                <textarea className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 text-sm font-medium min-h-[100px]" placeholder="Add preparation notes..." />
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <AlignLeft className="w-3.5 h-3.5 text-blue-500" />
+                                    Description
+                                </label>
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm font-medium text-slate-800 dark:text-white min-h-[100px] transition-all"
+                                    placeholder="Add preparation notes..."
+                                />
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4">
                                 <button
                                     type="button"
                                     onClick={() => setOpen(false)}
-                                    className="w-full bg-slate-50 border border-slate-200 text-slate-600 font-bold py-3.5 rounded-xl hover:bg-slate-100 transition-colors"
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="w-full bg-[#0F1C2E] text-white font-bold py-3.5 rounded-xl hover:bg-blue-900 shadow-lg shadow-blue-900/10 transition-colors"
+                                    className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-colors"
                                 >
                                     Create Event
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
+                    </motion.div>
+                </div>,
+                document.body
             )}
         </>
     );

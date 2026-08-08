@@ -122,6 +122,10 @@ export default function Footer() {
                     if (item === "Refund Policy") route = "/refund-policy";
                     if (item === "Terms of Service") route = "/terms";
                     if (item === "About Us") route = "/about";
+                    if (item === "Features") route = "/features";
+                    if (item === "How It Works") route = "/how-it-works";
+                    if (item === "Blog" || item === "Blogs") route = "/blogs";
+                    if (item === "Lex Bot") route = "/login";
 
                     // External Link handler for LawJurist
                     if (item === "LawJurist") {

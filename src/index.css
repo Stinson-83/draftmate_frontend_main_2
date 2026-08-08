@@ -385,6 +385,7 @@ select:focus {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
 /* ── Layout utility ──────────────────────────────────────────────────────── */
 .container-xl {
   width: 100%;
@@ -569,5 +570,4 @@ select:focus {
 
 .draftmate-scroll::-webkit-scrollbar-thumb:hover {
   background: #1D4ED8; /* Darker blue when interacting */
-}
 }

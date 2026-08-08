@@ -285,8 +285,6 @@ function TestimonialCard({ item, onExpand }) {
 function MarqueeRow({ items, direction, onExpand }) {
     const [paused, setPaused] = useState(false);
     const tripled = [...items, ...items, ...items];
-    const animClass =
-        direction === "left" ? "animate-marquee-x-left" : "animate-marquee-x-right";
 
     return (
         <div
@@ -295,7 +293,7 @@ function MarqueeRow({ items, direction, onExpand }) {
             onMouseLeave={() => setPaused(false)}
         >
             <div
-                className={`flex w-max ${paused ? "" : animClass} marquee-track`}
+                className={`flex w-max marquee-track ${paused ? "" : direction === "left" ? "animate-marquee-x-left" : "animate-marquee-x-right"}`}
                 style={{
                     willChange: "transform",
                     animationPlayState: paused ? "paused" : "running",

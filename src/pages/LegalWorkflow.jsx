@@ -223,7 +223,15 @@ const LegalWorkflow = () => {
                             <div className="wf-buttons">
                                 <a 
                                     href={msg.url} 
-                                    target={msg.url.startsWith('http') ? "_blank" : "_self"} 
+                                    onClick={(e) => {
+                                        if (msg.url.includes('/dashboard/editor')) {
+                                            e.preventDefault();
+                                            const pathIndex = msg.url.indexOf('/dashboard/editor');
+                                            const path = msg.url.substring(pathIndex);
+                                            navigate(path);
+                                        }
+                                    }}
+                                    target={msg.url.startsWith('http') && !msg.url.includes('/dashboard/editor') ? "_blank" : "_self"} 
                                     rel="noreferrer"
                                     className="wf-btn primary"
                                 >

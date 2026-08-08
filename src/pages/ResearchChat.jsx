@@ -42,11 +42,19 @@ const NODE_LABELS = {
 
 const ResearchProgressTimeline = ({ activeNodes }) => {
     const stages = [
-        { id: 'router', label: 'Analyzing Query' },
-        { id: 'research_agent', label: 'Gathering Facts' },
-        { id: 'citation_agent', label: 'Verifying Citations' },
-        { id: 'manager_aggregate', label: 'Compiling Research' }
+        { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
+        { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
+        { ids: ['citation_agent', 'strategy_agent', 'explainer_agent'], label: 'Verifying Citations' },
+        { ids: ['manager_aggregate', 'memory_store'], label: 'Compiling Research' }
     ];
+
+    let activeStageIndex = 0;
+    stages.forEach((stage, idx) => {
+        const hasNode = activeNodes.some(n => stage.ids.includes(n.node));
+        if (hasNode) {
+            activeStageIndex = Math.max(activeStageIndex, idx);
+        }
+    });
 
     return (
         <div className="bg-white border border-blue-100 rounded-2xl p-6 mb-6 shadow-[0_4px_20px_rgba(37,99,235,0.04)] relative overflow-hidden">
@@ -60,11 +68,12 @@ const ResearchProgressTimeline = ({ activeNodes }) => {
             </div>
             <div className="flex items-center justify-between w-full overflow-x-auto pb-2 scrollbar-hide">
                 {stages.map((stage, idx) => {
-                    const isCompleted = activeNodes.some(n => n.node === stage.id && n.status === 'completed');
-                    const isRunning = activeNodes.some(n => n.node === stage.id && n.status === 'running');
+                    const isNodeCompleted = activeNodes.some(n => stage.ids.includes(n.node) && n.status === 'completed');
+                    const isCompleted = idx < activeStageIndex || isNodeCompleted;
+                    const isRunning = (idx === activeStageIndex && !isCompleted) || activeNodes.some(n => stage.ids.includes(n.node) && n.status === 'running');
 
                     return (
-                        <React.Fragment key={stage.id}>
+                        <React.Fragment key={stage.label}>
                             <div className="flex flex-col items-center gap-2 min-w-[90px] shrink-0">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${isCompleted ? 'bg-blue-600 border-blue-600 text-white' :
                                     isRunning ? 'border-blue-500 text-blue-500 animate-pulse' : 'border-slate-200 text-slate-300'

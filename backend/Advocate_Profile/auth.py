@@ -165,6 +165,7 @@ def register_advocate(request: Request, user: UserCreate):
     conn = None
     try:
         conn = get_db_connection()
+        _ensure_users_table_columns(conn)
         with conn.cursor() as cur:
             # Duplicate email check
             cur.execute("SELECT id FROM users WHERE email = %s", (user.email,))
@@ -330,3 +331,131 @@ def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     finally:
         if conn:
             conn.close()
+
+
+def _ensure_users_table_columns(conn):
+    """Ensure full_name and user_type columns exist on users table."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255);")
+            cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(50) DEFAULT 'ADVOCATE';")
+            conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+@router.post("/session-login", response_model=Token)
+async def session_login(request: Request):
+    """
+    Authenticate using a valid DraftMate user session_id.
+    Validates with the login_db auth service, then provisions
+    or logs in the corresponding advocate user.
+    """
+    session_id = None
+    
+    # 1. Try to get session_id from query parameters
+    session_id = request.query_params.get("session_id")
+    
+    # 2. Try to parse JSON body
+    if not session_id:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                session_id = body.get("session_id")
+            elif isinstance(body, str):
+                session_id = body
+        except Exception:
+            # Fallback to reading raw body
+            try:
+                raw_body = await request.body()
+                decoded = raw_body.decode('utf-8').strip()
+                # If it looks like a JSON string, try to parse it
+                if decoded.startswith('{'):
+                    import json
+                    session_id = json.loads(decoded).get("session_id")
+                else:
+                    session_id = decoded.replace('"', '').replace("'", "")
+            except Exception:
+                pass
+
+    if not session_id or len(session_id.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Valid session_id is required.")
+
+    session_id = session_id.strip()
+
+    # Validate with login_db auth service
+    auth_url = os.getenv("AUTH_SERVICE_URL", "http://127.0.0.1:8009")
+    verify_url = f"{auth_url.rstrip('/')}/verify_session/{session_id}"
+    try:
+        import urllib.request
+        import urllib.error
+        import json
+        req = urllib.request.Request(verify_url, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as response:
+            res_data = json.loads(response.read().decode())
+    except urllib.error.HTTPError as http_err:
+        if http_err.code == 401:
+            raise HTTPException(status_code=401, detail="Invalid session token.")
+        raise HTTPException(status_code=500, detail=f"Auth service returned status {http_err.code}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to verify session with auth service: {e}"
+        )
+
+    if not res_data.get("valid") or not res_data.get("user_id"):
+        raise HTTPException(status_code=401, detail="Invalid session.")
+
+    user_id = res_data["user_id"]
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        _ensure_users_table_columns(conn)
+        with conn.cursor() as cur:
+            # Check user in DB
+            cur.execute("SELECT email, password_hash FROM users WHERE id = %s", (user_id,))
+            user_row = cur.fetchone()
+            if not user_row:
+                email = res_data.get("email") or f"user_{user_id[:8]}@example.com"
+                hashed = pwd_context.hash(str(uuid.uuid4()))
+                display_name = email.split('@')[0].capitalize()
+                cur.execute(
+                    """
+                    INSERT INTO users (id, email, password_hash, full_name, user_type)
+                    VALUES (%s, %s, %s, %s, 'ADVOCATE')
+                    """,
+                    (user_id, email, hashed, display_name),
+                )
+                conn.commit()
+                cur.execute("SELECT email, password_hash FROM users WHERE id = %s", (user_id,))
+                user_row = cur.fetchone()
+
+            email = user_row["email"]
+            # Check or create advocate profile
+            cur.execute("SELECT id FROM advocate_profiles WHERE user_id = %s", (user_id,))
+            prof_row = cur.fetchone()
+            if not prof_row:
+                slug = f"{email.split('@')[0].lower()}-{str(uuid.uuid4())[:8]}"
+                title = email.split('@')[0].capitalize()
+                cur.execute(
+                    """
+                    INSERT INTO advocate_profiles (user_id, slug, title, is_public)
+                    VALUES (%s, %s, %s, FALSE)
+                    """,
+                    (user_id, slug, title),
+                )
+                conn.commit()
+
+        access, refresh = _issue_token_pair(user_id)
+        _store_refresh_token(conn, user_id, refresh)
+        return Token(access_token=access, refresh_token=refresh)
+
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+

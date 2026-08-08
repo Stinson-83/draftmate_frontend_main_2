@@ -134,11 +134,14 @@ def handle_intake(message: str | None, session: dict) -> list:
     if matched_type:
         session["draft_type"] = matched_type
         session["workflow_state"] = "collecting_context"
-        session["questions_pending"] = list(DRAFT_TYPES[matched_type]["questions"])
-        session["questions_asked"] = []
+        
+        questions = list(DRAFT_TYPES[matched_type]["questions"])
+        first_question = questions.pop(0)
+        
+        session["questions_pending"] = questions
+        session["questions_asked"] = [first_question]
 
         type_name = DRAFT_TYPES[matched_type]["name"]
-        first_question = session["questions_pending"][0]
 
         return [
             TextMessage(body=f"got it — {type_name}. let me understand your case."),

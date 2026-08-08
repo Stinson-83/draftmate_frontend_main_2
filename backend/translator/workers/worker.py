@@ -104,6 +104,15 @@ def _run_pipeline(session, job: TranslationJob) -> None:
 
         store_bytes_at_rest(rebuilt_path, rebuilt_path.read_bytes())
 
+        # Upload translated file to S3
+        try:
+            from backend.Drafter.s3_helper import upload_file_to_s3
+            s3_key = f"translator/translated/{translated_filename}"
+            upload_file_to_s3(str(rebuilt_path), s3_key)
+            logger.info(f"Successfully uploaded {translated_filename} to S3 at {s3_key}")
+        except Exception as e:
+            logger.error(f"Failed to upload {translated_filename} to S3: {e}")
+
         update_translation_job(
             session,
             job.id,

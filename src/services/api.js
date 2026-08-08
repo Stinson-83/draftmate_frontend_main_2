@@ -291,6 +291,7 @@ export const api = {
     },
 
     getTranslationDownloadUrl: (jobId) => `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.DOWNLOAD_JOB(jobId)}`,
+    getTranslationSourceUrl: (jobId) => `${TRANSLATOR_BASE_URL}/translation-jobs/${jobId}/source`,
 
     /**
      * Send email notification for calendar event.
@@ -328,25 +329,30 @@ export const api = {
      * @returns {Promise<Array>} - List of notifications
      */
     getNotifications: async (userId, options = {}) => {
-        const params = new URLSearchParams();
-        if (options.type) params.append('type', options.type);
-        if (options.unreadOnly) params.append('unread_only', 'true');
-        if (options.limit) params.append('limit', options.limit.toString());
+        try {
+            const params = new URLSearchParams();
+            if (options.type) params.append('type', options.type);
+            if (options.unreadOnly) params.append('unread_only', 'true');
+            if (options.limit) params.append('limit', options.limit.toString());
 
-        const queryString = params.toString();
-        const url = `${NOTIFICATION_BASE_URL}/notifications/${userId}${queryString ? `?${queryString}` : ''}`;
+            const queryString = params.toString();
+            const url = `${NOTIFICATION_BASE_URL}/notifications/${userId}${queryString ? `?${queryString}` : ''}`;
 
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to fetch notifications');
+            if (!response.ok) {
+                throw new Error('Failed to fetch notifications');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - returning empty notifications');
+            return [];
         }
-        return response.json();
     },
 
     /**
@@ -355,14 +361,19 @@ export const api = {
      * @returns {Promise<Object>} - { user_id, unread_count }
      */
     getUnreadCount: async (userId) => {
-        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/count`, {
-            method: 'GET',
-        });
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/count`, {
+                method: 'GET',
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to fetch unread count');
+            if (!response.ok) {
+                throw new Error('Failed to fetch unread count');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - returning 0 unread count');
+            return { user_id: userId, unread_count: 0 };
         }
-        return response.json();
     },
 
     /**
@@ -371,18 +382,23 @@ export const api = {
      * @returns {Promise<Object>} - Created notification
      */
     createNotification: async (notification) => {
-        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(notification),
-        });
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(notification),
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to create notification');
+            if (!response.ok) {
+                throw new Error('Failed to create notification');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - notification not created');
+            return null;
         }
-        return response.json();
     },
 
     /**
@@ -391,17 +407,22 @@ export const api = {
      * @returns {Promise<Object>} - Updated notification
      */
     markNotificationRead: async (notificationId) => {
-        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}/read`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}/read`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to mark notification as read');
+            if (!response.ok) {
+                throw new Error('Failed to mark notification as read');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - mark as read failed');
+            return null;
         }
-        return response.json();
     },
 
     /**
@@ -410,17 +431,22 @@ export const api = {
      * @returns {Promise<Object>} - { success, message, affected_count }
      */
     markAllNotificationsRead: async (userId) => {
-        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/read-all`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/read-all`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to mark all as read');
+            if (!response.ok) {
+                throw new Error('Failed to mark all as read');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - mark all as read failed');
+            return null;
         }
-        return response.json();
     },
 
     /**
@@ -429,14 +455,19 @@ export const api = {
      * @returns {Promise<Object>} - { success, message }
      */
     deleteNotification: async (notificationId) => {
-        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}`, {
-            method: 'DELETE',
-        });
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}`, {
+                method: 'DELETE',
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to delete notification');
+            if (!response.ok) {
+                throw new Error('Failed to delete notification');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - delete failed');
+            return null;
         }
-        return response.json();
     },
 
     /**
@@ -445,14 +476,19 @@ export const api = {
      * @returns {Promise<Object>} - { success, message, affected_count }
      */
     deleteAllNotifications: async (userId) => {
-        const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/all`, {
-            method: 'DELETE',
-        });
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/all`, {
+                method: 'DELETE',
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to delete all notifications');
+            if (!response.ok) {
+                throw new Error('Failed to delete all notifications');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - delete all failed');
+            return null;
         }
-        return response.json();
     },
 };
 

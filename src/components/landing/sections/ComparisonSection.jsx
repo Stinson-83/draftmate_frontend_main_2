@@ -61,7 +61,7 @@ export default function ComparisonSection() {
                 Feature
               </div>
               <div className="text-ink/50 text-[13px] font-semibold flex items-center">
-                Generic AI (ChatGPT)
+                Generic AI
               </div>
               <div className="flex items-center">
                 <span className="font-bold text-[13px]" style={{ color: "#1D4ED8" }}>

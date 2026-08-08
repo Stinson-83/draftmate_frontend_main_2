@@ -32,6 +32,7 @@ def _new_session(session_key: str, profile_name: str | None = None) -> dict[str,
         "profile_name": profile_name,
         "workflow_state": "intake",
         "draft_type": None,
+        "source": "whatsapp",
         "collected_context": {
             "facts": [],
             "documents": [],
@@ -84,9 +85,12 @@ def update_session(session_key: str, updates: dict[str, Any]) -> dict[str, Any]:
 def reset_session(session_key: str) -> dict[str, Any]:
     """Reset a session to fresh state."""
     profile_name = None
+    source = "whatsapp"
     if session_key in _SESSIONS:
         profile_name = _SESSIONS[session_key].get("profile_name")
+        source = _SESSIONS[session_key].get("source", "whatsapp")
     session = _new_session(session_key, profile_name)
+    session["source"] = source
     _SESSIONS[session_key] = session
     return session
 

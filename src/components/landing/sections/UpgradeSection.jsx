@@ -1,12 +1,15 @@
+import React, { useState } from "react";
 import { ArrowRight, Check, Zap } from "lucide-react";
 import TypewriterText from "@/components/landing/TypewriterText";
 import ScrollReveal from "@/components/landing/ScrollReveal";
 import { useNavigate } from "react-router-dom";
+import BookDemoModal from "../BookDemoModal";
+
 
 const BENEFITS = [
   "Draft any Indian legal document in under 2 minutes",
   "Verified citations from Supreme Court & High Courts",
-  "Zero hallucinations — guaranteed accuracy",
+  "Zero hallucinations",
   "Auto-updated with BNS, DPDPA and latest laws",
   "Lex Bot research assistant included",
   "Full data privacy — attorney-client privilege level",
@@ -20,6 +23,7 @@ const TYPED = [
 ];
 
 export default function UpgradeSection() {
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const navigate = useNavigate();
   return (
     <section className="section-pad divider">
@@ -102,6 +106,7 @@ export default function UpgradeSection() {
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
+                  onClick={() => setIsDemoModalOpen(true)}
                   className="inline-flex items-center justify-center gap-2 px-10 py-4
                              rounded-xl font-semibold text-[15px] text-white/80
                              transition-all duration-200 hover:text-white active:scale-95"
@@ -121,6 +126,11 @@ export default function UpgradeSection() {
           </div>
         </ScrollReveal>
       </div>
+      {/* Render the Book Demo Modal */}
+      <BookDemoModal
+        isOpen={isDemoModalOpen}
+        onClose={() => setIsDemoModalOpen(false)}
+      />
     </section>
   );
 }

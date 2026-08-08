@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload, Split } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { caseService } from '../services/library/caseService';
 
 const SOURCE_LANGUAGE_OPTIONS = [
   { value: 'auto', label: 'Auto-detect' },
@@ -188,6 +189,11 @@ const TranslateDocumentPage = () => {
     return api.getTranslationDownloadUrl(selectedJobId);
   }, [selectedJobId]);
 
+  const sourceUrl = useMemo(() => {
+    if (!selectedJobId) return null;
+    return api.getTranslationSourceUrl(selectedJobId);
+  }, [selectedJobId]);
+
   const previewAllowed = useMemo(() => {
     const name = (job?.file_name || selectedFile?.name || '').toLowerCase();
     if (!name) return false;
@@ -259,10 +265,10 @@ const TranslateDocumentPage = () => {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-10 lg:grid-cols-[1.1fr_0.9fr] lg:px-12">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-10 lg:grid-cols-2 lg:px-12">
         <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4">
               <label className="space-y-2">
                 <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                   <FileText className="h-4 w-4 text-indigo-600" />
@@ -283,41 +289,43 @@ const TranslateDocumentPage = () => {
                 </div>
               </label>
 
-              <label className="space-y-2">
-                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  <Languages className="h-4 w-4 text-indigo-600" />
-                  Source language
-                </span>
-                <select
-                  value={sourceLanguage}
-                  onChange={(e) => handleSourceLanguageChange(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                >
-                  {SOURCE_LANGUAGE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <Languages className="h-4 w-4 text-indigo-600" />
+                    Source language
+                  </span>
+                  <select
+                    value={sourceLanguage}
+                    onChange={(e) => handleSourceLanguageChange(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  >
+                    {SOURCE_LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="space-y-2">
-                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  <Languages className="h-4 w-4 text-indigo-600" />
-                  Target language
-                </span>
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                >
-                  {targetLanguageOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="space-y-2">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <Languages className="h-4 w-4 text-indigo-600" />
+                    Target language
+                  </span>
+                  <select
+                    value={targetLanguage}
+                    onChange={(e) => setTargetLanguage(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  >
+                    {targetLanguageOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -352,7 +360,7 @@ const TranslateDocumentPage = () => {
               {downloadUrl && isCompleted && (
                 <>
                   <a
-                    href={downloadUrl}
+                    href={downloadUrl + '?raw=1'}
                     className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
                   >
                     <Download className="h-4 w-4" />
@@ -364,7 +372,7 @@ const TranslateDocumentPage = () => {
                     className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
                   >
                     <Split className="h-4 w-4" />
-                    Open Side-by-Side Comparison View
+                    Full Screen View
                   </button>
                 </>
               )}
@@ -484,6 +492,9 @@ const TranslateDocumentPage = () => {
                           onClick={() => {
                             setSelectedFile(null);
                             setActiveJobId(historyJob.job_id);
+                            setTimeout(() => {
+                              document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth' });
+                            }, 100);
                           }}
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
@@ -496,7 +507,7 @@ const TranslateDocumentPage = () => {
                           disabled={!historyJob.download_available}
                           onClick={() => {
                             if (!historyJob.download_available) return;
-                            window.open(api.getTranslationDownloadUrl(historyJob.job_id), '_blank', 'noopener,noreferrer');
+                            window.open(api.getTranslationDownloadUrl(historyJob.job_id) + '?raw=1', '_blank', 'noopener,noreferrer');
                           }}
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
@@ -516,28 +527,55 @@ const TranslateDocumentPage = () => {
               </p>
             )}
           </div>
-
-          {isCompleted && downloadUrl && (
-            <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Preview</h3>
-                <ArrowRight className="h-4 w-4 text-slate-400" />
-              </div>
-              {previewAllowed ? (
-                <iframe
-                  src={downloadUrl}
-                  className="mt-4 h-[420px] w-full rounded-2xl border border-slate-200 bg-white dark:border-slate-800"
-                  title="Translated document preview"
-                />
-              ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-                  Browser preview is unavailable for this file type. Use the download button to open the translated document.
-                </div>
-              )}
-            </div>
-          )}
         </aside>
       </div>
+
+      {isCompleted && downloadUrl && (
+        <div className="mx-auto max-w-6xl px-4 pb-12 md:px-10 lg:px-12">
+          <div id="preview-section" className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Side-by-Side Document Preview</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Comparing original source and target translation</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(`/dashboard/translate/compare/${selectedJobId}`)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
+              >
+                <Split className="h-3.5 w-3.5" />
+                Full Screen View
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-6 md:grid-cols-2">
+              {/* Left Column: Original */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="bg-slate-100 px-3.5 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
+                  Original ({getLanguageLabel(job?.source_language || sourceLanguage)})
+                </div>
+                <iframe
+                  src={sourceUrl}
+                  className="h-[460px] w-full border-0 bg-white"
+                  title="Original document preview"
+                />
+              </div>
+
+              {/* Right Column: Translated */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="bg-slate-100 px-3.5 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-indigo-700 dark:bg-slate-800 dark:text-indigo-300 border-b border-slate-200 dark:border-slate-800">
+                  Translation ({getLanguageLabel(job?.target_language || targetLanguage)})
+                </div>
+                <iframe
+                  src={downloadUrl}
+                  className="h-[460px] w-full border-0 bg-white"
+                  title="Translated document preview"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

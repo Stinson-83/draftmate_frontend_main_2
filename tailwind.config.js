@@ -11,6 +11,21 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: {
+          DEFAULT: "#136dec",
+          50: "#EFF6FF",
+          100: "#DBEAFE",
+          200: "#BFDBFE",
+          300: "#93C5FD",
+          400: "#60A5FA",
+          500: "#136dec",
+          600: "#2563EB",
+          700: "#1D4ED8",
+          800: "#1E3A5F",
+          900: "#1E3A8A",
+        },
+        "background-light": "#f6f7f8",
+        "background-dark": "#101822",
         brand: {
           50:  "#EFF6FF",
           100: "#DBEAFE",
@@ -37,7 +52,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
+        display: ["Inter", "sans-serif"],
       },
       animation: {
         "marquee-left":    "marqueeLeft 35s linear infinite",

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import fullLogo from '../assets/FULL_LOGO.svg';
+import Footer from '../components/landing/sections/Footer';
 import { faqs } from '../data/faqs';
 
 const FAQs = () => {
@@ -70,21 +71,7 @@ const FAQs = () => {
             </section>
 
             {/* Footer */}
-            <footer className="bg-slate-900 text-white py-12 px-4">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-                    <Link to="/" className="flex items-center gap-3">
-                        <div className="h-8 bg-white/90 backdrop-blur-sm rounded-full px-4 py-1 shadow-sm">
-                            <img src={fullLogo} alt="DraftMate" className="h-full object-contain" />
-                        </div>
-                    </Link>
-                    <div className="flex gap-6">
-                        <Link to="/" className="text-slate-400 hover:text-white transition-colors">Home</Link>
-                        <Link to="/features" className="text-slate-400 hover:text-white transition-colors">Features</Link>
-                        <Link to="/login" className="text-slate-400 hover:text-white transition-colors">Login</Link>
-                    </div>
-                    <p className="text-slate-500 text-sm">© 2024 DraftMate. All rights reserved.</p>
-                </div>
-            </footer>
+            <Footer />
         </div>
     );
 };

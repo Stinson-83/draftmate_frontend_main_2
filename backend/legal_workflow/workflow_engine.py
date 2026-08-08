@@ -46,9 +46,9 @@ async def process_turn(payload: IngressPayload) -> list:
     
     Returns a list of OutboundMessage objects to send back.
     """
-    # Session key: phone for WhatsApp, user_id for web
     session_key = payload.phone or payload.user_id or "anonymous"
     session = get_or_create_session(session_key, payload.platform_profile_name)
+    session["source"] = payload.source
 
     state = session["workflow_state"]
     text = (payload.message or "").strip().lower()
@@ -137,7 +137,10 @@ async def _handle_drafting(session: dict, session_key: str) -> list:
         })
 
         # Build editor URL
-        editor_url = f"{settings.frontend_url}/dashboard/editor?draft={draft_id}"
+        if session.get("source") == "web":
+            editor_url = f"/dashboard/editor?draft={draft_id}"
+        else:
+            editor_url = f"{settings.frontend_url}/dashboard/editor?draft={draft_id}"
 
         messages.append(TextMessage(body="your draft is ready! 📝"))
         messages.append(Delay(seconds=1.0))
@@ -292,7 +295,10 @@ async def _run_review(session: dict, session_key: str) -> list:
     messages.append(TextMessage(body=review_text))
 
     draft_id = session.get("draft_id")
-    editor_url = f"{settings.frontend_url}/dashboard/editor?draft={draft_id}" if draft_id else None
+    if session.get("source") == "web":
+        editor_url = f"/dashboard/editor?draft={draft_id}" if draft_id else None
+    else:
+        editor_url = f"{settings.frontend_url}/dashboard/editor?draft={draft_id}" if draft_id else None
 
     cta_buttons = [
         Button(id="apply_fixes", title="Apply Suggestions"),
@@ -330,7 +336,10 @@ async def _handle_reviewing(session: dict, session_key: str, text: str) -> list:
     if text in ("download pdf", "download_pdf", "pdf", "download"):
         draft_id = session.get("draft_id")
         if draft_id:
-            pdf_url = f"{settings.frontend_url}/api/workflow/draft/{draft_id}/pdf"
+            if session.get("source") == "web":
+                pdf_url = f"/api/workflow/draft/{draft_id}/pdf"
+            else:
+                pdf_url = f"{settings.frontend_url}/api/workflow/draft/{draft_id}/pdf"
             return [
                 DocumentMessage(
                     url=pdf_url,

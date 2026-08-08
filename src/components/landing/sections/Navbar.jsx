@@ -5,30 +5,30 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 // ── Navigation links ─────────────────────────────────────────────────────────
 // Note: We've removed Law Jurist and FAQs from this array as they require special routing logic handled below.
 const NAV_LINKS = [
-  { label: "Features",     href: "#features"  },
-  { label: "Blogs",        href: "#blogs"     },
-  // { label: "About",        href: "#about"     },
-  // { label: "Pricing",      href: "#pricing"   },
-  { label: "How it Works", href: "#steps"     },
+  { label: "Features",     href: "/features"      },
+  { label: "Blogs",        href: "/blogs"         },
+  // { label: "About",        href: "/about"         },
+  // { label: "Pricing",      href: "/pricing"       },
+  { label: "How it Works", href: "/how-it-works"  },
 ];
 
 const ACADEMY_STYLE = {
   background: "linear-gradient(135deg, rgba(37,99,235,0.10), rgba(14,165,233,0.10))",
-  border:     "1px solid rgba(37,99,235,0.22)",
-  color:      "#2563EB",
+  border: "1px solid rgba(37,99,235,0.22)",
+  color: "#2563EB",
 };
 
 const ACADEMY_MOBILE_STYLE = {
   background: "linear-gradient(135deg, rgba(37,99,235,0.07), rgba(14,165,233,0.07))",
-  border:     "1px solid rgba(37,99,235,0.15)",
-  color:      "#2563EB",
+  border: "1px solid rgba(37,99,235,0.15)",
+  color: "#2563EB",
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [open, setOpen]         = useState(false);
-  
+  const [open, setOpen] = useState(false);
+
   // React Router hooks for programmatic navigation
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,7 +43,7 @@ export default function Navbar() {
   const handleFaqClick = (e) => {
     e.preventDefault();
     setOpen(false);
-    
+
     if (location.pathname !== "/") {
       // If not on the home page, navigate to home with the hash
       navigate("/#faq");
@@ -58,11 +58,10 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
+      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${scrolled
           ? "bg-white/95 backdrop-blur-xl border-b border-slate-200/70 shadow-sm shadow-slate-200/50"
           : "bg-transparent"
-      }`}
+        }`}
     >
       <div className="max-w-[1440px] mx-auto px-5 md:px-10">
 
@@ -103,7 +102,7 @@ export default function Navbar() {
 
           {/* ── ② Nav links ─────────────────────────────────────── */}
           <div className="flex items-center justify-center gap-0 px-2">
-            
+
             {/* External Law Jurist Link using <a> tag */}
             <a
               href="https://lawjurist.com/"
@@ -126,14 +125,14 @@ export default function Navbar() {
             ))}
 
             <button
-              onClick={()=>navigate('/about')}
+              onClick={() => navigate('/about')}
               className="px-2.5 py-2 text-[12.5px] font-medium text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50/80 transition-all duration-200 whitespace-nowrap"
             >
               About
             </button>
 
             <button
-              onClick={()=>navigate('/pricing')}
+              onClick={() => navigate('/pricing')}
               className="px-2.5 py-2 text-[12.5px] font-medium text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50/80 transition-all duration-200 whitespace-nowrap"
             >
               Pricing
@@ -141,10 +140,10 @@ export default function Navbar() {
 
             {/* Special FAQ routing handler */}
             <button
-              onClick={handleFaqClick}
+              onClick={() => navigate('/advocates')}
               className="px-2.5 py-2 text-[12.5px] font-medium text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-50/80 transition-all duration-200 whitespace-nowrap"
             >
-              FAQs
+              Lawyer Search
             </button>
 
             {/* Academy pill */}
@@ -178,8 +177,8 @@ export default function Navbar() {
                          flex items-center gap-1.5 text-white whitespace-nowrap
                          transition-all duration-200 hover:opacity-90 hover:scale-[1.02]"
               style={{
-                background:  "linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%)",
-                boxShadow:   "0 2px 14px rgba(37,99,235,0.32)",
+                background: "linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%)",
+                boxShadow: "0 2px 14px rgba(37,99,235,0.32)",
               }}
             >
               <Zap className="w-3.5 h-3.5" />
@@ -213,7 +212,7 @@ export default function Navbar() {
             className="p-2 rounded-lg border border-slate-200 bg-white/80 backdrop-blur-sm"
           >
             {open
-              ? <X    className="w-4 h-4 text-slate-700" />
+              ? <X className="w-4 h-4 text-slate-700" />
               : <Menu className="w-4 h-4 text-slate-700" />
             }
           </button>
@@ -228,7 +227,7 @@ export default function Navbar() {
                     ${open ? "max-h-[640px] opacity-100" : "max-h-0 opacity-0"}`}
       >
         <div className="bg-white/98 backdrop-blur-xl border-t border-slate-100 px-5 py-4 space-y-1">
-          
+
           <a
             href="https://lawjurist.com/"
             target="_blank"

@@ -67,9 +67,19 @@ async function _fetch(url, options = {}, isRetry = false) {
         if (refreshed) {
             return _fetch(url, options, true);
         }
-        // Refresh failed — clear tokens and redirect
+        // Try auto-session login with active DraftMate session
+        const sessionId = localStorage.getItem('session_id');
+        if (sessionId) {
+            try {
+                const data = await advocateAuth.sessionLogin(sessionId);
+                advocateAuth.saveTokens(data);
+                return _fetch(url, options, true);
+            } catch (e) {
+                console.warn('Auto session login failed:', e);
+            }
+        }
+        // Refresh failed — clear tokens
         tokens.clear();
-        window.location.href = '/advocate/login?session_expired=1';
         throw new Error('Session expired. Please log in again.');
     }
 
@@ -119,6 +129,19 @@ export const advocateAuth = {
     saveTokens: ({ access_token, refresh_token }) => {
         tokens.setAccess(access_token);
         tokens.setRefresh(refresh_token);
+    },
+
+    sessionLogin: async (sessionId) => {
+        const res = await fetch(`${BASE}${EP.SESSION_LOGIN}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Session login failed.');
+        }
+        return res.json();
     },
 };
 
