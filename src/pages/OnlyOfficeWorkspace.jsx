@@ -65,6 +65,87 @@ const OnlyOfficeWorkspace = () => {
   const [shareAccess, setShareAccess] = useState('edit');
   const [isSharing, setIsSharing] = useState(false);
 
+  // ⚖ AI Legal Draft Judge states and functions
+  const [judgeReport, setJudgeReport] = useState(null);
+  const [isJudging, setIsJudging] = useState(false);
+  const [judgeStatus, setJudgeStatus] = useState("Saving changes...");
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  const handleJudgeDraft = async () => {
+    if (!editorInstanceRef.current) {
+      toast.error("Editor is not ready.");
+      return;
+    }
+    setIsJudging(true);
+    setJudgeReport(null);
+    setJudgeStatus("Saving document changes...");
+    try {
+      // Force OnlyOffice to save active session state to disk
+      editorInstanceRef.current.forceSave();
+      
+      // Wait briefly for OnlyOffice to write changes to local storage
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      
+      setJudgeStatus("AI Auditor is evaluating document text...");
+      const token = localStorage.getItem('session_id');
+      const resp = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/judge`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ draft_id: draftId })
+      });
+      
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.detail || "AI Auditing failed.");
+      }
+      
+      const report = await resp.json();
+      setJudgeReport(report);
+      toast.success("Draft assessment complete!");
+    } catch (err) {
+      console.error("Auditor error:", err);
+      toast.error("Auditing failed: " + err.message);
+    } finally {
+      setIsJudging(false);
+    }
+  };
+
+  const handleExportJudgePDF = async () => {
+    if (!judgeReport) return;
+    setIsExportingPDF(true);
+    try {
+      const token = localStorage.getItem('session_id');
+      const resp = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/judge/export`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(judgeReport)
+      });
+      
+      if (!resp.ok) throw new Error("PDF generation failed.");
+      
+      const blob = await resp.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `AI_Auditor_Report_${judgeReport.filename || 'draft'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Assessment PDF exported successfully!");
+    } catch (err) {
+      console.error("PDF export error:", err);
+      toast.error("Export failed: " + err.message);
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
   const startResize = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -207,6 +288,19 @@ const OnlyOfficeWorkspace = () => {
 
     const nextConfig = {
       ...activeConfig,
+      editorConfig: {
+        ...(activeConfig?.editorConfig || {}),
+        plugins: {
+          autostart: [
+            "asc.{bf7a0491-137a-4290-9519-756184a51e60}",
+            ...(activeConfig?.editorConfig?.plugins?.autostart || [])
+          ],
+          pluginsData: [
+            `${window.location.origin}/plugins/ai-redline/config.json`,
+            ...(activeConfig?.editorConfig?.plugins?.pluginsData || [])
+          ]
+        }
+      },
       events: {
         ...(activeConfig?.events || {}),
         onDocumentReady: (...args) => {
@@ -1067,6 +1161,18 @@ const OnlyOfficeWorkspace = () => {
               <span className="material-symbols-outlined align-middle mr-1.5 text-base">schema</span>
               Variables ({variablesDetected.length})
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('judge')}
+              className={`tab-underline flex-1 py-4 text-center text-xs font-semibold border-b-2 transition-all duration-200 ${
+                activeTab === 'judge'
+                  ? 'tab-active border-blue-600 text-blue-800 bg-[#E3F0F7]'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-[#CDE3F0]/55'
+              }`}
+            >
+              <span className="material-symbols-outlined align-middle mr-1.5 text-base">balance</span>
+              Judge
+            </button>
           </div>
 
           {/* Variables Tab */}
@@ -1108,6 +1214,184 @@ const OnlyOfficeWorkspace = () => {
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+
+          {/* Judge Tab */}
+          {activeTab === 'judge' && (
+            <div className="custom-scroll flex-1 overflow-y-auto p-4 space-y-4 bg-[#E3F0F7]">
+              {!judgeReport && !isJudging && (
+                <div className="popup-anim flex flex-col items-center justify-center text-center p-6 bg-white border border-[#B9D9EB] rounded-2xl shadow-sm space-y-4">
+                  <div className="p-4 bg-blue-50 text-blue-600 rounded-full">
+                    <span className="material-symbols-outlined text-4xl">balance</span>
+                  </div>
+                  <h4 className="text-lg font-bold text-slate-800">Judge My Draft</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Ready to evaluate your document? The AI Legal Auditor will review the entire draft for structure, consistency, legal reasoning, citation backing, and conciseness.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleJudgeDraft}
+                    className="btn-scale w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-base">gavel</span>
+                    Judge My Draft
+                  </button>
+                </div>
+              )}
+
+              {isJudging && (
+                <div className="popup-anim flex flex-col items-center justify-center text-center p-8 bg-white border border-[#B9D9EB] rounded-2xl shadow-sm space-y-4">
+                  <Loader2 className="h-8 w-8 text-blue-600 smooth-spin" />
+                  <h4 className="text-sm font-bold text-slate-700">{judgeStatus}</h4>
+                  <p className="text-xs text-slate-500">
+                    Extracting text from document and assessing structural reasoning. This may take up to a minute.
+                  </p>
+                </div>
+              )}
+
+              {judgeReport && (
+                <div className="space-y-4">
+                  {/* Score Card Banner */}
+                  <div className="popup-anim bg-slate-900 text-white p-5 rounded-2xl shadow-md flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Overall Rating</div>
+                      <div className="text-2xl font-black text-white mt-1">{judgeReport.overall_score} / 100</div>
+                    </div>
+                    <div className="px-3 py-1 bg-blue-600/30 border border-blue-500/40 text-blue-400 text-xs font-bold rounded-lg uppercase tracking-wider">
+                      {judgeReport.grade}
+                    </div>
+                  </div>
+
+                  {/* Dimension scorecard */}
+                  <div className="popup-anim bg-white border border-[#B9D9EB] p-4 rounded-2xl shadow-sm space-y-3">
+                    <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Analysis Scorecard</h5>
+                    <div className="space-y-2.5">
+                      {Object.entries(judgeReport.categories || {}).map(([key, val]) => (
+                        <div key={key} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold text-slate-700">
+                            <span className="capitalize">{key}</span>
+                            <span>{val}</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${val}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* PDF Export Action */}
+                  <button
+                    type="button"
+                    onClick={handleExportJudgePDF}
+                    disabled={isExportingPDF}
+                    className="btn-scale w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    {isExportingPDF ? <Loader2 className="h-4 w-4 smooth-spin" /> : <span className="material-symbols-outlined text-base">download</span>}
+                    {isExportingPDF ? "Compiling PDF..." : "Export Review Report (PDF)"}
+                  </button>
+
+                  {/* Strengths */}
+                  {judgeReport.strengths && judgeReport.strengths.length > 0 && (
+                    <div className="popup-anim bg-white border border-emerald-100 p-4 rounded-2xl shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+                        <span className="material-symbols-outlined text-base">check_circle</span>
+                        <span>✓ STRENGTHS</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-1.5">
+                        {judgeReport.strengths.map((s, i) => (
+                          <li key={i} className="text-xs text-slate-650 leading-relaxed flex items-start gap-1.5">
+                            <span className="text-emerald-500 shrink-0">•</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Weaknesses */}
+                  {judgeReport.weaknesses && judgeReport.weaknesses.length > 0 && (
+                    <div className="popup-anim bg-white border border-amber-100 p-4 rounded-2xl shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-amber-700 font-bold text-xs">
+                        <span className="material-symbols-outlined text-base">warning</span>
+                        <span>⚠ WEAKNESSES</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-1.5">
+                        {judgeReport.weaknesses.map((w, i) => (
+                          <li key={i} className="text-xs text-slate-650 leading-relaxed flex items-start gap-1.5">
+                            <span className="text-amber-500 shrink-0">•</span>
+                            <span>{w}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Critical Issues */}
+                  {judgeReport.critical_issues && judgeReport.critical_issues.length > 0 && (
+                    <div className="popup-anim bg-white border border-rose-100 p-4 rounded-2xl shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-rose-700 font-bold text-xs">
+                        <span className="material-symbols-outlined text-base">cancel</span>
+                        <span>🔴 CRITICAL ISSUES</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-1.5">
+                        {judgeReport.critical_issues.map((ci, i) => (
+                          <li key={i} className="text-xs text-slate-650 leading-relaxed flex items-start gap-1.5">
+                            <span className="text-rose-500 shrink-0">•</span>
+                            <span>{ci}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Suggestions */}
+                  {judgeReport.suggestions && judgeReport.suggestions.length > 0 && (
+                    <div className="popup-anim bg-white border border-blue-100 p-4 rounded-2xl shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-blue-700 font-bold text-xs">
+                        <span className="material-symbols-outlined text-base">lightbulb</span>
+                        <span>💡 SUGGESTIONS</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-1.5">
+                        {judgeReport.suggestions.map((sug, i) => (
+                          <li key={i} className="text-xs text-slate-650 leading-relaxed flex items-start gap-1.5">
+                            <span className="text-blue-500 shrink-0">•</span>
+                            <span>{sug}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Opposing Questions */}
+                  {judgeReport.opposing_questions && judgeReport.opposing_questions.length > 0 && (
+                    <div className="popup-anim bg-white border border-slate-200 p-4 rounded-2xl shadow-sm space-y-2">
+                      <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
+                        <span className="material-symbols-outlined text-base">help</span>
+                        <span>❓ QUESTIONS TO CONSIDER</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-1.5">
+                        {judgeReport.opposing_questions.map((q, i) => (
+                          <li key={i} className="text-xs text-slate-650 leading-relaxed flex items-start gap-1.5">
+                            <span className="text-slate-400 shrink-0">•</span>
+                            <span>{q}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Reset analysis button */}
+                  <button
+                    type="button"
+                    onClick={() => setJudgeReport(null)}
+                    className="w-full py-2 bg-slate-100 hover:bg-slate-200 border border-[#B9D9EB] text-slate-600 rounded-xl text-xs font-semibold hover:text-slate-800 transition-colors"
+                  >
+                    Re-Judge Draft
+                  </button>
+                </div>
               )}
             </div>
           )}
