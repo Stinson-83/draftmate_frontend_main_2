@@ -562,6 +562,29 @@ const OnlyOfficeWorkspace = () => {
         onStatus: (msg) => {
           setStatusMessage(msg || 'Processing legal research...');
         },
+        onNodeUpdate: (evt) => {
+          const nodeNames = {
+            memory_recall: 'Checking session history...',
+            router: 'Analyzing document structure & legal query...',
+            research_agent: 'Searching Indian Bare Acts & precedents...',
+            law_agent: 'Analyzing statutory provisions & legal framework...',
+            case_agent: 'Finding relevant High Court & Supreme Court judgments...',
+            explainer_agent: 'Formulating legal explanation...',
+            manager_aggregate: 'Finalizing response...',
+          };
+          if (evt.status === 'running' && nodeNames[evt.node]) {
+            setStatusMessage(nodeNames[evt.node]);
+          }
+        },
+        onNodeStream: (evt) => {
+          if (evt.chunk) {
+            accumulatedResponse += evt.chunk;
+            const currentText = accumulatedResponse;
+            setMessages((prev) => prev.map((m) =>
+              m.id === assistantMsgId ? { ...m, content: currentText } : m
+            ));
+          }
+        },
         onToken: (chunk, accumulated) => {
           accumulatedResponse = accumulated;
           setMessages((prev) => prev.map((m) =>
