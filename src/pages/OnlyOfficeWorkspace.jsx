@@ -5,6 +5,53 @@ import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 
+const SmoothVlcProgressBar = ({ statusMessage, isLoading }) => {
+  const [progress, setProgress] = useState(5);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setProgress(100);
+      return;
+    }
+    setProgress(10);
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev < 95) {
+          const inc = Math.max(0.4, (95 - prev) * 0.08);
+          return Math.min(95, prev + inc);
+        }
+        return prev;
+      });
+    }, 50);
+
+    return () => clearInterval(timer);
+  }, [isLoading]);
+
+  if (!isLoading) return null;
+
+  return (
+    <div className="my-2 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-md text-white">
+      <div className="flex items-center justify-between text-[11px] mb-1.5 font-medium">
+        <span className="truncate text-slate-300 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping shrink-0" />
+          {statusMessage || 'Processing legal query...'}
+        </span>
+        <span className="font-mono text-blue-400 font-bold shrink-0">{Math.round(progress)}%</span>
+      </div>
+      <div className="relative h-2 bg-slate-800 rounded-full w-full overflow-hidden shadow-inner border border-slate-700/60">
+        <div
+          className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(59,130,246,0.9)]"
+          style={{ width: `${progress}%` }}
+        />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full border-2 border-blue-400 shadow-[0_0_8px_#3b82f6] pointer-events-none transition-all duration-300 ease-out z-10"
+          style={{ left: `calc(${progress}% - 7px)` }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const ONLYOFFICE_API_SRC = `${window.location.origin}/onlyoffice/web-apps/apps/api/documents/api.js`;
 const ONLYOFFICE_ORIGIN = new URL(ONLYOFFICE_API_SRC).origin;
 
@@ -1292,13 +1339,8 @@ const OnlyOfficeWorkspace = () => {
                 </div>
               ))}
 
-              {/* Streaming Status Indicator */}
-              {isChatLoading && statusMessage && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 px-2 py-1 italic animate-pulse">
-                  <span className="material-symbols-outlined text-sm animate-spin">autorenew</span>
-                  {statusMessage}
-                </div>
-              )}
+              {/* VLC / Spotify Style Continuous Progress Bar */}
+              <SmoothVlcProgressBar statusMessage={statusMessage} isLoading={isChatLoading} />
 
               <div ref={chatEndRef} />
             </div>

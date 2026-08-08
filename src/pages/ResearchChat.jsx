@@ -40,7 +40,7 @@ const NODE_LABELS = {
     'memory_store': 'Committing insights to memory'
 };
 
-const ResearchProgressTimeline = ({ activeNodes }) => {
+const ResearchProgressTimeline = ({ activeNodes, isTyping }) => {
     const stages = [
         { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
         { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
@@ -56,36 +56,96 @@ const ResearchProgressTimeline = ({ activeNodes }) => {
         }
     });
 
+    const [progress, setProgress] = useState(10);
+
+    useEffect(() => {
+        let targetProgress = 15;
+        if (activeStageIndex === 0) targetProgress = 30;
+        else if (activeStageIndex === 1) targetProgress = 60;
+        else if (activeStageIndex === 2) targetProgress = 85;
+        else if (activeStageIndex === 3) targetProgress = 98;
+
+        if (!isTyping && activeNodes.length > 0) {
+            targetProgress = 100;
+        }
+
+        const interval = setInterval(() => {
+            setProgress((prev) => {
+                if (prev < targetProgress) {
+                    const step = Math.max(0.5, (targetProgress - prev) * 0.12);
+                    return Math.min(targetProgress, prev + step);
+                }
+                return prev;
+            });
+        }, 50);
+
+        return () => clearInterval(interval);
+    }, [activeStageIndex, activeNodes, isTyping]);
+
+    const displayPercent = Math.round(progress);
+
     return (
-        <div className="bg-white border border-blue-100 rounded-2xl p-6 mb-6 shadow-[0_4px_20px_rgba(37,99,235,0.04)] relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-blue-50/50 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between mb-5">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    Autonomous Research Pipeline
-                </h3>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">LIVE</span>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 shadow-2xl relative overflow-hidden text-white backdrop-blur-md">
+            <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full animate-ping" />
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-300 flex items-center gap-2">
+                        Autonomous Research Pipeline
+                    </h3>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-end gap-1 h-3">
+                        <div className="w-1 bg-blue-400 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
+                        <div className="w-1 bg-indigo-400 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
+                        <div className="w-1 bg-purple-400 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
+                    </div>
+                    <span className="text-xs font-mono font-bold text-blue-400 bg-blue-950/80 border border-blue-800/60 px-2.5 py-1 rounded-full shadow-inner">
+                        {displayPercent}%
+                    </span>
+                </div>
             </div>
-            <div className="flex items-center justify-between w-full overflow-x-auto pb-2 scrollbar-hide">
+
+            {/* VLC / Spotify Continuous Progress Bar Track */}
+            <div className="relative my-5 px-1">
+                <div className="h-2.5 bg-slate-800 rounded-full w-full relative overflow-hidden shadow-inner border border-slate-700/60">
+                    <div
+                        className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 rounded-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(59,130,246,0.9)]"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-blue-400 shadow-[0_0_12px_#3b82f6] transition-all duration-300 ease-out z-20 pointer-events-none"
+                    style={{ left: `calc(${progress}% - 8px)` }}
+                />
+            </div>
+
+            {/* Stage Nodes */}
+            <div className="grid grid-cols-4 gap-2 pt-2">
                 {stages.map((stage, idx) => {
-                    const isNodeCompleted = activeNodes.some(n => stage.ids.includes(n.node) && n.status === 'completed');
-                    const isCompleted = idx < activeStageIndex || isNodeCompleted;
-                    const isRunning = (idx === activeStageIndex && !isCompleted) || activeNodes.some(n => stage.ids.includes(n.node) && n.status === 'running');
+                    const stageThreshold = (idx + 1) * 25;
+                    const isPassed = progress >= stageThreshold - 15;
+                    const isCurrent = progress >= (idx * 25) && progress < stageThreshold;
 
                     return (
-                        <React.Fragment key={stage.label}>
-                            <div className="flex flex-col items-center gap-2 min-w-[90px] shrink-0">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${isCompleted ? 'bg-blue-600 border-blue-600 text-white' :
-                                    isRunning ? 'border-blue-500 text-blue-500 animate-pulse' : 'border-slate-200 text-slate-300'
-                                    }`}>
-                                    {isCompleted ? <span className="material-symbols-outlined text-sm">check</span> : <span className="text-[10px] font-bold">{idx + 1}</span>}
-                                </div>
-                                <span className={`text-[10px] font-bold text-center whitespace-nowrap ${isRunning ? 'text-blue-600' : isCompleted ? 'text-slate-700' : 'text-slate-400'}`}>
-                                    {stage.label}
-                                </span>
+                        <div key={stage.label} className="flex flex-col items-center text-center">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-bold mb-1.5 transition-all duration-300 ${
+                                isPassed
+                                    ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(59,130,246,0.8)]'
+                                    : isCurrent
+                                        ? 'bg-slate-800 border-blue-400 text-blue-400 animate-pulse'
+                                        : 'bg-slate-800/80 border-slate-700 text-slate-500'
+                            }`}>
+                                {isPassed ? <span className="material-symbols-outlined text-xs">check</span> : (idx + 1)}
                             </div>
-                            {idx < stages.length - 1 && <div className={`h-[2px] flex-1 min-w-[30px] mx-2 transition-colors duration-500 ${isCompleted ? 'bg-blue-600' : 'bg-slate-100'}`} />}
-                        </React.Fragment>
+                            <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${
+                                isPassed ? 'text-blue-300' : isCurrent ? 'text-white' : 'text-slate-500'
+                            }`}>
+                                {stage.label}
+                            </span>
+                        </div>
                     );
                 })}
             </div>
@@ -907,7 +967,7 @@ const ResearchChat = () => {
                     <div className="max-w-4xl mx-auto w-full">
 
                         {/* Progress Timeline & Tasks UI */}
-                        {isTyping && <ResearchProgressTimeline activeNodes={activeNodes} />}
+                        {isTyping && <ResearchProgressTimeline activeNodes={activeNodes} isTyping={isTyping} />}
                         {isTyping && <SubQueryTasks isTyping={isTyping} input={input} />}
 
                         {/* File Preview */}
