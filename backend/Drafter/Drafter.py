@@ -229,12 +229,32 @@ def _strip_json_block(text: str) -> str:
 def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
     if not text:
         return None
+    cleaned = _strip_json_block(text)
     try:
-        payload = json.loads(_strip_json_block(text))
+        payload = json.loads(cleaned)
         if isinstance(payload, dict):
             return payload
     except Exception:
-        return None
+        pass
+
+    try:
+        repaired = re.sub(r",\s*([\]}])", r"\1", cleaned)
+        payload = json.loads(repaired)
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+
+    try:
+        def sanitize_string_literals(match):
+            return match.group(0).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+        repaired_strings = re.sub(r'"([^"\\]*(?:\\.[^"\\]*)*)"', sanitize_string_literals, cleaned)
+        payload = json.loads(repaired_strings)
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+
     return None
 
 
@@ -825,6 +845,21 @@ def _apply_run_style(run, font_size: Pt, bold: bool):
     run.bold = bold
 
 
+def _sanitize_filename(raw_name: str, max_len: int = 40) -> str:
+    if not raw_name:
+        return "Legal_Draft.docx"
+    clean = raw_name.strip()
+    if clean.lower().endswith(".docx"):
+        clean = clean[:-5]
+    clean = re.sub(r'[^a-zA-Z0-9_\-]', '_', clean)
+    clean = re.sub(r'_+', '_', clean).strip('_')
+    if len(clean) > max_len:
+        clean = clean[:max_len].rstrip('_')
+    if not clean:
+        clean = "Legal_Draft"
+    return clean + ".docx"
+
+
 def build_docx_with_controls(ai_data: dict, file_target_name: str) -> str:
     shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
     if not shared_storage_path:
@@ -832,9 +867,7 @@ def build_docx_with_controls(ai_data: dict, file_target_name: str) -> str:
 
     os.makedirs(shared_storage_path, exist_ok=True)
 
-    safe_name = (file_target_name or "").strip() or "draftmate_draft.docx"
-    if not safe_name.lower().endswith(".docx"):
-        safe_name = safe_name + ".docx"
+    safe_name = _sanitize_filename(file_target_name)
     output_path = os.path.join(shared_storage_path, safe_name)
 
     doc = Document()

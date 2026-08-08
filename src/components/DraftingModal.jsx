@@ -94,7 +94,9 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             .trim()
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_|_$/g, '');
+            .replace(/^_|_$/g, '')
+            .slice(0, 40)
+            .replace(/_$/, '');
         return `${raw || 'ai_draft'}.docx`;
     };
 
