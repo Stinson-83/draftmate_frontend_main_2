@@ -315,14 +315,36 @@ const OnlyOfficeWorkspace = () => {
     }
   };
 
+  const sendToPlugin = (payload) => {
+    let sent = false;
+    if (pluginWindowRef.current) {
+      try {
+        pluginWindowRef.current.postMessage(payload, '*');
+        sent = true;
+      } catch (err) {
+        console.warn('[OnlyOfficeWorkspace] pluginWindowRef postMessage failed:', err);
+      }
+    }
+    try {
+      const iframes = document.querySelectorAll('iframe');
+      iframes.forEach((iframe) => {
+        try {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.postMessage(payload, '*');
+            sent = true;
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+    return sent;
+  };
+
   const startSelectionPolling = () => {
     if (selectionPollRef.current) return;
 
     selectionPollRef.current = window.setInterval(() => {
-      const plugin = pluginWindowRef.current;
-      if (!plugin) return;
       if (Date.now() < selectionPollPausedUntilRef.current) return;
-      plugin.postMessage({ type: 'ONLYOFFICE_POLL_SELECTION' }, ONLYOFFICE_ORIGIN);
+      sendToPlugin({ type: 'ONLYOFFICE_POLL_SELECTION' });
     }, 500);
   };
 
@@ -334,9 +356,20 @@ const OnlyOfficeWorkspace = () => {
   };
 
   useEffect(() => {
+    startSelectionPolling();
+    return () => stopSelectionPolling();
+  }, []);
+
+  useEffect(() => {
     const handleMessage = (e) => {
       if (e.origin !== window.location.origin && e.origin !== ONLYOFFICE_ORIGIN) return;
       if (!e.data) return;
+
+      if (e.data.type && typeof e.data.type === 'string' && e.data.type.startsWith('ONLYOFFICE_')) {
+        if (e.source && e.source !== window) {
+          pluginWindowRef.current = e.source;
+        }
+      }
 
       if (e.data.type === 'ONLYOFFICE_PLUGIN_READY') {
         console.log('ONLYOFFICE plugin is ready!', e.source);
@@ -349,7 +382,9 @@ const OnlyOfficeWorkspace = () => {
         const selectedText = String(e.data.text || '').trim();
         setSelectionPreview(selectedText);
         setShowAutoFormatPopup(Boolean(selectedText));
-        if (!selectedText) {
+        if (selectedText) {
+          setActiveSelectionText(selectedText);
+        } else {
           setIsAutoFormatting(false);
         }
         return;
@@ -650,42 +685,38 @@ const OnlyOfficeWorkspace = () => {
   };
 
   const handleExplainSelection = () => {
-    if (!pluginWindowRef.current) {
-      toast.error('AI Assistant plugin is not ready. Please make sure the ONLYOFFICE document is fully loaded.');
-      return;
-    }
-
+    const selectedText = selectionPreview.trim() || activeSelectionText.trim();
     pendingSelectionActionRef.current = 'explain';
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, ONLYOFFICE_ORIGIN);
+    sendToPlugin({ type: 'ONLYOFFICE_GET_SELECTION' });
+
+    if (selectedText) {
+      handleSendMessage(`Explain this selection: "${selectedText}"`);
+      pendingSelectionActionRef.current = null;
+    } else {
+      toast.info('Please select text inside the document first.');
+    }
   };
 
   const handleFindRelevantCases = () => {
-    if (!pluginWindowRef.current) {
-      toast.error('The canvas connection is warming up. Please wait a moment and try again.');
-      return;
-    }
-
+    const selectedText = selectionPreview.trim() || activeSelectionText.trim();
     pendingSelectionActionRef.current = 'cases';
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_GET_SELECTION' }, ONLYOFFICE_ORIGIN);
+    sendToPlugin({ type: 'ONLYOFFICE_GET_SELECTION' });
+
+    if (selectedText) {
+      fetchRelevantCases(selectedText);
+      pendingSelectionActionRef.current = null;
+    } else {
+      toast.info('Please select text inside the document first.');
+    }
   };
 
   const handleInsertText = (textToInsert) => {
-    if (!pluginWindowRef.current) {
-      toast.error('AI Assistant plugin is not ready. Please make sure the ONLYOFFICE document is fully loaded.');
-      return;
-    }
-
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_INSERT_TEXT', text: textToInsert }, ONLYOFFICE_ORIGIN);
+    sendToPlugin({ type: 'ONLYOFFICE_INSERT_TEXT', text: textToInsert });
     toast.success('Inserted content into ONLYOFFICE document!');
   };
 
   const handleAutoFormatSelection = () => {
-    if (!pluginWindowRef.current) {
-      toast.error('AI Assistant plugin is not ready. Please make sure the ONLYOFFICE document is fully loaded.');
-      return;
-    }
-
-    if (!selectionPreview.trim()) {
+    if (!selectionPreview.trim() && !activeSelectionText.trim()) {
       toast.info('Select text in ONLYOFFICE first.');
       return;
     }
@@ -693,26 +724,22 @@ const OnlyOfficeWorkspace = () => {
     selectionPollPausedUntilRef.current = Date.now() + 1200;
     setIsAutoFormatting(true);
     setShowAutoFormatPopup(false);
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_AUTO_FORMAT_SELECTION' }, ONLYOFFICE_ORIGIN);
+    sendToPlugin({ type: 'ONLYOFFICE_AUTO_FORMAT_SELECTION' });
   };
 
   const handleEnhanceWithAISelection = () => {
-    if (!pluginWindowRef.current) {
-      toast.error('AI Assistant plugin is not ready. Please make sure the ONLYOFFICE document is fully loaded.');
-      return;
-    }
-
-    if (!selectionPreview.trim()) {
+    const selectedText = selectionPreview.trim() || activeSelectionText.trim();
+    if (!selectedText) {
       toast.info('Select text in ONLYOFFICE first.');
       return;
     }
 
     selectionPollPausedUntilRef.current = Date.now() + 1200;
-    setEnhanceSelectionText(selectionPreview.trim());
+    setEnhanceSelectionText(selectedText);
     setInputMessage('');
     setActiveTab('chat');
     setShowAutoFormatPopup(false);
-    pluginWindowRef.current.postMessage({ type: 'ONLYOFFICE_ENHANCE_WITH_AI' }, ONLYOFFICE_ORIGIN);
+    sendToPlugin({ type: 'ONLYOFFICE_ENHANCE_WITH_AI' });
   };
 
   const handleGenerateCaseParagraph = async (caseItem) => {
