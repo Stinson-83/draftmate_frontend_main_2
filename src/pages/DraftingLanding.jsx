@@ -68,6 +68,67 @@ const DraftingLanding = () => {
         setIsModalOpen(true);
     };
 
+    const handleCreateEmptyClick = async () => {
+        const sessionId = localStorage.getItem('session_id');
+        if (!sessionId) {
+            toast.error('Please sign in again before creating a document.');
+            return;
+        }
+
+        const loadingToast = toast.loading('Creating empty document...');
+
+        try {
+            const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/create`;
+            const response = await axios.post(url, {}, {
+                headers: {
+                    Authorization: `Bearer ${sessionId}`
+                }
+            });
+            const data = response.data;
+            const fileName = data?.filename || data?.document?.title || 'Untitled Draft.docx';
+            const documentKey = data?.documentKey || data?.document?.key || '';
+            const onlyofficeConfig = data?.onlyofficeConfig || data;
+
+            saveDeskDraftRecord({
+                id: documentKey,
+                name: fileName,
+                filename: fileName,
+                documentKey,
+                onlyofficeConfig,
+                variablesDetected: data?.variablesDetected || [],
+                status: 'In progress',
+                source: 'empty_document',
+                trackingParams: {
+                    source: 'empty_document',
+                    documentKey,
+                    filename: fileName,
+                    createdAt: new Date().toISOString(),
+                },
+            });
+
+            toast.dismiss(loadingToast);
+            toast.success('Empty document created successfully!');
+
+            navigate('/dashboard/workspace', {
+                state: {
+                    documentKey,
+                    filename: fileName,
+                    onlyofficeConfig,
+                    variablesDetected: data?.variablesDetected || [],
+                    trackingParams: {
+                        source: 'empty_document',
+                        documentKey,
+                        filename: fileName,
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Failed to create empty document:', error);
+            toast.dismiss(loadingToast);
+            toast.error('Failed to initialize empty document. Please try again.');
+        }
+    };
+
     const handleUploadClick = () => {
         fileInputRef.current.click();
     };
@@ -248,11 +309,23 @@ const DraftingLanding = () => {
                     <div className="card-badge bg-blue-100 text-blue-800">AI-Powered</div>
                     <h3 className="card-title">Create New Draft</h3>
                     <p className="card-desc">
-                        Start a fresh document with interactive AI generation or open a blank workspace ready for live team collaboration.
+                        Start a fresh document with interactive AI generation or select multi-document synthesis.
                     </p>
                 </div>
 
-                {/* Card 2: Upload */}
+                {/* Card 2: Start Empty Document */}
+                <div className="launchpad-card hover-lift" onClick={handleCreateEmptyClick}>
+                    <div className="card-icon-wrapper bg-indigo-50 text-indigo-600">
+                        <FolderClosed className="h-6 w-6" />
+                    </div>
+                    <div className="card-badge bg-indigo-100 text-indigo-800">Blank Page</div>
+                    <h3 className="card-title">Start Empty Document</h3>
+                    <p className="card-desc">
+                        Create an empty workspace immediately and begin editing without AI intake.
+                    </p>
+                </div>
+
+                {/* Card 3: Upload */}
                 <div className="launchpad-card hover-lift" onClick={handleUploadClick}>
                     <div className="card-icon-wrapper bg-emerald-50 text-emerald-600">
                         <UploadCloud className="h-6 w-6" />
@@ -261,18 +334,6 @@ const DraftingLanding = () => {
                     <h3 className="card-title">Work on Existing Document</h3>
                     <p className="card-desc">
                         Upload a `.docx` or `.pdf` file to seamlessly continue your work in a fully collaborative, Word-compatible editor.
-                    </p>
-                </div>
-
-                {/* Card 3: Review */}
-                <div className="launchpad-card hover-lift" onClick={() => navigate('/dashboard/drafts')}>
-                    <div className="card-icon-wrapper bg-indigo-50 text-indigo-600">
-                        <FolderClosed className="h-6 w-6" />
-                    </div>
-                    <div className="card-badge bg-indigo-100 text-indigo-800">Team Library</div>
-                    <h3 className="card-title">Review Your Drafts</h3>
-                    <p className="card-desc">
-                        Jump back into your previously created documents, check team edit histories, and finalize your text.
                     </p>
                 </div>
             </section>

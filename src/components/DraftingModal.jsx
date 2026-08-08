@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, FileText, Lock, Loader2, PenTool, Square, X } from 'lucide-react';
+import { Check, FileText, Lock, Loader2, PenTool, Square, X, UploadCloud } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
@@ -28,6 +28,10 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const [loadingMessage, setLoadingMessage] = useState('Loading...');
     const [allQuestions, setAllQuestions] = useState({});
     const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const [otherInputs, setOtherInputs] = useState({});
+    const [isEditingSummary, setIsEditingSummary] = useState(false);
+    const [editedSummary, setEditedSummary] = useState(INITIAL_SUMMARY);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -39,6 +43,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     useEffect(() => {
         setPrompt(initialPrompt || '');
     }, [initialPrompt]);
+
+    useEffect(() => {
+        if (intakeStep === 'summary') {
+            setEditedSummary(draftSummary);
+            setIsEditingSummary(false);
+        }
+    }, [intakeStep, draftSummary]);
 
     const sessionToken = localStorage.getItem('session_id') || '';
     const DRAFTER_API_URL = API_CONFIG.DRAFTER.BASE_URL;
@@ -177,7 +188,14 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const buildAnswerContext = (currentAnswers = answers) => {
         const answerLines = Object.entries(currentAnswers).map(([key, value]) => {
             const questionText = allQuestions[key] || key;
-            const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+            let displayValue = '';
+            if (value === 'others_option') {
+                displayValue = otherInputs[key] || '';
+            } else if (value === 'skip_option') {
+                displayValue = '[Skipped]';
+            } else {
+                displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+            }
             return `Question: ${questionText}\n  Answer: ${displayValue}`;
         });
 
@@ -333,7 +351,15 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             const formattedAnswers = {};
             Object.entries(currentAnswers).forEach(([key, val]) => {
                 const questionText = allQuestions[key] || key;
-                formattedAnswers[questionText] = val;
+                let displayVal = '';
+                if (val === 'others_option') {
+                    displayVal = otherInputs[key] || '';
+                } else if (val === 'skip_option') {
+                    displayVal = '[Skipped]';
+                } else {
+                    displayVal = val;
+                }
+                formattedAnswers[questionText] = displayVal;
             });
 
             const response = await fetch(`${DRAFTER_API_URL}/v2/draft/intake/analyze`, {
@@ -445,10 +471,163 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             return;
         }
 
-        if (choice === 'empty') {
-            createWorkspaceEmptyDocument();
+        if (choice === 'docs_with_ai') {
+            setSelectedFiles([]);
+            setPrompt('');
+            setIntakeStep('docs_with_ai');
+            return;
         }
     };
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        if (selectedFiles.length + files.length > 5) {
+            toast.error("You can upload a maximum of 5 files.");
+            return;
+        }
+        setSelectedFiles(prev => [...prev, ...files]);
+    };
+
+    const handleRemoveFile = (index) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleDocsWithAiSubmit = async () => {
+        if (selectedFiles.length === 0) {
+            toast.error("Please upload at least one document.");
+            return;
+        }
+        if (!prompt.trim()) {
+            toast.error("Please provide instructions for the AI.");
+            return;
+        }
+
+        setIsLoading(true);
+        setLoadingMessage("Synthesizing documents and draft...");
+
+        try {
+            const formData = new FormData();
+            selectedFiles.forEach((file) => {
+                formData.append('files', file);
+            });
+            formData.append('prompt', prompt);
+
+            const response = await fetch(`${DRAFTER_API_URL}/v2/draft/compile_with_documents`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${sessionToken}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                let detail = 'Failed to generate draft from documents.';
+                try {
+                    const errorData = await response.json();
+                    detail = errorData?.detail || detail;
+                } catch {
+                    detail = response.statusText || detail;
+                }
+                throw new Error(detail);
+            }
+
+            const data = await response.json();
+            navigateToWorkspace(data, { source: 'docs_with_ai' });
+            toast.success("Draft generated successfully from documents!");
+            onClose();
+        } catch (error) {
+            console.error('Multi-document compile error:', error);
+            toast.error(error.message || 'Failed to generate draft.');
+        } finally {
+            setIsLoading(false);
+            setLoadingMessage('Loading...');
+        }
+    };
+
+    const renderDocsWithAiView = () => (
+        <div className="step-content fade-in">
+            <div className="modal-header">
+                <div className="icon-badge">
+                    <PenTool size={20} />
+                </div>
+                <h2 className="modal-title">Documents with AI</h2>
+            </div>
+            <p className="modal-subtitle">
+                Upload up to 5 reference documents and provide a prompt detailing how you want your draft structured.
+            </p>
+
+            <div className="input-area" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div 
+                    className="file-dropzone" 
+                    onClick={() => fileInputRef.current.click()}
+                    style={{
+                        border: '2px dashed var(--border-color, #cbd5e1)',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        transition: 'border-color 0.2s',
+                    }}
+                >
+                    <UploadCloud className="h-8 w-8 text-slate-400" style={{ margin: '0 auto 12px auto' }} />
+                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #64748b)' }}>
+                        Click to upload files (PDF, DOCX)
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted, #94a3b8)' }}>
+                        Up to 5 files
+                    </p>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        multiple 
+                        accept=".pdf,.docx,.doc,.rtf,.txt"
+                        style={{ display: 'none' }} 
+                    />
+                </div>
+
+                {selectedFiles.length > 0 && (
+                    <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px' }}>
+                        {selectedFiles.map((file, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px' }}>
+                                <span style={{ fontSize: '13px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                                    {file.name}
+                                </span>
+                                <button 
+                                    onClick={() => handleRemoveFile(idx)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <textarea
+                    placeholder="Provide your prompt/instructions here..."
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={4}
+                />
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '24px' }}>
+                <button
+                    className="btn btn-ghost"
+                    onClick={() => {
+                        setIntakeStep('selection');
+                    }}
+                >
+                    Back
+                </button>
+                <button className="btn btn-primary" onClick={handleDocsWithAiSubmit}>
+                    Generate
+                </button>
+            </div>
+        </div>
+    );
 
     const handlePromptSubmit = async () => {
         if (!prompt.trim()) {
@@ -552,13 +731,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     </div>
                 </button>
 
-                <button className="option-card" onClick={() => handleSelectionChoice('empty')}>
+                <button className="option-card" onClick={() => handleSelectionChoice('docs_with_ai')}>
                     <div className="icon-box upload">
-                        <FileText size={24} />
+                        <UploadCloud size={24} />
                     </div>
                     <div className="text-content">
-                        <h3>Start Empty Document</h3>
-                        <p>Create an empty workspace immediately and begin editing without intake.</p>
+                        <h3>Documents with AI</h3>
+                        <p>Upload reference documents and write a prompt to generate a tailored legal draft.</p>
                     </div>
                 </button>
             </div>
@@ -636,10 +815,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                             {question.helperText ? (
                                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{question.helperText}</p>
                             ) : null}
-
-                            {hasOptions ? (
+                             {hasOptions ? (
                                 <div className="mt-4 grid gap-2">
-                                    {question.options.map((option) => {
+                                    {[
+                                        ...question.options,
+                                        { label: 'Others', value: 'others_option' },
+                                        { label: 'Skip', value: 'skip_option' }
+                                    ].map((option) => {
                                         const optionKey = String(option.value);
                                         const checked = question.multiple
                                             ? Array.isArray(currentValue) && currentValue.includes(optionKey)
@@ -671,6 +853,18 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                                             </label>
                                         );
                                     })}
+                                    {currentValue === 'others_option' && (
+                                        <textarea
+                                            className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                            rows={2}
+                                            value={otherInputs[question.id] || ''}
+                                            placeholder="Enter your custom details here..."
+                                            onChange={(e) => {
+                                                const text = e.target.value;
+                                                setOtherInputs(prev => ({ ...prev, [question.id]: text }));
+                                            }}
+                                        />
+                                    )}
                                 </div>
                             ) : (
                                 <textarea
@@ -702,92 +896,263 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         </div>
     );
 
-    const renderSummaryView = () => (
-        <div className="step-content fade-in">
-            <div className="modal-header">
-                <div className="icon-badge">
-                    <Check size={20} />
+    const renderSummaryView = () => {
+        const basis = isEditingSummary ? editedSummary.basis : draftSummary.basis;
+        const assumptions = isEditingSummary ? editedSummary.assumptions : draftSummary.assumptions;
+
+        const handleMetadataChange = (field, value) => {
+            setEditedSummary(prev => ({
+                ...prev,
+                basis: {
+                    ...prev.basis,
+                    [field]: value
+                }
+            }));
+        };
+
+        const handleListChange = (listName, index, value) => {
+            setEditedSummary(prev => {
+                const nextList = [...prev[listName]];
+                nextList[index] = value;
+                return { ...prev, [listName]: nextList };
+            });
+        };
+
+        const handleAddListItem = (listName) => {
+            setEditedSummary(prev => ({
+                ...prev,
+                [listName]: [...prev[listName], '']
+            }));
+        };
+
+        const handleRemoveListItem = (listName, index) => {
+            setEditedSummary(prev => ({
+                ...prev,
+                [listName]: prev[listName].filter((_, i) => i !== index)
+            }));
+        };
+
+        const handleSaveEdits = () => {
+            setDraftSummary(editedSummary);
+            setIsEditingSummary(false);
+            toast.success("Summary updated successfully!");
+        };
+
+        return (
+            <div className="step-content fade-in">
+                <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="icon-badge">
+                            <Check size={20} />
+                        </div>
+                        <h2 className="modal-title">Draft summary</h2>
+                    </div>
+                    {!isEditingSummary && (
+                        <button 
+                            className="btn btn-ghost btn-sm" 
+                            onClick={() => setIsEditingSummary(true)}
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                            Edit
+                        </button>
+                    )}
                 </div>
-                <h2 className="modal-title">Draft summary</h2>
-            </div>
 
-            <p className="modal-subtitle">
-                Review the generated basis and assumptions before we compile the final document.
-            </p>
+                <p className="modal-subtitle">
+                    {isEditingSummary ? "Customize the generated basis and assumptions before compilation." : "Review the generated basis and assumptions before we compile the final document."}
+                </p>
 
-            <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Draft Basis</h3>
-                    <div className="mt-3 space-y-3 text-sm">
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Document Type</div>
-                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.documentType || 'Legal Document'}</div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white" style={{ marginBottom: '12px' }}>Draft Basis</h3>
+                        <div className="space-y-3 text-sm">
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Document Type</div>
+                                {isEditingSummary ? (
+                                    <input 
+                                        type="text"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={basis.documentType || ''}
+                                        onChange={(e) => handleMetadataChange('documentType', e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="mt-1 text-slate-900 dark:text-white">{basis.documentType || 'Legal Document'}</div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Jurisdiction</div>
+                                {isEditingSummary ? (
+                                    <input 
+                                        type="text"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={basis.jurisdiction || ''}
+                                        onChange={(e) => handleMetadataChange('jurisdiction', e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="mt-1 text-slate-900 dark:text-white">{basis.jurisdiction || 'Not specified'}</div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Representation Position</div>
+                                {isEditingSummary ? (
+                                    <input 
+                                        type="text"
+                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        value={basis.representationPosition || ''}
+                                        onChange={(e) => handleMetadataChange('representationPosition', e.target.value)}
+                                    />
+                                ) : (
+                                    <div className="mt-1 text-slate-900 dark:text-white">{basis.representationPosition || 'Not specified'}</div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Key Legal Positions</div>
+                                {isEditingSummary ? (
+                                    <div className="mt-2 space-y-2">
+                                        {basis.keyLegalPositions.map((item, idx) => (
+                                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <input 
+                                                    type="text"
+                                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    value={item}
+                                                    onChange={(e) => {
+                                                        const nextList = [...basis.keyLegalPositions];
+                                                        nextList[idx] = e.target.value;
+                                                        setEditedSummary(prev => ({
+                                                            ...prev,
+                                                            basis: { ...prev.basis, keyLegalPositions: nextList }
+                                                        }));
+                                                    }}
+                                                />
+                                                <button 
+                                                    onClick={() => {
+                                                        const nextList = basis.keyLegalPositions.filter((_, i) => i !== idx);
+                                                        setEditedSummary(prev => ({
+                                                            ...prev,
+                                                            basis: { ...prev.basis, keyLegalPositions: nextList }
+                                                        }));
+                                                    }}
+                                                    style={{ color: '#ef4444', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
+                                                >
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button 
+                                            className="btn btn-ghost btn-sm"
+                                            onClick={() => {
+                                                setEditedSummary(prev => ({
+                                                    ...prev,
+                                                    basis: { ...prev.basis, keyLegalPositions: [...prev.basis.keyLegalPositions, ''] }
+                                                }));
+                                            }}
+                                            style={{ padding: '4px 8px', fontSize: '11px', marginTop: '4px' }}
+                                        >
+                                            + Add Position
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <ul className="mt-2 space-y-2">
+                                        {toStringList(basis.keyLegalPositions).length > 0 ? (
+                                            toStringList(basis.keyLegalPositions).map((item) => (
+                                                <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
+                                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                                    <span>{item}</span>
+                                                </li>
+                                            ))
+                                        ) : (
+                                            <li className="text-slate-500 dark:text-slate-400">No key positions identified yet.</li>
+                                        )}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Jurisdiction</div>
-                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.jurisdiction || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Representation Position</div>
-                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.representationPosition || 'Not specified'}</div>
-                        </div>
-                        <div>
-                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Key Legal Positions</div>
-                            <ul className="mt-2 space-y-2">
-                                {toStringList(draftSummary.basis.keyLegalPositions).length > 0 ? (
-                                    toStringList(draftSummary.basis.keyLegalPositions).map((item) => (
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white" style={{ marginBottom: '12px' }}>Assumptions Used</h3>
+                        {isEditingSummary ? (
+                            <div className="space-y-2">
+                                {assumptions.map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <input 
+                                            type="text"
+                                            className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            value={item}
+                                            onChange={(e) => handleListChange('assumptions', idx, e.target.value)}
+                                        />
+                                        <button 
+                                            onClick={() => handleRemoveListItem('assumptions', idx)}
+                                            style={{ color: '#ef4444', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button 
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => handleAddListItem('assumptions')}
+                                    style={{ padding: '4px 8px', fontSize: '11px', marginTop: '4px' }}
+                                >
+                                    + Add Assumption
+                                </button>
+                            </div>
+                        ) : (
+                            <ul className="mt-3 space-y-2 text-sm">
+                                {toStringList(assumptions).length > 0 ? (
+                                    toStringList(assumptions).map((item) => (
                                         <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
-                                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                                             <span>{item}</span>
                                         </li>
                                     ))
                                 ) : (
-                                    <li className="text-slate-500 dark:text-slate-400">No key positions identified yet.</li>
+                                    <li className="text-slate-500 dark:text-slate-400">
+                                        Market-standard assumptions will be applied by the draft engine.
+                                    </li>
                                 )}
                             </ul>
-                        </div>
+                        )}
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Assumptions Used</h3>
-                    <ul className="mt-3 space-y-2 text-sm">
-                        {toStringList(draftSummary.assumptions).length > 0 ? (
-                            toStringList(draftSummary.assumptions).map((item) => (
-                                <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
-                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                    <span>{item}</span>
-                                </li>
-                            ))
-                        ) : (
-                            <li className="text-slate-500 dark:text-slate-400">
-                                Market-standard assumptions will be applied by the draft engine.
-                            </li>
-                        )}
-                    </ul>
+                <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Captured context</div>
+                    <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                        {prompt.trim()}
+                    </p>
+                </div>
+
+                <div className="modal-actions">
+                    {isEditingSummary ? (
+                        <>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setIsEditingSummary(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button className="btn btn-primary" onClick={handleSaveEdits}>
+                                Save Summary
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => setIntakeStep('clarifying')}
+                            >
+                                Review Questions
+                            </button>
+                            <button className="btn btn-primary" onClick={handleGenerateAndOpen}>
+                                Generate & Open in Workspace
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
-
-            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Captured context</div>
-                <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                    {prompt.trim()}
-                </p>
-            </div>
-
-            <div className="modal-actions">
-                <button
-                    className="btn btn-ghost"
-                    onClick={() => setIntakeStep('clarifying')}
-                >
-                    Review Questions
-                </button>
-                <button className="btn btn-primary" onClick={handleGenerateAndOpen}>
-                    Generate & Open in Workspace
-                </button>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderLoadingView = () => (
         <div className="step-content fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
@@ -806,6 +1171,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
                 {intakeStep === 'loading' || isLoading ? renderLoadingView() : null}
                 {!isLoading && intakeStep === 'selection' ? renderSelectionView() : null}
+                {!isLoading && intakeStep === 'docs_with_ai' ? renderDocsWithAiView() : null}
                 {!isLoading && intakeStep === 'prompt_input' ? renderPromptInputView() : null}
                 {!isLoading && intakeStep === 'clarifying' ? renderClarifyingView() : null}
                 {!isLoading && intakeStep === 'summary' ? renderSummaryView() : null}
