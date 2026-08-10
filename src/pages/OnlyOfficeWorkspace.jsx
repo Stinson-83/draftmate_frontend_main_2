@@ -72,6 +72,7 @@ const OnlyOfficeWorkspace = () => {
   const [composerHasValue, setComposerHasValue] = useState(false);
   const selectionPollRef = useRef(null);
   const selectionPollPausedUntilRef = useRef(0);
+  const dismissedSelectionTextRef = useRef('');
 
   const canvasTargetRef = useRef(null);
   const [docsApiReady, setDocsApiReady] = useState(false);
@@ -438,11 +439,23 @@ const OnlyOfficeWorkspace = () => {
       if (e.data.type === 'ONLYOFFICE_SELECTION_STATE' || e.data.type === 'ONLYOFFICE_SELECTION_CHANGED') {
         const selectedText = String(e.data.text || '').trim();
         setSelectionPreview(selectedText);
-        setShowAutoFormatPopup(Boolean(selectedText));
-        if (selectedText) {
+        
+        if (!selectedText) {
+          dismissedSelectionTextRef.current = '';
+          setShowAutoFormatPopup(false);
+          setIsAutoFormatting(false);
+          return;
+        }
+
+        if (dismissedSelectionTextRef.current && selectedText !== dismissedSelectionTextRef.current) {
+          dismissedSelectionTextRef.current = '';
+        }
+
+        if (selectedText !== dismissedSelectionTextRef.current) {
+          setShowAutoFormatPopup(true);
           setActiveSelectionText(selectedText);
         } else {
-          setIsAutoFormatting(false);
+          setShowAutoFormatPopup(false);
         }
         return;
       }
@@ -1158,6 +1171,7 @@ const OnlyOfficeWorkspace = () => {
                 <button
                   type="button"
                   onClick={() => {
+                    dismissedSelectionTextRef.current = selectionPreview;
                     setShowAutoFormatPopup(false);
                     setIsAutoFormatting(false);
                   }}
