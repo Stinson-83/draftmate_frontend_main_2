@@ -246,7 +246,7 @@ const OnlyOfficeWorkspace = () => {
     };
   }, [navigate]);
 
-  const activeConfig = draftId ? dynamicConfig : (dynamicConfig || onlyofficeConfig);
+  const activeConfig = dynamicConfig || onlyofficeConfig;
 
   useEffect(() => {
     console.log("[OnlyOfficeWorkspace] Editor init useEffect triggered. docsApiReady =", docsApiReady, "activeConfig =", activeConfig);
@@ -311,6 +311,7 @@ const OnlyOfficeWorkspace = () => {
         },
         onAppReady: () => {
           console.log("ONLYOFFICE App is ready.");
+          setIsCanvasLoading(false);
         }
       },
       width: '100%',
