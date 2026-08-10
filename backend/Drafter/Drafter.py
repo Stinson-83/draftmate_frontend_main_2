@@ -2511,10 +2511,16 @@ Provide your analysis strictly in JSON format matching this schema:
   "suggestions": ["Verify the termination clause"],
   "opposing_questions": ["What is the backing for the damages amount?"]
 }
+
+IMPORTANT:
+1. You MUST escape any double quotes inside JSON string values as \\" (e.g. \\"Force Majeure\\") to ensure that the output is syntactically valid JSON.
+2. Never output raw unescaped double quotes inside text fields.
+3. Output only the pure JSON structure, without any markdown code block wrapper (no ```json).
 """
 
 @app.post("/v2/draft/judge")
 async def judge_draft(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    import os
     user_id = await verify_token(authorization)
     draft_id = request.get("draft_id")
     if not draft_id:
@@ -2566,20 +2572,44 @@ async def judge_draft(request: Dict[str, Any], authorization: Optional[str] = He
 
     # 4. Invoke LLM for judgment
     try:
+        import google.generativeai as genai
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
             system_instruction=JUDGE_AI_PROMPT,
             generation_config=genai.GenerationConfig(
                 temperature=0.1,
                 response_mime_type="application/json",
-                max_output_tokens=1536
+                max_output_tokens=8192
             )
         )
         prompt_content = f"LEGAL DRAFT FILENAME: {filename}\n\nCONTENT:\n{document_text}"
         response = model.generate_content(prompt_content)
         
         raw_text = response.text.strip()
-        payload = json.loads(raw_text)
+        if raw_text.startswith("```"):
+            lines = raw_text.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines[-1].startswith("```"):
+                lines = lines[:-1]
+            raw_text = "\n".join(lines).strip()
+            
+        try:
+            payload = json.loads(raw_text)
+        except Exception as json_err:
+            logger.warning(f"Standard JSON decode failed: {json_err}. Trying ast.literal_eval fallback.")
+            try:
+                import ast
+                payload = ast.literal_eval(raw_text)
+                if not isinstance(payload, dict):
+                    raise ValueError("Parsed object is not a dictionary")
+            except Exception as ast_err:
+                logger.error(f"Both JSON and AST parsing failed. Raw response: {raw_text}")
+                raise json_err
+            
         payload["filename"] = filename
         return payload
     except Exception as e:

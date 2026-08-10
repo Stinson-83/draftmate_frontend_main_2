@@ -180,6 +180,7 @@ class ChronologyEventRegister(BaseModel):
     confidence: float
     is_conflict: bool
     conflict_details: List[dict]
+    status: Optional[str] = "pending"
 
 class ChronologyEventUpdate(BaseModel):
     event_id: str

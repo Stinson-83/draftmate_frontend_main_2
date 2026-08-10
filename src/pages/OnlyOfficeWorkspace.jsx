@@ -7,6 +7,8 @@ import { api } from '../services/api';
 const ONLYOFFICE_API_SRC = `${window.location.origin}/onlyoffice/web-apps/apps/api/documents/api.js`;
 const ONLYOFFICE_ORIGIN = new URL(ONLYOFFICE_API_SRC).origin;
 
+import { toast } from 'sonner';
+
 const OnlyOfficeWorkspace = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -81,7 +83,9 @@ const OnlyOfficeWorkspace = () => {
     setJudgeStatus("Saving document changes...");
     try {
       // Force OnlyOffice to save active session state to disk
-      editorInstanceRef.current.forceSave();
+      if (editorInstanceRef.current && typeof editorInstanceRef.current.executeCommand === 'function') {
+        editorInstanceRef.current.executeCommand("forceSave", {});
+      }
       
       // Wait briefly for OnlyOffice to write changes to local storage
       await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -198,7 +202,7 @@ const OnlyOfficeWorkspace = () => {
   }, [location]);
 
   const draftId = useMemo(() => {
-    return location?.state?.draftId || location?.state?.id;
+    return location?.state?.draftId || location?.state?.id || location?.state?.documentKey;
   }, [location]);
 
   useEffect(() => {

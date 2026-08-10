@@ -5,17 +5,23 @@
     <title>AI Redline Review</title>
     <script type="text/javascript" src="https://onlyoffice.github.io/sdkjs-plugins/v1/plugins.js"></script>
     <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             font-size: 13px;
             color: #f1f5f9;
             background-color: #0f172a;
-            margin: 0;
             padding: 1rem;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
             gap: 1.25rem;
+            overflow-y: auto;
         }
 
         h3 {

@@ -228,7 +228,27 @@ def extract_events_from_page(page_text: str, page_num: int, doc_name: str) -> Li
         
         # Parse output
         raw_text = response.text.strip()
-        payload = json.loads(raw_text)
+        if raw_text.startswith("```"):
+            lines = raw_text.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines[-1].startswith("```"):
+                lines = lines[:-1]
+            raw_text = "\n".join(lines).strip()
+
+        try:
+            payload = json.loads(raw_text)
+        except Exception as json_err:
+            logger.warning(f"Standard JSON decode failed on page {page_num}: {json_err}. Trying AST fallback.")
+            try:
+                import ast
+                payload = ast.literal_eval(raw_text)
+                if not isinstance(payload, dict):
+                    raise ValueError("Parsed object is not a dictionary")
+            except Exception as ast_err:
+                logger.error(f"Both JSON and AST parsing failed on page {page_num}. Raw response: {raw_text}")
+                raise json_err
+
         events = payload.get("events", [])
         
         # Append source metadata
