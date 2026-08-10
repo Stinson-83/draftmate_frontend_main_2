@@ -206,6 +206,23 @@ const TranslateDocumentPage = () => {
     }
   }, [job, selectedJobId]);
 
+  // 20-second auto-reset timer upon job completion to reset buttons, form and progressbar
+  React.useEffect(() => {
+    if (job?.status === 'completed') {
+      const timer = setTimeout(() => {
+        setSelectedFile(null);
+        setActiveJobId(null);
+        setUploadProgress(0);
+        setStatusMessage('Choose a document to start translation.');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }, 20000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [job?.status, job?.id]);
+
   // Auto-save history completed jobs to Document Management
   React.useEffect(() => {
     if (historyJobs && historyJobs.length > 0) {
