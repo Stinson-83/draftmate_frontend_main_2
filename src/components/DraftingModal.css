@@ -15,16 +15,24 @@
 
 .modal-content {
     background: var(--surface);
-    width: 92%;
-    max-width: 1180px;
-    max-height: 90vh;
+    width: 90%;
+    min-width: 850px;
+    max-width: 1100px;
+    min-height: 460px;
     overflow-y: auto;
     border-radius: var(--radius-xl);
-    padding: 36px;
+    padding: 40px 48px;
     position: relative;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid var(--border);
+}
+
+@media (max-width: 900px) {
+    .modal-content {
+        min-width: 95%;
+        padding: 24px;
+    }
 }
 
 .close-btn {
@@ -45,7 +53,7 @@
 }
 
 .modal-title {
-    font-size: 1.6rem;
+    font-size: 1.85rem;
     font-weight: 700;
     color: var(--text-main);
     margin: 0;
@@ -56,39 +64,40 @@
 .options-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-top: 24px;
+    gap: 32px;
+    margin-top: 32px;
 }
 
 .option-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 28px 32px;
+    border-radius: 20px;
+    padding: 36px 32px;
     text-align: left;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 18px;
     height: 100%;
-    min-height: 210px;
+    min-height: 260px;
 }
 
 .option-card:hover {
     border-color: var(--primary);
     background: var(--surface-hover);
-    transform: translateY(-2px);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 
 .icon-box {
-    width: 54px;
-    height: 54px;
-    border-radius: 14px;
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .icon-box.upload {
@@ -102,16 +111,16 @@
 }
 
 .text-content h3 {
-    font-size: 1.18rem;
-    font-weight: 650;
-    margin-bottom: 6px;
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 8px;
     color: var(--text-main);
 }
 
 .text-content p {
-    font-size: 0.93rem;
+    font-size: 1.02rem;
     color: var(--text-secondary);
-    line-height: 1.55;
+    line-height: 1.6;
 }
 
 /* Step 2 Styles */
