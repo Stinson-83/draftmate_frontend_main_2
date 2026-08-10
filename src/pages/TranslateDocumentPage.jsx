@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload, Split } from 'lucide-react';
@@ -103,6 +103,7 @@ const formatJobDate = (value) => {
 
 const TranslateDocumentPage = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [targetLanguage, setTargetLanguage] = useState('hi-IN');
@@ -326,24 +327,44 @@ const TranslateDocumentPage = () => {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-10 lg:grid-cols-2 lg:px-12">
-        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-4">
-              <label className="space-y-2">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-10 lg:grid-cols-2 lg:px-12 min-w-0 overflow-hidden">
+        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 min-w-0 overflow-hidden">
+          <form onSubmit={handleSubmit} className="space-y-6 min-w-0 overflow-hidden">
+            <div className="grid gap-4 min-w-0 overflow-hidden">
+              <label className="space-y-2 block min-w-0 overflow-hidden">
                 <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                   <FileText className="h-4 w-4 text-indigo-600" />
                   Source document
                 </span>
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70 overflow-hidden">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70 overflow-hidden min-w-0">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".pdf,.docx,.html,.htm"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 dark:text-slate-300 truncate"
+                    className="hidden"
                   />
+                  <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Choose File
+                    </button>
+                    <span
+                      className="truncate min-w-0 flex-1 text-sm font-medium text-slate-600 dark:text-slate-300"
+                      title={selectedFile ? selectedFile.name : 'No file chosen'}
+                    >
+                      {selectedFile ? selectedFile.name : 'No file chosen'}
+                    </span>
+                  </div>
                   {selectedFile && (
-                    <p className="mt-3 truncate text-xs font-medium text-slate-500 dark:text-slate-400" title={selectedFile.name}>
+                    <p
+                      className="mt-2.5 truncate text-xs font-semibold text-indigo-600 dark:text-indigo-400 min-w-0 block w-full overflow-hidden"
+                      title={selectedFile.name}
+                    >
                       Selected: {selectedFile.name}
                     </p>
                   )}
@@ -441,7 +462,7 @@ const TranslateDocumentPage = () => {
           </form>
         </section>
 
-        <aside className="space-y-6">
+        <aside className="space-y-6 min-w-0 overflow-hidden">
           <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-white">
               <FileSearch className="h-5 w-5 text-indigo-600" />
