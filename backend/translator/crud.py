@@ -23,7 +23,7 @@ def serialize_translation_job(job: TranslationJob) -> dict[str, str | int | bool
         "source_language": job.source_language,
         "target_language": job.target_language,
         "created_at": job.created_at.isoformat() if job.created_at else None,
-        "download_available": job.status == "completed" and translated_file_exists,
+        "download_available": job.status == "completed",
     }
 
 

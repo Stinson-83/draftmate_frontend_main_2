@@ -170,6 +170,59 @@ const TranslateDocumentPage = () => {
   const isFailed = job?.status === 'failed';
   const displayProgress = selectedJobId ? Math.max(uploadProgress, job?.progress ?? 0) : uploadProgress;
 
+  const savedJobsRef = React.useRef(new Set());
+
+  // Auto-save active completed job to Document Management ("Translated Documents" folder)
+  React.useEffect(() => {
+    if (job && job.status === 'completed') {
+      const jobId = job.job_id || job.id || selectedJobId;
+      if (jobId && !savedJobsRef.current.has(jobId)) {
+        savedJobsRef.current.add(jobId);
+        const langCode = (job.target_language || 'HI').toUpperCase();
+        const baseName = job.file_name || 'Document.pdf';
+        const docName = `Translated_${langCode}_${baseName}`;
+
+        caseService.addCaseDocument(null, {
+          name: docName,
+          filename: docName,
+          source: 'translate',
+          url: api.getTranslationDownloadUrl(jobId) + '?raw=1',
+          type: baseName.split('.').pop() || 'pdf'
+        }).then(() => {
+          console.log('[TranslateDocumentPage] Auto-saved translated document to Document Management');
+        }).catch((err) => {
+          console.warn('[TranslateDocumentPage] Auto-save error:', err);
+        });
+      }
+    }
+  }, [job, selectedJobId]);
+
+  // Auto-save history completed jobs to Document Management
+  React.useEffect(() => {
+    if (historyJobs && historyJobs.length > 0) {
+      historyJobs.forEach(async (hJob) => {
+        const jobId = hJob.job_id || hJob.id;
+        if (hJob.status === 'completed' && jobId && !savedJobsRef.current.has(jobId)) {
+          savedJobsRef.current.add(jobId);
+          const langCode = (hJob.target_language || 'HI').toUpperCase();
+          const baseName = hJob.file_name || 'Document.pdf';
+          const docName = `Translated_${langCode}_${baseName}`;
+          try {
+            await caseService.addCaseDocument(null, {
+              name: docName,
+              filename: docName,
+              source: 'translate',
+              url: api.getTranslationDownloadUrl(jobId) + '?raw=1',
+              type: baseName.split('.').pop() || 'pdf'
+            });
+          } catch (err) {
+            console.warn('[TranslateDocumentPage] Auto-save history error:', err);
+          }
+        }
+      });
+    }
+  }, [historyJobs]);
+
   const liveStatusMessage = useMemo(() => {
     if (!job) return statusMessage;
     if (job.status === 'processing') {
@@ -492,9 +545,7 @@ const TranslateDocumentPage = () => {
                           onClick={() => {
                             setSelectedFile(null);
                             setActiveJobId(historyJob.job_id);
-                            setTimeout(() => {
-                              document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth' });
-                            }, 100);
+                            window.open(`/dashboard/translate/compare/${historyJob.job_id}`, '_blank', 'noopener,noreferrer');
                           }}
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
@@ -504,15 +555,15 @@ const TranslateDocumentPage = () => {
 
                         <button
                           type="button"
-                          disabled={!historyJob.download_available}
+                          disabled={historyJob.status !== 'completed' && !historyJob.download_available}
                           onClick={() => {
-                            if (!historyJob.download_available) return;
+                            if (historyJob.status !== 'completed' && !historyJob.download_available) return;
                             window.open(api.getTranslationDownloadUrl(historyJob.job_id) + '?raw=1', '_blank', 'noopener,noreferrer');
                           }}
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          {historyJob.download_available ? 'Download' : 'Pending'}
+                          {historyJob.status === 'completed' || historyJob.download_available ? 'Download' : 'Pending'}
                         </button>
                       </div>
                     </div>
