@@ -56,12 +56,22 @@ export const caseService = {
   async getCases() {
     const deletedIds = new Set(JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]'));
 
+    const cleanDocNameStr = (raw) => {
+      if (!raw) return raw;
+      return raw
+        .replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?/, '')
+        .replace(/^[0-9a-fA-F]{32}[_-]?/, '')
+        .replace(/^Translated_([A-Z]{2})-[A-Z]{2}_/i, 'Translated_$1_');
+    };
+
     const filterDeletedDocs = (c) => {
       if (!c) return c;
       if (c.documents && c.documents.length > 0) {
         const seenIds = new Set();
         const seenNames = new Set();
         c.documents = c.documents.filter(d => {
+          if (d.name) d.name = cleanDocNameStr(d.name);
+          if (d.filename) d.filename = cleanDocNameStr(d.filename);
           const idKey = String(d.id);
           const nameKey = (d.name || d.filename || '').toLowerCase().trim();
           if (deletedIds.has(idKey) || (nameKey && deletedIds.has(nameKey))) return false;

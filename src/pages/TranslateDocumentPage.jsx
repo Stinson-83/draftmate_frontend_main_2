@@ -181,15 +181,27 @@ const TranslateDocumentPage = () => {
 
   const savedJobsRef = React.useRef(new Set());
 
+  // Helper to format clean, short document names without long UUIDs
+  const cleanDocName = (rawName, targetLang = 'HI') => {
+    if (!rawName) return 'Translated_Document.pdf';
+    let cleaned = rawName
+      .replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?/, '')
+      .replace(/^[0-9a-fA-F]{32}[_-]?/, '')
+      .replace(/^Translated_[A-Z_a-z-]+_/i, '')
+      .replace(/^Translated_/i, '');
+
+    const langCode = targetLang.split('-')[0].toUpperCase();
+    return `Translated_${langCode}_${cleaned}`;
+  };
+
   // Auto-save active completed job to Document Management ("Translated Documents" folder)
   React.useEffect(() => {
     if (job && job.status === 'completed') {
       const jobId = job.job_id || job.id || selectedJobId;
       if (jobId && !savedJobsRef.current.has(jobId)) {
         savedJobsRef.current.add(jobId);
-        const langCode = (job.target_language || 'HI').toUpperCase();
         const baseName = job.file_name || 'Document.pdf';
-        const docName = `Translated_${langCode}_${baseName}`;
+        const docName = cleanDocName(baseName, job.target_language || 'HI');
 
         caseService.addCaseDocument(null, {
           name: docName,
@@ -230,9 +242,8 @@ const TranslateDocumentPage = () => {
         const jobId = hJob.job_id || hJob.id;
         if (hJob.status === 'completed' && jobId && !savedJobsRef.current.has(jobId)) {
           savedJobsRef.current.add(jobId);
-          const langCode = (hJob.target_language || 'HI').toUpperCase();
           const baseName = hJob.file_name || 'Document.pdf';
-          const docName = `Translated_${langCode}_${baseName}`;
+          const docName = cleanDocName(baseName, hJob.target_language || 'HI');
           try {
             await caseService.addCaseDocument(null, {
               name: docName,
