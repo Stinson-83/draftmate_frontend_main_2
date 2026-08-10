@@ -327,15 +327,15 @@ const TranslateDocumentPage = () => {
                   <FileText className="h-4 w-4 text-indigo-600" />
                   Source document
                 </span>
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70 overflow-hidden">
                   <input
                     type="file"
                     accept=".pdf,.docx,.html,.htm"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 dark:text-slate-300"
+                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 dark:text-slate-300 truncate"
                   />
                   {selectedFile && (
-                    <p className="mt-3 truncate text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-3 truncate text-xs font-medium text-slate-500 dark:text-slate-400" title={selectedFile.name}>
                       Selected: {selectedFile.name}
                     </p>
                   )}
@@ -382,8 +382,8 @@ const TranslateDocumentPage = () => {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-              <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
-                <span>{liveStatusMessage}</span>
+              <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300 min-w-0 overflow-hidden">
+                <span className="truncate min-w-0 flex-1" title={liveStatusMessage}>{liveStatusMessage}</span>
                 <span className="shrink-0 font-semibold text-indigo-600 dark:text-indigo-400">
                   {selectedJobId ? `Job #${selectedJobId}` : uploadMutation.isPending ? 'Submitting…' : 'Ready'}
                 </span>
@@ -632,9 +632,9 @@ const TranslateDocumentPage = () => {
 };
 
 const StatusRow = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900/70">
-    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</span>
-    <span className="text-sm font-semibold text-slate-900 dark:text-white">{value}</span>
+  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900/70 overflow-hidden min-w-0">
+    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 shrink-0">{label}</span>
+    <span className="text-sm font-semibold text-slate-900 dark:text-white truncate min-w-0 max-w-[200px] sm:max-w-[260px] text-right" title={typeof value === 'string' ? value : undefined}>{value}</span>
   </div>
 );
 
