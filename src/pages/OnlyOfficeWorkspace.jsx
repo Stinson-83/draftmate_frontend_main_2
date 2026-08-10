@@ -598,7 +598,7 @@ const OnlyOfficeWorkspace = () => {
     setIsChatLoading(true);
     setStatusMessage(isEnhancementMode ? 'Enhancing selected text...' : 'Assistant is thinking...');
 
-    const assistantMsgId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : ('id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9));
+    const assistantMsgId = crypto.randomUUID();
     setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }]);
 
     try {
@@ -623,30 +623,16 @@ const OnlyOfficeWorkspace = () => {
             setStatusMessage(nodeNames[evt.node]);
           }
         },
-        onNodeStream: (evt) => {
-          if (evt.node === 'explainer_agent' || evt.node === 'manager_aggregate') {
-            if (evt.chunk && typeof evt.chunk === 'string') {
-              accumulatedResponse += evt.chunk;
-              setMessages((prev) => prev.map((m) =>
-                m.id === assistantMsgId ? { ...m, content: accumulatedResponse } : m
-              ));
-            }
-          }
-        },
         onToken: (chunk, accumulated) => {
-          if (accumulated) {
-            accumulatedResponse = accumulated;
-          } else if (chunk) {
-            accumulatedResponse += chunk;
-          }
+          accumulatedResponse = accumulated;
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, content: accumulatedResponse } : m
+            m.id === assistantMsgId ? { ...m, content: accumulated } : m
           ));
         },
         onAnswer: (content) => {
-          accumulatedResponse = content || accumulatedResponse;
+          accumulatedResponse = content;
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, content: accumulatedResponse, isStreaming: false } : m
+            m.id === assistantMsgId ? { ...m, content: content, isStreaming: false } : m
           ));
         },
         onDone: () => {

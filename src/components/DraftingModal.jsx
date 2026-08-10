@@ -613,6 +613,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={4}
                 />
+                <PromptQualityBar prompt={prompt} />
             </div>
 
             <div className="modal-actions" style={{ marginTop: '24px' }}>
