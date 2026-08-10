@@ -105,7 +105,7 @@ const TranslateDocumentPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [sourceLanguage, setSourceLanguage] = useState('en-IN');
   const [targetLanguage, setTargetLanguage] = useState('hi-IN');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [activeJobId, setActiveJobId] = useState(null);
