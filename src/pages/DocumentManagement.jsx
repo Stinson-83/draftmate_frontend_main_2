@@ -344,7 +344,23 @@ const DocumentManagement = () => {
   };
 
   const handleDocumentClick = async (doc) => {
-    if (doc.type === 'docx') {
+    // 1. If this is a translated document or has a direct file URL
+    if (doc.source === 'translate' || (doc.url && (doc.url.includes('translator') || doc.url.includes('/download')))) {
+      if (doc.url) {
+        let downloadUrl = doc.url;
+        if (!downloadUrl.startsWith('http') && !downloadUrl.startsWith('blob:') && !downloadUrl.startsWith('data:')) {
+          downloadUrl = `${window.location.origin}${downloadUrl}`;
+        }
+        if (downloadUrl.includes('/translator/') && !downloadUrl.includes('raw=1')) {
+          downloadUrl += (downloadUrl.includes('?') ? '&' : '?') + 'raw=1';
+        }
+        window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
+
+    // 2. Drafter workspace documents
+    if (doc.type === 'docx' && doc.source !== 'translate') {
       const toastId = toast.loading("Opening document...");
       try {
         const token = localStorage.getItem('session_id') || localStorage.getItem('token');
