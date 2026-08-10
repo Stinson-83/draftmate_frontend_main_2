@@ -183,8 +183,9 @@ class SarvamTranslateClient:
             "source_language_code": normalized_source,
             "target_language_code": normalized_target,
             "model": model,
-            "mode": "formal",
         }
+        if model != SARVAM_MAYURA_MODEL and normalized_source != "auto":
+            request_body["mode"] = "formal"
 
         max_retries = 6
         backoff_factor = 2.0

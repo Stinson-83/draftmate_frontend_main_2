@@ -156,7 +156,29 @@ async def create_translation_job(
         target_language=normalized_target_language,
     )
 
-    process_translation_job.delay(job.id, str(file_path), normalized_target_language)
+    try:
+        process_translation_job.delay(job.id, str(file_path), normalized_target_language)
+    except Exception as cel_err:
+        print(f"[TRANSLATOR API] Celery delay exception: {cel_err}")
+
+    import threading
+    def _run_bg_translation(j_id: int):
+        from backend.translator.database import SessionLocal
+        if SessionLocal:
+            with SessionLocal() as bg_db:
+                from backend.translator.crud import get_translation_job
+                bg_job = get_translation_job(bg_db, j_id)
+                if bg_job and bg_job.status not in {"completed", "failed"}:
+                    from backend.translator.workers.worker import _run_pipeline
+                    try:
+                        _run_pipeline(bg_db, bg_job)
+                        bg_db.refresh(bg_job)
+                        print(f"[TRANSLATOR BG RUNNER SUCCESS] Job #{j_id} completed via thread runner!")
+                    except Exception as err:
+                        print(f"[TRANSLATOR BG RUNNER ERROR]: {err}")
+
+    bg_thread = threading.Thread(target=_run_bg_translation, args=(job.id,), daemon=True)
+    bg_thread.start()
 
     return {
         "job_id": job.id,

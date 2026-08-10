@@ -82,7 +82,15 @@ const getCurrentUserId = () => {
 const formatJobDate = (value) => {
   if (!value) return 'Unknown';
 
-  const date = new Date(value);
+  let isoStr = String(value).trim();
+  if (isoStr.includes(' ') && !isoStr.includes('T')) {
+    isoStr = isoStr.replace(' ', 'T');
+  }
+  if (!isoStr.endsWith('Z') && !isoStr.includes('+') && !isoStr.includes('-')) {
+    isoStr += 'Z';
+  }
+
+  const date = new Date(isoStr);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -443,12 +451,29 @@ const TranslateDocumentPage = () => {
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <StatusRow label="File" value={job?.file_name || selectedFile?.name || 'Waiting for a document'} />
               <StatusRow label="Source" value={getLanguageLabel(job?.source_language || sourceLanguage)} />
-              <StatusRow label="Status" value={job?.status || (uploadMutation.isPending ? 'uploading' : 'idle')} />
+              <StatusRow label="Status" value={job?.status ? `${job.status} (${job?.progress ?? Math.round(uploadProgress)}%)` : (uploadMutation.isPending ? 'uploading' : 'idle')} />
               <StatusRow label="Stage" value={job?.stage || 'waiting'} />
               <StatusRow label="Progress" value={`${job?.progress ?? Math.round(uploadProgress)}%`} />
               <StatusRow label="Target" value={getLanguageLabel(job?.target_language || targetLanguage)} />
               <StatusRow label="Created" value={formatJobDate(job?.created_at)} />
             </div>
+
+            {(job || uploadMutation.isPending) && (
+              <div className="mt-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-sky-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <span>DOCUMENT COMPLETION</span>
+                  <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-sm">
+                    {job?.progress ?? Math.round(displayProgress)}%
+                  </span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500 transition-all duration-500"
+                    style={{ width: `${Math.max(4, job?.progress ?? Math.round(displayProgress))}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {translationJobQuery.isError && (
               <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
@@ -512,17 +537,17 @@ const TranslateDocumentPage = () => {
                         : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/50'
                         }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                      <div className="flex items-start justify-between gap-3 min-w-0">
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <p className="truncate block w-full text-sm font-semibold text-slate-950 dark:text-white" title={historyJob.file_name}>
                             {historyJob.file_name}
                           </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <span>{getLanguageLabel(historyJob.source_language || 'auto')}</span>
                             <span>→</span>
                             <span>{historyJob.target_language?.toUpperCase()}</span>
                             <span>•</span>
-                            <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex items-center gap-1 shrink-0">
                               <CalendarDays className="h-3.5 w-3.5" />
                               {formatJobDate(historyJob.created_at)}
                             </span>
