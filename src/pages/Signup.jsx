@@ -262,8 +262,8 @@ const Signup = () => {
         if (typing) return 'border-blue-400 ring-2 ring-blue-300/30 bg-blue-50/20 dark:bg-blue-900/10';
         if (valid === true) return 'border-emerald-500 ring-2 ring-emerald-400/20 bg-emerald-50/20 dark:bg-emerald-900/10';
         if (valid === false) return 'border-red-500 ring-2 ring-red-400/20 bg-red-50/20 dark:bg-red-900/10';
-        if (focused) return 'border-blue-500 ring-2 ring-blue-400/20 bg-white dark:bg-slate-900';
-        return 'border-transparent bg-slate-100 dark:bg-slate-800/80';
+        if (focused) return 'border-blue-500 ring-2 ring-blue-500/20 bg-white dark:bg-slate-900';
+        return 'border border-slate-200 dark:border-slate-700 bg-[#F8FAFF] dark:bg-slate-800/80';
     };
 
     return (
@@ -603,16 +603,13 @@ const Signup = () => {
                                     {!emailTyping && emailValid === true && <SuccessIcon />}
                                     {!emailTyping && emailValid === false && <ErrorIcon />}
                                 </label>
-                                <div className={`relative ${emailFocused ? 'inp-shimmer' : ''}`}>
+                                <div className="relative">
                                     <input
                                         className={`inp w-full rounded-xl border h-14 px-4 pr-12
                                             text-slate-900 dark:text-white text-base
                                             placeholder:text-slate-400 dark:placeholder:text-slate-500
                                             focus:outline-none
                                             ${getInputClasses(emailValid, emailFocused, emailTyping)}
-                                            ${emailTyping ? 'state-typing' : ''}
-                                            ${!emailTyping && emailValid === true ? 'state-valid' : ''}
-                                            ${!emailTyping && emailValid === false ? 'state-invalid' : ''}
                                         `}
                                         placeholder="attorney@lawfirm.com"
                                         type="email"
@@ -633,15 +630,13 @@ const Signup = () => {
                                                 d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                                         </svg>
                                     </div>
-                                    {/* Focus accent line */}
-                                    <AccentLine show={emailFocused} valid={emailValid} />
                                 </div>
                                 <SlideMessage show={emailValid === false} color="red">
                                     Please enter a valid email address
                                 </SlideMessage>
                             </div>
 
-                            {/* ΓöÇΓöÇ PASSWORD ΓöÇΓöÇ */}
+                            {/* ── PASSWORD ── */}
                             <div
                                 className="flex flex-col gap-1.5 anim-fade-up"
                                 style={{ animationDelay: '0.3s' }}
@@ -652,16 +647,13 @@ const Signup = () => {
                                     {!passwordTyping && passwordValid === true && <SuccessIcon />}
                                     {!passwordTyping && passwordValid === false && <ErrorIcon />}
                                 </label>
-                                <div className={`relative ${passwordFocused ? 'inp-shimmer' : ''}`}>
+                                <div className="relative">
                                     <input
                                         className={`inp w-full rounded-xl border h-14 pl-4 pr-14
                                             text-slate-900 dark:text-white text-base
                                             placeholder:text-slate-400 dark:placeholder:text-slate-500
                                             focus:outline-none
                                             ${getInputClasses(passwordValid, passwordFocused, passwordTyping)}
-                                            ${passwordTyping ? 'state-typing' : ''}
-                                            ${!passwordTyping && passwordValid === true ? 'state-valid' : ''}
-                                            ${!passwordTyping && passwordValid === false ? 'state-invalid' : ''}
                                         `}
                                         placeholder="••••••••"
                                         type={showPassword ? 'text' : 'password'}
@@ -674,7 +666,6 @@ const Signup = () => {
                                             if (password.length > 0) setPasswordValid(password.length >= 6);
                                         }}
                                     />
-                                    <AccentLine show={passwordFocused} valid={passwordValid} />
                                     <button type="button"
                                         onClick={() => setShowPassword(!showPassword)}
                                         className="absolute right-0 top-0 bottom-0 pr-4 flex items-center justify-center
@@ -717,7 +708,7 @@ const Signup = () => {
                                 </SlideMessage>
                             </div>
 
-                            {/* ΓöÇΓöÇ CONFIRM PASSWORD ΓöÇΓöÇ */}
+                            {/* ── CONFIRM PASSWORD ── */}
                             <div
                                 className="flex flex-col gap-1.5 anim-fade-up"
                                 style={{ animationDelay: '0.38s' }}
@@ -728,16 +719,13 @@ const Signup = () => {
                                     {!confirmTyping && confirmValid === true && <SuccessIcon />}
                                     {!confirmTyping && confirmValid === false && <ErrorIcon />}
                                 </label>
-                                <div className={`relative ${confirmFocused ? 'inp-shimmer' : ''}`}>
+                                <div className="relative">
                                     <input
                                         className={`inp w-full rounded-xl border h-14 pl-4 pr-14
                                             text-slate-900 dark:text-white text-base
                                             placeholder:text-slate-400 dark:placeholder:text-slate-500
                                             focus:outline-none
                                             ${getInputClasses(confirmValid, confirmFocused, confirmTyping)}
-                                            ${confirmTyping ? 'state-typing' : ''}
-                                            ${!confirmTyping && confirmValid === true ? 'state-valid' : ''}
-                                            ${!confirmTyping && confirmValid === false ? 'state-invalid' : ''}
                                         `}
                                         placeholder="••••••••"
                                         type={showConfirmPassword ? 'text' : 'password'}
@@ -750,7 +738,6 @@ const Signup = () => {
                                             if (confirmPassword.length > 0) setConfirmValid(confirmPassword === password);
                                         }}
                                     />
-                                    <AccentLine show={confirmFocused} valid={confirmValid} />
                                     <button type="button"
                                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                         className="absolute right-0 top-0 bottom-0 pr-4 flex items-center justify-center
