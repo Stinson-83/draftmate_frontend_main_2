@@ -726,7 +726,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             <div className="options-grid">
                 <button className="option-card" onClick={() => handleSelectionChoice('ai')}>
                     <div className="icon-box type">
-                        <PenTool size={24} />
+                        <PenTool size={30} />
                     </div>
                     <div className="text-content">
                         <h3>Generate with AI</h3>
@@ -736,7 +736,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
                 <button className="option-card" onClick={() => handleSelectionChoice('docs_with_ai')}>
                     <div className="icon-box upload">
-                        <UploadCloud size={24} />
+                        <UploadCloud size={30} />
                     </div>
                     <div className="text-content">
                         <h3>Documents with AI</h3>
