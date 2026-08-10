@@ -248,6 +248,28 @@ def _docx_to_html_preview(file_path: Path, title: str = "Document Preview") -> R
         return Response(content=f"<html><body><p>Unable to render DOCX preview: {e}</p></body></html>", media_type="text/html")
 
 
+import re
+
+def _clean_download_name(raw_name: str | None, target_lang: str | None = None) -> str:
+    if not raw_name:
+        return "Translated_Document.docx"
+    name = Path(raw_name).name
+    while True:
+        new_name = re.sub(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?', '', name)
+        new_name = re.sub(r'^[0-9a-fA-F]{32}[_-]?', '', new_name)
+        if new_name == name:
+            break
+        name = new_name
+    
+    name = re.sub(r'^Translated_[A-Z_a-z-]+_', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'^Translated_', '', name, flags=re.IGNORECASE)
+    
+    if target_lang and not name.startswith("Translated_"):
+        lang_code = target_lang.split('-')[0].upper()
+        return f"Translated_{lang_code}_{name}"
+    return name
+
+
 @app.get("/translation-jobs/{job_id}/source", name="download_translation_source_file")
 def download_source_file(job_id: int, request: Request, raw: str | None = Query(default=None), db: Session = Depends(get_db)):
     job = get_translation_job(db, job_id)
@@ -262,15 +284,16 @@ def download_source_file(job_id: int, request: Request, raw: str | None = Query(
         source_path = Path(os.getcwd()) / source_path
 
     if source_path.exists():
+        clean_name = _clean_download_name(source_path.name, job.source_language)
         if raw != "1" and source_path.suffix.lower() == ".docx":
-            return _docx_to_html_preview(source_path, title="Original Document")
+            return _docx_to_html_preview(source_path, title=clean_name)
 
-        response = build_download_response(source_path, download_name=source_path.name)
-        content_type, _ = mimetypes.guess_type(source_path.name)
+        response = build_download_response(source_path, download_name=clean_name)
+        content_type, _ = mimetypes.guess_type(clean_name)
         if content_type:
             response.media_type = content_type
         disp_type = "attachment" if raw == "1" else "inline"
-        response.headers["Content-Disposition"] = f'{disp_type}; filename="{source_path.name}"'
+        response.headers["Content-Disposition"] = f'{disp_type}; filename="{clean_name}"'
         return response
 
     # Web Viewport Fallback
@@ -301,15 +324,16 @@ def download_translated_file(job_id: int, request: Request, raw: str | None = Qu
             pass
 
     if translated_path.exists():
+        clean_name = _clean_download_name(translated_path.name, job.target_language)
         if raw != "1" and translated_path.suffix.lower() == ".docx":
-            return _docx_to_html_preview(translated_path, title="Translated Document")
+            return _docx_to_html_preview(translated_path, title=clean_name)
 
-        response = build_download_response(translated_path, download_name=translated_path.name)
-        content_type, _ = mimetypes.guess_type(translated_path.name)
+        response = build_download_response(translated_path, download_name=clean_name)
+        content_type, _ = mimetypes.guess_type(clean_name)
         if content_type:
             response.media_type = content_type
         disp_type = "attachment" if raw == "1" else "inline"
-        response.headers["Content-Disposition"] = f'{disp_type}; filename="{translated_path.name}"'
+        response.headers["Content-Disposition"] = f'{disp_type}; filename="{clean_name}"'
         return response
 
     # Stylized, clean inline translation simulation block rendered to HTML frame canvas

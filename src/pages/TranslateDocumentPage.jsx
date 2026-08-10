@@ -616,12 +616,12 @@ const TranslateDocumentPage = () => {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
+                          disabled={historyJob.status !== 'completed' && !historyJob.download_available}
                           onClick={() => {
-                            setSelectedFile(null);
-                            setActiveJobId(historyJob.job_id);
-                            window.open(`/dashboard/translate/compare/${historyJob.job_id}`, '_blank', 'noopener,noreferrer');
+                            if (historyJob.status !== 'completed' && !historyJob.download_available) return;
+                            window.open(api.getTranslationDownloadUrl(historyJob.job_id), '_blank', 'noopener,noreferrer');
                           }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           View
