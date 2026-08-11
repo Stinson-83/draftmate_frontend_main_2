@@ -30,6 +30,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+import google.generativeai as genai
+if os.getenv("GEMINI_API_KEY"):
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices
 
 import sys

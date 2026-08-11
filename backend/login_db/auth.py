@@ -125,6 +125,30 @@ def get_db_connection():
         print(f"Database connection error: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
 
+def resolve_uuid_from_identifier(identifier: str, cur) -> Optional[str]:
+    import uuid
+    import hashlib
+    try:
+        uuid.UUID(identifier)
+        return identifier
+    except ValueError:
+        pass
+
+    cur.execute("SELECT id FROM drafts WHERE document_key = %s", (identifier,))
+    res = cur.fetchone()
+    if res:
+        return str(res[0])
+
+    cur.execute("SELECT id FROM drafts;")
+    all_drafts = cur.fetchall()
+    for d in all_drafts:
+        d_id_str = str(d[0])
+        d_hash = hashlib.sha256(d_id_str.encode('utf-8')).hexdigest()
+        if d_hash == identifier:
+            return d_id_str
+            
+    return None
+
 # Pydantic Models
 class UserLogin(BaseModel):
     email: str
@@ -906,6 +930,10 @@ def verify_draft_access(draft_id: str, user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        resolved_id = resolve_uuid_from_identifier(draft_id, cur)
+        if resolved_id:
+            draft_id = resolved_id
+
         # Check if user is owner
         cur.execute("SELECT created_by FROM drafts WHERE id = %s", (draft_id,))
         res = cur.fetchone()
@@ -931,6 +959,10 @@ def get_draft_internal(draft_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        resolved_id = resolve_uuid_from_identifier(draft_id, cur)
+        if resolved_id:
+            draft_id = resolved_id
+
         cur.execute("SELECT id, name, filename, document_key, created_by, folder_id, variables_detected, status FROM drafts WHERE id = %s", (draft_id,))
         r = cur.fetchone()
         if not r:
@@ -1461,20 +1493,12 @@ def internal_update_event(event: ChronologyEventUpdate):
 
 @app.get("/internal/draft/resolve_id/{identifier}")
 def internal_resolve_draft_id(identifier: str):
-    import uuid
-    try:
-        uuid.UUID(identifier)
-        return {"id": identifier}
-    except ValueError:
-        pass
-        
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id FROM drafts WHERE document_key = %s", (identifier,))
-        res = cur.fetchone()
-        if res:
-            return {"id": str(res[0])}
+        resolved_id = resolve_uuid_from_identifier(identifier, cur)
+        if resolved_id:
+            return {"id": resolved_id}
         raise HTTPException(status_code=404, detail="Draft not found by key")
     except Exception as e:
         print(f"Resolve draft ID error: {e}")

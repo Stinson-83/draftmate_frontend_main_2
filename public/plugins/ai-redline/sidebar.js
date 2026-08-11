@@ -7,16 +7,21 @@
 
     // Initialize ONLYOFFICE Plugin
     window.Asc.plugin.init = function() {
-        documentKey = window.Asc.plugin.info.documentKey || "";
-        // Look up active draft ID from OnlyOffice config if available
-        draftId = window.Asc.plugin.info.editorConfig?.customization?.logo?.url || ""; 
-
         // Bind DOM events
         document.getElementById("btn-capture").addEventListener("click", captureSelection);
         document.getElementById("btn-generate").addEventListener("click", generateRedline);
         
-        // Load existing changes
-        loadChanges();
+        // Setup listener for metadata broadcast from parent React container
+        window.addEventListener("message", function(e) {
+            if (e.data && e.data.type === "REDLINE_METADATA") {
+                draftId = e.data.draftId || "";
+                documentKey = e.data.documentKey || "";
+                loadChanges();
+            }
+        });
+
+        // Broadcast to parent React window that the redlining plugin is ready
+        window.top.postMessage({ type: "REDLINE_PLUGIN_READY" }, "*");
     };
 
     // 1. Capture text selection
@@ -34,20 +39,13 @@
             selectedText = text.trim();
             statusDiv.innerHTML = `"${selectedText.substring(0, 100)}${selectedText.length > 100 ? '...' : ''}"`;
             
-            // Wrap range in content control to lock bounds
-            window.Asc.plugin.callCommand(function() {
-                var oDocument = Api.GetDocument();
-                var oRange = oDocument.GetRangeBySelect();
-                var controlId = "chg_" + Math.random().toString(36).substring(2, 11);
-                
-                var oContentControl = Api.CreateContentControl(2); // Block content control
-                oContentControl.SetTag(controlId);
-                oContentControl.SetLock(1); // Content locking
-                oRange.InsertContentControl(oContentControl);
-                
-                return { controlId: controlId };
-            }, false, true, function(result) {
-                activeControlId = result.controlId;
+            // Wrap range in content control to lock bounds using official executeMethod
+            var controlId = "chg_" + Math.random().toString(36).substring(2, 11);
+            window.Asc.plugin.executeMethod("AddContentControl", [1, {
+                "Tag": controlId,
+                "Lock": 3 // Content locking
+            }], function() {
+                activeControlId = controlId;
                 document.getElementById("btn-generate").disabled = false;
             });
         });
@@ -111,7 +109,9 @@
 
     // 3. Render redline markup inside OnlyOffice Content Control
     function applyDiffToEditor(controlId, opcodes) {
-        window.Asc.plugin.callCommand(function(data) {
+        window.Asc.plugin.info.data = JSON.stringify({ controlId: controlId, opcodes: opcodes });
+        window.Asc.plugin.callCommand(function() {
+            var data = JSON.parse(Asc.plugin.info.data);
             var oDocument = Api.GetDocument();
             var aContentControls = oDocument.GetContentControlsByTag(data.controlId);
             if (aContentControls.length > 0) {
@@ -202,7 +202,9 @@
             });
 
             // Run ONLYOFFICE Accept commands
-            window.Asc.plugin.callCommand(function(data) {
+            window.Asc.plugin.info.data = JSON.stringify({ controlId: controlId });
+            window.Asc.plugin.callCommand(function() {
+                var data = JSON.parse(Asc.plugin.info.data);
                 var oDocument = Api.GetDocument();
                 var aContentControls = oDocument.GetContentControlsByTag(data.controlId);
                 if (aContentControls.length > 0) {
@@ -243,7 +245,9 @@
             });
 
             // Run ONLYOFFICE Reject commands
-            window.Asc.plugin.callCommand(function(data) {
+            window.Asc.plugin.info.data = JSON.stringify({ controlId: controlId });
+            window.Asc.plugin.callCommand(function() {
+                var data = JSON.parse(Asc.plugin.info.data);
                 var oDocument = Api.GetDocument();
                 var aContentControls = oDocument.GetContentControlsByTag(data.controlId);
                 if (aContentControls.length > 0) {
@@ -272,7 +276,9 @@
 
     // Helper: Remove control wrapper
     function removeControl(controlId) {
-        window.Asc.plugin.callCommand(function(data) {
+        window.Asc.plugin.info.data = JSON.stringify({ controlId: controlId });
+        window.Asc.plugin.callCommand(function() {
+            var data = JSON.parse(Asc.plugin.info.data);
             var oDocument = Api.GetDocument();
             var aContentControls = oDocument.GetContentControlsByTag(data.controlId);
             if (aContentControls.length > 0) {

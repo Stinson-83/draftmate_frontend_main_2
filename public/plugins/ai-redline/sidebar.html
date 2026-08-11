@@ -9,19 +9,29 @@
             height: 100%;
             margin: 0;
             padding: 0;
+            overflow: hidden;
+            background-color: #0f172a;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             font-size: 13px;
             color: #f1f5f9;
-            background-color: #0f172a;
-            padding: 1rem;
             box-sizing: border-box;
+        }
+
+        .scroll-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;
+            padding: 1rem;
             display: flex;
             flex-direction: column;
             gap: 1.25rem;
-            overflow-y: auto;
+            box-sizing: border-box;
         }
 
         h3 {
@@ -158,29 +168,31 @@
     </style>
 </head>
 <body>
-    <h3>✨ AI Redlining</h3>
+    <div class="scroll-wrapper">
+        <h3>✨ AI Redlining</h3>
 
-    <div class="section-box">
-        <label style="font-weight: 600; font-size: 12px;">1. Highighted Clause Context</label>
-        <div id="selection-status" class="selected-text-preview">
-            Highlight text in the editor window and click "Capture" below.
+        <div class="section-box">
+            <label style="font-weight: 600; font-size: 12px;">1. Highighted Clause Context</label>
+            <div id="selection-status" class="selected-text-preview">
+                Highlight text in the editor window and click "Capture" below.
+            </div>
+            <button id="btn-capture">Capture Highlights</button>
         </div>
-        <button id="btn-capture">Capture Highlights</button>
-    </div>
 
-    <div class="section-box">
-        <label style="font-weight: 600; font-size: 12px;">2. AI Editor Instruction</label>
-        <textarea id="ai-instruction" rows="3" placeholder="e.g. Change notice period to 90 days or make it favorable to the Customer..."></textarea>
-        <button id="btn-generate" disabled>
-            <span>Generate Redline Proposal</span>
-        </button>
-    </div>
+        <div class="section-box">
+            <label style="font-weight: 600; font-size: 12px;">2. AI Editor Instruction</label>
+            <textarea id="ai-instruction" rows="3" placeholder="e.g. Change notice period to 90 days or make it favorable to the Customer..."></textarea>
+            <button id="btn-generate" disabled>
+                <span>Generate Redline Proposal</span>
+            </button>
+        </div>
 
-    <div class="section-box">
-        <label style="font-weight: 600; font-size: 12px;">3. Changes Review Panel</label>
-        <div id="changes-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
-            <div style="font-style: italic; color: #64748b; font-size: 11px; text-align: center; margin: 1rem 0;">
-                No pending tracked changes.
+        <div class="section-box">
+            <label style="font-weight: 600; font-size: 12px;">3. Changes Review Panel</label>
+            <div id="changes-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div style="font-style: italic; color: #64748b; font-size: 11px; text-align: center; margin: 1rem 0;">
+                    No pending tracked changes.
+                </div>
             </div>
         </div>
     </div>
