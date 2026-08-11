@@ -50,6 +50,9 @@ services:
     extra_hosts:
       - "drafter-service:host-gateway"
       - "host.docker.internal:host-gateway"
+    depends_on:
+      backend:
+        condition: service_started
     restart: unless-stopped
 
   redis:
@@ -100,6 +103,9 @@ services:
       - "8003:8003"
     environment:
       - DRAFTER_SELF_URL=http://backend:8003
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_ENABLE_HF_TRANSFER=0
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -172,6 +178,12 @@ services:
         condition: service_started
       qdrant:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/lexbot/config/llm"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     volumes:
       - ./backend:/app/backend
       - /app/backend/models

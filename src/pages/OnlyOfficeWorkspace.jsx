@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Download, Gavel, Loader2, Plus, Mic, Quote, Send, Sparkles } from 'lucide-react';
+import { Check, Download, FileText, Gavel, Loader2, Plus, Mic, Quote, Send, Sparkles, X } from 'lucide-react';
 import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { processCitations, CitationLink } from '../utils/citationUtils';
+import convertMarkdownToDocHtml from '../utils/markdownToDocHtml';
 
 const SmoothVlcProgressBar = ({ statusMessage, isLoading }) => {
   const [progress, setProgress] = useState(5);
@@ -95,6 +99,12 @@ const OnlyOfficeWorkspace = () => {
   const [showAutoFormatPopup, setShowAutoFormatPopup] = useState(false);
   const [isAutoFormatting, setIsAutoFormatting] = useState(false);
   const [enhanceSelectionText, setEnhanceSelectionText] = useState('');
+  const [inlineCustomPrompt, setInlineCustomPrompt] = useState('');
+  const [inlineAiResponse, setInlineAiResponse] = useState('');
+  const [isInlineAiLoading, setIsInlineAiLoading] = useState(false);
+  const [selectedTone, setSelectedTone] = useState('');
+  const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
+  const [activeAction, setActiveAction] = useState('');
 
   // Case Law Assistant State
   const [caseCards, setCaseCards] = useState([]);
@@ -159,15 +169,23 @@ const OnlyOfficeWorkspace = () => {
     setComposerHasValue(Boolean(inputMessage.trim()));
   }, [inputMessage]);
 
-  const { documentKey, filename, onlyofficeConfig, variablesDetected } = useMemo(() => {
+  const { documentKey, filename, onlyofficeConfig, initialVars } = useMemo(() => {
     const state = location?.state || {};
     return {
       documentKey: state.documentKey,
       filename: state.filename,
       onlyofficeConfig: state.onlyofficeConfig,
-      variablesDetected: Array.isArray(state.variablesDetected) ? state.variablesDetected : [],
+      initialVars: Array.isArray(state.variablesDetected) ? state.variablesDetected : [],
     };
   }, [location]);
+
+  const [variablesDetected, setVariablesDetected] = useState(initialVars);
+
+  useEffect(() => {
+    if (initialVars.length > 0) {
+      setVariablesDetected((prev) => Array.from(new Set([...prev, ...initialVars])));
+    }
+  }, [initialVars]);
 
   const draftId = useMemo(() => {
     return location?.state?.draftId || location?.state?.id;
@@ -509,6 +527,13 @@ const OnlyOfficeWorkspace = () => {
           handleSendMessage(`Explain this selection: "${selectedText}"`);
         }
       }
+
+      if (e.data.type === 'ONLYOFFICE_VARIABLES_DETECTED') {
+        const vars = Array.isArray(e.data.variables) ? e.data.variables : [];
+        if (vars.length > 0) {
+          setVariablesDetected((prev) => Array.from(new Set([...prev, ...vars])));
+        }
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -645,8 +670,17 @@ const OnlyOfficeWorkspace = () => {
         },
         onAnswer: (content) => {
           accumulatedResponse = content;
+          setIsChatLoading(false);
+          setStatusMessage('');
           setMessages((prev) => prev.map((m) =>
             m.id === assistantMsgId ? { ...m, content: content, isStreaming: false } : m
+          ));
+        },
+        onSources: (sources) => {
+          setIsChatLoading(false);
+          setStatusMessage('');
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantMsgId ? { ...m, sources: sources, isStreaming: false } : m
           ));
         },
         onDone: () => {
@@ -681,14 +715,29 @@ const OnlyOfficeWorkspace = () => {
   const normalizeCaseItem = (item, idx, requestId) => {
     const rawCitation = item.citation || item.suggested_citation || item.reporter_citation || '';
     const isPureNumber = /^\d+$/.test(String(rawCitation).trim());
+    const docid = item.docid || item.doc_id || item.id || item.raw?.docid;
+
+    let caseUrl = item.source_url || item.url || item.raw?.source_url || item.raw?.url || '';
+    if (docid && (!caseUrl || caseUrl.toLowerCase().endsWith('.pdf'))) {
+      caseUrl = `https://indiankanoon.org/doc/${docid}/`;
+    } else if (caseUrl && caseUrl.includes('indiankanoon.org/doc/')) {
+      const docMatch = caseUrl.match(/indiankanoon\.org\/doc\/(\d+)/);
+      if (docMatch) {
+        caseUrl = `https://indiankanoon.org/doc/${docMatch[1]}/`;
+      }
+    } else if (docid) {
+      caseUrl = `https://indiankanoon.org/doc/${docid}/`;
+    }
+
     return {
       id: item.id || item.case_id || item.doc_id || `${requestId}-${idx}`,
       name: item.name || item.case_name || item.title || 'Untitled Case',
       court: item.court || item.court_hierarchy || item.court_name || item.hierarchy || 'Court metadata unavailable',
       citation: isPureNumber ? '' : rawCitation,
-      whyRelevant: item.whyRelevant || item.why_relevant || item.relevance || item.snippet || item.context || '',
-      holding: item.holding || item.ratio || item.ratio_decidendi || item.summary || '',
+      whyRelevant: item.whyRelevant || item.why_relevant || item.relevance_justification || item.relevance || item.snippet || item.context || '',
+      holding: item.holding || item.holding_summary || item.ratio || item.ratio_decidendi || item.summary || '',
       generatedParagraph: item.generatedParagraph || '',
+      url: caseUrl,
       raw: item,
     };
   };
@@ -710,9 +759,11 @@ const OnlyOfficeWorkspace = () => {
     caseFetchAbortRef.current = abortController;
 
     try {
-      const sessionId = localStorage.getItem('session_id');
-      const headers = { 'Content-Type': 'application/json' };
-      if (sessionId) headers.Authorization = `Bearer ${sessionId}`;
+      const token = localStorage.getItem('session_id') || localStorage.getItem('token') || localStorage.getItem('access_token') || 'dev_session';
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+      };
 
       const response = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/research/cases`, {
         method: 'POST',
@@ -804,9 +855,21 @@ const OnlyOfficeWorkspace = () => {
     }, 1500);
   };
 
-  const handleInsertText = (textToInsert) => {
-    sendToPlugin({ type: 'ONLYOFFICE_INSERT_TEXT', text: textToInsert });
-    toast.success('Inserted content into ONLYOFFICE document!');
+  const handleNavigateToVariable = (varName) => {
+    if (!varName) return;
+    sendToPlugin({ type: 'ONLYOFFICE_NAVIGATE_TO_VARIABLE', tag: varName });
+    toast.info(`Redirecting cursor to "${varName}" inside editor...`);
+  };
+
+  const handleInsertText = (textToInsert, sources = []) => {
+    if (!textToInsert) return;
+    console.log('[OnlyOfficeWorkspace] Original AI response:', textToInsert);
+    console.log('[OnlyOfficeWorkspace] Sources passed:', sources);
+    const formattedHtml = convertMarkdownToDocHtml(textToInsert, sources);
+    console.log('[OnlyOfficeWorkspace] Transformed HTML with clickable citations:', formattedHtml);
+    const sent = sendToPlugin({ type: 'ONLYOFFICE_INSERT_HTML', html: formattedHtml });
+    console.log('[OnlyOfficeWorkspace] ONLYOFFICE_INSERT_HTML sent to plugin status:', sent);
+    toast.success('Inserted formatted content with clickable citations into ONLYOFFICE!');
   };
 
   const handleAutoFormatSelection = () => {
@@ -834,6 +897,126 @@ const OnlyOfficeWorkspace = () => {
     setActiveTab('chat');
     setShowAutoFormatPopup(false);
     sendToPlugin({ type: 'ONLYOFFICE_ENHANCE_WITH_AI' });
+  };
+
+  const handleInlineQuickAction = async (actionType) => {
+    const textToProcess = selectionPreview.trim() || activeSelectionText.trim();
+    if (!textToProcess) {
+      toast.info('Select text in ONLYOFFICE first.');
+      return;
+    }
+
+    if (actionType === 'format') {
+      handleAutoFormatSelection();
+      return;
+    }
+
+    let prompt = '';
+    if (actionType === 'enhance') {
+      prompt = `[DIRECT EDIT MODE - NO SEARCH OR RETRIEVAL NEEDED]\nEnhance, refine, and polish the following legal text to improve clarity, precision, grammatical accuracy, and legal forcefulness while preserving all core facts and citations. Output ONLY the enhanced legal text without commentary:\n\n"${textToProcess}"`;
+    } else if (actionType === 'rephrase') {
+      const TONE_INSTRUCTIONS = {
+        'Humanize': 'Rewrite the text in a warm, natural, and human tone — approachable yet professional, removing cold legal jargon while preserving all legal facts and citations.',
+        'Formal':   'Rewrite the text in strict, authoritative, and formal legal language — precise terminology, structured sentences, suitable for court filings and official legal notices.',
+        'Academic': 'Rewrite the text in a scholarly, citation-rich, and objective academic tone — suitable for legal research memos, opinions, and journal-style analysis.',
+        'Simple':   'Rewrite the text in clear, plain, and simple language — easy for a non-lawyer to understand, while preserving all key legal facts and citations.',
+      };
+      const toneInstruction = selectedTone && TONE_INSTRUCTIONS[selectedTone]
+        ? TONE_INSTRUCTIONS[selectedTone]
+        : 'Rewrite the following text into formal, authoritative, and elegant legal terminology.';
+      prompt = `[DIRECT EDIT MODE - NO SEARCH OR RETRIEVAL NEEDED]\n${toneInstruction} Output ONLY the rephrased legal text without intro or outro commentary:\n\n"${textToProcess}"`;
+    } else if (actionType === 'summarize') {
+      prompt = `[DIRECT EDIT MODE - NO SEARCH OR RETRIEVAL NEEDED]\nProvide a clear, structured executive legal summary of the following text. Output ONLY the summary without intro or outro commentary:\n\n"${textToProcess}"`;
+    }
+
+    if (!prompt) return;
+
+    setIsInlineAiLoading(true);
+    setInlineAiResponse('');
+
+    try {
+      await api.chatStream(prompt, documentKey || 'inline-ai-workspace', {
+        onToken: (chunk, accumulated) => {
+          setInlineAiResponse(accumulated);
+        },
+        onAnswer: (content) => {
+          setInlineAiResponse(content || '');
+          setIsInlineAiLoading(false);
+        },
+        onDone: () => {
+          setIsInlineAiLoading(false);
+        },
+        onError: (err) => {
+          console.error('Inline AI action failed:', err);
+          toast.error(err?.message || 'Inline AI action failed.');
+          setIsInlineAiLoading(false);
+        },
+      });
+    } catch (err) {
+      console.error('Inline AI error:', err);
+      toast.error(err?.message || 'Inline AI action failed.');
+      setIsInlineAiLoading(false);
+    }
+  };
+
+  const handleInlineCustomPromptSubmit = async () => {
+    const textToProcess = selectionPreview.trim() || activeSelectionText.trim();
+    const promptText = inlineCustomPrompt.trim();
+    if (!textToProcess) {
+      toast.info('Select text in ONLYOFFICE first.');
+      return;
+    }
+    if (!promptText) return;
+
+    // If tone is also selected, combine: custom instruction is primary, tone applies as style
+    const TONE_STYLE = {
+      'Humanize': 'in a warm, natural, and human tone — approachable yet professional',
+      'Formal':   'in strict, authoritative, and formal legal language',
+      'Academic': 'in a scholarly, citation-rich, and objective academic tone',
+      'Simple':   'in clear, plain, and simple language easy for a non-lawyer to understand',
+    };
+    const toneClause = selectedTone && TONE_STYLE[selectedTone]
+      ? ` Write the output ${TONE_STYLE[selectedTone]}.`
+      : '';
+
+    const fullPrompt = `[DIRECT EDIT MODE - NO SEARCH OR RETRIEVAL NEEDED]\nPerform this instruction on the text: "${promptText}".${toneClause} Output ONLY the transformed legal text without intro or outro commentary:\n\n"${textToProcess}"`;
+    setIsInlineAiLoading(true);
+    setInlineAiResponse('');
+
+    try {
+      await api.chatStream(fullPrompt, documentKey || 'inline-ai-workspace', {
+        onToken: (chunk, accumulated) => {
+          setInlineAiResponse(accumulated);
+        },
+        onAnswer: (content) => {
+          setInlineAiResponse(content || '');
+          setIsInlineAiLoading(false);
+        },
+        onDone: () => {
+          setIsInlineAiLoading(false);
+        },
+        onError: (err) => {
+          console.error('Inline AI custom prompt failed:', err);
+          toast.error(err?.message || 'Inline AI request failed.');
+          setIsInlineAiLoading(false);
+        },
+      });
+    } catch (err) {
+      console.error('Inline AI error:', err);
+      toast.error(err?.message || 'Inline AI request failed.');
+      setIsInlineAiLoading(false);
+    }
+  };
+
+  const handleApplyInlineAiToDocument = () => {
+    if (!inlineAiResponse.trim()) return;
+    selectionPollPausedUntilRef.current = Date.now() + 1500;
+    const formattedHtml = convertMarkdownToDocHtml(inlineAiResponse.trim());
+    sendToPlugin({ type: 'ONLYOFFICE_INSERT_HTML', html: formattedHtml });
+    setShowAutoFormatPopup(false);
+    setInlineAiResponse('');
+    setInlineCustomPrompt('');
+    toast.success('Document updated with AI enhancement.');
   };
 
   const handleGenerateCaseParagraph = async (caseItem) => {
@@ -929,12 +1112,8 @@ const OnlyOfficeWorkspace = () => {
 
     return (
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Case Law Assistant</div>
-          <div className="text-[11px] text-slate-500">{caseCards.length} result{caseCards.length === 1 ? '' : 's'}</div>
-        </div>
-
         {caseCards.map((caseItem) => {
+          const targetUrl = caseItem.url || (caseItem.raw?.docid ? `https://indiankanoon.org/doc/${caseItem.raw.docid}/` : null);
           return (
             <div key={caseItem.id} className="rounded-2xl border border-[#B9D9EB] bg-white overflow-hidden shadow-sm">
               <div className="p-4 border-b border-[#B9D9EB]/50 bg-slate-50/50">
@@ -948,9 +1127,9 @@ const OnlyOfficeWorkspace = () => {
                     <p className="mt-1 text-[11px] text-slate-500">{caseItem.court}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {caseItem.raw?.source_url && (
+                    {targetUrl && (
                       <a
-                        href={caseItem.raw.source_url}
+                        href={targetUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[11px] font-semibold px-3 py-2 rounded-lg bg-[#E3F0F7] hover:bg-[#D0E6F2] border border-[#B9D9EB] text-slate-700 transition-colors inline-block whitespace-nowrap"
@@ -973,7 +1152,9 @@ const OnlyOfficeWorkspace = () => {
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Why Relevant</div>
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    {caseItem.whyRelevant || 'A matching legal proposition was identified for the highlighted text.'}
+                    {caseItem.whyRelevant && !caseItem.whyRelevant.toLowerCase().includes('not found')
+                      ? caseItem.whyRelevant
+                      : 'Identified as a matching judicial precedent for the highlighted text and legal proposition.'}
                   </p>
                 </div>
               </div>
@@ -1160,45 +1341,198 @@ const OnlyOfficeWorkspace = () => {
         <div className="flex-1 min-h-0 relative">
           <div ref={canvasTargetRef} id="onlyoffice-canvas-target-node" className="h-full w-full bg-white" />
           {showAutoFormatPopup && selectionPreview ? (
-            <div className="absolute top-4 right-4 z-30 w-[min(360px,calc(100%-2rem))] rounded-xl border border-[#B9D9EB] bg-white shadow-2xl overflow-hidden">
-              <div className="border-b border-[#B9D9EB]/70 bg-[#F7FBFD] px-3 py-2.5">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Auto format</div>
-                <div className="mt-1 text-xs text-slate-600" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {selectionPreview}
+            <div className="absolute top-3 right-3 z-30 w-80 rounded-xl bg-white border border-gray-200 shadow-xl">
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">AI Assistant</span>
                 </div>
-              </div>
-              <div className="flex items-center justify-between gap-3 px-3 py-3">
                 <button
                   type="button"
                   onClick={() => {
                     dismissedSelectionTextRef.current = selectionPreview;
                     setShowAutoFormatPopup(false);
                     setIsAutoFormatting(false);
+                    setInlineAiResponse('');
                   }}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  Dismiss
+                  <X className="h-3.5 w-3.5" />
                 </button>
+              </div>
+
+              {/* Selected Text */}
+              <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Selected Text</p>
+                <p className="text-xs text-gray-600 line-clamp-2 italic">"{selectionPreview}"</p>
+              </div>
+
+              {/* Actions Row */}
+              <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-gray-100">
+
+                {/* Enhance with AI — standalone */}
+                <button
+                  type="button"
+                  onClick={() => { setActiveAction('enhance'); handleInlineQuickAction('enhance'); }}
+                  disabled={isAutoFormatting || isInlineAiLoading}
+                  className={`flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${activeAction === 'enhance' ? 'ring-2 ring-blue-300' : ''}`}
+                >
+                  {isInlineAiLoading && activeAction === 'enhance' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  Enhance with AI
+                </button>
+
+                {/* Rephrase + Tone split button */}
+                <div className="relative">
+                  <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                    <button
+                      type="button"
+                      onClick={() => { setActiveAction('rephrase'); handleInlineQuickAction('rephrase'); }}
+                      disabled={isAutoFormatting || isInlineAiLoading}
+                      className="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                    >
+                      <Quote className="h-3 w-3" />
+                      Rephrase
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsToneDropdownOpen((v) => !v)}
+                      disabled={isAutoFormatting || isInlineAiLoading}
+                      className="flex items-center gap-1 bg-white hover:bg-gray-50 border-l border-gray-200 text-gray-500 px-2 py-1.5 text-xs transition-colors disabled:opacity-50"
+                    >
+                      <span className="max-w-[44px] truncate">{selectedTone || 'Tone'}</span>
+                      <svg className="h-2.5 w-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                  </div>
+
+                  {/* Tone Dropdown */}
+                  {isToneDropdownOpen && (
+                    <div className="absolute bottom-full left-0 z-50 mb-1 w-32 rounded-lg border border-gray-200 bg-white shadow-lg py-1 text-xs">
+                      {['Humanize', 'Formal', 'Academic', 'Simple'].map((tone) => (
+                        <button
+                          key={tone}
+                          type="button"
+                          onClick={() => { setSelectedTone(tone); setIsToneDropdownOpen(false); }}
+                          className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors hover:bg-gray-50 ${selectedTone === tone ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
+                        >
+                          {tone}
+                          {selectedTone === tone && <Check className="h-3 w-3 text-blue-600" />}
+                        </button>
+                      ))}
+                      {selectedTone && (
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedTone(''); setIsToneDropdownOpen(false); }}
+                          className="w-full text-left px-3 py-2 text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveAction('format'); handleInlineQuickAction('format'); }}
+                  disabled={isAutoFormatting || isInlineAiLoading}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {isAutoFormatting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  Auto Format
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveAction('summarize'); handleInlineQuickAction('summarize'); }}
+                  disabled={isAutoFormatting || isInlineAiLoading}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  <FileText className="h-3 w-3" />
+                  Summarize
+                </button>
+              </div>
+
+              {/* Action hint */}
+              {activeAction && (
+                <div className="px-4 pb-2">
+                  <p className="text-[10px] text-blue-600 bg-blue-50 rounded-md px-2.5 py-1.5 leading-relaxed">
+                    {activeAction === 'enhance'  && '✦ Enhancing selected text for clarity, legal precision, and grammatical accuracy.'}
+                    {activeAction === 'rephrase' && `↺ Rephrasing selected text${selectedTone ? ` in ${selectedTone} tone` : ' in formal legal tone'}. Use the Tone dropdown to change style.`}
+                    {activeAction === 'format'   && '⊞ Auto-formatting document structure — applying legal typography, headings, and spacing.'}
+                    {activeAction === 'summarize'&& '≡ Summarizing selected text into a concise executive legal summary.'}
+                    {activeAction === 'custom'   && (selectedTone
+                      ? `✎ Applying your custom instruction in ${selectedTone} tone — both will be combined.`
+                      : '✎ Applying your custom instruction to the selected text.'
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* Custom Instruction */}
+              <div className="px-4 py-3">
                 <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={inlineCustomPrompt}
+                    onChange={(e) => setInlineCustomPrompt(e.target.value)}
+                    onFocus={() => setActiveAction('custom')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && inlineCustomPrompt.trim()) {
+                        e.preventDefault();
+                        handleInlineCustomPromptSubmit();
+                      }
+                    }}
+                    placeholder={
+                      activeAction === 'enhance'  ? 'e.g. Make it more concise and assertive...' :
+                      activeAction === 'rephrase' ? 'e.g. Use simpler words for client communication...' :
+                      activeAction === 'summarize'? 'e.g. Focus only on financial clauses...' :
+                      activeAction === 'format'   ? 'e.g. Add numbered headings and sub-clauses...' :
+                      'Type a custom instruction for the selected text...'
+                    }
+                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-800 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  />
                   <button
                     type="button"
-                    onClick={handleAutoFormatSelection}
-                    disabled={isAutoFormatting}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70 transition-colors"
+                    onClick={handleInlineCustomPromptSubmit}
+                    disabled={!inlineCustomPrompt.trim() || isInlineAiLoading}
+                    className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-2 text-white disabled:opacity-40 transition-colors shrink-0"
                   >
-                    {isAutoFormatting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    Auto format
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleEnhanceWithAISelection}
-                    className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-900 transition-colors"
-                  >
-                    <Quote className="h-3.5 w-3.5" />
-                    Enhance with AI
+                    {isInlineAiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                   </button>
                 </div>
               </div>
+
+              {/* AI Response */}
+              {inlineAiResponse ? (
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Result</span>
+                    {isInlineAiLoading && <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}
+                  </div>
+                  <div className="max-h-32 overflow-y-auto rounded-lg bg-white border border-gray-200 px-3 py-2.5 text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {inlineAiResponse}
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setInlineAiResponse('')}
+                      className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      Discard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyInlineAiToDocument}
+                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Insert into Document
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
           {isCanvasLoading ? (
@@ -1285,26 +1619,30 @@ const OnlyOfficeWorkspace = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#E3F0F7]">
             <div className="px-1 py-2">
               <div className="text-xs text-slate-650">
-                Variables detected from the drafting matrix. Mapping content controls directly to active placeholders.
+                Variables automatically detected from document placeholders. Click any variable tag to redirect cursor directly to its location.
               </div>
             </div>
             {variablesDetected.length === 0 ? (
-              <div className="rounded-xl border border-[#B9D9EB] bg-white p-4 shadow-sm">
-                <div className="text-sm font-semibold">No variables detected</div>
-                <div className="text-xs text-slate-500 mt-1">
-                  This panel will populate after the drafting engine identifies placeholders.
-                </div>
+              <div className="rounded-xl border border-[#B9D9EB] bg-white p-4 shadow-sm text-center text-slate-600 text-xs">
+                No variables detected in this document.
               </div>
             ) : (
               variablesDetected.map((variable, idx) => {
                 const name = String(variable || '');
                 return (
-                  <div key={`${name}-${idx}`} className="rounded-xl border border-[#B9D9EB] bg-white p-4 shadow-sm">
+                  <div
+                    key={`${name}-${idx}`}
+                    onClick={() => handleNavigateToVariable(name)}
+                    className="rounded-xl border border-[#B9D9EB] bg-white p-4 shadow-sm cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate text-slate-800">{name}</div>
+                        <div className="text-sm font-semibold truncate text-slate-800 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-base text-blue-500">location_on</span>
+                          {name}
+                        </div>
                         <div className="text-xs text-slate-500 mt-1">
-                          This tag maps to an active content control inside the editor.
+                          Click to jump cursor to this variable in editor.
                         </div>
                       </div>
                     </div>
@@ -1337,13 +1675,30 @@ const OnlyOfficeWorkspace = () => {
                       : 'bg-white border border-[#B9D9EB] text-slate-800 mr-auto shadow-sm'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap leading-relaxed">{msg.content || '...'}</div>
+                  {msg.role === 'user' ? (
+                    <div className="whitespace-pre-wrap leading-relaxed">{msg.content || '...'}</div>
+                  ) : (
+                    <div className="prose dark:prose-invert prose-sm max-w-none text-slate-800 leading-relaxed space-y-2">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          a: ({ href, children }) => (
+                            <CitationLink href={href} sources={msg.sources} compact={true}>
+                              {children}
+                            </CitationLink>
+                          )
+                        }}
+                      >
+                        {processCitations(msg.content, msg.sources)}
+                      </ReactMarkdown>
+                    </div>
+                  )}
 
                   {msg.role === 'assistant' && !msg.isStreaming && msg.content && (
                     <div className="mt-3.5 pt-2.5 border-t border-[#E3F0F7] flex justify-end">
                       <button
                         type="button"
-                        onClick={() => handleInsertText(msg.content)}
+                        onClick={() => handleInsertText(msg.content, msg.sources)}
                         className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-wider"
                       >
                         <span className="material-symbols-outlined text-sm">input</span>
@@ -1414,7 +1769,12 @@ const OnlyOfficeWorkspace = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3 px-1">
-                  <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Case Law Assistant</div>
+                  <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold flex items-center gap-2">
+                    <span>Case Law Assistant</span>
+                    {caseCards.length > 0 && (
+                      <span className="text-[11px] text-slate-500 font-normal lowercase">({caseCards.length} result{caseCards.length === 1 ? '' : 's'})</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {caseCardsLoading ? (
                       <div className="flex items-center gap-1 text-[11px] text-slate-500">
@@ -1462,102 +1822,6 @@ const OnlyOfficeWorkspace = () => {
       </aside>
       )}
 
-      {/* Floating expanding chat input bar */}
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 flex flex-col items-center gap-3 pointer-events-none select-none" style={{ width: 'min(760px, calc(100vw - 2rem))' }}>
-        {enhanceSelectionText ? (
-          <div className="pointer-events-auto w-full rounded-2xl border border-[#B9D9EB] bg-white shadow-xl overflow-hidden">
-            <div className="flex items-start justify-between gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <Quote className="h-3.5 w-3.5" />
-                  Selected text
-                </div>
-                <div className="mt-1 text-sm text-slate-700 whitespace-pre-wrap break-words max-h-20 overflow-hidden">
-                  {enhanceSelectionText}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEnhanceSelectionText('')}
-                className="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-        ) : null}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (composerHasValue) {
-              handleSendMessage();
-              setActiveTab('chat');
-            }
-          }}
-          className={`pointer-events-auto w-full flex items-end gap-3 bg-[#f0f4f9] border border-[#d8e1ea] shadow-[0_12px_30px_rgba(15,23,42,0.08)] px-4 py-3.5 transition-all duration-300 ${
-            composerExpanded ? 'rounded-[20px]' : 'rounded-full'
-          }`}
-        >
-          {/* Left Column (fixed height side column, bottom anchored) */}
-          <div className="flex h-10 items-center justify-center shrink-0">
-            <button
-              type="button"
-              disabled
-              title="Attachments coming soon"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d8e1ea] bg-white/80 text-slate-500 opacity-70"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-
-          <textarea
-            ref={composerTextareaRef}
-            rows={1}
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (composerHasValue) {
-                  handleSendMessage();
-                  setActiveTab('chat');
-                }
-              }
-            }}
-            placeholder={enhanceSelectionText ? 'Write enhancement instructions...' : 'Ask your AI...'}
-            disabled={isChatLoading}
-            style={{
-              height: '24px',
-              minHeight: '24px',
-              maxHeight: '160px',
-            }}
-            className="flex-1 resize-none overflow-y-auto bg-transparent border-0 outline-none focus:outline-none focus:ring-0 text-[15px] leading-6 text-slate-800 placeholder:text-slate-400 font-sans"
-          />
-
-          {/* Right Column (fixed height side column, bottom anchored) */}
-          <div className="flex h-10 items-center justify-end gap-2 shrink-0">
-            <button
-              type="button"
-              disabled
-              title="Voice input coming soon"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d8e1ea] bg-white/80 text-slate-500 opacity-70"
-            >
-              <Mic className="h-4 w-4" />
-            </button>
-            <button
-              type="submit"
-              disabled={isChatLoading || !inputMessage.trim()}
-              className={`inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-semibold transition-all duration-200 ${
-                inputMessage.trim()
-                  ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 opacity-100'
-                  : 'bg-slate-900/10 text-slate-500 opacity-50 cursor-not-allowed'
-              } ${isChatLoading ? 'cursor-wait opacity-70' : ''}`}
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-        </form>
-      </div>
       {isDragging && (
         <div className="fixed inset-0 z-50 cursor-col-resize select-none bg-transparent" />
       )}

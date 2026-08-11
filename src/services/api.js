@@ -123,6 +123,9 @@ export const api = {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                if (response.status === 502 || errorText.includes('502 Bad Gateway')) {
+                    throw new Error('AI Assistant service is warming up. Please wait a moment and try again.');
+                }
                 throw new Error(`Stream failed: ${response.status} ${errorText}`);
             }
 

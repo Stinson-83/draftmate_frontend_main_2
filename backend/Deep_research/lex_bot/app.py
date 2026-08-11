@@ -644,7 +644,7 @@ async def _stream_chat(request: ChatRequest, user_id: str):
                             content = chunk.content if hasattr(chunk, "content") else str(chunk)
                             if content:
                                 yield f"data: {json.dumps({'event': 'node_stream', 'node': active_node, 'chunk': content})}\n\n"
-                                if active_node in ("explainer_agent", "manager_aggregate"):
+                                if active_node in ("explainer_agent", "manager_aggregate", "research_agent", "law_agent", "case_agent", "document_agent"):
                                     yield f"data: {json.dumps({'event': 'token', 'chunk': content, 'accumulated': ''})}\n\n"
                                 
                 elif kind == "on_chain_end" and not event.get("parent_ids"):
@@ -665,47 +665,36 @@ async def _stream_chat(request: ChatRequest, user_id: str):
         # Yield the final answer FIRST (user sees it immediately)
         yield f"data: {json.dumps({'event': 'answer', 'content': answer})}\n\n"
             
-        # Yield sources immediately (don't wait for followups)
+        # Yield sources immediately
         if sources:
             yield f"data: {json.dumps({'event': 'sources', 'sources': sources})}\n\n"
-
-        # Generate followups post-stream (Step 8) — non-blocking
-        # User already has their answer, followups are a bonus
-        followup_future = loop.run_in_executor(
-            None,
-            lambda: _generate_followups_sync(request.query, answer, "fast")
-        )
-        
-        try:
-            suggested_followups = await asyncio.wait_for(followup_future, timeout=15.0)
-        except asyncio.TimeoutError:
-            logger.warning("Follow-up generation timed out (15s)")
-            suggested_followups = []
-
-        if suggested_followups:
-            yield f"data: {json.dumps({'event': 'followups', 'questions': suggested_followups})}\n\n"
 
         if "latency" in result:
             yield f"data: {json.dumps({'event': 'latency', 'latency': result['latency']})}\n\n"
 
+        # Signal completion immediately so frontend progress bar finishes at 100%
         yield f"data: {json.dumps({'event': 'done', 'message': 'Complete'})}\n\n"
-        
-        # Store assistant response
+
+        # Async background persistence (DB store & mem0) — non-blocking
         if user_id:
-            chat_store.add_message(
-                user_id=user_id,
-                session_id=session_id,
-                role="assistant",
-                content=answer,
-                msg_metadata={
-                    "complexity": result.get("complexity"),
-                    "agents": result.get("selected_agents"),
-                    "sources": sources,
-                }
-            )
+            def _async_bg_persist():
+                try:
+                    chat_store.add_message(
+                        user_id=user_id,
+                        session_id=session_id,
+                        role="assistant",
+                        content=answer,
+                        msg_metadata={
+                            "complexity": result.get("complexity"),
+                            "agents": result.get("selected_agents"),
+                            "sources": sources,
+                        }
+                    )
+                    _background_memory_store(user_id, request.query, answer)
+                except Exception as ex:
+                    logger.warning(f"Background persistence error: {ex}")
             
-            # (Step 16) Fire and forget mem0 storage
-            _background_memory_store(user_id, request.query, answer)
+            loop.run_in_executor(None, _async_bg_persist)
             
     except Exception as e:
         logger.error(f"Stream error: {e}")

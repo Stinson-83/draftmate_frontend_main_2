@@ -45,9 +45,24 @@ OPENAI_REASONING_MODEL = "gpt-4o"
 # Legacy compatibility
 LLM_MODEL_NAME = GEMINI_FAST_MODEL
 
-# --- EMBEDDING MODEL ---
-EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL") or "sentence-transformers/all-MiniLM-L6-v2"
-RERANK_MODEL = os.getenv("RERANK_MODEL") or "cross-encoder/ms-marco-MiniLM-L-6-v2"
+# Force offline mode for HuggingFace Transformers to avoid startup network delay
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+# --- EMBEDDING & RERANK MODEL ---
+_models_dir = Path(__file__).parent.parent.parent / "models"
+_local_embed = _models_dir / "embedding"
+_local_rerank = _models_dir / "rerank"
+
+if _local_embed.is_dir() and (_local_embed / "config.json").exists():
+    EMBEDDING_MODEL_NAME = str(_local_embed)
+else:
+    EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL") or "sentence-transformers/all-MiniLM-L6-v2"
+
+if _local_rerank.is_dir() and (_local_rerank / "config.json").exists():
+    RERANK_MODEL = str(_local_rerank)
+else:
+    RERANK_MODEL = os.getenv("RERANK_MODEL") or "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 # --- SEARCH CONFIG ---
 DB_SEARCH_LIMIT_PRE = 150  # Reduced from 200 for faster reranking (Step 10b)

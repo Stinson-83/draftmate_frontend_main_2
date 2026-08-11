@@ -26,7 +26,9 @@ ENV EMBED_MODEL=/app/backend/models/embedding
 ENV RERANK_MODEL=/app/backend/models/rerank
 ENV EASYOCR_MODULE_PATH=/app/backend/models/easyocr
 ENV SKIP_TUNNEL=true
-ENV HF_ENDPOINT=https://huggingface.co
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_HUB_ENABLE_HF_TRANSFER=0
 ENV SHARED_STORAGE_PATH=/app/shared_drafts
 
 # Set work directory

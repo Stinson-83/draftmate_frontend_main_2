@@ -5,53 +5,48 @@ import React from 'react';
  * Handles: [1], [2], [1, 3, 4, 6], [7, 8], [Case Law], [Strategy, Section 2], etc.
  */
 export const processCitations = (content, sources) => {
-    if (!sources || sources.length === 0) return content;
+    if (!content) return '';
 
     let processed = content;
 
-    // Create a map for quick source lookup
-    const sourceByIndex = {};
-    sources.forEach(source => {
-        if (source.index !== undefined && source.index !== null) {
-            sourceByIndex[source.index] = source;
-        }
+    // 1. Convert bare URLs (https://..., http://..., or indiankanoon.org/...) into clickable markdown links
+    const urlRegex = /(?<!\]\(|href=")(https?:\/\/[^\s<>\)\]]+|(?<!\/)\b(?:www\.)?indiankanoon\.org\/[^\s<>\)\]]+)/gi;
+    processed = processed.replace(urlRegex, (match) => {
+        const fullUrl = match.startsWith('http') ? match : `https://${match}`;
+        return `[${match}](${fullUrl})`;
     });
 
-    // 1. Handle MULTI-number citations FIRST: [1, 3, 4, 6], [7, 8], [1,2]
+    // Map source by index (both string and numeric keys)
+    const sourceByIndex = {};
+    if (Array.isArray(sources)) {
+        sources.forEach(source => {
+            if (source.index !== undefined && source.index !== null) {
+                sourceByIndex[source.index] = source;
+                sourceByIndex[String(source.index)] = source;
+            }
+        });
+    }
+
+    // 2. Handle MULTI-number citations FIRST: [1, 2], [1, 3, 4], [7, 8]
     const multiNumPattern = /\[(\d+(?:\s*,\s*\d+)+)\](?!\()/g;
     processed = processed.replace(multiNumPattern, (match, nums) => {
-        const indices = nums.split(',').map(n => parseInt(n.trim()));
-        const firstSource = indices.find(idx => sourceByIndex[idx]);
-        if (firstSource !== undefined) {
-            return `[${match}](citation://multi?nums=${encodeURIComponent(nums)})`;
-        }
-        return match;
+        return `[${match}](citation://multi?nums=${encodeURIComponent(nums)})`;
     });
 
-    // 2. Handle SINGLE numeric citations: [1], [2], etc.
+    // 3. Handle SINGLE numeric citations: [1], [2], etc.
     processed = processed.replace(/\[(\d+)\](?!\()/g, (match, num) => {
         const index = parseInt(num);
-        const source = sourceByIndex[index];
-        if (source) {
-            const url = source.url || `citation://numeric?index=${index}`;
-            return `[\\[${index}\\]](${url})`;
-        }
-        return match;
+        const source = sourceByIndex[index] || sourceByIndex[num];
+        const url = source?.url || `citation://numeric?index=${index}`;
+        return `[\\[${index}\\]](${url})`;
     });
 
-    // 3. Handle text-based citations WITH comma: [Strategy, Section 2]
-    const textWithCommaPattern = /\[([a-zA-Z][a-zA-Z\s]*),\s*([^\]]+)\](?!\()/g;
-    processed = processed.replace(textWithCommaPattern, (match, sourceName, details) => {
-        return `[${match}](citation://text?source=${encodeURIComponent(sourceName.trim())}&details=${encodeURIComponent(details.trim())})`;
-    });
-
-    // 4. Handle simple text citations WITHOUT comma: [Case Law], [Strategy]
-    const simpleTextPattern = /\[([A-Za-z][A-Za-z0-9\s.-]*)\](?!\()/g;
-    processed = processed.replace(simpleTextPattern, (match, text) => {
-        const t = text.trim();
-        if (/^\d+$/.test(t)) return match;
-        if (t.includes('\\')) return match;
-        return `[${match}](citation://simple?text=${encodeURIComponent(t)})`;
+    // 4. Handle bracketed text with domain link: [Indian Kanoon: indiankanoon.org/doc/158154666/]
+    const bracketedLinkPattern = /\[([^\]]*?)(https?:\/\/[^\s\]]+|indiankanoon\.org\/[^\s\]]+)([^\]]*?)\](?!\()/gi;
+    processed = processed.replace(bracketedLinkPattern, (match, prefix, rawUrl) => {
+        const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+        const label = prefix.replace(/:$/, '').trim() || 'Indian Kanoon';
+        return `[${label}](${fullUrl})`;
     });
 
     return processed;
@@ -93,11 +88,11 @@ export const CitationLink = ({ href, children, sources, compact = false }) => {
 
             if (citationType === 'numeric') {
                 const index = parseInt(url.searchParams.get('index'));
-                source = sources?.find(s => s.index === index);
+                source = sources?.find(s => Number(s.index) === Number(index) || String(s.index) === String(index));
             } else if (citationType === 'multi') {
                 const nums = url.searchParams.get('nums');
                 const indices = nums.split(',').map(n => parseInt(n.trim()));
-                matchedSources = sources?.filter(s => indices.includes(s.index)) || [];
+                matchedSources = sources?.filter(s => indices.some(idx => Number(s.index) === Number(idx) || String(s.index) === String(idx))) || [];
                 if (matchedSources.length > 0) {
                     source = matchedSources[0];
                 }
@@ -121,19 +116,24 @@ export const CitationLink = ({ href, children, sources, compact = false }) => {
         const numericMatch = children?.toString().match(/\\\[(\d+)\\\]|\[(\d+)\]/);
         if (numericMatch) {
             const citationIndex = parseInt(numericMatch[1] || numericMatch[2]);
-            source = sources?.find(s => s.index === citationIndex);
+            source = sources?.find(s => Number(s.index) === Number(citationIndex) || String(s.index) === String(citationIndex));
         }
         if (!source) source = sources?.find(s => s.url === href);
     } else {
         const numericMatch = children?.toString().match(/\\\[(\d+)\\\]|\[(\d+)\]/);
         if (numericMatch) {
             const citationIndex = parseInt(numericMatch[1] || numericMatch[2]);
-            source = sources?.find(s => s.index === citationIndex);
+            source = sources?.find(s => Number(s.index) === Number(citationIndex) || String(s.index) === String(citationIndex));
         }
     }
 
-    const hasValidUrl = source?.url || matchedSources.some(s => s.url);
-    const targetUrl = source?.url || (isDirectUrl ? href : undefined);
+    const defaultSearchQuery = source?.citation || source?.title || source?.name || (typeof children === 'string' && !children.includes('[') ? children : '');
+    const defaultSearchUrl = defaultSearchQuery
+        ? `https://indiankanoon.org/search/?formInput=${encodeURIComponent(defaultSearchQuery)}`
+        : undefined;
+
+    const targetUrl = source?.url || (isDirectUrl ? href : defaultSearchUrl);
+    const hasValidUrl = Boolean(targetUrl);
     const hasMultipleSources = matchedSources.length > 1;
 
     // Compact mode for sidebar (smaller, less intrusive)
@@ -154,6 +154,7 @@ export const CitationLink = ({ href, children, sources, compact = false }) => {
                 rel={targetUrl ? "noopener noreferrer" : undefined}
                 className={linkClasses}
                 onClick={(e) => {
+                    e.stopPropagation();
                     if (!targetUrl) e.preventDefault();
                 }}
             >
@@ -173,24 +174,31 @@ export const CitationLink = ({ href, children, sources, compact = false }) => {
                                 </span>
                             </div>
                             <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
-                                {matchedSources.map((s, idx) => (
-                                    <a
-                                        key={idx}
-                                        href={s.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block p-1.5 rounded bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{s.index}]</span>
-                                            <span className={`text-[9px] px-1 py-0.5 rounded-full ${s.type === 'Case' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' :
-                                                s.type === 'Law' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
-                                                    'bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-300'
-                                                }`}>{formatSourceType(s.type)}</span>
-                                        </div>
-                                        <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 mt-0.5">{s.title}</p>
-                                    </a>
-                                ))}
+                                {matchedSources.map((s, idx) => {
+                                    const sourceUrl = s.url || (s.title || s.citation ? `https://indiankanoon.org/search/?formInput=${encodeURIComponent(s.citation || s.title)}` : undefined);
+                                    return (
+                                        <a
+                                            key={idx}
+                                            href={sourceUrl}
+                                            target={sourceUrl ? "_blank" : undefined}
+                                            rel={sourceUrl ? "noopener noreferrer" : undefined}
+                                            className="block p-1.5 rounded bg-slate-50 dark:bg-slate-700/50 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!sourceUrl) e.preventDefault();
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-blue-500 dark:text-blue-400 text-xs font-mono">[{s.index}]</span>
+                                                <span className={`text-[9px] px-1 py-0.5 rounded-full ${s.type === 'Case' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' :
+                                                    s.type === 'Law' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
+                                                        'bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-300'
+                                                    }`}>{formatSourceType(s.type)}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-1 mt-0.5">{s.title || s.citation}</p>
+                                        </a>
+                                    );
+                                })}
                             </div>
                         </>
                     ) : (
