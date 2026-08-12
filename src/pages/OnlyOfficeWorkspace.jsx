@@ -718,15 +718,13 @@ const OnlyOfficeWorkspace = () => {
     const docid = item.docid || item.doc_id || item.id || item.raw?.docid;
 
     let caseUrl = item.source_url || item.url || item.raw?.source_url || item.raw?.url || '';
-    if (docid && (!caseUrl || caseUrl.toLowerCase().endsWith('.pdf'))) {
-      caseUrl = `https://indiankanoon.org/doc/${docid}/`;
+    if (docid) {
+      caseUrl = `https://indiankanoon.org/doc/${docid}/?type=pdf`;
     } else if (caseUrl && caseUrl.includes('indiankanoon.org/doc/')) {
       const docMatch = caseUrl.match(/indiankanoon\.org\/doc\/(\d+)/);
       if (docMatch) {
-        caseUrl = `https://indiankanoon.org/doc/${docMatch[1]}/`;
+        caseUrl = `https://indiankanoon.org/doc/${docMatch[1]}/?type=pdf`;
       }
-    } else if (docid) {
-      caseUrl = `https://indiankanoon.org/doc/${docid}/`;
     }
 
     return {
@@ -900,11 +898,12 @@ const OnlyOfficeWorkspace = () => {
   };
 
   const handleInlineQuickAction = async (actionType) => {
-    const textToProcess = selectionPreview.trim() || activeSelectionText.trim();
-    if (!textToProcess) {
+    const rawText = selectionPreview.trim() || activeSelectionText.trim();
+    if (!rawText) {
       toast.info('Select text in ONLYOFFICE first.');
       return;
     }
+    const textToProcess = rawText.length > 3500 ? rawText.slice(0, 3500) + '...' : rawText;
 
     if (actionType === 'format') {
       handleAutoFormatSelection();
@@ -948,27 +947,33 @@ const OnlyOfficeWorkspace = () => {
         },
         onError: (err) => {
           console.error('Inline AI action failed:', err);
-          toast.error(err?.message || 'Inline AI action failed.');
+          const msg = String(err?.message || '').toLowerCase();
+          if (msg.includes('fetch') || msg.includes('network') || msg.includes('502')) {
+            toast.error('AI Service is connecting. Please try Rephrase again in a moment.');
+          } else {
+            toast.error(err?.message || 'Inline AI action failed.');
+          }
           setIsInlineAiLoading(false);
         },
       });
     } catch (err) {
       console.error('Inline AI error:', err);
-      toast.error(err?.message || 'Inline AI action failed.');
+      toast.error('AI Service is connecting. Please try again in a moment.');
       setIsInlineAiLoading(false);
     }
   };
 
   const handleInlineCustomPromptSubmit = async () => {
-    const textToProcess = selectionPreview.trim() || activeSelectionText.trim();
+    const rawText = selectionPreview.trim() || activeSelectionText.trim();
     const promptText = inlineCustomPrompt.trim();
-    if (!textToProcess) {
+    if (!rawText) {
       toast.info('Select text in ONLYOFFICE first.');
       return;
     }
     if (!promptText) return;
 
-    // If tone is also selected, combine: custom instruction is primary, tone applies as style
+    const textToProcess = rawText.length > 3500 ? rawText.slice(0, 3500) + '...' : rawText;
+
     const TONE_STYLE = {
       'Humanize': 'in a warm, natural, and human tone — approachable yet professional',
       'Formal':   'in strict, authoritative, and formal legal language',
@@ -997,13 +1002,18 @@ const OnlyOfficeWorkspace = () => {
         },
         onError: (err) => {
           console.error('Inline AI custom prompt failed:', err);
-          toast.error(err?.message || 'Inline AI request failed.');
+          const msg = String(err?.message || '').toLowerCase();
+          if (msg.includes('fetch') || msg.includes('network') || msg.includes('502')) {
+            toast.error('AI Service is connecting. Please try again in a moment.');
+          } else {
+            toast.error(err?.message || 'Inline AI request failed.');
+          }
           setIsInlineAiLoading(false);
         },
       });
     } catch (err) {
       console.error('Inline AI error:', err);
-      toast.error(err?.message || 'Inline AI request failed.');
+      toast.error('AI Service is connecting. Please try again in a moment.');
       setIsInlineAiLoading(false);
     }
   };
@@ -1113,7 +1123,7 @@ const OnlyOfficeWorkspace = () => {
     return (
       <div className="space-y-3">
         {caseCards.map((caseItem) => {
-          const targetUrl = caseItem.url || (caseItem.raw?.docid ? `https://indiankanoon.org/doc/${caseItem.raw.docid}/` : null);
+          const targetUrl = caseItem.url || (caseItem.raw?.docid ? `https://indiankanoon.org/doc/${caseItem.raw.docid}/?type=pdf` : null);
           return (
             <div key={caseItem.id} className="rounded-2xl border border-[#B9D9EB] bg-white overflow-hidden shadow-sm">
               <div className="p-4 border-b border-[#B9D9EB]/50 bg-slate-50/50">

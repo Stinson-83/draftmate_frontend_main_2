@@ -325,7 +325,8 @@ export const convertMarkdownToDocHtml = (rawInput, sources = []) => {
     if (node.type === 'heading') {
       const fontSize = node.level === 1 ? '14pt' : node.level === 2 ? '12.5pt' : '11.5pt';
       const marginTop = node.level === 1 ? '14pt' : node.level === 2 ? '12pt' : '10pt';
-      htmlResult += `<h${node.level} style="font-size: ${fontSize}; font-weight: bold; color: #000000; margin-top: ${marginTop}; margin-bottom: 4pt; line-height: 1.3; text-align: left;">${formatInlineText(node.text, sources)}</h${node.level}>\n`;
+      const textAlign = node.level === 1 ? 'center' : 'left';
+      htmlResult += `<h${node.level} style="font-size: ${fontSize}; font-weight: bold; color: #000000; margin-top: ${marginTop}; margin-bottom: 6pt; line-height: 1.3; text-align: ${textAlign};">${formatInlineText(node.text, sources)}</h${node.level}>\n`;
     } else if (node.type === 'paragraph') {
       htmlResult += `<p style="font-size: 11pt; line-height: 1.5; color: #111827; margin-top: 0pt; margin-bottom: 6pt; text-align: justify;">${formatInlineText(node.text, sources)}</p>\n`;
     } else if (node.type === 'blockquote') {

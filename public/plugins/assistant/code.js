@@ -218,11 +218,20 @@
 
             if (isHeadingLine(paraText)) {
                 var formattedHeader = convertUrlsToLinksInHtml(escaped);
-                htmlBlocks.push(
-                    '<h3 style="font-size: 11.5pt; font-weight: bold; color: #000000; margin-top: 10pt; margin-bottom: 4pt; line-height: 1.3; text-align: left;">' +
-                    formattedHeader +
-                    '</h3>'
-                );
+                var isMainTitle = /^(IN THE|SUPREME COURT|HIGH COURT|BEFORE THE|PETITION|MEMORANDUM|DEED|AGREEMENT|SPECIAL LEAVE|RECORD OF PROCEEDINGS)\b/i.test(paraText.trim());
+                if (isMainTitle) {
+                    htmlBlocks.push(
+                        '<h1 style="font-size: 14pt; font-weight: bold; color: #000000; margin-top: 14pt; margin-bottom: 6pt; line-height: 1.3; text-align: center;">' +
+                        formattedHeader +
+                        '</h1>'
+                    );
+                } else {
+                    htmlBlocks.push(
+                        '<h3 style="font-size: 11.5pt; font-weight: bold; color: #000000; margin-top: 10pt; margin-bottom: 4pt; line-height: 1.3; text-align: left;">' +
+                        formattedHeader +
+                        '</h3>'
+                    );
+                }
                 return;
             }
 
