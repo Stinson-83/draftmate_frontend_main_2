@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Check, Download, FileText, Gavel, Loader2, Plus, Mic, Quote, Send, Sparkles, X } from 'lucide-react';
+import { Check, Download, FileText, Gavel, GripHorizontal, Loader2, Plus, Mic, Quote, Send, Sparkles, X } from 'lucide-react';
 import { API_CONFIG } from '../services/endpoints';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -105,6 +106,64 @@ const OnlyOfficeWorkspace = () => {
   const [selectedTone, setSelectedTone] = useState('');
   const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
   const [activeAction, setActiveAction] = useState('');
+  const [popupSize, setPopupSize] = useState('small'); // 'small' (480px), 'medium' (560px), 'large' (680px)
+  const [isDraggingPopup, setIsDraggingPopup] = useState(false);
+  const isDraggingPopupRef = useRef(false);
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
+  const popupPosRef = useRef({ x: 0, y: 0 });
+  const popupElementRef = useRef(null);
+
+  const inlineCustomPromptRef = useRef(null);
+
+  useEffect(() => {
+    if (inlineCustomPromptRef.current) {
+      inlineCustomPromptRef.current.style.height = 'auto';
+      inlineCustomPromptRef.current.style.height = `${Math.max(88, inlineCustomPromptRef.current.scrollHeight)}px`;
+    }
+  }, [inlineCustomPrompt, showAutoFormatPopup]);
+
+  const handlePopupMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
+    isDraggingPopupRef.current = true;
+    setIsDraggingPopup(true);
+    dragStartPosRef.current = {
+      x: e.clientX - popupPosRef.current.x,
+      y: e.clientY - popupPosRef.current.y,
+    };
+    if (canvasTargetRef.current) {
+      canvasTargetRef.current.style.pointerEvents = 'none';
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDraggingPopupRef.current) return;
+      const newX = e.clientX - dragStartPosRef.current.x;
+      const newY = e.clientY - dragStartPosRef.current.y;
+      popupPosRef.current = { x: newX, y: newY };
+
+      if (popupElementRef.current) {
+        popupElementRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingPopupRef.current) {
+        isDraggingPopupRef.current = false;
+        setIsDraggingPopup(false);
+        if (canvasTargetRef.current) {
+          canvasTargetRef.current.style.pointerEvents = 'auto';
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Case Law Assistant State
   const [caseCards, setCaseCards] = useState([]);
@@ -1350,201 +1409,259 @@ const OnlyOfficeWorkspace = () => {
 
         <div className="flex-1 min-h-0 relative">
           <div ref={canvasTargetRef} id="onlyoffice-canvas-target-node" className="h-full w-full bg-white" />
-          {showAutoFormatPopup && selectionPreview ? (
-            <div className="absolute top-3 right-3 z-30 w-80 rounded-xl bg-white border border-gray-200 shadow-xl">
 
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                  <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">AI Assistant</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    dismissedSelectionTextRef.current = selectionPreview;
-                    setShowAutoFormatPopup(false);
-                    setIsAutoFormatting(false);
-                    setInlineAiResponse('');
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              {/* Selected Text */}
-              <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">Selected Text</p>
-                <p className="text-xs text-gray-600 line-clamp-2 italic">"{selectionPreview}"</p>
-              </div>
-
-              {/* Actions Row */}
-              <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-gray-100">
-
-                {/* Enhance with AI — standalone */}
-                <button
-                  type="button"
-                  onClick={() => { setActiveAction('enhance'); handleInlineQuickAction('enhance'); }}
-                  disabled={isAutoFormatting || isInlineAiLoading}
-                  className={`flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${activeAction === 'enhance' ? 'ring-2 ring-blue-300' : ''}`}
-                >
-                  {isInlineAiLoading && activeAction === 'enhance' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  Enhance with AI
-                </button>
-
-                {/* Rephrase + Tone split button */}
-                <div className="relative">
-                  <div className="flex rounded-lg overflow-hidden border border-gray-300">
-                    <button
-                      type="button"
-                      onClick={() => { setActiveAction('rephrase'); handleInlineQuickAction('rephrase'); }}
-                      disabled={isAutoFormatting || isInlineAiLoading}
-                      className="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                      <Quote className="h-3 w-3" />
-                      Rephrase
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsToneDropdownOpen((v) => !v)}
-                      disabled={isAutoFormatting || isInlineAiLoading}
-                      className="flex items-center gap-1 bg-white hover:bg-gray-50 border-l border-gray-200 text-gray-500 px-2 py-1.5 text-xs transition-colors disabled:opacity-50"
-                    >
-                      <span className="max-w-[44px] truncate">{selectedTone || 'Tone'}</span>
-                      <svg className="h-2.5 w-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                  </div>
-
-                  {/* Tone Dropdown */}
-                  {isToneDropdownOpen && (
-                    <div className="absolute bottom-full left-0 z-50 mb-1 w-32 rounded-lg border border-gray-200 bg-white shadow-lg py-1 text-xs">
-                      {['Humanize', 'Formal', 'Academic', 'Simple'].map((tone) => (
-                        <button
-                          key={tone}
-                          type="button"
-                          onClick={() => { setSelectedTone(tone); setIsToneDropdownOpen(false); }}
-                          className={`w-full text-left px-3 py-2 flex items-center justify-between transition-colors hover:bg-gray-50 ${selectedTone === tone ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
-                        >
-                          {tone}
-                          {selectedTone === tone && <Check className="h-3 w-3 text-blue-600" />}
-                        </button>
-                      ))}
-                      {selectedTone && (
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedTone(''); setIsToneDropdownOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => { setActiveAction('format'); handleInlineQuickAction('format'); }}
-                  disabled={isAutoFormatting || isInlineAiLoading}
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  {isAutoFormatting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  Auto Format
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setActiveAction('summarize'); handleInlineQuickAction('summarize'); }}
-                  disabled={isAutoFormatting || isInlineAiLoading}
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  <FileText className="h-3 w-3" />
-                  Summarize
-                </button>
-              </div>
-
-              {/* Action hint */}
-              {activeAction && (
-                <div className="px-4 pb-2">
-                  <p className="text-[10px] text-blue-600 bg-blue-50 rounded-md px-2.5 py-1.5 leading-relaxed">
-                    {activeAction === 'enhance'  && '✦ Enhancing selected text for clarity, legal precision, and grammatical accuracy.'}
-                    {activeAction === 'rephrase' && `↺ Rephrasing selected text${selectedTone ? ` in ${selectedTone} tone` : ' in formal legal tone'}. Use the Tone dropdown to change style.`}
-                    {activeAction === 'format'   && '⊞ Auto-formatting document structure — applying legal typography, headings, and spacing.'}
-                    {activeAction === 'summarize'&& '≡ Summarizing selected text into a concise executive legal summary.'}
-                    {activeAction === 'custom'   && (selectedTone
-                      ? `✎ Applying your custom instruction in ${selectedTone} tone — both will be combined.`
-                      : '✎ Applying your custom instruction to the selected text.'
-                    )}
-                  </p>
-                </div>
+          {/* Floating AI Assistant Modal — Portaled to document.body with z-[9999] so it floats ON TOP of all sidebars, headers & iframe */}
+          {showAutoFormatPopup && selectionPreview && createPortal(
+            <>
+              {/* Invisible overlay during drag to catch ultra-fast mouse cursor movement anywhere on screen */}
+              {isDraggingPopup && (
+                <div className="fixed inset-0 z-[10000] cursor-grabbing bg-transparent select-none" />
               )}
 
-              {/* Custom Instruction */}
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={inlineCustomPrompt}
-                    onChange={(e) => setInlineCustomPrompt(e.target.value)}
-                    onFocus={() => setActiveAction('custom')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && inlineCustomPrompt.trim()) {
-                        e.preventDefault();
-                        handleInlineCustomPromptSubmit();
-                      }
-                    }}
-                    placeholder={
-                      activeAction === 'enhance'  ? 'e.g. Make it more concise and assertive...' :
-                      activeAction === 'rephrase' ? 'e.g. Use simpler words for client communication...' :
-                      activeAction === 'summarize'? 'e.g. Focus only on financial clauses...' :
-                      activeAction === 'format'   ? 'e.g. Add numbered headings and sub-clauses...' :
-                      'Type a custom instruction for the selected text...'
-                    }
-                    className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-800 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:bg-white transition-all"
-                  />
+              <div
+                ref={popupElementRef}
+                style={{
+                  transform: `translate3d(${popupPosRef.current.x}px, ${popupPosRef.current.y}px, 0)`,
+                }}
+                className={`fixed top-16 right-80 z-[9999] ${
+                  popupSize === 'small' ? 'w-[480px]' : popupSize === 'medium' ? 'w-[560px]' : 'w-[680px]'
+                } rounded-xl bg-white border border-gray-200 shadow-2xl transition-[width] duration-200`}
+              >
+
+                {/* Header — Draggable */}
+                <div
+                  onMouseDown={handlePopupMouseDown}
+                  className="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-grab active:cursor-grabbing select-none bg-slate-50/90 rounded-t-xl"
+                >
+                  <div className="flex items-center gap-2">
+                    <GripHorizontal className="h-4 w-4 text-slate-400 shrink-0" />
+                    <Sparkles className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI Assistant</span>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    {/* Size Selector Pills */}
+                    <div className="flex items-center bg-gray-200/60 p-0.5 rounded-lg text-xs font-bold text-gray-600">
+                      <button
+                        type="button"
+                        onClick={() => setPopupSize('small')}
+                        className={`px-2 py-0.5 rounded-md transition-all ${popupSize === 'small' ? 'bg-white text-blue-600 shadow-sm' : 'hover:text-gray-900'}`}
+                        title="Small View (480px)"
+                      >
+                        S
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPopupSize('medium')}
+                        className={`px-2 py-0.5 rounded-md transition-all ${popupSize === 'medium' ? 'bg-white text-blue-600 shadow-sm' : 'hover:text-gray-900'}`}
+                        title="Medium View (560px)"
+                      >
+                        M
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPopupSize('large')}
+                        className={`px-2 py-0.5 rounded-md transition-all ${popupSize === 'large' ? 'bg-white text-blue-600 shadow-sm' : 'hover:text-gray-900'}`}
+                        title="Large Wide View (680px)"
+                      >
+                        L
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        dismissedSelectionTextRef.current = selectionPreview;
+                        setShowAutoFormatPopup(false);
+                        setIsAutoFormatting(false);
+                        setInlineAiResponse('');
+                        popupPosRef.current = { x: 0, y: 0 };
+                        if (popupElementRef.current) {
+                          popupElementRef.current.style.transform = 'translate3d(0px, 0px, 0)';
+                        }
+                      }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-md hover:bg-gray-200/50"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Selected Text */}
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Selected Text</p>
+                  <p className="text-sm text-gray-800 font-medium line-clamp-2 italic leading-relaxed">"{selectionPreview}"</p>
+                </div>
+
+                {/* Actions Row */}
+                <div className="px-4 py-3 flex flex-wrap gap-2.5 border-b border-gray-100">
+
+                  {/* Enhance with AI — standalone */}
                   <button
                     type="button"
-                    onClick={handleInlineCustomPromptSubmit}
-                    disabled={!inlineCustomPrompt.trim() || isInlineAiLoading}
-                    className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-2 text-white disabled:opacity-40 transition-colors shrink-0"
+                    onClick={() => { setActiveAction('enhance'); handleInlineQuickAction('enhance'); }}
+                    disabled={isAutoFormatting || isInlineAiLoading}
+                    className={`flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${activeAction === 'enhance' ? 'ring-2 ring-blue-300' : ''}`}
                   >
-                    {isInlineAiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    {isInlineAiLoading && activeAction === 'enhance' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Enhance with AI
+                  </button>
+
+                  {/* Rephrase + Tone split button */}
+                  <div className="relative">
+                    <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                      <button
+                        type="button"
+                        onClick={() => { setActiveAction('rephrase'); handleInlineQuickAction('rephrase'); }}
+                        disabled={isAutoFormatting || isInlineAiLoading}
+                        className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-800 px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+                      >
+                        <Quote className="h-3.5 w-3.5" />
+                        Rephrase
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsToneDropdownOpen((v) => !v)}
+                        disabled={isAutoFormatting || isInlineAiLoading}
+                        className="flex items-center gap-1.5 bg-white hover:bg-gray-50 border-l border-gray-200 text-gray-600 px-2.5 py-2 text-sm transition-colors disabled:opacity-50 font-medium"
+                      >
+                        <span className="max-w-[56px] truncate">{selectedTone || 'Tone'}</span>
+                        <svg className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                    </div>
+
+                    {/* Tone Dropdown */}
+                    {isToneDropdownOpen && (
+                      <div className="absolute bottom-full left-0 z-50 mb-1 w-36 rounded-lg border border-gray-200 bg-white shadow-lg py-1.5 text-sm">
+                        {['Humanize', 'Formal', 'Academic', 'Simple'].map((tone) => (
+                          <button
+                            key={tone}
+                            type="button"
+                            onClick={() => { setSelectedTone(tone); setIsToneDropdownOpen(false); }}
+                            className={`w-full text-left px-3.5 py-2 flex items-center justify-between transition-colors hover:bg-gray-50 ${selectedTone === tone ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}
+                          >
+                            {tone}
+                            {selectedTone === tone && <Check className="h-4 w-4 text-blue-600" />}
+                          </button>
+                        ))}
+                        {selectedTone && (
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedTone(''); setIsToneDropdownOpen(false); }}
+                            className="w-full text-left px-3.5 py-2 text-gray-400 hover:bg-gray-50 border-t border-gray-100 transition-colors text-xs"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setActiveAction('format'); handleInlineQuickAction('format'); }}
+                    disabled={isAutoFormatting || isInlineAiLoading}
+                    className="flex items-center gap-2 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    {isAutoFormatting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Auto Format
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setActiveAction('summarize'); handleInlineQuickAction('summarize'); }}
+                    disabled={isAutoFormatting || isInlineAiLoading}
+                    className="flex items-center gap-2 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Summarize
                   </button>
                 </div>
-              </div>
 
-              {/* AI Response */}
-              {inlineAiResponse ? (
-                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Result</span>
-                    {isInlineAiLoading && <Loader2 className="h-3 w-3 animate-spin text-blue-600" />}
+                {/* Action hint */}
+                {activeAction && (
+                  <div className="px-4 pb-2 pt-1">
+                    <p className="text-xs text-blue-700 font-medium bg-blue-50/80 rounded-lg px-3 py-2 leading-relaxed">
+                      {activeAction === 'enhance'  && '✦ Enhancing selected text for clarity, legal precision, and grammatical accuracy.'}
+                      {activeAction === 'rephrase' && `↺ Rephrasing selected text${selectedTone ? ` in ${selectedTone} tone` : ' in formal legal tone'}. Use the Tone dropdown to change style.`}
+                      {activeAction === 'format'   && '⊞ Auto-formatting document structure — applying legal typography, headings, and spacing.'}
+                      {activeAction === 'summarize'&& '≡ Summarizing selected text into a concise executive legal summary.'}
+                      {activeAction === 'custom'   && (selectedTone
+                        ? `✎ Applying your custom instruction in ${selectedTone} tone — both will be combined.`
+                        : '✎ Applying your custom instruction to the selected text.'
+                      )}
+                    </p>
                   </div>
-                  <div className="max-h-32 overflow-y-auto rounded-lg bg-white border border-gray-200 px-3 py-2.5 text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {inlineAiResponse}
-                  </div>
-                  <div className="flex items-center justify-end gap-2">
+                )}
+
+                {/* Custom Instruction */}
+                <div className="px-4 py-3">
+                  <div className="flex items-start gap-2.5">
+                    <textarea
+                      ref={inlineCustomPromptRef}
+                      rows={3}
+                      value={inlineCustomPrompt}
+                      onChange={(e) => setInlineCustomPrompt(e.target.value)}
+                      onFocus={() => setActiveAction('custom')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && inlineCustomPrompt.trim()) {
+                          e.preventDefault();
+                          handleInlineCustomPromptSubmit();
+                        }
+                      }}
+                      placeholder={
+                        activeAction === 'enhance'  ? 'e.g. Make it more concise and assertive...' :
+                        activeAction === 'rephrase' ? 'e.g. Use simpler words for client communication...' :
+                        activeAction === 'summarize'? 'e.g. Focus only on financial clauses...' :
+                        activeAction === 'format'   ? 'e.g. Add numbered headings and sub-clauses...' :
+                        'Type a custom instruction for the selected text...'
+                      }
+                      className="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 placeholder:text-sm outline-none focus:border-blue-500 focus:bg-white transition-[border-color,background-color] resize-none overflow-hidden min-h-[88px] leading-relaxed font-normal"
+                    />
                     <button
                       type="button"
-                      onClick={() => setInlineAiResponse('')}
-                      className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                      onClick={handleInlineCustomPromptSubmit}
+                      disabled={!inlineCustomPrompt.trim() || isInlineAiLoading}
+                      className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3.5 py-3 text-white disabled:opacity-40 transition-colors shrink-0 mt-0.5"
                     >
-                      Discard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleApplyInlineAiToDocument}
-                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white transition-colors"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Insert into Document
+                      {isInlineAiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
-              ) : null}
-            </div>
-          ) : null}
+
+                {/* AI Response */}
+                {inlineAiResponse ? (
+                  <div className="border-t border-gray-100 bg-gray-50/80 px-4 py-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Result</span>
+                      {isInlineAiLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />}
+                    </div>
+                    <div className="max-h-40 overflow-y-auto rounded-lg bg-white border border-gray-200 px-3.5 py-3 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap font-normal">
+                      {inlineAiResponse}
+                    </div>
+                    <div className="flex items-center justify-end gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setInlineAiResponse('')}
+                        className="text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors px-2 py-1"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApplyInlineAiToDocument}
+                        className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors"
+                      >
+                        <Check className="h-4 w-4" />
+                        Insert into Document
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </>,
+            document.body
+          )}
           {isCanvasLoading ? (
             <div className="absolute inset-0 bg-[#E3F0F7]/90 z-20">
               <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#E3F0F7] via-[#B9D9EB] to-[#E3F0F7]" />

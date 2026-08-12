@@ -4,6 +4,7 @@ import {
   ShieldCheck, Clock, HelpCircle, User, CreditCard, 
   ChevronRight, Check, Zap, Download, AlertCircle, Building2, Briefcase, GraduationCap
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getBillingHistory, createOrder, doPayment } from '../services/RazorpayService';
 
 /* ─────────────────────────────────────────────────────────────
@@ -48,12 +49,12 @@ const MOCK_HISTORY = [
    Main Billing Component
 ───────────────────────────────────────────────────────────── */
 export default function Billing() {
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('subscription');
   const [isAnnual, setIsAnnual] = useState(false);
   const [coupon, setCoupon] = useState('');
   const [billingHistory, setBillingHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [paying, setPaying] = useState(false);
+  const [processingId, setProcessingId] = useState(null);
   
   // State for Account Details selection
   const [accountType, setAccountType] = useState('personal');
@@ -76,47 +77,47 @@ export default function Billing() {
   }, []);
 
   const handlePlanPurchase = async (plan) => {
-    if (paying) return;
+    if (processingId) return;
     const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || '';
-    if (!sessionId) { alert('Please log in first.'); return; }
+    if (!sessionId) { toast.error('Please log in first.'); return; }
     const planId = plan.name.includes('Professional')
       ? (isAnnual ? 'PRO_ANNUAL' : 'PRO_MONTHLY')
       : 'BASIC_MONTHLY';
     try {
-      setPaying(true);
+      setProcessingId(plan.name);
       const orderData = await createOrder(planId, sessionId);
       await doPayment(
         orderData,
-        () => { alert('Payment successful! Your plan is now active.'); window.location.reload(); },
-        (err) => { alert('Payment failed or cancelled.'); console.error(err); }
+        () => { toast.success('Payment successful! Your plan is now active.'); setTimeout(() => window.location.reload(), 1500); },
+        (err) => { toast.error('Payment cancelled or incomplete.'); console.error(err); }
       );
     } catch (e) {
-      alert('Could not initiate payment. Please try again.');
+      toast.error('Could not initiate payment. Please try again.');
       console.error(e);
     } finally {
-      setPaying(false);
+      setProcessingId(null);
     }
   };
 
   const handleTopUpPurchase = async (pack) => {
-    if (paying) return;
+    if (processingId) return;
     const sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || '';
-    if (!sessionId) { alert('Please log in first.'); return; }
+    if (!sessionId) { toast.error('Please log in first.'); return; }
     const packIdMap = { 'Pack A': 'pack_a', 'Pack B': 'pack_b', 'Pack C': 'pack_c' };
     const planId = packIdMap[pack.name] || 'pack_a';
     try {
-      setPaying(true);
+      setProcessingId(pack.name);
       const orderData = await createOrder(planId, sessionId);
       await doPayment(
         orderData,
-        () => { alert(`Credits purchased! ${pack.credits} credits added to your wallet.`); window.location.reload(); },
-        (err) => { alert('Payment failed or cancelled.'); console.error(err); }
+        () => { toast.success(`Credits purchased! ${pack.credits} credits added to your wallet.`); setTimeout(() => window.location.reload(), 1500); },
+        (err) => { toast.error('Payment cancelled or incomplete.'); console.error(err); }
       );
     } catch (e) {
-      alert('Could not initiate payment. Please try again.');
+      toast.error('Could not initiate payment. Please try again.');
       console.error(e);
     } finally {
-      setPaying(false);
+      setProcessingId(null);
     }
   };
 
@@ -224,11 +225,11 @@ export default function Billing() {
 
                         <button
                           onClick={() => handlePlanPurchase(plan)}
-                          disabled={paying}
+                          disabled={Boolean(processingId)}
                           className={`w-full py-3 rounded-xl text-sm font-bold transition-all mb-4 ${
-                            paying ? 'opacity-60 cursor-not-allowed' : ''
+                            processingId === plan.name ? 'opacity-70 cursor-wait bg-blue-700 text-white' : Boolean(processingId) ? 'opacity-50 cursor-not-allowed' : ''
                           } ${plan.highlight ? 'bg-[#0F1C2E] text-white hover:bg-slate-800 shadow-md' : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'}`}>
-                          {paying ? 'Processing...' : plan.buttonText}
+                          {processingId === plan.name ? 'Processing...' : plan.buttonText}
                         </button>
 
                         {isAnnual && (
@@ -268,11 +269,11 @@ export default function Billing() {
                         </div>
                         <button
                           onClick={() => handleTopUpPurchase(pack)}
-                          disabled={paying}
+                          disabled={Boolean(processingId)}
                           className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
-                            paying ? 'opacity-60 cursor-not-allowed' : ''
+                            processingId === pack.name ? 'opacity-70 cursor-wait bg-blue-700 text-white' : Boolean(processingId) ? 'opacity-50 cursor-not-allowed' : ''
                           } ${pack.highlight ? 'bg-white text-[#0F1C2E] hover:bg-slate-100' : 'bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100'}`}>
-                          {paying ? 'Processing...' : 'Buy Pack'}
+                          {processingId === pack.name ? 'Processing...' : 'Buy Pack'}
                         </button>
                       </div>
                     ))}

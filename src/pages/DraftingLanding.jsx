@@ -56,7 +56,10 @@ const DraftingLanding = () => {
     };
 
     useEffect(() => {
-        if (location.state?.openDrafting) {
+        const savedIntake = sessionStorage.getItem('draftmate_active_intake');
+        if (savedIntake) {
+            setIsModalOpen(true);
+        } else if (location.state?.openDrafting) {
             setInitialDraftingPrompt(location.state.prompt || '');
             setIsModalOpen(true);
             navigate(location.pathname, { replace: true, state: {} });

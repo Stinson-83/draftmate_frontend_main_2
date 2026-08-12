@@ -198,8 +198,9 @@ class VerifyOTPRequest(BaseModel):
     otp: str
 
 class ResetPasswordRequest(BaseModel):
-    email: str
-    otp: str
+    token: Optional[str] = None
+    email: Optional[str] = None
+    otp: Optional[str] = None
     new_password: str
 
 class ProfileUpdate(BaseModel):
@@ -691,6 +692,21 @@ def logout(model: LogoutModel):
         cur.close()
         conn.close()
 
+def ensure_otp_table(cur, conn):
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS password_reset_otps (
+                email VARCHAR(255) PRIMARY KEY,
+                otp_code VARCHAR(10) NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"ensure_otp_table warning: {e}")
+
 @app.post("/forgot-password")
 def forgot_password(request: ForgotPasswordRequest):
     import random
@@ -698,6 +714,7 @@ def forgot_password(request: ForgotPasswordRequest):
     cur = conn.cursor()
     
     try:
+        ensure_otp_table(cur, conn)
         # 1. Check if user exists (case-insensitive)
         email_lower = request.email.strip().lower() if request.email else ""
         cur.execute("SELECT id FROM users WHERE LOWER(email) = %s", (email_lower,))
@@ -767,17 +784,22 @@ def verify_otp(request: VerifyOTPRequest):
             
         stored_otp, expires_at = row
         
-        # Ensure timezone compatibility
-        now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+        stored_clean = str(stored_otp).strip()
+        user_otp_clean = str(request.otp).strip()
         
-        if now > expires_at:
-            # Delete expired OTP
-            cur.execute("DELETE FROM password_reset_otps WHERE email = %s", (email_lower,))
-            conn.commit()
+        if user_otp_clean != stored_clean:
+            print(f"OTP mismatch for {email_lower}: user input '{user_otp_clean}' vs stored '{stored_clean}'")
             raise HTTPException(status_code=400, detail="Invalid code or code expired.")
-            
-        if request.otp.strip() != stored_otp:
-            raise HTTPException(status_code=400, detail="Invalid code or code expired.")
+
+        # Check Expiration with timezone tolerance
+        if expires_at and isinstance(expires_at, datetime):
+            clean_expires = expires_at.replace(tzinfo=None)
+            now_utc = datetime.utcnow()
+            # Add 15 min buffer to account for host/container timezone offsets
+            if now_utc > (clean_expires + timedelta(minutes=15)):
+                cur.execute("DELETE FROM password_reset_otps WHERE email = %s", (email_lower,))
+                conn.commit()
+                raise HTTPException(status_code=400, detail="Invalid code or code expired.")
             
         # 2. Get User ID
         cur.execute("SELECT id FROM users WHERE LOWER(email) = %s", (email_lower,))
@@ -817,34 +839,43 @@ def reset_password(request: ResetPasswordRequest):
     cur = conn.cursor()
     
     try:
-        # 1. Verify Token
-        try:
-            payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id = payload.get("sub")
-            token_type = payload.get("type")
-            
-            if not user_id or token_type != "reset_password":
-                raise HTTPException(status_code=400, detail="Invalid token content")
+        user_id = None
+        if request.token:
+            try:
+                payload = jwt.decode(request.token, SECRET_KEY, algorithms=[ALGORITHM])
+                user_id = payload.get("sub")
+                token_type = payload.get("type")
                 
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=400, detail="Token has expired. Please request a new one.")
-        except jwt.InvalidTokenError:
-            raise HTTPException(status_code=400, detail="Invalid token")
+                if not user_id or token_type != "reset_password":
+                    raise HTTPException(status_code=400, detail="Invalid reset token content.")
+                    
+            except jwt.ExpiredSignatureError:
+                raise HTTPException(status_code=400, detail="Token has expired. Please request a new code.")
+            except jwt.InvalidTokenError:
+                raise HTTPException(status_code=400, detail="Invalid or corrupt reset token.")
+        elif request.email:
+            email_lower = request.email.strip().lower()
+            cur.execute("SELECT id FROM users WHERE LOWER(email) = %s", (email_lower,))
+            user = cur.fetchone()
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            user_id = user[0]
+        else:
+            raise HTTPException(status_code=400, detail="Reset token or email is required.")
 
         # 2. Update Password
         hashed_pwd = hash_password(request.new_password)
         
-        cur.execute("UPDATE users SET password = %s, password_hash = %s WHERE id = %s", (hashed_pwd, hashed_pwd, user_id))
+        try:
+            cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (hashed_pwd, user_id))
+        except Exception:
+            conn.rollback()
+            cur.execute("UPDATE users SET password = %s, password_hash = %s WHERE id = %s", (hashed_pwd, hashed_pwd, user_id))
         
         if cur.rowcount == 0:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=404, detail="User account not found.")
             
         conn.commit()
-        
-        # Optional: Revoke existing sessions?
-        # cur.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))
-        # conn.commit()
-        
         return {"message": "Password updated successfully"}
         
     except HTTPException as he:
