@@ -1,0 +1,32 @@
+{
+  "id": "indian-evidence-act",
+  "name": "The Indian Evidence Act, 1872",
+  "shortName": "Evidence Act",
+  "category": "Criminal Law",
+  "totalSections": 167,
+  "lastUpdated": "2020-03-13",
+  "description": "The Indian Evidence Act, 1872 consolidates, defines, and amends the law of evidence in India.",
+  "chapters": [
+    {
+      "id": "ch1",
+      "title": "Chapter I",
+      "subtitle": "Preliminary",
+      "sections": [
+        { "number": "1", "title": "Short title, extent and commencement", "content": "This Act may be called the Indian Evidence Act, 1872. It extends to the whole of India and applies to all judicial proceedings in or before any Court, including Courts-martial..." },
+        { "number": "2", "title": "[Repeal of enactments.]", "content": "[Repeal of enactments.].––Rep. by the Repealing Act, 1938 (1 of 1938), s. 2 and Schedule." },
+        { "number": "3", "title": "Interpretation-clause", "content": "In this Act the following words and expressions are used in the following senses, unless a contrary intention appears from the context: \"Court\" includes all Judges and Magistrates... \"Fact\" means and includes anything, state of things..." },
+        { "number": "4", "title": "\"May Presume\" \"Shall presume\" \"Conclusive proof\"", "content": "Whenever it is provided by this Act that the Court may presume a fact, it may either regard such fact as proved, unless and until it is disproved..." }
+      ]
+    },
+    {
+      "id": "ch2",
+      "title": "Chapter II",
+      "subtitle": "Of the Relevancy of Facts",
+      "sections": [
+        { "number": "5", "title": "Evidence may be given of facts in issue and relevant facts", "content": "Evidence may be given in any suit or proceeding of the existence or non-existence of every fact in issue and of such other facts as are hereinafter declared to be relevant..." },
+        { "number": "6", "title": "Relevancy of facts forming part of same transaction", "content": "Facts which, though not in issue, are so connected with a fact in issue as to form part of the same transaction, are relevant..." },
+        { "number": "7", "title": "Facts which are the occasion, cause or effect of facts in issue", "content": "Facts which are the occasion, cause or effect, immediate or otherwise, of relevant facts, or facts in issue..." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+"""
+Base Agent - Foundation for all specialized agents
+
+Supports:
+- Dual LLM modes (fast/reasoning)
+- Both Gemini and OpenAI providers
+- Query enhancement for better search
+"""
+
+import os
+import threading
+from typing import Literal
+from cachetools import LRUCache
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
+from langchain_core.language_models.chat_models import BaseChatModel
+
+from lex_bot.core.llm_factory import LLMFactory, get_llm
+from lex_bot.config import LLM_PROVIDER
+
+# Cache enhanced queries: legal queries repeat heavily across users and sessions.
+# Key: (normalized_query, agent_type) — mode-independent since enhance_query uses fast LLM always.
+_enhance_cache: LRUCache = LRUCache(maxsize=500)
+_enhance_cache_lock = threading.Lock()
+
+
+class BaseAgent:
+    """
+    Base class for all Lex Bot agents.
+    
+    Provides:
+    - LLM initialization with mode selection
+    - Query enhancement for search optimization
+    """
+    
+    def __init__(
+        self,
+        mode: Literal["fast", "reasoning"] = "fast",
+        provider: Literal["gemini", "openai"] = None
+    ):
+        """
+        Initialize agent with specified LLM configuration.
+        
+        Args:
+            mode: "fast" for quick responses, "reasoning" for complex analysis
+            provider: "gemini" or "openai". Defaults to config.
+        """
+        self.mode = mode
+        self.provider = provider or LLM_PROVIDER
+        self.llm = self._init_llm()
+    
+    def _init_llm(self) -> BaseChatModel:
+        """Initialize LLM using factory."""
+        return LLMFactory.create(mode=self.mode, provider=self.provider)
+    
+    def switch_mode(self, mode: Literal["fast", "reasoning"]):
+        """Switch LLM mode dynamically."""
+        self.mode = mode
+        self.llm = self._init_llm()
+    
+    def enhance_query(self, query: str, agent_type: str) -> str:
+        """
+        Enhance the user query for better search results.
+        
+        Args:
+            query: Original user query
+            agent_type: Type of agent ("law", "case", "general")
+            
+        Returns:
+            Enhanced query string
+        """
+        system_prompt = ""
+        
+        if agent_type == "law":
+            system_prompt = """You are a legal search optimizer.
+            Input: A user query about Indian Law.
+            Output: A single line of 5-8 relevant search keywords.
+            - Include the specific act or section if relevant (e.g. "Article 21").
+            - NO explanations, NO lists, NO markdown. Just keywords separated by spaces."""
+        
+        elif agent_type == "case":
+            system_prompt = """You are a case law research specialist.
+            Input: An unstructured user query about Indian legal cases.
+            Output: A single line of 5-8 relevant search keywords.
+            Instructions:
+            - Structure roughly as: "Case Name + Court Name + Date of Judgment"
+            - Extract case name, court, date from query if available
+            - Focus on landmark case names or specific doctrines.
+            - NO explanations, NO lists, NO markdown. Just keywords."""
+        
+        else:
+            system_prompt = """You are a legal search optimizer.
+            Input: A legal research query.
+            Output: A single line of 5-8 search keywords. Just keywords, no formatting."""
+        
+        cache_key = (query.strip().lower(), agent_type)
+        if cache_key in _enhance_cache:
+            return _enhance_cache[cache_key]
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", "{query}")
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+
+        try:
+            result = chain.invoke({"query": query})
+            with _enhance_cache_lock:
+                _enhance_cache[cache_key] = result
+            return result
+        except Exception as e:
+            return query
+
+    def _generate_followups(self, query: str, answer: str) -> list[str]:
+        """Generate 3 follow-up questions based on the answer."""
+        prompt = ChatPromptTemplate.from_template("""
+        You are a helpful legal assistant.
+        Based on the user's query and your answer, suggest 3 relevant follow-up questions the user might want to ask next.
+        
+        Query: {query}
+        Answer: {answer}
+        
+        Return ONLY a JSON list of strings, e.g.: ["Question 1?", "Question 2?", "Question 3?"]
+        """)
+        chain = prompt | self.llm | JsonOutputParser()
+        try:
+            return chain.invoke({"query": query, "answer": answer[:2000]})
+        except Exception:
+            return []

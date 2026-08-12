@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.local
+.git
+.gitignore
+*.log
+alembic/versions/*.pyc
+.vscode
+.idea

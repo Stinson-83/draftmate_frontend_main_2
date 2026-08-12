@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+boto3
+sqlalchemy
+psycopg2-binary
+pgvector
+requests
+google-generativeai
+paramiko
+sshtunnel
+sentence-transformers

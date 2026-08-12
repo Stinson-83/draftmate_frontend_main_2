@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+requests
+razorpay
+psycopg2-binary
+python-dotenv
+sshtunnel
+paramiko
+python-dateutil

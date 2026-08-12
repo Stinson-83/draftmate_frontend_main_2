@@ -1,0 +1,494 @@
+import axios from 'axios';
+import { API_CONFIG } from './endpoints';
+
+const API_BASE_URL = API_CONFIG.LEX_BOT.BASE_URL;
+const NOTIFICATION_BASE_URL = API_CONFIG.NOTIFICATION.BASE_URL;
+const TRANSLATOR_BASE_URL = API_CONFIG.TRANSLATOR.BASE_URL;
+
+const getTranslatorUserHeader = (userId) => (userId ? { 'X-User-Id': userId } : {});
+
+export const api = {
+    /**
+     * Get current LLM configuration.
+     * @returns {Promise<Object>} - { current_model, available_models, modes }
+     */
+    getLLMConfig: async () => {
+        const response = await fetch(`${API_BASE_URL}/config/llm`, {
+            method: 'GET',
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to get LLM config: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Set LLM model at runtime.
+     * @param {string} model - The model to switch to.
+     * @returns {Promise<Object>} - Updated configuration.
+     */
+    setLLMConfig: async (model) => {
+        const response = await fetch(`${API_BASE_URL}/config/llm`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ model }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to set LLM config: ${errorText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Upload a PDF file to the backend.
+     * @param {File} file - The file object to upload.
+     * @param {string} sessionId - The current session ID.
+     * @returns {Promise<Object>} - The JSON response from the server.
+     */
+    uploadFile: async (file, sessionId) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('session_id', sessionId);
+
+        const response = await fetch(`${API_BASE_URL}/upload`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `Upload failed with status ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Send a chat query to the backend (non-streaming).
+     * @param {string} query - The user's question.
+     * @param {string} sessionId - The current session ID.
+     * @param {boolean} reasoning - Whether to use reasoning mode.
+     * @returns {Promise<Object>} - The JSON response containing the answer.
+     */
+    chat: async (query, sessionId, reasoning = false) => {
+        const endpoint = reasoning ? '/chat/reasoning' : '/chat';
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+            },
+            body: JSON.stringify({
+                query: query,
+                session_id: sessionId,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Chat failed: ${response.status} ${errorText}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Send a chat query with streaming response (SSE).
+     * @param {string} query - The user's question.
+     * @param {string} sessionId - The current session ID.
+     * @param {Object} callbacks - Event callbacks { onStatus, onAnswer, onFollowups, onDone, onError }
+     */
+    chatStream: async (query, sessionId, callbacks = {}) => {
+        const { onStatus, onToken, onAnswer, onFollowups, onSources, onDone, onError, onNodeUpdate, onNodeStream } = callbacks;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+                },
+                body: JSON.stringify({
+                    query: query,
+                    session_id: sessionId,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Stream failed: ${response.status} ${errorText}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep incomplete line in buffer
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const event = JSON.parse(line.slice(6));
+
+                            switch (event.event) {
+                                case 'status':
+                                    onStatus?.(event.message, event.quote);
+                                    break;
+                                case 'token':
+                                    onToken?.(event.chunk, event.accumulated);
+                                    break;
+                                case 'answer_complete':
+                                    onAnswer?.(event.content);
+                                    break;
+                                case 'answer':
+                                    onAnswer?.(event.content);
+                                    break;
+                                case 'followups':
+                                    onFollowups?.(event.questions);
+                                    break;
+                                case 'sources':
+                                    onSources?.(event.sources);
+                                    break;
+                                case 'done':
+                                    onDone?.(event);
+                                    break;
+                                case 'node_update':
+                                    onNodeUpdate?.(event);
+                                    break;
+                                case 'node_stream':
+                                    onNodeStream?.(event);
+                                    break;
+                                case 'error':
+                                    onError?.(new Error(event.message));
+                                    break;
+                            }
+                        } catch {
+                            console.warn('Failed to parse SSE event:', line);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            onError?.(error);
+            throw error;
+        }
+    },
+    /**
+     * Get list of user sessions.
+     * @returns {Promise<Object>} - { sessions: [], total: int }
+     */
+    getSessions: async () => {
+        const response = await fetch(`${API_BASE_URL}/sessions`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch sessions: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    /**
+     * Get history for a specific session.
+     * @param {string} sessionId 
+     * @returns {Promise<Object>} - Session object with messages
+     */
+    getSessionHistory: async (sessionId) => {
+        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch session history: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    submitTranslationJob: async ({ file, targetLanguage, sourceLanguage = 'auto', userId, onUploadProgress }) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('target_language', targetLanguage);
+        if (sourceLanguage) {
+            formData.append('source_language', sourceLanguage);
+        }
+
+        try {
+            const response = await axios.post(
+                `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.CREATE_JOB}`,
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        ...getTranslatorUserHeader(userId),
+                    },
+                    onUploadProgress,
+                }
+            );
+
+            return response.data;
+        } catch (error) {
+            const detail = error?.response?.data?.detail;
+            const message = Array.isArray(detail)
+                ? detail.map((item) => item?.msg || item?.detail || String(item)).join(', ')
+                : detail || error?.response?.data?.message || error?.message;
+            throw new Error(message || 'Failed to submit translation job');
+        }
+    },
+
+    getTranslationJob: async (jobId, userId) => {
+        const response = await fetch(`${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.GET_JOB(jobId)}`, {
+            method: 'GET',
+            headers: getTranslatorUserHeader(userId),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `Failed to fetch translation job: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    listTranslationJobs: async ({ userId, limit = 20 } = {}) => {
+        const params = new URLSearchParams();
+        params.set('limit', String(limit));
+
+        const response = await fetch(
+            `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.LIST_JOBS}?${params.toString()}`,
+            {
+                method: 'GET',
+                headers: getTranslatorUserHeader(userId),
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `Failed to fetch translation jobs: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
+    getTranslationDownloadUrl: (jobId) => `${TRANSLATOR_BASE_URL}${API_CONFIG.TRANSLATOR.ENDPOINTS.DOWNLOAD_JOB(jobId)}`,
+    getTranslationSourceUrl: (jobId) => `${TRANSLATOR_BASE_URL}/translation-jobs/${jobId}/source`,
+
+    /**
+     * Send email notification for calendar event.
+     * @param {string} toEmail - Recipient email
+     * @param {string} subject - Email subject
+     * @param {string} body - Email body
+     */
+    sendEmailNotification: async (toEmail, subject, body) => {
+        const response = await fetch(`${NOTIFICATION_BASE_URL}/send-email`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                to_email: toEmail,
+                subject: subject,
+                body: body
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to send email notification');
+        }
+        return response.json();
+    },
+
+    // =======================================================================
+    // NOTIFICATION CRUD API
+    // =======================================================================
+
+    /**
+     * Get all notifications for a user.
+     * @param {string} userId - User identifier
+     * @param {Object} options - Filter options { type, unreadOnly, limit }
+     * @returns {Promise<Array>} - List of notifications
+     */
+    getNotifications: async (userId, options = {}) => {
+        try {
+            const params = new URLSearchParams();
+            if (options.type) params.append('type', options.type);
+            if (options.unreadOnly) params.append('unread_only', 'true');
+            if (options.limit) params.append('limit', options.limit.toString());
+
+            const queryString = params.toString();
+            const url = `${NOTIFICATION_BASE_URL}/notifications/${userId}${queryString ? `?${queryString}` : ''}`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch notifications');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - returning empty notifications');
+            return [];
+        }
+    },
+
+    /**
+     * Get unread notification count.
+     * @param {string} userId - User identifier
+     * @returns {Promise<Object>} - { user_id, unread_count }
+     */
+    getUnreadCount: async (userId) => {
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/count`, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch unread count');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - returning 0 unread count');
+            return { user_id: userId, unread_count: 0 };
+        }
+    },
+
+    /**
+     * Create a new notification.
+     * @param {Object} notification - { user_id, type, title, message, metadata }
+     * @returns {Promise<Object>} - Created notification
+     */
+    createNotification: async (notification) => {
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(notification),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create notification');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - notification not created');
+            return null;
+        }
+    },
+
+    /**
+     * Mark a notification as read.
+     * @param {string} notificationId - Notification ID
+     * @returns {Promise<Object>} - Updated notification
+     */
+    markNotificationRead: async (notificationId) => {
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}/read`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to mark notification as read');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - mark as read failed');
+            return null;
+        }
+    },
+
+    /**
+     * Mark all notifications as read for a user.
+     * @param {string} userId - User identifier
+     * @returns {Promise<Object>} - { success, message, affected_count }
+     */
+    markAllNotificationsRead: async (userId) => {
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/read-all`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to mark all as read');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - mark all as read failed');
+            return null;
+        }
+    },
+
+    /**
+     * Delete a notification.
+     * @param {string} notificationId - Notification ID
+     * @returns {Promise<Object>} - { success, message }
+     */
+    deleteNotification: async (notificationId) => {
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${notificationId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete notification');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - delete failed');
+            return null;
+        }
+    },
+
+    /**
+     * Delete all notifications for a user.
+     * @param {string} userId - User identifier
+     * @returns {Promise<Object>} - { success, message, affected_count }
+     */
+    deleteAllNotifications: async (userId) => {
+        try {
+            const response = await fetch(`${NOTIFICATION_BASE_URL}/notifications/${userId}/all`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete all notifications');
+            }
+            return response.json();
+        } catch (err) {
+            console.warn('Notification service unavailable - delete all failed');
+            return null;
+        }
+    },
+};
+

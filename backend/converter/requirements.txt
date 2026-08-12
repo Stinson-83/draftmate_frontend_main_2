@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+boto3
+pdf2docx
+docx2pdf
+python-docx
+pypandoc
+pdf2image
+requests
+beautifulsoup4
+python-multipart

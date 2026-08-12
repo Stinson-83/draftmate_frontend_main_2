@@ -1,0 +1,192 @@
+export const dictionaryCategories = [
+  "All",
+  "Constitutional Law",
+  "Criminal Law",
+  "Civil Law",
+  "Corporate Law",
+  "General Legal Terms",
+  "Latin Maxims"
+];
+
+export const mockLegalDictionary = [
+  {
+    id: "mens-rea",
+    term: "Mens Rea",
+    category: "Criminal Law",
+    shortMeaning: "Guilty mind; intention to commit a crime",
+    definition: "Mens Rea is a Latin term meaning 'guilty mind'. It refers to the mental state of a person when they commit a crime.",
+    explanation: "In criminal law, it is a fundamental principle that for a person to be held liable for a crime, they must have had a guilty state of mind. This distinguishes between accidental acts and intentional criminal behavior.",
+    example: "If a person accidentally hits someone with their car, they may not have mens rea, but if they intentionally hit someone, they do.",
+    relatedTerms: ["Actus Reus", "Intention", "Negligence"],
+    usageInIndianLaw: "Under the Indian Penal Code (IPC), most offences require both actus reus and mens rea for conviction.",
+    keywords: ["guilty mind", "intention", "criminal liability"]
+  },
+  {
+    id: "actus-reus",
+    term: "Actus Reus",
+    category: "Criminal Law",
+    shortMeaning: "Guilty act; the physical element of a crime",
+    definition: "Actus Reus is a Latin term meaning 'guilty act'. It refers to the physical act or omission that constitutes the criminal offence.",
+    explanation: "The physical element of a crime includes the act itself, the circumstances surrounding the act, and the consequences of the act.",
+    example: "Stealing someone's property is the actus reus of theft.",
+    relatedTerms: ["Mens Rea", "Omission", "Causation"],
+    usageInIndianLaw: "Section 32 of the IPC defines acts and omissions.",
+    keywords: ["guilty act", "physical element", "omission"]
+  },
+  {
+    id: "res-judicata",
+    term: "Res Judicata",
+    category: "Civil Law",
+    shortMeaning: "A matter already judged; cannot be re-litigated",
+    definition: "Res Judicata is a Latin maxim meaning 'a matter already judged'. It is a legal principle that prevents parties from re-litigating issues that have already been decided by a competent court.",
+    explanation: "This principle ensures finality in judicial proceedings and avoids abuse of the court system.",
+    example: "If a court has already decided that a contract is invalid, the same parties cannot sue again on the same contract.",
+    relatedTerms: ["Estoppel", "Locus Standi", "Finality"],
+    usageInIndianLaw: "Section 11 of the Code of Civil Procedure, 1908 incorporates the principle of res judicata.",
+    keywords: ["already judged", "finality", "re-litigation"]
+  },
+  {
+    id: "locus-standi",
+    term: "Locus Standi",
+    category: "General Legal Terms",
+    shortMeaning: "Right to appear in court; legal standing",
+    definition: "Locus Standi is a Latin term meaning 'right to stand'. It refers to the legal right of a person to appear in court and be heard.",
+    explanation: "A person must have a sufficient connection to the legal issue to have standing to challenge it in court.",
+    example: "Only a person who has suffered a legal injury has locus standi to file a suit.",
+    relatedTerms: ["Public Interest Litigation", "Jurisdiction", "Standing"],
+    usageInIndianLaw: "In India, PIL allows any person or organization to file a suit on behalf of marginalized groups.",
+    keywords: ["legal standing", "right to sue", "PIL"]
+  },
+  {
+    id: "estoppel",
+    term: "Estoppel",
+    category: "Civil Law",
+    shortMeaning: "Prevented from going back on a promise",
+    definition: "Estoppel is a legal principle that prevents a person from going back on their word or promise if another person has relied on it.",
+    explanation: "There are several types of estoppel, including promissory estoppel and equitable estoppel.",
+    example: "If a landlord promises not to evict a tenant and the tenant relies on that promise, the landlord may be estopped from evicting.",
+    relatedTerms: ["Promissory Estoppel", "Equitable Estoppel", "Reliance"],
+    usageInIndianLaw: "Estoppel is recognized under the Indian Evidence Act, 1872.",
+    keywords: ["promise", "reliance", "equitable"]
+  },
+  {
+    id: "habeas-corpus",
+    term: "Habeas Corpus",
+    category: "Constitutional Law",
+    shortMeaning: "You have the body; writ for illegal detention",
+    definition: "Habeas Corpus is a Latin term meaning 'you have the body'. It is a writ used to challenge illegal detention.",
+    explanation: "This writ is considered the 'great writ' and is used to protect personal liberty.",
+    example: "If a person is detained without a valid reason, their family can file a habeas corpus petition.",
+    relatedTerms: ["Mandamus", "Certiorari", "Quo Warranto"],
+    usageInIndianLaw: "Under Article 32 of the Indian Constitution, the Supreme Court can issue writs including habeas corpus.",
+    keywords: ["writ", "liberty", "detention"]
+  },
+  {
+    id: "certiorari",
+    term: "Certiorari",
+    category: "Constitutional Law",
+    shortMeaning: "To be certified; writ to quash lower court order",
+    definition: "Certiorari is a Latin term meaning 'to be certified'. It is a writ issued by a higher court to quash the order of a lower court or tribunal.",
+    explanation: "This writ is used to correct errors of jurisdiction or law.",
+    example: "If a lower court exceeds its jurisdiction, a writ of certiorari can be filed.",
+    relatedTerms: ["Habeas Corpus", "Mandamus", "Prohibition"],
+    usageInIndianLaw: "Article 226 of the Constitution gives High Courts the power to issue writs.",
+    keywords: ["writ", "quash", "jurisdiction"]
+  },
+  {
+    id: "mandamus",
+    term: "Mandamus",
+    category: "Constitutional Law",
+    shortMeaning: "We command; writ to enforce public duty",
+    definition: "Mandamus is a Latin term meaning 'we command'. It is a writ issued by a court to a public official to perform their legal duties.",
+    explanation: "This writ compels the performance of a legal duty.",
+    example: "If a public official refuses to perform a mandatory duty, a writ of mandamus can be sought.",
+    relatedTerms: ["Habeas Corpus", "Certiorari", "Prohibition"],
+    usageInIndianLaw: "Available under Articles 32 and 226 of the Indian Constitution.",
+    keywords: ["writ", "public duty", "command"]
+  },
+  {
+    id: "injunction",
+    term: "Injunction",
+    category: "Civil Law",
+    shortMeaning: "Court order to do or not do something",
+    definition: "An injunction is a court order that requires a party to do or refrain from doing a specific act.",
+    explanation: "Injunctions are equitable remedies that protect rights during legal proceedings.",
+    example: "A court may issue an injunction to stop a company from infringing on a patent.",
+    relatedTerms: ["Temporary Injunction", "Permanent Injunction", "Stay Order"],
+    usageInIndianLaw: "Governed by Order 39 of the Code of Civil Procedure.",
+    keywords: ["court order", "equitable", "stay"]
+  },
+  {
+    id: "tort",
+    term: "Tort",
+    category: "Civil Law",
+    shortMeaning: "Civil wrong causing harm or injury",
+    definition: "A tort is a civil wrong that causes harm or injury to another person, leading to legal liability.",
+    explanation: "Torts can be intentional or negligent.",
+    example: "Negligently causing a car accident is a tort.",
+    relatedTerms: ["Negligence", "Damages", "Assault"],
+    usageInIndianLaw: "Tort law is part of civil law in India, though not codified.",
+    keywords: ["civil wrong", "negligence", "damages"]
+  },
+  {
+    id: "ignorantia-juris-non-excusat",
+    term: "Ignorantia Juris Non Excusat",
+    category: "Latin Maxims",
+    shortMeaning: "Ignorance of law is no excuse",
+    definition: "A Latin maxim meaning that not knowing the law does not excuse a person from liability for violating it.",
+    explanation: "This principle is based on the presumption that everyone knows the law.",
+    example: "A person cannot claim they didn't know theft was illegal to avoid prosecution.",
+    relatedTerms: ["Mens Rea", "Strict Liability", "Ignorantia Facti Excusat"],
+    usageInIndianLaw: "This maxim is recognized in Indian criminal and civil law.",
+    keywords: ["ignorance", "law", "liability"]
+  },
+  {
+    id: "ignorantia-facti-excusat",
+    term: "Ignorantia Facti Excusat",
+    category: "Latin Maxims",
+    shortMeaning: "Ignorance of fact is an excuse",
+    definition: "A Latin maxim meaning that not knowing a fact can excuse a person from liability.",
+    explanation: "This is distinguished from ignorance of law, which is not an excuse.",
+    example: "If a person takes an item believing it to be their own, they may not be guilty of theft.",
+    relatedTerms: ["Ignorantia Juris Non Excusat", "Mistake of Fact", "Mistake of Law"],
+    usageInIndianLaw: "Recognized under Section 76 of the Indian Penal Code.",
+    keywords: ["ignorance", "fact", "mistake"]
+  },
+  {
+    id: "actio-personalis-moritur-cum-persona",
+    term: "Actio Personalis Moritur Cum Persona",
+    category: "Latin Maxims",
+    shortMeaning: "A personal action dies with the person",
+    definition: "A Latin maxim meaning that a personal cause of action dies with the death of the person.",
+    explanation: "Some legal actions cannot be continued after the death of a party.",
+    example: "A claim for defamation cannot be continued by the heirs of the deceased.",
+    relatedTerms: ["Estate", "Heirs", "Legal Representative"],
+    usageInIndianLaw: "The maxim has limited application in Indian law.",
+    keywords: ["personal action", "death", "heirs"]
+  },
+  {
+    id: "audi-alteram-partem",
+    term: "Audi Alteram Partem",
+    category: "Latin Maxims",
+    shortMeaning: "Hear the other side",
+    definition: "A Latin maxim meaning that both parties must be given a chance to be heard before a decision is made.",
+    explanation: "This is a fundamental principle of natural justice.",
+    example: "A court cannot decide a case without hearing both the plaintiff and the defendant.",
+    relatedTerms: ["Natural Justice", "Nemo Judex in Causa Sua", "Fair Hearing"],
+    usageInIndianLaw: "Principles of natural justice are part of Indian constitutional law.",
+    keywords: ["natural justice", "hearing", "fairness"]
+  },
+  {
+    id: "nemo-judex-in-causa-sua",
+    term: "Nemo Judex in Causa Sua",
+    category: "Latin Maxims",
+    shortMeaning: "No one should be a judge in their own case",
+    definition: "A Latin maxim meaning that a person cannot decide a case in which they have a personal interest.",
+    explanation: "This is another fundamental principle of natural justice.",
+    example: "A judge who is related to one of the parties must recuse themselves from the case.",
+    relatedTerms: ["Natural Justice", "Audi Alteram Partem", "Bias"],
+    usageInIndianLaw: "Violation of this principle makes judicial orders voidable.",
+    keywords: ["judge", "bias", "natural justice"]
+  }
+];

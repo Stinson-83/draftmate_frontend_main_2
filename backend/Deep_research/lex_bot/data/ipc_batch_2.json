@@ -1,0 +1,205 @@
+{
+    "3": {
+        "title": "Punishment of offences committed beyond, but which by law may be tried within, India",
+        "description": "Any person liable, by any Indian law, to be tried for an offence committed beyond India shall be dealt with according to the provisions of this Code for any act committed beyond India in the same manner as if such act had been committed within India.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "1"
+    },
+    "34": {
+        "title": "Acts done by several persons in furtherance of common intention",
+        "description": "When a criminal act is done by several persons in furtherance of the common intention of all, each of such persons is liable for that act in the same manner as if it were done by him alone.",
+        "offense": "Common Intention (Principle)",
+        "punishment": "Same as the offense committed",
+        "bns_equivalent": "3(5)"
+    },
+    "76": {
+        "title": "Act done by a person bound, or by mistake of fact believing himself bound, by law",
+        "description": "Nothing is an offence which is done by a person who is, or who by reason of a mistake of fact and not by reason of a mistake of law in good faith believes himself to be, bound by law to do it.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "14"
+    },
+    "80": {
+        "title": "Accident in doing a lawful act",
+        "description": "Nothing is an offence which is done by accident or misfortune, and without any criminal intention or knowledge in the doing of a lawful act in a lawful manner by lawful means and with proper care and caution.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "18"
+    },
+    "82": {
+        "title": "Act of a child under seven years of age",
+        "description": "Nothing is an offence which is done by a child under seven years of age.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "20"
+    },
+    "83": {
+        "title": "Act of a child above seven and under twelve of immature understanding",
+        "description": "Nothing is an offence which is done by a child above seven years of age and under twelve, who has not attained sufficient maturity of understanding to judge of the nature and consequences of his conduct on that occasion.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "21"
+    },
+    "84": {
+        "title": "Act of a person of unsound mind",
+        "description": "Nothing is an offence which is done by a person who, at the time of doing it, by reason of unsoundness of mind, is incapable of knowing the nature of the act, or that he is doing what is either wrong or contrary to law.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "22"
+    },
+    "96": {
+        "title": "Things done in private defence",
+        "description": "Nothing is an offence which is done in the exercise of the right of private defence.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "34"
+    },
+    "97": {
+        "title": "Right of private defence of the body and of property",
+        "description": "Every person has a right, subject to the restrictions contained in section 99, to defend: First—His own body, and the body of any other person, against any offence affecting the human body. Second—The property, whether movable or immovable, of himself or of any other person, against any act which is an offence falling under the definition of theft, robbery, mischief or criminal trespass, or which is an attempt to commit theft, robbery, mischief or criminal trespass.",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "35"
+    },
+    "100": {
+        "title": "When the right of private defence of the body extends to causing death",
+        "description": "The right of private defence of the body extends, under the restrictions mentioned in the last preceding section, to the voluntary causing of death or of any other harm to the assailant, if the offence which occasions the exercise of the right be of any of the descriptions hereinafter enumerated, namely:— First.—Such an assault as may reasonably cause the apprehension that death will otherwise be the consequence of such assault...",
+        "offense": "NA",
+        "punishment": "NA",
+        "bns_equivalent": "38"
+    },
+    "120A": {
+        "title": "Definition of criminal conspiracy",
+        "description": "When two or more persons agree to do, or cause to be done, (1) an illegal act, or (2) an act which is not illegal by illegal means, such an agreement is designated a criminal conspiracy: Provided that no agreement except an agreement to commit an offence shall amount to a criminal conspiracy unless some act besides the agreement is done by one or more parties to such agreement in pursuance thereof.",
+        "offense": "Criminal Conspiracy (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "61"
+    },
+    "120B": {
+        "title": "Punishment of criminal conspiracy",
+        "description": "(1) Whoever is a party to a criminal conspiracy to commit an offence punishable with death, imprisonment for life or rigorous imprisonment for a term of two years or upwards, shall, where no express provision is made in this Code for the punishment of such a conspiracy, be punished in the same manner as if he had abetted such offence. (2) Whoever is a party to a criminal conspiracy other than a criminal conspiracy to commit an offence punishable as aforesaid shall be punished with imprisonment of either description for a term not exceeding six months, or with fine or with both.",
+        "offense": "Criminal conspiracy",
+        "punishment": "Same as abetment of offense OR up to 6 months + Fine",
+        "bns_equivalent": "61(2)"
+    },
+    "124A": {
+        "title": "Sedition",
+        "description": "Whoever, by words, either spoken or written, or by signs, or by visible representation, or otherwise, brings or attempts to bring into hatred or contempt, or excites or attempts to excite disaffection towards, the Government established by law in India, shall be punished...",
+        "offense": "Sedition",
+        "punishment": "Life + Fine, or up to 3 years + Fine",
+        "bns_equivalent": "150 (Treason)"
+    },
+    "141": {
+        "title": "Unlawful assembly",
+        "description": "An assembly of five or more persons is designated an 'unlawful assembly', if the common object of the persons composing that assembly is: First—To overawe by criminal force, or show of criminal force, the Central or any State Government or Parliament or the Legislature of any State, or any public servant in the exercise of the lawful power of such public servant; or Second—To resist the execution of any law, or of any legal process; or Third—To commit any mischief or criminal trespass, or other offence...",
+        "offense": "Unlawful assembly (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "189"
+    },
+    "143": {
+        "title": "Punishment",
+        "description": "Whoever is a member of an unlawful assembly, shall be punished with imprisonment of either description for a term which may extend to six months, or with fine, or with both.",
+        "offense": "Being member of unlawful assembly",
+        "punishment": "Up to 6 months or Fine or Both",
+        "bns_equivalent": "189(2)"
+    },
+    "147": {
+        "title": "Punishment for rioting",
+        "description": "Whoever is guilty of rioting, shall be punished with imprisonment of either description for a term which may extend to two years, or with fine, or with both.",
+        "offense": "Rioting",
+        "punishment": "Up to 2 years or Fine or Both",
+        "bns_equivalent": "191(2)"
+    },
+    "148": {
+        "title": "Rioting, armed with deadly weapon",
+        "description": "Whoever is guilty of rioting, being armed with a deadly weapon or with anything which, used as a weapon of offence, is likely to cause death, shall be punished with imprisonment of either description for a term which may extend to three years, or with fine, or with both.",
+        "offense": "Rioting with deadly weapon",
+        "punishment": "Up to 3 years or Fine or Both",
+        "bns_equivalent": "191(3)"
+    },
+    "149": {
+        "title": "Every member of unlawful assembly guilty of offence committed in prosecution of common object",
+        "description": "If an offence is committed by any member of an unlawful assembly in prosecution of the common object of that assembly, or such as the members of that assembly knew to be likely to be committed in prosecution of that object, every person who, at the time of the committing of that offence, is a member of the same assembly, is guilty of that offence.",
+        "offense": "Vicarious liability for unlawful assembly",
+        "punishment": "Same as the offense committed",
+        "bns_equivalent": "190"
+    },
+    "160": {
+        "title": "Punishment for committing affray",
+        "description": "Whoever commits an affray, shall be punished with imprisonment of either description for a term which may extend to one month, or with fine which may extend to one hundred rupees, or with both.",
+        "offense": "Affray",
+        "punishment": "Up to 1 month or Fine up to 100",
+        "bns_equivalent": "194(2)"
+    },
+    "171E": {
+        "title": "Punishment for bribery",
+        "description": "Whoever commits the offence of bribery shall be punished with imprisonment of either description for a term which may extend to one year, or with fine, or with both: Provided that bribery by treating shall be punished with fine only.",
+        "offense": "Bribery (Elections)",
+        "punishment": "Up to 1 year or Fine or Both",
+        "bns_equivalent": "171"
+    },
+    "191": {
+        "title": "Giving false evidence",
+        "description": "Whoever, being legally bound by an oath or by an express provision of law to state the truth, or being bound by law to make a declaration upon any subject, makes any statement which is false, and which he either knows or believes to be false or does not believe to be true, is said to give false evidence.",
+        "offense": "Giving false evidence (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "227"
+    },
+    "193": {
+        "title": "Punishment for false evidence",
+        "description": "Whoever intentionally gives false evidence in any stage of a judicial proceeding, or fabricates false evidence for the purpose of being used in any stage of a judicial proceeding, shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine...",
+        "offense": "Giving/Fabricating false evidence",
+        "punishment": "Up to 7 years + Fine (Judicial proceed.) / Up to 3 years + Fine (Other)",
+        "bns_equivalent": "229"
+    },
+    "201": {
+        "title": "Causing disappearance of evidence of offence, or giving false information to screen offender",
+        "description": "Whoever, knowing or having reason to believe that an offence has been committed, causes any evidence of the commission of that offence to disappear, with the intention of screening the offender from legal punishment, or with that intention gives any information respecting the offence which he knows or believes to be false...",
+        "offense": "Destroying evidence",
+        "punishment": "Varies based on the offense screened (1/6th to 7 years)",
+        "bns_equivalent": "238"
+    },
+    "212": {
+        "title": "Harbouring offender",
+        "description": "Whoever harbours or conceals a person whom he knows or has reason to believe to be the offender, with the intention of screening him from legal punishment...",
+        "offense": "Harbouring offender",
+        "punishment": "Varies (Up to 5 years for capital offense, etc.)",
+        "bns_equivalent": "249"
+    },
+    "268": {
+        "title": "Public nuisance",
+        "description": "A person is guilty of a public nuisance who does any act or is guilty of an illegal omission which causes any common injury, danger or annoyance to the public or to the people in general who dwell or occupy property in the vicinity...",
+        "offense": "Public nuisance (Definition)",
+        "punishment": "NA",
+        "bns_equivalent": "270"
+    },
+    "279": {
+        "title": "Rash driving or riding on a public way",
+        "description": "Whoever drives any vehicle, or rides, on any public way in a manner so rash or negligent as to endanger human life, or to be likely to cause hurt or injury to any other person, shall be punished with imprisonment of either description for a term which may extend to six months, or with fine which may extend to one thousand rupees, or with both.",
+        "offense": "Rash driving",
+        "punishment": "Up to 6 months or Fine up to 1000 or Both",
+        "bns_equivalent": "281"
+    },
+    "494": {
+        "title": "Marrying again during lifetime of husband or wife",
+        "description": "Whoever, having a husband or wife living, marries in any case in which such marriage is void by reason of its taking place during the life of such husband or wife, shall be punished with imprisonment of either description for a term which may extend to seven years, and shall also be liable to fine.",
+        "offense": "Bigamy",
+        "punishment": "Up to 7 years + Fine",
+        "bns_equivalent": "81"
+    },
+    "497": {
+        "title": "Adultery",
+        "description": "Section 497 has been struck down by the Supreme Court of India in Joseph Shine v. Union of India (2018) as unconstitutional. It is no longer a criminal offence.",
+        "offense": "Adultery (Decriminalized)",
+        "punishment": "None (Decriminalized)",
+        "bns_equivalent": "NA"
+    },
+    "498A": {
+        "title": "Husband or relative of husband of a woman subjecting her to cruelty",
+        "description": "Whoever, being the husband or the relative of the husband of a woman, subjects such woman to cruelty shall be punished with imprisonment for a term which may extend to three years and shall also be liable to fine.",
+        "offense": "Cruelty by husband/relatives",
+        "punishment": "Up to 3 years + Fine",
+        "bns_equivalent": "85"
+    }
+}

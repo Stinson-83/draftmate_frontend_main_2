@@ -1,0 +1,144 @@
+
+    <style>
+        .pdf-page {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .text-span {
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+    </style>
+    <div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<div class="pdf-page" style="position: relative; width:595.2000122070312px; height:841.6799926757812px; background-color: white; margin: 0; padding: 0;">
+</div>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const allElements = Array.from(document.querySelectorAll('.content-element'));
+
+            // Store original top/left positions and single-line heights
+            const editableSpans = document.querySelectorAll('.editable');
+            allElements.forEach(el => {
+                el.dataset.originalTop = el.style.top;
+                el.dataset.originalLeft = el.style.left;
+                
+                const editable = el.querySelector('.editable') || (el.classList.contains('editable') ? el : null);
+                if (editable && editable.isContentEditable) {
+                    // Store the initial, single-line height
+                    editable.dataset.singleLineHeight = editable.offsetHeight > 0 ? editable.offsetHeight : 17;
+                }
+            });
+
+            const updateLayout = () => {
+                let cumulativeShift = 0; // The total vertical shift for *all subsequent rows*
+
+                // Group elements by their original top position
+                const rows = new Map();
+                allElements.forEach(el => {
+                    const top = el.dataset.originalTop;
+                    if (!rows.has(top)) {
+                        rows.set(top, []);
+                    }
+                    rows.get(top).push(el);
+                });
+
+                // Get the unique top positions and sort them numerically
+                const sortedTopPositions = Array.from(rows.keys()).sort((a, b) => parseFloat(a) - parseFloat(b));
+
+                // Iterate through each "visual row"
+                for (const top of sortedTopPositions) {
+                    const elementsInRow = rows.get(top);
+                    
+                    // Sort elements in this row by their LEFT position
+                    elementsInRow.sort((a, b) => parseFloat(a.dataset.originalLeft) - parseFloat(b.dataset.originalLeft));
+
+                    let perElementShift = 0; // The shift *within* this row for horizontal collisions
+                    let maxHeightThisRow = 17; // Track the tallest element in this "visual row"
+                    let originalRowHeight = 17; // The base height of the row
+
+                    // Get the original row height from the first editable element in it
+                    const firstEditable = elementsInRow[0].querySelector('.editable');
+                    if (firstEditable && firstEditable.dataset.singleLineHeight) {
+                        originalRowHeight = parseFloat(firstEditable.dataset.singleLineHeight);
+                    }
+
+                    // Iterate through each element in the row
+                    for (let i = 0; i < elementsInRow.length; i++) {
+                        const el = elementsInRow[i];
+                        
+                        // Apply BOTH shifts: the global cumulative shift AND the intra-row shift
+                        el.style.top = `${parseFloat(top) + cumulativeShift + perElementShift}px`;
+                        
+                        const currentHeight = el.offsetHeight;
+                        maxHeightThisRow = Math.max(maxHeightThisRow, currentHeight);
+
+                        // --- THIS IS THE NEW COLLISION LOGIC ---
+                        if (i < elementsInRow.length - 1) {
+                            const nextElement = elementsInRow[i+1];
+                            
+                            // Get the right edge of this element
+                            const myRightEdge = el.offsetLeft + el.offsetWidth;
+                            
+                            // Get the left edge of the next element
+                            const nextElementLeftEdge = nextElement.offsetLeft;
+
+                            // Check for overlap
+                            if (myRightEdge > nextElementLeftEdge) {
+                                // COLLISION!
+                                // Add the full height of the current element to the intra-row shift.
+                                // This will push the 'nextElement' (and all others after it) down.
+                                perElementShift += currentHeight;
+                            }
+                        }
+                    }
+
+                    // Now, update the global cumulative shift for the *next* row
+                    let rowHeightIncrease = (maxHeightThisRow > originalRowHeight) ? (maxHeightThisRow - originalRowHeight) : 0;
+                    cumulativeShift += rowHeightIncrease + perElementShift;
+                }
+            };
+
+            // Add the listener to all *editable* fields
+            editableSpans.forEach(span => {
+                span.addEventListener('input', updateLayout);
+            });
+        });
+    </script></body></html>

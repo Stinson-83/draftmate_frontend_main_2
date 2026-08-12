@@ -1,0 +1,240 @@
+/**
+ * Consolidated Backend Endpoints Configuration
+ * 
+ * This file contains the API configuration for all backend microservices.
+ * 
+ * IMPORTANT: 
+ * - All services are now routed through a single Nginx Reverse Proxy.
+ * - Base URL is determined by VITE_API_BASE_URL env var.
+ * - Path prefixes map to specific services (e.g., /converter -> port 8000).
+ */
+
+const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
+let BASE_URL = envBaseUrl !== undefined ? envBaseUrl : '';
+
+// Remove trailing slash if present to avoid double slashes (e.g. //auth)
+// which browsers interpret as protocol-relative URLs
+if (BASE_URL.endsWith('/')) {
+    BASE_URL = BASE_URL.slice(0, -1);
+}
+
+export const API_CONFIG = {
+    // Service: backend/converter (Port 8000)
+    CONVERTER: {
+        BASE_URL: `${BASE_URL}/converter`,
+        ENDPOINTS: {
+            CONVERT: '/convert', // POST
+        }
+    },
+
+    // Service: backend/Drafter (Port 8003)
+    DRAFTER: {
+        BASE_URL: `${BASE_URL}/drafter`,
+        ENDPOINTS: {
+            GENERATE: '/generate', // POST
+        }
+    },
+
+    // Service: backend/query (Port 8001)
+    QUERY: {
+        BASE_URL: `${BASE_URL}/query`,
+        ENDPOINTS: {
+            HEALTH: '/', // GET
+            DIAGNOSTICS: '/diag', // GET
+            SEARCH: '/search', // POST
+            DOWNLOAD_TEMPLATE: '/download-template', // POST
+            DOWNLOAD_TEMPLATE_HTML: '/download-template-html', // POST
+        }
+    },
+
+    ENHANCE_BOT: {
+        // Direct local address to avoid Nginx requirement for dev
+        BASE_URL: `${BASE_URL}/enhance`,
+        ENDPOINTS: {
+            ENHANCE_CONTENT: '/enhance_content', // POST
+            ENHANCE_CLAUSE: '/enhance_clause', // POST
+            CREATE_PLACEHOLDERS: '/create_placeholders', // POST
+            SUMMARISE_CONTEXT: '/summarise_context', // POST
+        }
+    },
+
+    // Service: backend/Deep_research/lex_bot (Port 8004)
+    LEX_BOT: {
+        BASE_URL: `${BASE_URL}/lexbot`,
+        ENDPOINTS: {
+            HEALTH: '/', // GET
+            CONFIG_LLM: '/config/llm', // GET, POST
+            CHAT: '/chat', // POST
+            CHAT_REASONING: '/chat/reasoning', // POST
+            SESSIONS: '/sessions', // POST
+            UPLOAD: '/upload', // POST
+            MEMORY: '/memory', // POST
+
+            // Dynamic endpoints helpers
+            getSession: (sessionId, userId) => `/sessions/${sessionId}?user_id=${userId}`, // GET
+            deleteSession: (sessionId, userId) => `/sessions/${sessionId}?user_id=${userId}`, // DELETE
+            getUserSessions: (userId) => `/users/${userId}/sessions`, // GET
+        }
+    },
+
+    // Service: backend/PDF_Editor (Port 8005)
+    PDF_EDITOR_API: {
+        BASE_URL: `${BASE_URL}/pdf`,
+        ENDPOINTS: {
+            MERGE: '/merge', // POST
+            SPLIT: '/split', // POST
+            COMPRESS: '/compress', // POST
+            PDF_TO_WORD: '/pdf-to-word', // POST
+            WORD_TO_PDF: '/word-to-pdf', // POST
+            ROTATE: '/rotate', // POST
+            PREVIEW: '/preview', // POST
+            REORDER: '/reorder', // POST
+            WATERMARK: '/watermark', // POST
+            ASSEMBLE: '/assemble', // POST
+            ADD_PAGE_NUMBERS: '/add_page_numbers', // POST
+        }
+    },
+
+    // Service: backend/legal_workflow (Port 8010)
+    LEGAL_WORKFLOW: {
+        BASE_URL: `${BASE_URL}/workflow`,
+        ENDPOINTS: {
+            TURN: '/api/workflow/turn', // POST
+            GET_DRAFT: (draftId) => `/api/workflow/draft/${draftId}`, // GET
+            GET_PDF: (draftId) => `/api/workflow/draft/${draftId}/pdf`, // GET
+        }
+    },
+
+    // Service: backend/login_db (Port 8009)
+    AUTH: {
+        BASE_URL: `${BASE_URL}/auth`,
+        ENDPOINTS: {
+            LOGIN: '/login', // POST
+            REGISTER: '/register', // POST
+            GOOGLE_LOGIN: '/google-login', // POST
+            LOGOUT: '/logout', // POST
+            VERIFY_SESSION: '/verify_session', // GET
+            GET_PROFILE: (userId) => `/profile/${userId}`, // GET
+            UPDATE_PROFILE: '/profile/update', // POST
+            FORGOT_PASSWORD: '/forgot-password', // POST
+            VERIFY_OTP: '/verify-otp', // POST
+            RESET_PASSWORD: '/reset-password', // POST
+        }
+    },
+
+    // Service: backend/Notification (Port 8015)
+    NOTIFICATION: {
+        BASE_URL: `${BASE_URL}/notification`,
+        ENDPOINTS: {
+            GET_ALL: (userId) => `/notifications/${userId}`,
+            GET_COUNT: (userId) => `/notifications/${userId}/count`,
+            CREATE: '/notifications',
+            MARK_READ: (notificationId) => `/notifications/${notificationId}/read`,
+            MARK_ALL_READ: (userId) => `/notifications/${userId}/read-all`,
+            DELETE: (notificationId) => `/notifications/${notificationId}`,
+            DELETE_ALL: (userId) => `/notifications/${userId}/all`,
+        }
+    },
+
+    // Service: backend/translator (Port 8012) — routed via /translator/
+    TRANSLATOR: {
+        BASE_URL: `${BASE_URL}/translator`,
+        ENDPOINTS: {
+            CREATE_JOB: '/translation-jobs', // POST (multipart)
+            GET_JOB: (jobId) => `/translation-jobs/${jobId}`, // GET
+            LIST_JOBS: '/translation-jobs', // GET
+            DOWNLOAD_JOB: (jobId) => `/translation-jobs/${jobId}/download`, // GET
+        }
+    },
+
+    // Service: backend/Case_search (Port 8006)
+    CASE_SEARCH: {
+        BASE_URL: `${BASE_URL}/case_search`,
+        ENDPOINTS: {
+            SEARCH: '/search', // GET
+            DOC: (docId) => `/doc/${docId}`, // GET
+        }
+    },
+
+    // Service: backend/Advocate_Profile (Port 8007) — routed via /advocate-api/
+    ADVOCATE: {
+        BASE_URL: `${BASE_URL}/advocate-api`,
+        ENDPOINTS: {
+            // Auth
+            REGISTER: '/api/v1/auth/register',
+            LOGIN: '/api/v1/auth/login',
+            REFRESH: '/api/v1/auth/refresh',
+            LOGOUT: '/api/v1/auth/logout',
+            SESSION_LOGIN: '/api/v1/auth/session-login',
+            // Profile
+            MY_PROFILE: '/api/v1/profiles/me',
+            COMPLETE_ONBOARDING: '/api/v1/profiles/me/complete-onboarding',
+            UPDATE_PRACTICE_AREAS: '/api/v1/profiles/me/practice-areas',
+            UPDATE_DETAILS: '/api/v1/profiles/me/details',
+            UPLOAD_IMAGE: '/api/v1/profiles/me/upload-image',
+            PUBLIC_PROFILE: (slug) => `/api/v1/profiles/public/${slug}`,
+            // Discovery
+            SEARCH: '/api/v1/discovery/search',
+            FEATURED: '/api/v1/discovery/featured',
+            TRENDING: '/api/v1/discovery/trending',
+            RECENT: '/api/v1/discovery/recent',
+            RECOMMENDED: '/api/v1/discovery/recommended',
+            PRACTICE_AREAS: '/api/v1/discovery/practice-areas',
+            // Consultations
+            CONSULTATION_REQUEST: '/api/v1/consultations/request',
+            MY_CONSULTATIONS: '/api/v1/consultations',
+            UPDATE_CONSULTATION_STATUS: (id) => `/api/v1/consultations/${id}/status`,
+            // Messages (Legacy)
+            CONTACT_REQUEST: '/api/v1/contact/requests',
+            MY_MESSAGES: '/api/v1/contact/requests',
+            UPDATE_MESSAGE_STATUS: (id) => `/api/v1/contact/requests/${id}/status`,
+            // New Messaging System
+            MESSAGES_CONVERSATIONS: '/api/v1/messages/conversations',
+            MESSAGES_CONVERSATION: (email) => `/api/v1/messages/conversation/${email}`,
+            MESSAGES_SEND: '/api/v1/messages',
+            MESSAGES_REPLY: (email) => `/api/v1/messages/conversation/${email}/reply`,
+            MESSAGES_READ: (id) => `/api/v1/messages/${id}/read`,
+            MESSAGES_CONVERSATION_READ: (email) => `/api/v1/messages/conversation/${email}/read`,
+            MESSAGES_CONVERSATION_ARCHIVE: (email) => `/api/v1/messages/conversation/${email}/archive`,
+            // Verification
+            SUBMIT_VERIFICATION: '/api/v1/verification/submit',
+            // Analytics
+            TRACK_VIEW: '/api/v1/analytics/view',
+            TRACK_SHARE: '/api/v1/analytics/share',
+            MY_ANALYTICS: '/api/v1/analytics/dashboard',
+            // Bookmarks
+            BOOKMARKS: '/api/v1/bookmarks',
+            REMOVE_BOOKMARK: (id) => `/api/v1/bookmarks/${id}`,
+            // Admin
+            ADMIN_VERIFICATIONS: '/api/v1/admin/verifications',
+            UPDATE_VERIFICATION_STATUS: (id) => `/api/v1/admin/verifications/${id}/status`,
+            ADMIN_STATS: '/api/v1/admin/stats',
+        }
+    },
+
+    // Service: backend/Library_Service (Port 8008) — routed via /library-api/
+    LIBRARY: {
+        BASE_URL: import.meta.env.VITE_LIBRARY_API_BASE_URL || '/library-api',
+        ENDPOINTS: {
+            // Indian Kanoon endpoints
+            INDIAN_KANOON: {
+                PING: '/api/v1/library/indiankanoon/ping',
+                SEARCH: '/api/v1/library/indiankanoon/search',
+                SEARCH_BY_CITATION: '/api/v1/library/indiankanoon/search/citation',
+                SEARCH_BY_ACT: '/api/v1/library/indiankanoon/search/act',
+                DOCUMENT: (docId) => `/api/v1/library/indiankanoon/document/${docId}`,
+                DOCUMENT_METADATA: (docId) => `/api/v1/library/indiankanoon/document/${docId}/metadata`
+            },
+            // Bare Acts endpoints
+            BARE_ACTS: {
+                GET_ACTS: '/api/v1/library/bareacts',
+                SEARCH_ACTS: '/api/v1/library/bareacts/search',
+                GET_CATEGORIES: '/api/v1/library/bareacts/categories',
+                GET_ACT: (actId) => `/api/v1/library/bareacts/${actId}`,
+                GET_SECTIONS: (actId) => `/api/v1/library/bareacts/${actId}/sections`,
+                GET_SECTION: (actId, sectionId) => `/api/v1/library/bareacts/${actId}/sections/${sectionId}`,
+                SEARCH_SECTIONS: '/api/v1/library/bareacts/search/sections'
+            }
+        }
+    }
+};

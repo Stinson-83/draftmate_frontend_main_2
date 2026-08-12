@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+google-generativeai
+tavily-python
+firecrawl-py
+beautifulsoup4
+requests
+trafilatura
+duckduckgo-search
+lxml_html_clean

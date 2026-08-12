@@ -1,0 +1,385 @@
+import React, { useState } from 'react';
+import {
+    Save, Wand2, Download, Undo, Redo,
+    Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify,
+    Subscript, Superscript, List, ListOrdered, FileDown, FileText, ChevronDown, Highlighter, Link as LinkIcon, MoveVertical, Table as TableIcon, Hash, Printer
+} from 'lucide-react';
+import PrintModal from './PrintModal';
+
+const EditorToolbar = ({
+    execCommand,
+    onExportPDF,
+    onExportWord,
+    onPrint,
+    onSave,
+    draftName,
+    setDraftName,
+    showHeader,
+    setShowHeader,
+    showFooter,
+    setShowFooter,
+    showPageNumbers,
+    setShowPageNumbers,
+    onModify,
+    totalPages = 1
+}) => {
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showHighlightMenu, setShowHighlightMenu] = useState(false);
+    const [showLineSpacingMenu, setShowLineSpacingMenu] = useState(false);
+    const [showTableMenu, setShowTableMenu] = useState(false);
+    const [tableRows, setTableRows] = useState(3);
+    const [tableCols, setTableCols] = useState(3);
+    const [showLinkInput, setShowLinkInput] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [showSaveMenu, setShowSaveMenu] = useState(false);
+
+    const handleInsertLink = () => {
+        if (linkUrl) {
+            execCommand('insertLink', linkUrl);
+            setLinkUrl('');
+            setShowLinkInput(false);
+        }
+    };
+
+
+    return (
+        <div className="editor-toolbar glass-panel">
+            <div className="toolbar-group">
+                <select className="font-select" onChange={(e) => execCommand('fontName', e.target.value)}>
+                    <option value="Inter">Inter</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Calisto MT">Calisto MT</option>
+                    <option value="Book Antiqua">Book Antiqua</option>
+                    <option value="Bookman Old Style">Bookman Old Style</option>
+                    <option value="Angsana New">Angsana New</option>
+                    <option value="Calibri">Calibri</option>
+                    <option value="Californian FB">Californian FB</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                    <option value="Georgia">Georgia</option>
+                </select>
+                <select className="size-select" onChange={(e) => execCommand('customFontSize', e.target.value)}>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="14">14</option>
+                    <option value="16">16</option>
+                    <option value="18">18</option>
+                    <option value="20">20</option>
+                    <option value="22">22</option>
+                    <option value="24">24</option>
+                    <option value="26">26</option>
+                    <option value="28">28</option>
+                    <option value="36">36</option>
+                    <option value="48">48</option>
+                    <option value="72">72</option>
+                </select>
+            </div>
+            <div className="toolbar-divider"></div>
+            <div className="toolbar-group">
+                {/* Change Case Dropdown */}
+                {/* Change Case Dropdown - Custom UI */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="tool-btn"
+                        onClick={() => setShowExportMenu(prev => prev === 'case' ? false : 'case')}
+                        title="Change Case"
+                        style={{ width: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <span style={{ fontSize: '15px', fontWeight: 600 }}>Aa</span>
+                        <ChevronDown size={12} style={{ marginLeft: 2, opacity: 0.7 }} />
+                    </button>
+                    {showExportMenu === 'case' && (
+                        <div className="export-menu glass-panel" style={{ minWidth: '180px', left: 0 }}>
+                            <button onClick={() => { execCommand('changeCase', 'sentence'); setShowExportMenu(false); }} style={{ textAlign: 'left', justifyContent: 'flex-start' }}>
+                                Sentence case.
+                            </button>
+                            <button onClick={() => { execCommand('changeCase', 'lower'); setShowExportMenu(false); }} style={{ textAlign: 'left', justifyContent: 'flex-start' }}>
+                                lowercase
+                            </button>
+                            <button onClick={() => { execCommand('changeCase', 'upper'); setShowExportMenu(false); }} style={{ textAlign: 'left', justifyContent: 'flex-start' }}>
+                                UPPERCASE
+                            </button>
+                            <button onClick={() => { execCommand('changeCase', 'capitalize'); setShowExportMenu(false); }} style={{ textAlign: 'left', justifyContent: 'flex-start' }}>
+                                Capitalize Each Word
+                            </button>
+                            {/* <button onClick={() => { execCommand('changeCase', 'toggle'); setShowExportMenu(false); }}>
+                                tOGGLE cASE
+                            </button> */}
+                        </div>
+                    )}
+                </div>
+                <div className="toolbar-divider"></div>
+                <button className="tool-btn" onClick={() => execCommand('undo')} title="Undo"><Undo size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('redo')} title="Redo"><Redo size={18} /></button>
+            </div>
+            <div className="toolbar-divider"></div>
+            <div className="toolbar-group">
+                <button className="tool-btn" onClick={() => execCommand('bold')} title="Bold"><Bold size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('italic')} title="Italic"><Italic size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('underline')} title="Underline"><Underline size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('subscript')} title="Subscript"><Subscript size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('superscript')} title="Superscript"><Superscript size={18} /></button>
+
+                {/* Highlight Dropdown */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="tool-btn"
+                        onClick={() => setShowHighlightMenu(!showHighlightMenu)}
+                        title="Highlight Color"
+                        style={{ display: 'flex', alignItems: 'center' }}
+                    >
+                        <Highlighter size={18} />
+                        <ChevronDown size={12} style={{ marginLeft: 2, opacity: 0.7 }} />
+                    </button>
+                    {showHighlightMenu && (
+                        <div className="highlight-menu glass-panel">
+                            <button className="highlight-swatch" onClick={() => { execCommand('highlight', 'yellow'); setShowHighlightMenu(false); }} title="Yellow" style={{ background: '#fef08a' }} />
+                            <button className="highlight-swatch" onClick={() => { execCommand('highlight', 'green'); setShowHighlightMenu(false); }} title="Green" style={{ background: '#bbf7d0' }} />
+                            <button className="highlight-swatch" onClick={() => { execCommand('highlight', 'cyan'); setShowHighlightMenu(false); }} title="Cyan" style={{ background: '#a5f3fc' }} />
+                            <button className="highlight-swatch" onClick={() => { execCommand('highlight', 'magenta'); setShowHighlightMenu(false); }} title="Magenta" style={{ background: '#f5d0fe' }} />
+                            <button className="highlight-swatch" onClick={() => { execCommand('highlight', 'gray'); setShowHighlightMenu(false); }} title="Gray" style={{ background: '#e2e8f0' }} />
+                            <div style={{ width: 1, height: 24, background: '#e2e8f0', margin: '0 2px' }}></div>
+                            <button className="highlight-swatch" onClick={() => { execCommand('highlight', 'none'); setShowHighlightMenu(false); }} title="No Color" style={{ background: 'transparent', color: '#64748b' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                            </button>
+                        </div>
+                    )}
+                </div>
+                {/* Link Button */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className={`tool-btn ${showLinkInput ? 'active' : ''}`}
+                        onClick={() => setShowLinkInput(!showLinkInput)}
+                        title="Insert Link"
+                    >
+                        <LinkIcon size={18} />
+                    </button>
+                    {showLinkInput && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 8, padding: 8, zIndex: 50, display: 'flex', gap: 4, alignItems: 'center', minWidth: 260 }}>
+                            <input
+                                type="text"
+                                value={linkUrl}
+                                onChange={(e) => setLinkUrl(e.target.value)}
+                                placeholder="Paste URL..."
+                                style={{ flex: 1, padding: '4px 8px', fontSize: '13px', borderRadius: 4, border: '1px solid #e2e8f0', outline: 'none' }}
+                                onKeyDown={(e) => e.key === 'Enter' && handleInsertLink()}
+                                autoFocus
+                            />
+                            <button
+                                onClick={handleInsertLink}
+                                style={{ padding: '4px 8px', background: '#2563eb', color: 'white', borderRadius: 4, fontSize: '12px', border: 'none', cursor: 'pointer' }}
+                            >
+                                Add
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+            <div className="toolbar-divider"></div>
+            <div className="toolbar-group">
+                <button className="tool-btn" onClick={() => execCommand('justifyLeft')} title="Align Left"><AlignLeft size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('justifyCenter')} title="Align Center"><AlignCenter size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('justifyRight')} title="Align Right"><AlignRight size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('justifyFull')} title="Align Justify"><AlignJustify size={18} /></button>
+
+                {/* Line Spacing Dropdown */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="tool-btn"
+                        onClick={() => setShowLineSpacingMenu(!showLineSpacingMenu)}
+                        title="Line Spacing"
+                        style={{ display: 'flex', alignItems: 'center' }}
+                    >
+                        <MoveVertical size={16} />
+                        <ChevronDown size={10} style={{ marginLeft: 2, opacity: 0.7 }} />
+                    </button>
+                    {showLineSpacingMenu && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, padding: 4, zIndex: 50, display: 'flex', flexDirection: 'column', minWidth: 80 }}>
+                            {[1.0, 1.15, 1.5, 2.0, 2.5, 3.0].map(val => (
+                                <button
+                                    key={val}
+                                    onClick={() => { execCommand('lineSpacing', val); setShowLineSpacingMenu(false); }}
+                                    style={{ padding: '6px 12px', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}
+                                    className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm"
+                                >
+                                    {val}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <button className="tool-btn" onClick={() => execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
+                <button className="tool-btn" onClick={() => execCommand('insertOrderedList')} title="Numbered List"><ListOrdered size={18} /></button>
+
+                {/* Table Button */}
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="tool-btn"
+                        onClick={() => setShowTableMenu(!showTableMenu)}
+                        title="Insert Table"
+                    >
+                        <TableIcon size={18} />
+                    </button>
+                    {showTableMenu && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, padding: 12, zIndex: 60, minWidth: 160 }}>
+                            <div style={{ marginBottom: 8, fontSize: '0.85rem', fontWeight: 500 }}>Insert Table</div>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                                <label style={{ fontSize: '0.8rem' }}>Rows: <input type="number" min="1" max="10" value={tableRows} onChange={e => setTableRows(e.target.value)} style={{ width: 40, padding: 2 }} /></label>
+                                <label style={{ fontSize: '0.8rem' }}>Cols: <input type="number" min="1" max="10" value={tableCols} onChange={e => setTableCols(e.target.value)} style={{ width: 40, padding: 2 }} /></label>
+                            </div>
+                            <button
+                                onClick={() => { execCommand('insertTable', { rows: parseInt(tableRows), cols: parseInt(tableCols) }); setShowTableMenu(false); }}
+                                style={{ width: '100%', padding: '4px 8px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: '0.85rem' }}
+                            >
+                                Insert
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+            <div className="toolbar-divider"></div>
+
+            {/* Header/Footer Toggles */}
+            <div className="toolbar-group">
+                <button
+                    className={`tool-btn ${showHeader ? 'active' : ''}`}
+                    onClick={() => setShowHeader(!showHeader)}
+                    title="Toggle Header"
+                    style={{ color: showHeader ? 'var(--primary)' : 'inherit', background: showHeader ? '#f1f5f9' : 'transparent' }}
+                >
+                    Header
+                </button>
+                <button
+                    className={`tool-btn ${showFooter ? 'active' : ''}`}
+                    onClick={() => setShowFooter(!showFooter)}
+                    title="Toggle Footer"
+                    style={{ color: showFooter ? 'var(--primary)' : 'inherit', background: showFooter ? '#f1f5f9' : 'transparent' }}
+                >
+                    Footer
+                </button>
+                <button
+                    className={`tool-btn ${showPageNumbers ? 'active' : ''}`}
+                    onClick={() => setShowPageNumbers(!showPageNumbers)}
+                    title="Toggle Page Numbers"
+                    style={{ color: showPageNumbers ? 'var(--primary)' : 'inherit', background: showPageNumbers ? '#f1f5f9' : 'transparent' }}
+                >
+                    <Hash size={14} />
+                    Page
+                </button>
+            </div>
+            <div className="toolbar-divider"></div>
+
+            <div className="toolbar-group" style={{ width: '140px' }}>
+                <input
+                    type="text"
+                    value={draftName || ''}
+                    onChange={(e) => setDraftName && setDraftName(e.target.value)}
+                    placeholder="Untitled Draft"
+                    className="draft-name-input"
+                    style={{
+                        width: '100%',
+                        padding: '6px 12px',
+                        border: '1px solid transparent',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: '#1e293b',
+                        background: 'transparent',
+                        transition: 'all 0.2s'
+                    }}
+                    onFocus={(e) => {
+                        e.target.style.background = '#f1f5f9';
+                        e.target.style.borderColor = '#cbd5e1';
+                    }}
+                    onBlur={(e) => {
+                        e.target.style.background = 'transparent';
+                        e.target.style.borderColor = 'transparent';
+                    }}
+                />
+            </div>
+            <div className="spacer"></div>
+            <div className="toolbar-actions">
+                <button className="btn btn-primary btn-sm" onClick={onModify}>
+                    <Wand2 size={16} style={{ marginRight: 8 }} />
+                    Modify
+                </button>
+                <div style={{ position: 'relative' }}>
+                    <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShowSaveMenu(!showSaveMenu)}
+                        title="Save options"
+                    >
+                        <Save size={16} />
+                    </button>
+                    {showSaveMenu && (
+                        <div className="glass-panel" style={{ position: 'absolute', top: '100%', right: 0, marginTop: 8, padding: 4, zIndex: 60, minWidth: 140, display: 'flex', flexDirection: 'column' }}>
+                            {['Started', 'In progress', 'Completed', 'Review'].map(status => {
+                                let color = '#94a3b8';
+                                if (status === 'In progress') color = '#facc15';
+                                if (status === 'Completed') color = '#22c55e';
+                                if (status === 'Review') color = '#60a5fa';
+
+                                return (
+                                    <button
+                                        key={status}
+                                        onClick={() => { onSave(status); setShowSaveMenu(false); }}
+                                        style={{
+                                            textAlign: 'left',
+                                            padding: '8px 12px',
+                                            fontSize: '0.85rem',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#334155',
+                                            borderRadius: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px'
+                                        }}
+                                        className="hover:bg-slate-100 dark:hover:bg-slate-700 dark:text-slate-200"
+                                    >
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: color }}></span>
+                                        {status}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowExportMenu(!showExportMenu)}>
+                        <Download size={16} />
+                    </button>
+                    {showExportMenu && (
+                        <div className="export-menu glass-panel">
+                            <button onClick={() => { onExportPDF(); setShowExportMenu(false); }}>
+                                <FileDown size={16} /> Export as PDF
+                            </button>
+                            <button onClick={() => { onExportWord(); setShowExportMenu(false); }}>
+                                <FileText size={16} /> Export as Word
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <PrintModal
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                onPrint={onPrint || (() => window.print())}
+                onDownloadPDF={onExportPDF}
+                onDownloadWord={onExportWord}
+                totalPages={totalPages}
+            />
+        </div>
+    );
+};
+
+export default EditorToolbar;
