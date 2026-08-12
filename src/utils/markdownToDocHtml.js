@@ -318,22 +318,23 @@ export const convertMarkdownToDocHtml = (rawInput, sources = []) => {
 
   console.log('[MarkdownToDocHtml] --- Step 2: Detected AST Structure ---', ast);
 
-  // Render HTML that inherits active document font-family and styling from ONLYOFFICE
-  let htmlResult = `<div style="line-height: 1.5; color: #111827;">\n`;
+  // Render HTML using single dedicated legal document typography and structure
+  let htmlResult = `<div style="font-family: inherit; font-size: 11pt; line-height: 1.5; color: #111827;">\n`;
 
   ast.forEach((node) => {
     if (node.type === 'heading') {
-      const marginTop = node.level === 1 ? '16pt' : node.level === 2 ? '14pt' : '10pt';
-      htmlResult += `<h${node.level} style="font-weight: bold; color: #000000; margin-top: ${marginTop}; margin-bottom: 4pt;">${formatInlineText(node.text, sources)}</h${node.level}>\n`;
+      const fontSize = node.level === 1 ? '14pt' : node.level === 2 ? '12.5pt' : '11.5pt';
+      const marginTop = node.level === 1 ? '14pt' : node.level === 2 ? '12pt' : '10pt';
+      htmlResult += `<h${node.level} style="font-size: ${fontSize}; font-weight: bold; color: #000000; margin-top: ${marginTop}; margin-bottom: 4pt; line-height: 1.3; text-align: left;">${formatInlineText(node.text, sources)}</h${node.level}>\n`;
     } else if (node.type === 'paragraph') {
-      htmlResult += `<p style="line-height: 1.5; color: #111827; margin-bottom: 8pt; text-align: justify;">${formatInlineText(node.text, sources)}</p>\n`;
+      htmlResult += `<p style="font-size: 11pt; line-height: 1.5; color: #111827; margin-top: 0pt; margin-bottom: 6pt; text-align: justify;">${formatInlineText(node.text, sources)}</p>\n`;
     } else if (node.type === 'blockquote') {
-      htmlResult += `<blockquote style="font-style: italic; border-left: 3px solid #cbd5e1; padding-left: 10pt; margin-left: 0; color: #374151;">${formatInlineText(node.text, sources)}</blockquote>\n`;
+      htmlResult += `<blockquote style="font-size: 11pt; font-style: italic; border-left: 3px solid #64748b; padding-left: 10pt; margin-top: 4pt; margin-bottom: 6pt; color: #334155;">${formatInlineText(node.text, sources)}</blockquote>\n`;
     } else if (node.type === 'ul' || node.type === 'ol') {
       const tag = node.type;
-      htmlResult += `<${tag} style="line-height: 1.5; margin-bottom: 8pt; padding-left: 18pt;">\n`;
+      htmlResult += `<${tag} style="font-size: 11pt; line-height: 1.5; color: #111827; margin-top: 0pt; margin-bottom: 6pt; padding-left: 18pt;">\n`;
       node.items.forEach((item) => {
-        htmlResult += `  <li style="margin-bottom: 4pt;">${formatInlineText(item.text, sources)}</li>\n`;
+        htmlResult += `  <li style="margin-bottom: 3pt;">${formatInlineText(item.text, sources)}</li>\n`;
       });
       htmlResult += `</${tag}>\n`;
     }
