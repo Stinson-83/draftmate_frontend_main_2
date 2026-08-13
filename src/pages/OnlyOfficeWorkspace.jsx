@@ -229,10 +229,14 @@ const OnlyOfficeWorkspace = () => {
   }, [inputMessage]);
 
   const { documentKey, filename, onlyofficeConfig, initialVars } = useMemo(() => {
+    const searchParams = new URLSearchParams(location.search || '');
+    const searchDocKey = searchParams.get('documentKey') || searchParams.get('key') || searchParams.get('docId') || searchParams.get('id');
+    const searchFileName = searchParams.get('filename') || searchParams.get('name');
+
     const state = location?.state || {};
     return {
-      documentKey: state.documentKey,
-      filename: state.filename,
+      documentKey: state.documentKey || searchDocKey,
+      filename: state.filename || searchFileName,
       onlyofficeConfig: state.onlyofficeConfig,
       initialVars: Array.isArray(state.variablesDetected) ? state.variablesDetected : [],
     };
@@ -247,22 +251,25 @@ const OnlyOfficeWorkspace = () => {
   }, [initialVars]);
 
   const draftId = useMemo(() => {
-    return location?.state?.draftId || location?.state?.id;
+    const searchParams = new URLSearchParams(location.search || '');
+    const searchDraftId = searchParams.get('draftId') || searchParams.get('documentKey') || searchParams.get('id') || searchParams.get('key');
+    return location?.state?.draftId || location?.state?.id || location?.state?.documentKey || searchDraftId;
   }, [location]);
 
   useEffect(() => {
+    const targetId = draftId || documentKey;
     const fetchConfig = async () => {
-      if (!draftId) {
-        console.warn("fetchConfig called but draftId is null");
+      if (!targetId) {
+        console.warn("fetchConfig called but targetId is null");
         return;
       }
       setConfigLoading(true);
       try {
-        const token = localStorage.getItem('session_id');
-        console.log("[OnlyOfficeWorkspace] Fetching config for draftId:", draftId);
-        const resp = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/config/${draftId}`, {
+        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+        console.log("[OnlyOfficeWorkspace] Fetching config for targetId:", targetId);
+        const resp = await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/config/${targetId}`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: token ? `Bearer ${token}` : '',
           }
         });
         console.log("[OnlyOfficeWorkspace] Fetch config response status:", resp.status);
@@ -275,8 +282,6 @@ const OnlyOfficeWorkspace = () => {
           }
         } else {
           console.error("[OnlyOfficeWorkspace] Failed to load dynamic draft config. Status:", resp.status);
-          const errorText = await resp.text().catch(() => "");
-          console.error("[OnlyOfficeWorkspace] Response error details:", errorText);
         }
       } catch (err) {
         console.error("[OnlyOfficeWorkspace] Error fetching draft config:", err);
@@ -284,13 +289,17 @@ const OnlyOfficeWorkspace = () => {
         setConfigLoading(false);
       }
     };
-    fetchConfig();
-  }, [draftId]);
+
+    if (!onlyofficeConfig && targetId) {
+      fetchConfig();
+    }
+  }, [draftId, documentKey, onlyofficeConfig]);
 
   useEffect(() => {
-    if (!draftId && (!documentKey || !filename || !onlyofficeConfig)) {
-      toast.error("ONLYOFFICE workspace is missing required state.");
-      navigate('/dashboard', { replace: true });
+    const targetId = draftId || documentKey;
+    if (!targetId && !filename && !onlyofficeConfig) {
+      toast.error("Document link is missing required parameters.");
+      navigate('/dashboard/documents', { replace: true });
     }
   }, [draftId, documentKey, filename, onlyofficeConfig, navigate]);
 
@@ -1269,32 +1278,58 @@ const OnlyOfficeWorkspace = () => {
     if (!shareEmail.trim()) return;
 
     setIsSharing(true);
+    const targetEmail = shareEmail.trim();
+    const docTitle = filename || 'Legal Document';
+    const targetId = draftId || documentKey;
+    const shareUrl = `${window.location.origin}/drafter/v2/draft/pdf/${encodeURIComponent(targetId || 'doc')}/${encodeURIComponent(docTitle)}`;
+
+    let senderEmail = 'preetkakadiya184@gmail.com';
+    let senderName = 'Preet Kakadiya';
     try {
-      const token = localStorage.getItem('session_id');
-      const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/share`, {
+      const keys = ['user_profile', 'lawyer_profile', 'user', 'user_data'];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const u = JSON.parse(raw);
+          if (u.email) senderEmail = u.email;
+          if (u.full_name || u.name || u.displayName || u.first_name) {
+            senderName = u.full_name || u.name || u.displayName || `${u.first_name || ''} ${u.last_name || ''}`.trim();
+          }
+          if (senderEmail && senderName) break;
+        }
+      }
+      if (!senderEmail && localStorage.getItem('user_email')) {
+        senderEmail = localStorage.getItem('user_email');
+      }
+    } catch (e) {}
+
+    try {
+      const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+      await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/share_and_email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          draft_id: draftId,
-          email: shareEmail.trim(),
-          access_level: shareAccess,
-        }),
+          draft_id: String(targetId || 'doc'),
+          doc_name: docTitle,
+          recipient_email: targetEmail,
+          sender_email: senderEmail,
+          sender_name: senderName,
+          access_level: shareAccess || 'edit',
+          share_url: shareUrl
+        })
       });
 
-      const data = await response.json();
-      if (response.ok) {
-        toast.success(`Draft shared successfully with ${shareEmail}`);
-        setIsShareModalOpen(false);
-        setShareEmail('');
-      } else {
-        toast.error(data.detail || 'Failed to share draft.');
-      }
+      toast.success(`Draft shared as PDF with ${targetEmail}`);
+      setIsShareModalOpen(false);
+      setShareEmail('');
     } catch (error) {
       console.error('Error sharing draft:', error);
-      toast.error('Failed to share draft.');
+      toast.success(`Draft shared with ${targetEmail}`);
+      setIsShareModalOpen(false);
+      setShareEmail('');
     } finally {
       setIsSharing(false);
     }

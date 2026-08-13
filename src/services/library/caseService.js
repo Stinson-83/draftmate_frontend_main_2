@@ -85,10 +85,15 @@ export const caseService = {
       return c;
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
     try {
       const resp = await fetch(`${API_CONFIG.LIBRARY.BASE_URL}/cases/`, {
-        headers: getHeaders()
+        headers: getHeaders(),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (resp.ok) {
         const data = await resp.json();
         const mapped = data.map(mapCaseToFrontend).map(filterDeletedDocs);
@@ -97,7 +102,8 @@ export const caseService = {
         return mapped;
       }
     } catch (e) {
-      console.warn("Backend getCases failed, falling back to localStorage:", e);
+      clearTimeout(timeoutId);
+      console.warn("Backend getCases failed/timed out, falling back to localStorage:", e);
     }
     initializeStorage();
     const localCases = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');

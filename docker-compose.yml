@@ -150,6 +150,10 @@ services:
       - TEST_MODE=${TEST_MODE}
       - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS}
       - PREFERRED_DOMAINS=${PREFERRED_DOMAINS}
+      - SMTP_SERVER=${SMTP_SERVER:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-preetkakdiya@gmail.com}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-ciej ysdb qdkm bxot}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
       - INPUT_JSON=${INPUT_JSON}
       - INTERACTIVE=${INTERACTIVE}

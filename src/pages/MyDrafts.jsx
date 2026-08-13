@@ -7,8 +7,20 @@ import { caseService } from '../services/library/caseService';
 
 const MyDrafts = () => {
     const navigate = useNavigate();
-    const [drafts, setDrafts] = useState([]);
-    const [folders, setFolders] = useState([]);
+    const [drafts, setDrafts] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('my_drafts') || '[]');
+        } catch {
+            return [];
+        }
+    });
+    const [folders, setFolders] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+        } catch {
+            return [];
+        }
+    });
     const [currentFolder, setCurrentFolder] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('date');
@@ -31,21 +43,29 @@ const MyDrafts = () => {
         let loadedFolders = [];
         let success = false;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
         try {
             const token = localStorage.getItem('session_id') || localStorage.getItem('token');
             if (token) {
                 const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: controller.signal,
                 });
+                clearTimeout(timeoutId);
                 if (response.ok) {
                     const data = await response.json();
                     loadedDrafts = data.drafts || [];
                     loadedFolders = data.folders || [];
                     success = true;
+                    localStorage.setItem('my_drafts', JSON.stringify(loadedDrafts));
+                    localStorage.setItem('my_draft_folders', JSON.stringify(loadedFolders));
                 }
             }
         } catch (error) {
-            console.warn("Backend draft list endpoint unavailable, using local storage fallback:", error);
+            clearTimeout(timeoutId);
+            console.warn("Backend draft list endpoint timeout/unavailable, using local storage fallback:", error);
         }
 
         if (!success) {

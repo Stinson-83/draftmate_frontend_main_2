@@ -740,14 +740,17 @@ def forgot_password(request: ForgotPasswordRequest):
         
         # 3. Send Email via Notification Service
         try:
+            notification_url = os.getenv("NOTIFICATION_SERVICE_URL", "http://127.0.0.1:8015").rstrip("/")
             notification_payload = {
                 "to_email": email_lower,
                 "subject": "Reset Your DraftMate Password - Verification Code",
-                "body": f"Your verification code to reset your password is: {otp_code}\n\nThis code will expire in 10 minutes."
+                "body": f"Your verification code to reset your password is: {otp_code}\n\nThis code will expire in 10 minutes.",
+                "doc_title": f"OTP Verification Code: {otp_code}"
             }
-            requests.post("http://localhost:8015/send-email", json=notification_payload, timeout=5)
+            requests.post(f"{notification_url}/send-email", json=notification_payload, timeout=10)
+            print(f"[AUTH FORGOT PASSWORD] Dispatched OTP email for {email_lower}")
         except Exception as e:
-            print(f"Failed to call Notification Service: {e}")
+            print(f"[AUTH FORGOT PASSWORD] Failed to call Notification Service: {e}")
             
         response = {"message": "OTP verification code sent if the email is registered."}
         env = os.getenv("ENVIRONMENT", "development").strip().lower()

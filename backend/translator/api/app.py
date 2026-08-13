@@ -302,6 +302,7 @@ def download_source_file(job_id: int, request: Request, raw: str | None = Query(
 
 
 @app.get("/translation-jobs/{job_id}/download", name="download_translated_file")
+@app.get("/translation-jobs/{job_id}/pdf")
 def download_translated_file(job_id: int, request: Request, raw: str | None = Query(default=None), db: Session = Depends(get_db)):
     job = get_translation_job(db, job_id)
     if job is None:
@@ -325,8 +326,30 @@ def download_translated_file(job_id: int, request: Request, raw: str | None = Qu
 
     if translated_path.exists():
         clean_name = _clean_download_name(translated_path.name, job.target_language)
-        if raw != "1" and translated_path.suffix.lower() == ".docx":
-            return _docx_to_html_preview(translated_path, title=clean_name)
+
+        # Serve as inline PDF if requested or opening via share link
+        if request.url.path.endswith("/pdf") or (raw != "1" and translated_path.suffix.lower() in [".docx", ".doc"]):
+            pdf_path = translated_path.with_suffix(".pdf")
+            if not pdf_path.exists() or translated_path.stat().st_mtime > pdf_path.stat().st_mtime:
+                try:
+                    import subprocess
+                    subprocess.run(
+                        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(translated_path.parent), str(translated_path)],
+                        check=True,
+                        timeout=30
+                    )
+                except Exception as e:
+                    print(f"[TRANSLATOR PDF CONVERSION WARNING]: {e}")
+
+            if pdf_path.exists():
+                pdf_clean_name = clean_name.rsplit('.', 1)[0] + ".pdf"
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                return Response(
+                    content=pdf_bytes,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{pdf_clean_name}"'}
+                )
 
         response = build_download_response(translated_path, download_name=clean_name)
         content_type, _ = mimetypes.guess_type(clean_name)

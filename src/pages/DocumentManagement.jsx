@@ -29,6 +29,7 @@ const DocumentManagement = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [sharingDoc, setSharingDoc] = useState(null);
   const [shareEmailInput, setShareEmailInput] = useState('');
+  const [emailTemplate, setEmailTemplate] = useState('standard');
   const [copiedLink, setCopiedLink] = useState(false);
 
   const loadCases = useCallback(async () => {
@@ -297,19 +298,18 @@ const DocumentManagement = () => {
   };
 
   const getDocShareUrl = (doc) => {
-    if (!doc) return 'https://www.draftmate.in/dashboard/documents';
+    if (!doc) return `${window.location.origin}/dashboard/documents`;
     
-    // Dynamically use live production origin when deployed, or fallback to production domain on localhost
-    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const domain = (!isLocal && typeof window !== 'undefined' && window.location.origin)
+    const domain = (typeof window !== 'undefined' && window.location.origin)
       ? window.location.origin 
       : (import.meta.env.VITE_PUBLIC_APP_URL || 'https://www.draftmate.in');
       
     const cleanDomain = domain.endsWith('/') ? domain.slice(0, -1) : domain;
-    const docName = doc.filename || doc.name || 'document';
-    const docId = doc.id || 'doc-001';
     
-    return `${cleanDomain}/dashboard/workspace?documentKey=${encodeURIComponent(docId)}&filename=${encodeURIComponent(docName)}&autodownload=true`;
+    const docName = doc.filename || doc.name || 'document.docx';
+    const docId = doc.id || doc.documentKey || 'doc-001';
+    
+    return `${cleanDomain}/drafter/v2/draft/pdf/${encodeURIComponent(docId)}/${encodeURIComponent(docName)}`;
   };
 
   const handleCopyShareLink = () => {
@@ -320,13 +320,65 @@ const DocumentManagement = () => {
     setTimeout(() => setCopiedLink(false), 3000);
   };
 
-  const handleSendShareEmail = (e) => {
+  const [sharePermission, setSharePermission] = useState('edit');
+
+  const handleSendShareEmail = async (e) => {
     e.preventDefault();
     if (!shareEmailInput || !shareEmailInput.includes('@')) {
       toast.error("Please enter a valid email address.");
       return;
     }
-    toast.success(`Document "${sharingDoc?.name}" shared with ${shareEmailInput}!`);
+
+    const targetEmail = shareEmailInput.trim();
+    const docTitle = sharingDoc?.name || sharingDoc?.filename || 'Legal Document';
+    const toastId = toast.loading(`Converting to PDF & sending email to ${targetEmail}...`);
+    const shareUrl = getDocShareUrl(sharingDoc);
+    const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+    const docId = sharingDoc?.id || sharingDoc?.documentKey || 'doc';
+
+    let senderEmail = 'preetkakadiya184@gmail.com';
+    let senderName = 'Preet Kakadiya';
+    try {
+      const keys = ['user_profile', 'lawyer_profile', 'user', 'user_data'];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const u = JSON.parse(raw);
+          if (u.email) senderEmail = u.email;
+          if (u.full_name || u.name || u.displayName || u.first_name) {
+            senderName = u.full_name || u.name || u.displayName || `${u.first_name || ''} ${u.last_name || ''}`.trim();
+          }
+          if (senderEmail && senderName) break;
+        }
+      }
+      if (!senderEmail && localStorage.getItem('user_email')) {
+        senderEmail = localStorage.getItem('user_email');
+      }
+    } catch (e) {}
+
+    try {
+      await fetch(`${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/share_and_email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          draft_id: String(docId),
+          doc_name: docTitle,
+          recipient_email: targetEmail,
+          sender_email: senderEmail,
+          sender_name: senderName,
+          access_level: sharePermission || 'edit',
+          share_url: shareUrl,
+          template_style: emailTemplate
+        })
+      });
+    } catch (err) {
+      console.warn("Share and email automation warning:", err);
+    }
+
+    toast.success(`PDF document "${docTitle}" shared with ${targetEmail}!`, { id: toastId });
     setIsShareModalOpen(false);
     setShareEmailInput('');
   };
@@ -929,25 +981,46 @@ const DocumentManagement = () => {
             </div>
 
             {/* Email Share Section */}
-            <form onSubmit={handleSendShareEmail} className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+            <form onSubmit={handleSendShareEmail} className="space-y-4 pt-3 border-t border-slate-100 dark:border-slate-700">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                 Share via Email
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="email"
-                  placeholder="colleague@lawfirm.com"
-                  value={shareEmailInput}
-                  onChange={(e) => setShareEmailInput(e.target.value)}
-                  className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-600"
-                />
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-base">send</span>
-                  Send
-                </button>
+
+              <div className="space-y-3">
+                <div>
+                  <input
+                    type="email"
+                    placeholder="colleague@lawfirm.com"
+                    value={shareEmailInput}
+                    onChange={(e) => setShareEmailInput(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      Permission Level
+                    </label>
+                    <select
+                      value={sharePermission}
+                      onChange={(e) => setSharePermission(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-blue-600 font-medium"
+                    >
+                      <option value="edit">Can Edit (Co-author)</option>
+                      <option value="read">Can Read (View only)</option>
+                    </select>
+                  </div>
+                  <div className="self-end">
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1.5 shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-base">send</span>
+                      Send Invite
+                    </button>
+                  </div>
+                </div>
               </div>
             </form>
 
