@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dev:all": "concurrently \"npm run dev\" \"cd backend/Deep_research && ..\\..\\.venv\\Scripts\\python.exe -X utf8 -m uvicorn lex_bot.app:app --host 0.0.0.0 --port 8004\" \"cd backend/Drafter && ..\\..\\.venv\\Scripts\\python.exe -X utf8 -m uvicorn Drafter:app --host 0.0.0.0 --port 8003\" \"cd backend/login_db && ..\\..\\.venv\\Scripts\\python.exe -X utf8 -m uvicorn auth:app --host 0.0.0.0 --port 8009\""
+    "dev:all": "concurrently \"npm run dev\" \"cd backend/Deep_research && ..\\..\\.venv\\Scripts\\python.exe -X utf8 -m uvicorn lex_bot.app:app --host 0.0.0.0 --port 8004 --reload\" \"cd backend/Drafter && ..\\..\\.venv\\Scripts\\python.exe -X utf8 -m uvicorn Drafter:app --host 0.0.0.0 --port 8003 --reload\" \"cd backend/login_db && ..\\..\\.venv\\Scripts\\python.exe -X utf8 -m uvicorn auth:app --host 0.0.0.0 --port 8009 --reload\""
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.13",

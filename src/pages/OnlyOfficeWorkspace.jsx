@@ -100,6 +100,10 @@ const OnlyOfficeWorkspace = () => {
   const [showAutoFormatPopup, setShowAutoFormatPopup] = useState(false);
   const [isAutoFormatting, setIsAutoFormatting] = useState(false);
   const [enhanceSelectionText, setEnhanceSelectionText] = useState('');
+  const [isReasoningMode, setIsReasoningMode] = useState(false);
+  const [enhancePreviewText, setEnhancePreviewText] = useState('');
+  const [isEnhancingText, setIsEnhancingText] = useState(false);
+  const [showEnhancePreview, setShowEnhancePreview] = useState(false);
   const [inlineCustomPrompt, setInlineCustomPrompt] = useState('');
   const [inlineAiResponse, setInlineAiResponse] = useState('');
   const [isInlineAiLoading, setIsInlineAiLoading] = useState(false);
@@ -121,6 +125,20 @@ const OnlyOfficeWorkspace = () => {
       inlineCustomPromptRef.current.style.height = `${Math.max(88, inlineCustomPromptRef.current.scrollHeight)}px`;
     }
   }, [inlineCustomPrompt, showAutoFormatPopup]);
+
+  const handleComposerHeightResize = () => {
+    const el = composerTextareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const nextHeight = el.scrollHeight;
+    el.style.height = `${Math.min(160, Math.max(24, nextHeight))}px`;
+    setComposerExpanded(nextHeight > 42);
+    setComposerHasValue(Boolean(inputMessage.trim()));
+  };
+
+  useEffect(() => {
+    handleComposerHeightResize();
+  }, [inputMessage]);
 
   const handlePopupMouseDown = (e) => {
     if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
@@ -573,7 +591,6 @@ const OnlyOfficeWorkspace = () => {
         }
         setEnhanceSelectionText(selectedText);
         setInputMessage('');
-        setActiveTab('chat');
         setShowAutoFormatPopup(false);
         return;
       }
@@ -686,24 +703,58 @@ const OnlyOfficeWorkspace = () => {
   };
 
   // Chat message submission
-  const handleSendMessage = async (customQuery = null) => {
+  const handleEnhanceSubmit = async (queryText) => {
+    if (!queryText.trim() || !enhanceSelectionText.trim()) return;
+
+    const promptText = buildEnhancementPrompt(enhanceSelectionText.trim(), queryText.trim());
+    setInputMessage('');
+    setEnhancePreviewText('');
+    setIsEnhancingText(true);
+    setShowEnhancePreview(true);
+
+    try {
+      const activeSessionId = documentKey || 'workspace-chat-session';
+      await api.chatStream(promptText, activeSessionId, {
+        onToken: (chunk, accumulated) => {
+          setEnhancePreviewText(accumulated);
+        },
+        onAnswer: (content) => {
+          setEnhancePreviewText(content);
+        },
+        onDone: () => {
+          setIsEnhancingText(false);
+        },
+        onError: (err) => {
+          console.error('Enhancement error:', err);
+          setIsEnhancingText(false);
+          toast.error('Failed to enhance selection.');
+        }
+      }, "fast");
+    } catch (err) {
+      console.error('Enhancement initialization error:', err);
+      setIsEnhancingText(false);
+    }
+  };
+
+  const handleSendMessage = async (customQuery = null, forceMode = null) => {
     const queryText = customQuery || inputMessage;
     if (!queryText.trim()) return;
 
-    const isEnhancementMode = !customQuery && Boolean(enhanceSelectionText.trim());
-    const promptText = isEnhancementMode
-      ? buildEnhancementPrompt(enhanceSelectionText.trim(), queryText.trim())
-      : queryText;
+    const finalMode = forceMode || (isReasoningMode ? "reasoning" : "fast");
 
     if (!customQuery) setInputMessage('');
 
     const userMsg = {
       role: 'user',
-      content: isEnhancementMode ? `Enhance selected text: ${queryText}` : queryText,
+      content: queryText,
     };
     setMessages((prev) => [...prev, userMsg]);
     setIsChatLoading(true);
-    setStatusMessage(isEnhancementMode ? 'Enhancing selected text...' : 'Assistant is thinking...');
+    setStatusMessage(
+      finalMode === 'reasoning'
+        ? 'Deep reasoning agent is searching & analyzing precedents...'
+        : 'Assistant is thinking...'
+    );
 
     const assistantMsgId = crypto.randomUUID();
     setMessages((prev) => [...prev, { id: assistantMsgId, role: 'assistant', content: '', isStreaming: true }]);
@@ -712,9 +763,12 @@ const OnlyOfficeWorkspace = () => {
       const activeSessionId = documentKey || 'workspace-chat-session';
       let accumulatedResponse = '';
 
-      await api.chatStream(promptText, activeSessionId, {
+      await api.chatStream(queryText, activeSessionId, {
+        onSources: (sources) => {
+          setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, sources } : m));
+        },
         onStatus: (msg) => {
-          setStatusMessage(msg || 'Processing legal research...');
+          setStatusMessage(msg || (finalMode === 'reasoning' ? 'Performing deep legal reasoning...' : 'Processing legal research...'));
         },
         onNodeUpdate: (evt) => {
           const nodeNames = {
@@ -744,13 +798,6 @@ const OnlyOfficeWorkspace = () => {
             m.id === assistantMsgId ? { ...m, content: content, isStreaming: false } : m
           ));
         },
-        onSources: (sources) => {
-          setIsChatLoading(false);
-          setStatusMessage('');
-          setMessages((prev) => prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, sources: sources, isStreaming: false } : m
-          ));
-        },
         onDone: () => {
           setIsChatLoading(false);
           setStatusMessage('');
@@ -768,7 +815,7 @@ const OnlyOfficeWorkspace = () => {
               : m
           ));
         },
-      });
+      }, finalMode);
     } catch (err) {
       console.error('Workspace assistant error:', err);
       setIsChatLoading(false);
@@ -960,7 +1007,6 @@ const OnlyOfficeWorkspace = () => {
     selectionPollPausedUntilRef.current = Date.now() + 1200;
     setEnhanceSelectionText(selectedText);
     setInputMessage('');
-    setActiveTab('chat');
     setShowAutoFormatPopup(false);
     sendToPlugin({ type: 'ONLYOFFICE_ENHANCE_WITH_AI' });
   };
@@ -1338,6 +1384,38 @@ const OnlyOfficeWorkspace = () => {
   const downloadUrl = draftId 
     ? `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${draftId}/${filename || 'document.docx'}` 
     : `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/serve/${filename || 'document.docx'}`;
+
+  const renderParsedContent = (content, sources = []) => {
+    if (!content) return '';
+    if (!sources || sources.length === 0) {
+      return content;
+    }
+
+    const parts = content.split(/(\[\d+\])/g);
+    return parts.map((part, index) => {
+      const match = part.match(/^\[(\d+)\]$/);
+      if (match) {
+        const sourceIndex = parseInt(match[match.length - 1], 10) - 1;
+        const source = sources[sourceIndex];
+        const url = source?.url || source?.source_url;
+        if (url) {
+          return (
+            <a
+              key={index}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline mx-0.5 font-bold"
+              title={source.title || source.case_name || url}
+            >
+              {part}
+            </a>
+          );
+        }
+      }
+      return part;
+    });
+  };
 
   return (
     <div className="flex h-[calc(100vh-0px)] w-full bg-[#E3F0F7] text-slate-800 overflow-hidden relative">
@@ -1911,6 +1989,23 @@ const OnlyOfficeWorkspace = () => {
                 </button>
               </form>
 
+              {/* Deep Reasoning Mode Toggle */}
+              <div className="flex items-center justify-between px-2.5 py-2 bg-white rounded-xl border border-[#B9D9EB] shadow-sm text-xs">
+                <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-sm text-blue-600">psychology</span>
+                  Deep Reasoning Search
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isReasoningMode}
+                    onChange={(e) => setIsReasoningMode(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-205 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
               <button
                 type="button"
                 onClick={handleExplainSelection}
@@ -1983,6 +2078,157 @@ const OnlyOfficeWorkspace = () => {
         )}
       </aside>
       )}
+
+      {/* Floating Composer & Enhance Preview */}
+      <div className="composer-anim fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 flex flex-col items-center gap-3 pointer-events-none select-none" style={{ width: 'min(760px, calc(100vw - 2rem))' }}>
+        
+        {/* Floating AI Enhance Preview Card */}
+        {showEnhancePreview && (
+          <div className="popup-anim pointer-events-auto w-full rounded-2xl border border-blue-200 bg-white/95 shadow-2xl backdrop-blur-md p-4 space-y-3 flex flex-col select-none">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600">
+                <Sparkles className="h-4 w-4 sparkle-float animate-pulse" />
+                <span>AI Enhancement Preview</span>
+              </div>
+              {isEnhancingText && (
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold italic">
+                  <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                  Generating...
+                </div>
+              )}
+            </div>
+            
+            <div className="text-sm text-slate-700 max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed bg-slate-50 border border-slate-100 rounded-xl p-3 select-text custom-scroll">
+              {enhancePreviewText || (isEnhancingText ? "Writing response..." : "")}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEnhancePreview(false);
+                  setEnhancePreviewText('');
+                  setEnhanceSelectionText('');
+                }}
+                className="text-xs font-semibold px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-655 transition-colors"
+              >
+                Dismiss
+              </button>
+              <button
+                type="button"
+                disabled={isEnhancingText || !enhancePreviewText}
+                onClick={() => {
+                  handleInsertText(enhancePreviewText);
+                  setShowEnhancePreview(false);
+                  setEnhancePreviewText('');
+                  setEnhanceSelectionText('');
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Apply
+              </button>
+            </div>
+          </div>
+        )}
+
+        {enhanceSelectionText ? (
+          <div className="popup-anim pointer-events-auto w-full rounded-2xl border border-[#B9D9EB] bg-white shadow-xl overflow-hidden">
+            <div className="flex items-start justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <Quote className="h-3.5 w-3.5 text-slate-400" />
+                  Selected text
+                </div>
+                <div className="mt-1 text-sm text-slate-700 whitespace-pre-wrap break-words max-h-20 overflow-hidden">
+                  {enhanceSelectionText}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnhanceSelectionText('')}
+                className="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        ) : null}
+        
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (composerHasValue) {
+              if (enhanceSelectionText) {
+                handleEnhanceSubmit(inputMessage);
+              } else {
+                handleSendMessage();
+                setActiveTab('chat');
+              }
+            }
+          }}
+          className={`composer-input pointer-events-auto w-full flex items-end gap-3 bg-[#f0f4f9] border border-[#d8e1ea] shadow-[0_12px_30px_rgba(15,23,42,0.08)] px-4 py-3.5 transition-all duration-300 ${
+            composerExpanded ? 'rounded-[20px]' : 'rounded-full'
+          }`}
+        >
+          <div className="flex h-10 items-center justify-center shrink-0">
+            <button
+              type="button"
+              disabled
+              title="Attachments coming soon"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d8e1ea] bg-white/80 text-slate-500 opacity-70"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          <textarea
+            ref={composerTextareaRef}
+            rows={1}
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (composerHasValue) {
+                  if (enhanceSelectionText) {
+                    handleEnhanceSubmit(inputMessage);
+                  } else {
+                    handleSendMessage();
+                    setActiveTab('chat');
+                  }
+                }
+              }
+            }}
+            placeholder={enhanceSelectionText ? 'Write enhancement instructions...' : 'Ask your AI...'}
+            disabled={isChatLoading}
+            style={{ height: '24px', minHeight: '24px', maxHeight: '160px' }}
+            className="flex-1 resize-none overflow-y-auto bg-transparent border-0 outline-none focus:outline-none focus:ring-0 text-[15px] leading-6 text-slate-800 placeholder:text-slate-400 font-sans"
+          />
+
+          <div className="flex h-10 items-center justify-end gap-2 shrink-0">
+            <button
+              type="button"
+              disabled
+              title="Voice input coming soon"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d8e1ea] bg-white/80 text-slate-500 opacity-70"
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+            <button
+              type="submit"
+              disabled={isChatLoading || !inputMessage.trim()}
+              className={`inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-semibold transition-all duration-200 ${
+                inputMessage.trim()
+                  ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 opacity-100'
+                  : 'bg-slate-900/10 text-slate-500 opacity-50 cursor-not-allowed'
+              } ${isChatLoading ? 'cursor-wait opacity-70' : ''}`}
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      </div>
 
       {isDragging && (
         <div className="fixed inset-0 z-50 cursor-col-resize select-none bg-transparent" />

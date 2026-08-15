@@ -237,6 +237,7 @@ class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=50000, description="Legal query")
     user_id: Optional[str] = Field(None, description="User ID for memory")
     session_id: Optional[str] = Field(None, description="Session ID")
+    mode: Optional[str] = Field("fast", description="Execution mode: 'fast' or 'reasoning'")
     
     @field_validator('query')
     @classmethod
@@ -599,7 +600,7 @@ async def _stream_chat(request: ChatRequest, user_id: str):
                 query=request.query,
                 user_id=user_id,
                 session_id=session_id,
-                llm_mode="fast",
+                llm_mode=request.mode or "fast",
                 chat_store_instance=chat_store,
                 tracker=tracker
             )

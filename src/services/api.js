@@ -105,7 +105,7 @@ export const api = {
      * @param {string} sessionId - The current session ID.
      * @param {Object} callbacks - Event callbacks { onStatus, onAnswer, onFollowups, onDone, onError }
      */
-    chatStream: async (query, sessionId, callbacks = {}) => {
+    chatStream: async (query, sessionId, callbacks = {}, mode = "fast") => {
         const { onStatus, onToken, onAnswer, onFollowups, onSources, onDone, onError, onNodeUpdate, onNodeStream } = callbacks;
 
         try {
@@ -118,6 +118,7 @@ export const api = {
                 body: JSON.stringify({
                     query: query,
                     session_id: sessionId,
+                    mode: mode
                 }),
             });
 
