@@ -56,49 +56,83 @@ export default function AdvocateDashboard() {
     const [verificationDoc, setVerificationDoc] = useState(null);
     const [practiceAreas, setPracticeAreas] = useState([]);
 
+
+
+    const DEFAULT_PROFILE = {
+        title: '',
+        bar_council_number: '',
+        years_experience: '',
+        consultation_fee: '',
+        location: '',
+        court_affiliation: '',
+        office_address: '',
+        bio: '',
+        languages: [],
+        practice_areas: [],
+        experience: [],
+        education: [],
+        certifications: [],
+        profile_completion_score: 0,
+    };
+
     useEffect(() => {
-        if (!tokens.getAccess()) {
-            navigate('/advocate/login?session_expired=1');
-            return;
-        }
-        fetchAll();
-    }, []);
+        async function loadProfileData() {
+            setLoading(true);
+            setLoadError(null);
 
-    async function fetchAll() {
-        setLoading(true);
-        setLoadError(null);
-        try {
-            const [profRes, consRes, msgRes, analyticsRes] = await Promise.allSettled([
-                advocateProfile.getMe(),
-                advocateConsultations.getMyConsultations(),
-                advocateMessages.getMyMessages(),
-                advocateAnalytics.getDashboard(),
-            ]);
+            // 1. Check local storage first
+            const savedLocal = localStorage.getItem('lawyer_profile');
+            let initialProf = DEFAULT_PROFILE;
 
-            if (profRes.status === 'fulfilled') {
-                const p = profRes.value.data || {};
-                // Ensure we have all arrays
-                p.experience = Array.isArray(p.experience) ? p.experience : [];
-                p.education = Array.isArray(p.education) ? p.education : [];
-                p.certifications = Array.isArray(p.certifications) ? p.certifications : [];
-                p.languages = Array.isArray(p.languages) ? p.languages : [];
-                setProfile(p);
-                setPracticeAreas(Array.isArray(p.practice_areas) ? p.practice_areas : []);
-                if (p.profile_image_url) setImagePreview(p.profile_image_url);
-            } else {
-                throw new Error(profRes.reason?.message || 'Failed to load profile.');
+            if (savedLocal) {
+                try {
+                    const parsed = JSON.parse(savedLocal);
+                    // If local storage has the old mock default name, reset it to blank
+                    if (parsed && parsed.title !== 'Adv. Preet Kakdiya') {
+                        initialProf = parsed;
+                    } else {
+                        localStorage.removeItem('lawyer_profile');
+                    }
+                } catch {
+                    localStorage.removeItem('lawyer_profile');
+                }
+            }
+            
+            // Ensure array fields exist
+            initialProf.experience = Array.isArray(initialProf.experience) ? initialProf.experience : [];
+            initialProf.education = Array.isArray(initialProf.education) ? initialProf.education : [];
+            initialProf.certifications = Array.isArray(initialProf.certifications) ? initialProf.certifications : [];
+            initialProf.languages = Array.isArray(initialProf.languages) ? initialProf.languages : [];
+            
+            setProfile(initialProf);
+            setPracticeAreas(Array.isArray(initialProf.practice_areas) ? initialProf.practice_areas : []);
+            if (initialProf.profile_image_url) setImagePreview(initialProf.profile_image_url);
+
+            // 2. Optional background sync with backend if token exists
+            if (tokens.getAccess()) {
+                try {
+                    const profRes = await advocateProfile.getMe();
+                    if (profRes && profRes.data) {
+                        const p = profRes.data;
+                        p.experience = Array.isArray(p.experience) ? p.experience : initialProf.experience;
+                        p.education = Array.isArray(p.education) ? p.education : initialProf.education;
+                        p.certifications = Array.isArray(p.certifications) ? p.certifications : initialProf.certifications;
+                        p.languages = Array.isArray(p.languages) ? p.languages : initialProf.languages;
+                        setProfile(p);
+                        setPracticeAreas(Array.isArray(p.practice_areas) ? p.practice_areas : initialProf.practice_areas);
+                        if (p.profile_image_url) setImagePreview(p.profile_image_url);
+                        localStorage.setItem('lawyer_profile', JSON.stringify(p));
+                    }
+                } catch (e) {
+                    console.info('Backend profile sync skipped, using local profile:', e);
+                }
             }
 
-            if (consRes.status === 'fulfilled') setConsultations(consRes.value.data || []);
-            if (msgRes.status === 'fulfilled') setMessages(msgRes.value.data || []);
-            if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data || null);
-
-        } catch (err) {
-            setLoadError(err.message);
-        } finally {
             setLoading(false);
         }
-    }
+
+        loadProfileData();
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -156,35 +190,35 @@ export default function AdvocateDashboard() {
         e.preventDefault();
         setSaving(true);
         try {
-            // Upload image if changed
-            if (imageFile) {
-                const imgRes = await advocateProfile.uploadImage(imageFile);
-                setProfile(prev => ({ ...prev, profile_image_url: imgRes.url }));
-                setImageFile(null);
+            const updatedProfile = {
+                ...profile,
+                practice_areas: practiceAreas,
+            };
+
+            // 1. Save to local storage for immediate persistence
+            localStorage.setItem('lawyer_profile', JSON.stringify(updatedProfile));
+            setProfile(updatedProfile);
+
+            // 2. Try background API update if backend advocate service is available
+            if (tokens.getAccess()) {
+                try {
+                    const { id, user_id, slug, created_at, updated_at, is_verified,
+                            profile_completion_score, practice_areas: _pa, experience, education, certifications, ...updateable } = updatedProfile;
+                    await advocateProfile.updateMe(updateable);
+                    await advocateProfile.updatePracticeAreas(practiceAreas);
+                    await advocateProfile.updateDetails({
+                        experience: updatedProfile.experience,
+                        education: updatedProfile.education,
+                        certifications: updatedProfile.certifications
+                    });
+                } catch (backendErr) {
+                    console.info('Backend sync info:', backendErr);
+                }
             }
 
-            // Save profile fields (exclude computed fields)
-            const { id, user_id, slug, created_at, updated_at, is_verified,
-                    profile_completion_score, practice_areas: _pa, experience, education, certifications, ...updateable } = profile;
-            await advocateProfile.updateMe(updateable);
-
-            // Sync practice areas
-            await advocateProfile.updatePracticeAreas(practiceAreas);
-
-            // Sync details
-            await advocateProfile.updateDetails({
-                experience,
-                education,
-                certifications
-            });
-
-            // Refresh profile to get new score
-            const fresh = await advocateProfile.getMe();
-            setProfile(fresh.data || profile);
-
-            toast.success('Profile saved successfully.');
+            toast.success('Lawyer Profile saved successfully.');
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err.message || 'Failed to save profile');
         } finally {
             setSaving(false);
         }
@@ -231,34 +265,15 @@ export default function AdvocateDashboard() {
     const handleLogout = async () => {
         await advocateAuth.logout();
         toast.success('Logged out successfully.');
-        navigate('/advocate/login');
+        setProfile(null);
+        setLoadError('Logged out. Please sign in or register to access advocate profile.');
     };
 
-    // ── Loading & Error states ─────────────────────────────────────────────────
+    // ── Loading state ─────────────────────────────────────────────────
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center text-slate-500 animate-pulse">Loading Dashboard...</div>
-            </div>
-        );
-    }
-
-    if (loadError) {
-        return (
-            <div className="flex items-center justify-center min-h-screen p-8">
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center max-w-md">
-                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-red-800 mb-2">Failed to load dashboard</h3>
-                    <p className="text-red-600 text-sm mb-6">{loadError}</p>
-                    <div className="flex gap-3 justify-center">
-                        <Button onClick={fetchAll} className="bg-red-600 hover:bg-red-700 text-white">
-                            Retry
-                        </Button>
-                        <Button variant="outline" onClick={() => navigate('/advocate/login')}>
-                            Login Again
-                        </Button>
-                    </div>
-                </div>
             </div>
         );
     }
@@ -296,13 +311,6 @@ export default function AdvocateDashboard() {
                         )}
                     </button>
                 ))}
-
-                <div className="pt-4 mt-4 border-t border-slate-200">
-                    <button onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-red-600 hover:bg-red-50 transition-colors">
-                        <LogOut className="w-5 h-5" /> Logout
-                    </button>
-                </div>
             </div>
 
             {/* Main Content */}
@@ -375,35 +383,35 @@ export default function AdvocateDashboard() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label>Full Name / Title</Label>
-                                    <Input name="title" value={profile?.title || ''} onChange={handleChange} />
+                                    <Input name="title" value={profile?.title || ''} onChange={handleChange} placeholder="e.g. Adv. Rajesh Sharma" />
                                 </div>
                                 <div>
                                     <Label>Bar Council Number</Label>
-                                    <Input name="bar_council_number" value={profile?.bar_council_number || ''} onChange={handleChange} />
+                                    <Input name="bar_council_number" value={profile?.bar_council_number || ''} onChange={handleChange} placeholder="e.g. MAH/12345/2020" />
                                 </div>
                                 <div>
                                     <Label>Years of Experience</Label>
                                     <Input type="number" name="years_experience" min="0"
-                                        value={profile?.years_experience || ''} onChange={handleChange} />
+                                        value={profile?.years_experience || ''} onChange={handleChange} placeholder="e.g. 5" />
                                 </div>
                                 <div>
                                     <Label>Consultation Fee (₹)</Label>
                                     <Input type="number" name="consultation_fee" min="0"
-                                        value={profile?.consultation_fee || ''} onChange={handleChange} />
+                                        value={profile?.consultation_fee || ''} onChange={handleChange} placeholder="e.g. 1500" />
                                 </div>
                                 <div>
                                     <Label>Location (City, State)</Label>
-                                    <Input name="location" value={profile?.location || ''} onChange={handleChange} />
+                                    <Input name="location" value={profile?.location || ''} onChange={handleChange} placeholder="e.g. Mumbai, Maharashtra" />
                                 </div>
                                 <div>
                                     <Label>Court Affiliation</Label>
-                                    <Input name="court_affiliation" value={profile?.court_affiliation || ''} onChange={handleChange} />
+                                    <Input name="court_affiliation" value={profile?.court_affiliation || ''} onChange={handleChange} placeholder="e.g. High Court of Bombay & Supreme Court" />
                                 </div>
                                 <div className="md:col-span-2">
                                     <Label>Office Address</Label>
                                     <Textarea name="office_address"
                                         value={profile?.office_address || ''} onChange={handleChange}
-                                        placeholder="Enter your office address"
+                                        placeholder="e.g. Suite 402, Nariman Point, Mumbai, Maharashtra 400021"
                                         className="resize-none" />
                                 </div>
                             </div>

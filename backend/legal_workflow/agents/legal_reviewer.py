@@ -103,14 +103,23 @@ def review_draft(html_content: str, draft_type: str | None = None) -> dict:
                 text = text[:-3]
 
             import json
+            
+            # Find the actual JSON bounds in case the model returned leading/trailing markdown/text
+            start = text.find('{')
+            end = text.rfind('}')
+            if start != -1 and end != -1:
+                json_str = text[start:end+1]
+            else:
+                json_str = text
+
             try:
-                return json.loads(text.strip())
-            except json.JSONDecodeError:
-                logger.warning("reviewer: failed to parse JSON response, returning raw")
+                return json.loads(json_str.strip())
+            except json.JSONDecodeError as je:
+                logger.warning(f"reviewer: failed to parse JSON response: {je}. Returning raw response.")
                 return {
                     "overall_risk_level": "unknown",
                     "risk_score": 0,
-                    "summary": text[:500],
+                    "summary": text,  # Return the full raw response so it doesn't get cut off!
                     "issues": [],
                     "strengths": [],
                     "suggested_additions": [],

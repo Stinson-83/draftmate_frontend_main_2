@@ -20,7 +20,10 @@ def get_embedding_model() -> Any:
             from sentence_transformers import SentenceTransformer
             logger.info(f"🔍 Loading global Embedding Model: {EMBEDDING_MODEL_NAME}...")
             # Use CPU to avoid blocking / VRAM issues in multi-threaded setup unless GPU is specified
-            _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME, device='cpu')
+            try:
+                _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME, device='cpu', local_files_only=True)
+            except Exception:
+                _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME, device='cpu')
             logger.info("✅ Global Embedding Model loaded successfully")
         except ImportError:
             logger.error("SentenceTransformers not installed.")

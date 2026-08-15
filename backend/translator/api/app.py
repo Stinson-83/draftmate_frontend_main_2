@@ -89,7 +89,10 @@ def get_db() -> Generator[Session, None, None]:
 def _build_asset_url(request: Request, *, route_name: str, job_id: int) -> str | None:
     # Generate clean, absolute web-accessible download links for the React frontend
     try:
-        return str(request.url_for(route_name, job_id=job_id))
+        raw_url = str(request.url_for(route_name, job_id=job_id))
+        if "/translator/" not in raw_url:
+            raw_url = raw_url.replace("/translation-jobs/", "/translator/translation-jobs/")
+        return raw_url
     except Exception as e:
         print(f"[ERROR BUILD URL] Failed to compile asset route: {e}")
         return None
@@ -153,7 +156,29 @@ async def create_translation_job(
         target_language=normalized_target_language,
     )
 
-    process_translation_job.delay(job.id, str(file_path), normalized_target_language)
+    try:
+        process_translation_job.delay(job.id, str(file_path), normalized_target_language)
+    except Exception as cel_err:
+        print(f"[TRANSLATOR API] Celery delay exception: {cel_err}")
+
+    import threading
+    def _run_bg_translation(j_id: int):
+        from backend.translator.database import SessionLocal
+        if SessionLocal:
+            with SessionLocal() as bg_db:
+                from backend.translator.crud import get_translation_job
+                bg_job = get_translation_job(bg_db, j_id)
+                if bg_job and bg_job.status not in {"completed", "failed"}:
+                    from backend.translator.workers.worker import _run_pipeline
+                    try:
+                        _run_pipeline(bg_db, bg_job)
+                        bg_db.refresh(bg_job)
+                        print(f"[TRANSLATOR BG RUNNER SUCCESS] Job #{j_id} completed via thread runner!")
+                    except Exception as err:
+                        print(f"[TRANSLATOR BG RUNNER ERROR]: {err}")
+
+    bg_thread = threading.Thread(target=_run_bg_translation, args=(job.id,), daemon=True)
+    bg_thread.start()
 
     return {
         "job_id": job.id,
@@ -191,8 +216,62 @@ def list_translation_jobs_view(
     }
 
 
+def _docx_to_html_preview(file_path: Path, title: str = "Document Preview") -> Response:
+    try:
+        import docx
+        doc = docx.Document(file_path)
+        paragraphs_html = []
+        for p in doc.paragraphs:
+            text = p.text.strip()
+            if not text:
+                continue
+            if p.style.name.startswith("Heading"):
+                paragraphs_html.append(f"<h3 style='color:#0f172a; margin-top:16px; margin-bottom:8px;'>{text}</h3>")
+            else:
+                paragraphs_html.append(f"<p style='margin-bottom:12px; font-size:14px; color:#334155; line-height:1.6;'>{text}</p>")
+
+        body = "".join(paragraphs_html) or "<p style='color:#64748b;'>Document has no text content.</p>"
+        html = f"""<!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {{ font-family: system-ui, -apple-system, sans-serif; padding: 24px; background: #ffffff; margin: 0; }}
+          </style>
+        </head>
+        <body>
+          {body}
+        </body>
+        </html>"""
+        return Response(content=html, media_type="text/html")
+    except Exception as e:
+        return Response(content=f"<html><body><p>Unable to render DOCX preview: {e}</p></body></html>", media_type="text/html")
+
+
+import re
+
+def _clean_download_name(raw_name: str | None, target_lang: str | None = None) -> str:
+    if not raw_name:
+        return "Translated_Document.docx"
+    name = Path(raw_name).name
+    while True:
+        new_name = re.sub(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?', '', name)
+        new_name = re.sub(r'^[0-9a-fA-F]{32}[_-]?', '', new_name)
+        if new_name == name:
+            break
+        name = new_name
+    
+    name = re.sub(r'^Translated_[A-Z_a-z-]+_', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'^Translated_', '', name, flags=re.IGNORECASE)
+    
+    if target_lang and not name.startswith("Translated_"):
+        lang_code = target_lang.split('-')[0].upper()
+        return f"Translated_{lang_code}_{name}"
+    return name
+
+
 @app.get("/translation-jobs/{job_id}/source", name="download_translation_source_file")
-def download_source_file(job_id: int, db: Session = Depends(get_db)):
+def download_source_file(job_id: int, request: Request, raw: str | None = Query(default=None), db: Session = Depends(get_db)):
     job = get_translation_job(db, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Translation job not found")
@@ -201,43 +280,30 @@ def download_source_file(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Source file is not available in storage")
 
     source_path = Path(str(job.source_file).replace("\\", "/"))
+    if not source_path.exists():
+        source_path = Path(os.getcwd()) / source_path
+
     if source_path.exists():
-        response = build_download_response(source_path, download_name=source_path.name)
-        content_type, _ = mimetypes.guess_type(source_path.name)
+        clean_name = _clean_download_name(source_path.name, job.source_language)
+        if raw != "1" and source_path.suffix.lower() == ".docx":
+            return _docx_to_html_preview(source_path, title=clean_name)
+
+        response = build_download_response(source_path, download_name=clean_name)
+        content_type, _ = mimetypes.guess_type(clean_name)
         if content_type:
             response.media_type = content_type
-        response.headers["Content-Disposition"] = f'inline; filename="{source_path.name}"'
+        disp_type = "attachment" if raw == "1" else "inline"
+        response.headers["Content-Disposition"] = f'{disp_type}; filename="{clean_name}"'
         return response
 
-    fallback_path = Path(os.getcwd()) / source_path
-    if fallback_path.exists():
-        response = build_download_response(fallback_path, download_name=fallback_path.name)
-        content_type, _ = mimetypes.guess_type(fallback_path.name)
-        if content_type:
-            response.media_type = content_type
-        response.headers["Content-Disposition"] = f'inline; filename="{fallback_path.name}"'
-        return response
-
-    # Web Viewport Fallback logic to circumvent file loading errors
-    html_fallback = f"""
-    <html>
-      <body style="font-family: system-ui, sans-serif; padding: 24px; color: #1e293b; background-color: #f8fafc; line-height: 1.5;">
-        <h3 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px;">Original Legal Draft — Source Viewport</h3>
-        <p style="font-size: 14px; margin-bottom: 20px;"><strong>Detected Source Language Parameters:</strong> <span style="background:#e2e8f0; padding:2px 6px; border-radius:4px;">{job.source_language}</span></p>
-        <div style="background: white; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; min-height: 300px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-          <h4 style="color:#1e40af; margin-top:0;">[PREVIEW VIEWPORT STUB]</h4>
-          <p>This panel displays your uploaded legal draft text content seamlessly on Windows.</p>
-          <hr style="border:0; border-top: 1px dashed #cbd5e1; margin:20px 0;" />
-          <p style="font-size:12px; color:#64748b;"><strong>Original Absolute S3/System Reference:</strong><br/><code>{job.source_file}</code></p>
-        </div>
-      </body>
-    </html>
-    """
+    # Web Viewport Fallback
+    html_fallback = f"<html><body style='font-family: sans-serif; padding: 24px;'><h3>Original Document — Viewport</h3><p>Language: {job.source_language}</p></body></html>"
     return Response(content=html_fallback, media_type="text/html")
 
 
 @app.get("/translation-jobs/{job_id}/download", name="download_translated_file")
-def download_translated_file(job_id: int, db: Session = Depends(get_db)):
+@app.get("/translation-jobs/{job_id}/pdf")
+def download_translated_file(job_id: int, request: Request, raw: str | None = Query(default=None), db: Session = Depends(get_db)):
     job = get_translation_job(db, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Translation job not found")
@@ -246,21 +312,51 @@ def download_translated_file(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Translation job is not completed")
 
     translated_path = Path(str(job.translated_file).replace("\\", "/"))
-    if translated_path.exists():
-        response = build_download_response(translated_path, download_name=translated_path.name)
-        content_type, _ = mimetypes.guess_type(translated_path.name)
-        if content_type:
-            response.media_type = content_type
-        response.headers["Content-Disposition"] = f'inline; filename="{translated_path.name}"'
-        return response
+    if not translated_path.exists():
+        translated_path = Path(os.getcwd()) / translated_path
 
-    fallback_path = Path(os.getcwd()) / translated_path
-    if fallback_path.exists():
-        response = build_download_response(fallback_path, download_name=fallback_path.name)
-        content_type, _ = mimetypes.guess_type(fallback_path.name)
+    if not translated_path.exists():
+        try:
+            from backend.Drafter.s3_helper import ensure_file_exists_locally
+            s3_key = f"translator/translated/{translated_path.name}"
+            os.makedirs(translated_path.parent, exist_ok=True)
+            ensure_file_exists_locally(s3_key, str(translated_path))
+        except Exception:
+            pass
+
+    if translated_path.exists():
+        clean_name = _clean_download_name(translated_path.name, job.target_language)
+
+        # Serve as inline PDF if requested or opening via share link
+        if request.url.path.endswith("/pdf") or (raw != "1" and translated_path.suffix.lower() in [".docx", ".doc"]):
+            pdf_path = translated_path.with_suffix(".pdf")
+            if not pdf_path.exists() or translated_path.stat().st_mtime > pdf_path.stat().st_mtime:
+                try:
+                    import subprocess
+                    subprocess.run(
+                        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(translated_path.parent), str(translated_path)],
+                        check=True,
+                        timeout=30
+                    )
+                except Exception as e:
+                    print(f"[TRANSLATOR PDF CONVERSION WARNING]: {e}")
+
+            if pdf_path.exists():
+                pdf_clean_name = clean_name.rsplit('.', 1)[0] + ".pdf"
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                return Response(
+                    content=pdf_bytes,
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{pdf_clean_name}"'}
+                )
+
+        response = build_download_response(translated_path, download_name=clean_name)
+        content_type, _ = mimetypes.guess_type(clean_name)
         if content_type:
             response.media_type = content_type
-        response.headers["Content-Disposition"] = f'inline; filename="{fallback_path.name}"'
+        disp_type = "attachment" if raw == "1" else "inline"
+        response.headers["Content-Disposition"] = f'{disp_type}; filename="{clean_name}"'
         return response
 
     # Stylized, clean inline translation simulation block rendered to HTML frame canvas

@@ -3,11 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
 import DateTimelineModal from '../components/DateTimelineModal';
+import { caseService } from '../services/library/caseService';
 
 const MyDrafts = () => {
     const navigate = useNavigate();
-    const [drafts, setDrafts] = useState([]);
-    const [folders, setFolders] = useState([]);
+    const [drafts, setDrafts] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('my_drafts') || '[]');
+        } catch {
+            return [];
+        }
+    });
+    const [folders, setFolders] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+        } catch {
+            return [];
+        }
+    });
     const [currentFolder, setCurrentFolder] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('date');
@@ -18,50 +31,127 @@ const MyDrafts = () => {
     const [folderNameInput, setFolderNameInput] = useState('');
     const [isDraggingOverId, setIsDraggingOverId] = useState(null);
 
+    const [deleteModalState, setDeleteModalState] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        onConfirm: null
+    });
+
     const fetchDraftsAndFolders = async () => {
+        let loadedDrafts = [];
+        let loadedFolders = [];
+        let success = false;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
         try {
-            const token = localStorage.getItem('session_id');
-            const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setDrafts(data.drafts || []);
-                setFolders(data.folders || []);
-            } else {
-                toast.error("Failed to load drafts from database.");
+            const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+            if (token) {
+                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    signal: controller.signal,
+                });
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    const data = await response.json();
+                    loadedDrafts = data.drafts || [];
+                    loadedFolders = data.folders || [];
+                    success = true;
+                    localStorage.setItem('my_drafts', JSON.stringify(loadedDrafts));
+                    localStorage.setItem('my_draft_folders', JSON.stringify(loadedFolders));
+                }
             }
         } catch (error) {
-            console.error("Error fetching drafts:", error);
-            toast.error("Error connecting to drafts service.");
+            clearTimeout(timeoutId);
+            console.warn("Backend draft list endpoint timeout/unavailable, using local storage fallback:", error);
         }
+
+        if (!success) {
+            try {
+                loadedDrafts = JSON.parse(localStorage.getItem('my_drafts') || '[]');
+                loadedFolders = JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+            } catch (err) {
+                loadedDrafts = [];
+                loadedFolders = [];
+            }
+        }
+
+        // Always filter out locally-deleted drafts so they never resurrect after navigation
+        try {
+            const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
+            if (deletedIds.length > 0) {
+                loadedDrafts = loadedDrafts.filter(d => {
+                    const candidates = [d.id, d.documentKey, d.filename, d.name]
+                        .filter(Boolean)
+                        .map(v => String(v).trim().toLowerCase());
+                    return !candidates.some(c => deletedIds.includes(c));
+                });
+            }
+        } catch (e) {}
+
+        setDrafts(loadedDrafts);
+        setFolders(loadedFolders);
     };
 
     useEffect(() => {
         fetchDraftsAndFolders();
     }, []);
 
-    const handleDeleteDraft = async (id, e) => {
-        e.stopPropagation();
-        if (window.confirm('Are you sure you want to delete this draft?')) {
+    const performDeleteDraft = async (id) => {
+        const targetDraft = drafts.find(d => String(d.id) === String(id));
+        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+        const deleteTargets = Array.from(new Set([id, targetDraft?.documentKey, targetDraft?.filename, targetDraft?.name].filter(Boolean)));
+
+        for (const targetId of deleteTargets) {
             try {
-                const token = localStorage.getItem('session_id');
-                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ id }),
-                });
-                if (response.ok) {
-                    setDrafts(prev => prev.filter(draft => draft.id !== id));
-                    toast.success("Draft deleted successfully.");
-                } else {
-                    toast.error("Failed to delete draft.");
+                if (token) {
+                    await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ id: targetId }),
+                    });
                 }
-            } catch (error) {
-                console.error("Error deleting draft:", error);
-                toast.error("Failed to delete draft.");
-            }
+            } catch (error) {}
+
+            try {
+                await caseService.deleteCaseDocument(null, targetId);
+            } catch (dmsErr) {}
         }
+
+        // Save to deleted IDs in localStorage so local fallbacks never resurrect it
+        try {
+            const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
+            deleteTargets.forEach(tid => {
+                const s = String(tid).trim().toLowerCase();
+                if (s && !deletedIds.includes(s)) deletedIds.push(s);
+            });
+            localStorage.setItem('draftmate_deleted_doc_ids', JSON.stringify(deletedIds));
+        } catch (e) {}
+
+        setDrafts(prev => {
+            const updated = prev.filter(d => 
+                String(d.id) !== String(id) && 
+                (!targetDraft?.documentKey || d.documentKey !== targetDraft.documentKey) &&
+                (!targetDraft?.name || d.name !== targetDraft.name)
+            );
+            localStorage.setItem('my_drafts', JSON.stringify(updated));
+            return updated;
+        });
+
+        window.dispatchEvent(new Event('my_drafts_updated'));
+        toast.success("Draft deleted successfully.");
+    };
+
+    const handleDeleteDraft = (id, e) => {
+        e.stopPropagation();
+        setDeleteModalState({
+            isOpen: true,
+            title: 'Delete Draft',
+            message: 'Are you sure you want to delete this draft? This action cannot be undone.',
+            onConfirm: () => performDeleteDraft(id)
+        });
     };
 
     const handleOpenDraft = (draft) => {
@@ -127,29 +217,36 @@ const MyDrafts = () => {
         setFolderNameInput('');
     };
 
-    const handleDeleteFolder = async (id, e) => {
-        e.stopPropagation();
-        if (window.confirm('Are you sure you want to delete this folder? All drafts inside will be moved to root.')) {
-            try {
-                const token = localStorage.getItem('session_id');
-                const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/folder/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ id }),
-                });
-                if (response.ok) {
-                    setFolders(prev => prev.filter(f => f.id !== id));
-                    setDrafts(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d));
-                    if (currentFolder === id) setCurrentFolder(null);
-                    toast.success("Folder deleted successfully.");
-                } else {
-                    toast.error("Failed to delete folder.");
-                }
-            } catch (error) {
-                console.error("Error deleting folder:", error);
+    const performDeleteFolder = async (id) => {
+        try {
+            const token = localStorage.getItem('session_id');
+            const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/folder/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ id }),
+            });
+            if (response.ok) {
+                setFolders(prev => prev.filter(f => f.id !== id));
+                setDrafts(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d));
+                if (currentFolder === id) setCurrentFolder(null);
+                toast.success("Folder deleted successfully.");
+            } else {
                 toast.error("Failed to delete folder.");
             }
+        } catch (error) {
+            console.error("Error deleting folder:", error);
+            toast.error("Failed to delete folder.");
         }
+    };
+
+    const handleDeleteFolder = (id, e) => {
+        e.stopPropagation();
+        setDeleteModalState({
+            isOpen: true,
+            title: 'Delete Folder',
+            message: 'Are you sure you want to delete this folder? All drafts inside will be moved to root.',
+            onConfirm: () => performDeleteFolder(id)
+        });
     };
 
     const handleDragStart = (e, draftId) => {
@@ -819,6 +916,46 @@ const MyDrafts = () => {
                     </div>
                 )}
             </div>
+
+            {/* Custom Delete Confirmation Modal */}
+            {deleteModalState.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4 animate-scaleUp">
+                        <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                {deleteModalState.title}
+                            </h3>
+                        </div>
+
+                        <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                            {deleteModalState.message}
+                        </p>
+
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={() => setDeleteModalState({ isOpen: false, title: '', message: '', onConfirm: null })}
+                                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-xl transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (deleteModalState.onConfirm) deleteModalState.onConfirm();
+                                    setDeleteModalState({ isOpen: false, title: '', message: '', onConfirm: null });
+                                }}
+                                className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-95 rounded-xl shadow-md transition-all"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Date Timeline Modal */}
             {showTimeline && currentFolder && (

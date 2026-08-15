@@ -40,43 +40,117 @@ const NODE_LABELS = {
     'memory_store': 'Committing insights to memory'
 };
 
-const ResearchProgressTimeline = ({ activeNodes }) => {
+const ResearchProgressTimeline = ({ activeNodes, streamLength }) => {
     const stages = [
-        { id: 'router', label: 'Analyzing Query' },
-        { id: 'research_agent', label: 'Gathering Facts' },
-        { id: 'citation_agent', label: 'Verifying Citations' },
-        { id: 'manager_aggregate', label: 'Compiling Research' }
+        { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
+        { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
+        { ids: ['citation_agent', 'strategy_agent', 'explainer_agent'], label: 'Verifying Citations' },
+        { ids: ['manager_aggregate', 'memory_store'], label: 'Compiling Research' }
     ];
 
+    let activeStageIndex = 0;
+    stages.forEach((stage, idx) => {
+        const hasNode = activeNodes.some(n => stage.ids.includes(n.node));
+        if (hasNode) {
+            activeStageIndex = Math.max(activeStageIndex, idx);
+        }
+    });
+
+    // Advance stages dynamically based on stream token length
+    if (streamLength > 50) activeStageIndex = Math.max(activeStageIndex, 1);
+    if (streamLength > 200) activeStageIndex = Math.max(activeStageIndex, 2);
+    if (streamLength > 500) activeStageIndex = Math.max(activeStageIndex, 3);
+
+    const [progress, setProgress] = useState(15);
+
+    useEffect(() => {
+        let targetProgress = 20;
+        if (streamLength > 0) {
+            targetProgress = Math.min(99, 35 + Math.floor(streamLength / 8));
+        } else if (activeStageIndex === 1) {
+            targetProgress = 45;
+        } else if (activeStageIndex === 2) {
+            targetProgress = 70;
+        } else if (activeStageIndex === 3) {
+            targetProgress = 90;
+        }
+
+        const interval = setInterval(() => {
+            setProgress((prev) => {
+                if (prev < targetProgress) {
+                    const step = Math.max(1, (targetProgress - prev) * 0.2);
+                    return Math.min(targetProgress, prev + step);
+                }
+                return prev;
+            });
+        }, 30);
+
+        return () => clearInterval(interval);
+    }, [activeStageIndex, streamLength]);
+
+    const displayPercent = Math.round(progress);
+
     return (
-        <div className="bg-white border border-blue-100 rounded-2xl p-6 mb-6 shadow-[0_4px_20px_rgba(37,99,235,0.04)] relative overflow-hidden">
+        <div className="bg-white border border-blue-100 rounded-2xl p-5 mb-6 shadow-[0_4px_25px_rgba(37,99,235,0.06)] relative overflow-hidden text-slate-800 backdrop-blur-md animate-fade-in">
             <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-blue-50/50 to-transparent pointer-events-none" />
-            <div className="flex items-center justify-between mb-5">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    Autonomous Research Pipeline
-                </h3>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">LIVE</span>
+
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                        Autonomous Research Pipeline
+                    </h3>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-end gap-1 h-3">
+                        <div className="w-1 bg-blue-600 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
+                        <div className="w-1 bg-indigo-600 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
+                        <div className="w-1 bg-purple-600 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
+                    </div>
+                    <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full shadow-sm border text-blue-700 bg-blue-50 border-blue-200">
+                        {displayPercent}%
+                    </span>
+                </div>
             </div>
-            <div className="flex items-center justify-between w-full overflow-x-auto pb-2 scrollbar-hide">
+
+            {/* VLC / Spotify Continuous Progress Bar Track */}
+            <div className="relative my-5 px-1">
+                <div className="h-2.5 bg-slate-100 rounded-full w-full relative overflow-hidden border border-slate-200/80 shadow-inner">
+                    <div
+                        className="h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(37,99,235,0.4)] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-300 ease-out z-20 pointer-events-none"
+                    style={{ left: `calc(${progress}% - 8px)` }}
+                />
+            </div>
+
+            {/* Stage Nodes */}
+            <div className="grid grid-cols-4 gap-2 pt-1">
                 {stages.map((stage, idx) => {
-                    const isCompleted = activeNodes.some(n => n.node === stage.id && n.status === 'completed');
-                    const isRunning = activeNodes.some(n => n.node === stage.id && n.status === 'running');
+                    const stageThreshold = (idx + 1) * 25;
+                    const isPassed = progress >= stageThreshold - 10;
+                    const isCurrent = progress >= (idx * 25) && progress < stageThreshold;
 
                     return (
-                        <React.Fragment key={stage.id}>
-                            <div className="flex flex-col items-center gap-2 min-w-[90px] shrink-0">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${isCompleted ? 'bg-blue-600 border-blue-600 text-white' :
-                                    isRunning ? 'border-blue-500 text-blue-500 animate-pulse' : 'border-slate-200 text-slate-300'
-                                    }`}>
-                                    {isCompleted ? <span className="material-symbols-outlined text-sm">check</span> : <span className="text-[10px] font-bold">{idx + 1}</span>}
-                                </div>
-                                <span className={`text-[10px] font-bold text-center whitespace-nowrap ${isRunning ? 'text-blue-600' : isCompleted ? 'text-slate-700' : 'text-slate-400'}`}>
-                                    {stage.label}
-                                </span>
+                        <div key={stage.label} className="flex flex-col items-center text-center">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-bold mb-1.5 transition-all duration-300 ${
+                                isPassed
+                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                    : isCurrent
+                                        ? 'bg-blue-50 border-blue-600 text-blue-600 animate-pulse font-extrabold'
+                                        : 'bg-slate-50 border-slate-200 text-slate-400'
+                            }`}>
+                                {isPassed ? <span className="material-symbols-outlined text-xs">check</span> : (idx + 1)}
                             </div>
-                            {idx < stages.length - 1 && <div className={`h-[2px] flex-1 min-w-[30px] mx-2 transition-colors duration-500 ${isCompleted ? 'bg-blue-600' : 'bg-slate-100'}`} />}
-                        </React.Fragment>
+                            <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${
+                                isPassed ? 'text-slate-800' : isCurrent ? 'text-blue-600' : 'text-slate-400'
+                            }`}>
+                                {stage.label}
+                            </span>
+                        </div>
                     );
                 })}
             </div>
@@ -266,8 +340,19 @@ const ResearchChat = () => {
     //     window.history.replaceState({}, '', '/research');
     // };
 
+    const safeUUID = () => {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            try {
+                return crypto.randomUUID();
+            } catch (e) {
+                // fallback
+            }
+        }
+        return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
+    };
+
     const startNewChat = () => {
-        const newId = crypto.randomUUID();
+        const newId = safeUUID();
         setSessionId(newId);
         setMessages([{
             id: 1,
@@ -898,7 +983,13 @@ const ResearchChat = () => {
                     <div className="max-w-4xl mx-auto w-full">
 
                         {/* Progress Timeline & Tasks UI */}
-                        {isTyping && <ResearchProgressTimeline activeNodes={activeNodes} />}
+                        {/* Progress Timeline & Tasks UI - auto-hides once reply arrives */}
+                        {isTyping && (
+                            <ResearchProgressTimeline
+                                activeNodes={activeNodes}
+                                streamLength={messages[messages.length - 1]?.role === 'ai' ? (messages[messages.length - 1]?.content?.length || 0) : 0}
+                            />
+                        )}
                         {isTyping && <SubQueryTasks isTyping={isTyping} input={input} />}
 
                         {/* File Preview */}

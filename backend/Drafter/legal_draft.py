@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
@@ -178,7 +179,44 @@ def enrich_user_prompt(raw_prompt: str) -> str:
     except Exception as e:
         logger.error(f"Failed to enrich user prompt: {e}")
     
-    return raw_prompt
+def _fallback_parse_gemini_legal_json(cleaned_text: str) -> dict:
+    title_match = re.search(r'"title"\s*:\s*"(.*?)"\s*,\s*"metadata"', cleaned_text, re.DOTALL)
+    title = title_match.group(1).strip() if title_match else "Legal Document"
+
+    jur_match = re.search(r'"jurisdiction"\s*:\s*"(.*?)"', cleaned_text)
+    jurisdiction = jur_match.group(1).strip() if jur_match else "India"
+
+    placeholders = []
+    ph_match = re.search(r'"placeholders_detected"\s*:\s*\[(.*?)\]', cleaned_text, re.DOTALL)
+    if ph_match:
+        placeholders = re.findall(r'"([A-Z0-9_]+)"', ph_match.group(1))
+
+    content_blocks = []
+    pattern = re.compile(r'\{\s*"element_type"\s*:\s*"(header_block|heading_1|paragraph)"\s*,\s*"text"\s*:\s*"(.*?)"\s*\}', re.DOTALL)
+    for elem_type, text_val in pattern.findall(cleaned_text):
+        clean_p = text_val.replace('\\"', '"').replace('\\n', '\n').strip()
+        if clean_p:
+            content_blocks.append({"element_type": elem_type, "text": clean_p})
+
+    if not content_blocks:
+        items = re.findall(r'"element_type"\s*:\s*"(header_block|heading_1|paragraph)".*?"text"\s*:\s*"(.*?)"\s*(?=\}\s*,\s*\{|\}\s*\]|\}\s*\}$)', cleaned_text, re.DOTALL)
+        for elem_type, text_val in items:
+            clean_p = text_val.replace('\\"', '"').replace('\\n', '\n').strip()
+            if clean_p:
+                content_blocks.append({"element_type": elem_type, "text": clean_p})
+
+    if not content_blocks:
+        raw_clean = re.sub(r'[\{\}\[\]"]', '', cleaned_text).strip()
+        content_blocks = [{"element_type": "paragraph", "text": raw_clean[:4000]}]
+
+    return {
+        "title": title,
+        "metadata": {
+            "jurisdiction": jurisdiction,
+            "placeholders_detected": placeholders
+        },
+        "content": content_blocks
+    }
 
 
 def generate_production_json_draft(case_context: str, document_type: str = "Legal Document") -> dict:
@@ -229,19 +267,50 @@ def generate_production_json_draft(case_context: str, document_type: str = "Lega
     raw_text = _extract_response_text(response)
     logger.debug("Gemini raw JSON length=%s", len(raw_text))
 
+    # Robust cleaning of markdown blocks and json extraction
     cleaned = raw_text.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.lstrip("`").strip()
-    if cleaned.endswith("```"):
-        cleaned = cleaned.rstrip("`").strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned).strip()
 
+    start_idx = cleaned.find("{")
+    end_idx = cleaned.rfind("}")
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        cleaned = cleaned[start_idx : end_idx + 1]
+
+    payload = None
+    # Attempt 1: Direct load
     try:
         payload = json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        logger.error("Failed to parse Gemini JSON output: %s", e)
-        logger.error("Gemini raw output (first 1200 chars): %s", cleaned[:1200])
-        logger.error("Gemini raw output (last 1200 chars): %s", cleaned[-1200:])
-        raise ValueError(f"Gemini returned invalid JSON: {e}") from e
+    except json.JSONDecodeError:
+        pass
+
+    # Attempt 2: Strip trailing commas before closing braces/brackets
+    if payload is None:
+        try:
+            repaired = re.sub(r",\s*([\]}])", r"\1", cleaned)
+            payload = json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+
+    # Attempt 3: Escape raw unescaped newlines/tabs inside string values
+    if payload is None:
+        try:
+            def sanitize_string_literals(match):
+                return match.group(0).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            repaired_strings = re.sub(r'"([^"\\]*(?:\\.[^"\\]*)*)"', sanitize_string_literals, cleaned)
+            payload = json.loads(repaired_strings)
+        except Exception:
+            pass
+
+    # Attempt 4: Structural Regex Extraction (handles unescaped inner quotes inside legal paragraphs)
+    if payload is None:
+        try:
+            payload = _fallback_parse_gemini_legal_json(cleaned)
+        except Exception as e:
+            logger.error("Failed to parse Gemini JSON output: %s", e)
+            logger.error("Gemini raw output (first 1200 chars): %s", cleaned[:1200])
+            logger.error("Gemini raw output (last 1200 chars): %s", cleaned[-1200:])
+            raise ValueError(f"Gemini returned invalid JSON: {e}") from e
 
     try:
         return _strict_validate_production_schema(payload)

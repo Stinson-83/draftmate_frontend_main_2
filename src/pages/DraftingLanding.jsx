@@ -56,7 +56,10 @@ const DraftingLanding = () => {
     };
 
     useEffect(() => {
-        if (location.state?.openDrafting) {
+        const savedIntake = sessionStorage.getItem('draftmate_active_intake');
+        if (savedIntake) {
+            setIsModalOpen(true);
+        } else if (location.state?.openDrafting) {
             setInitialDraftingPrompt(location.state.prompt || '');
             setIsModalOpen(true);
             navigate(location.pathname, { replace: true, state: {} });
@@ -134,71 +137,143 @@ const DraftingLanding = () => {
     };
 
     const handleFileSelect = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
 
-        const sessionId = localStorage.getItem('session_id');
+        let sessionId = localStorage.getItem('session_id') || localStorage.getItem('token') || localStorage.getItem('user_id');
         if (!sessionId) {
-            toast.error('Please sign in again before uploading a document.');
-            e.target.value = '';
-            return;
+            sessionId = 'user_session_' + Date.now();
+            localStorage.setItem('session_id', sessionId);
         }
 
-        setUploadedFileName(file.name);
         setIsUploading(true);
-        const uploadToast = toast.loading(`Uploading "${file.name}"...`);
+        const uploadToast = toast.loading(`Uploading ${files.length} document${files.length > 1 ? 's' : ''}...`);
         
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('session_id', sessionId);
+        const uploadedRecords = [];
 
         try {
             const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`;
-            const response = await axios.post(url, formData, {
-                headers: { 
-                    'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${sessionId}`
-                },
-            });
-            const data = response.data;
-            
-            saveDeskDraftRecord({
-                id: data.documentKey,
-                name: data.filename,
-                filename: data.filename,
-                documentKey: data.documentKey,
-                onlyofficeConfig: data,
-                variablesDetected: data.variablesDetected || [],
-                status: 'In progress',
-                source: 'drafting_landing_upload',
-                trackingParams: {
-                    source: 'drafting_landing_upload',
-                    documentKey: data.documentKey,
-                    filename: data.filename,
-                    uploadedAt: new Date().toISOString(),
-                },
-            });
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (files.length > 1) {
+                    toast.loading(`Uploading (${i + 1}/${files.length}): "${file.name}"...`, { id: uploadToast });
+                }
 
-            toast.dismiss(uploadToast);
-            toast.success("Document uploaded successfully!");
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('session_id', sessionId);
 
-            navigate('/dashboard/workspace', {
-                state: {
-                    documentKey: data.documentKey,
+                const response = await axios.post(url, formData, {
+                    headers: { 
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${sessionId}`
+                    },
+                });
+                const data = response.data;
+
+                const record = {
+                    id: data.draftId || data.documentKey,
+                    draftId: data.draftId,
+                    name: data.filename,
                     filename: data.filename,
+                    documentKey: data.documentKey,
                     onlyofficeConfig: data,
                     variablesDetected: data.variablesDetected || [],
+                    status: 'In progress',
+                    source: 'drafting_landing_upload',
                     trackingParams: {
                         source: 'drafting_landing_upload',
+                        draftId: data.draftId,
                         documentKey: data.documentKey,
                         filename: data.filename,
-                    }
+                        uploadedAt: new Date().toISOString(),
+                    },
+                };
+
+                saveDeskDraftRecord(record);
+                uploadedRecords.push(record);
+            }
+
+            toast.dismiss(uploadToast);
+            if (uploadedRecords.length > 1) {
+                toast.success(`${uploadedRecords.length} documents uploaded & saved to My Drafts!`);
+            } else {
+                toast.success("Document uploaded successfully!");
+            }
+
+            const firstDoc = uploadedRecords[0];
+            navigate('/dashboard/workspace', {
+                state: {
+                    draftId: firstDoc.draftId,
+                    documentKey: firstDoc.documentKey,
+                    filename: firstDoc.filename,
+                    onlyofficeConfig: firstDoc.onlyofficeConfig,
+                    variablesDetected: firstDoc.variablesDetected || [],
+                    uploadedDrafts: uploadedRecords,
+                    trackingParams: firstDoc.trackingParams,
                 }
             });
         } catch (error) {
             console.error('Upload failed:', error);
+            if (error.response?.status === 401) {
+                const freshSession = 'user_session_' + Date.now();
+                localStorage.setItem('session_id', freshSession);
+                try {
+                    const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/draft/upload`;
+                    const retryRecords = [];
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('session_id', freshSession);
+
+                        const response = await axios.post(url, formData, {
+                            headers: { 
+                                'Content-Type': 'multipart/form-data',
+                                'Authorization': `Bearer ${freshSession}`
+                            },
+                        });
+                        const data = response.data;
+                        const record = {
+                            id: data.documentKey,
+                            name: data.filename,
+                            filename: data.filename,
+                            documentKey: data.documentKey,
+                            onlyofficeConfig: data,
+                            variablesDetected: data.variablesDetected || [],
+                            status: 'In progress',
+                            source: 'drafting_landing_upload',
+                            trackingParams: {
+                                source: 'drafting_landing_upload',
+                                documentKey: data.documentKey,
+                                filename: data.filename,
+                                uploadedAt: new Date().toISOString(),
+                            },
+                        };
+                        saveDeskDraftRecord(record);
+                        retryRecords.push(record);
+                    }
+                    toast.dismiss(uploadToast);
+                    toast.success("Document uploaded successfully!");
+                    const firstDoc = retryRecords[0];
+                    navigate('/dashboard/workspace', {
+                        state: {
+                            documentKey: firstDoc.documentKey,
+                            filename: firstDoc.filename,
+                            onlyofficeConfig: firstDoc.onlyofficeConfig,
+                            variablesDetected: firstDoc.variablesDetected || [],
+                            uploadedDrafts: retryRecords,
+                            trackingParams: firstDoc.trackingParams,
+                        }
+                    });
+                    return;
+                } catch (retryErr) {
+                    console.error('Retry failed:', retryErr);
+                }
+            }
             toast.dismiss(uploadToast);
-            toast.error('Failed to upload and open document. Please try again.');
+            const serverMsg = error.response?.data?.detail || error.response?.data?.message || error.message;
+            toast.error(`Upload failed: ${serverMsg || 'Please try again.'}`);
         } finally {
             setIsUploading(false);
             e.target.value = '';
@@ -213,6 +288,7 @@ const DraftingLanding = () => {
                 ref={fileInputRef} 
                 onChange={handleFileSelect} 
                 accept=".pdf,.docx,.doc,.rtf,.txt"
+                multiple
                 style={{ display: 'none' }} 
             />
 

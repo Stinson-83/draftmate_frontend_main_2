@@ -161,6 +161,105 @@
         lastSelectionSnapshot = '';
     }
 
+    function convertUrlsToLinksInHtml(htmlContent) {
+        if (!htmlContent) return '';
+
+        // 1. Convert markdown style links: [Label](http://...)
+        var mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s\)]+|www\.[^\s\)]+|indiankanoon\.org\/[^\s\)]+)\)/gi;
+        var processed = htmlContent.replace(mdLinkRegex, function(_, label, rawUrl) {
+            var fullUrl = rawUrl.startsWith('http') ? rawUrl : ('https://' + rawUrl);
+            return '<a href="' + fullUrl + '" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: 500;">' + label + '</a>';
+        });
+
+        // 2. Convert bare URLs: http://..., https://..., or indiankanoon.org/doc/...
+        var bareUrlRegex = /(?<!href=")(https?:\/\/[^\s<>\)\]]+|(?<!\/)\b(?:www\.)?indiankanoon\.org\/[^\s<>\)\]]+)/gi;
+        processed = processed.replace(bareUrlRegex, function(match) {
+            var fullUrl = match.startsWith('http') ? match : ('https://' + match);
+            return '<a href="' + fullUrl + '" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: 500;">' + match + '</a>';
+        });
+
+        return processed;
+    }
+
+    function formatCaseNamesInHtml(escapedText) {
+        var caseRegex = /\b([A-Z][A-Za-z0-9.&'/-]*(?:\s+[A-Z][A-Za-z0-9.&'/-]*)*)\s+(?:vs\.?|v\.?)\s+([A-Z][A-Za-z0-9.&'/-]*(?:\s+[A-Z][A-Za-z0-9.&'/-]*)*)\b|\bIn\s+re\s+([A-Z][A-Za-z0-9.&'/-]*(?:\s+[A-Z][A-Za-z0-9.&'/-]*)*)\b/g;
+        return escapedText.replace(caseRegex, function(match) {
+            return '<em style="font-style: italic; font-weight: 600;">' + match + '</em>';
+        });
+    }
+
+    function formatLegalDocumentHtml(text) {
+        var normalized = normalizeWhitespace(text);
+        if (!normalized.trim()) return '';
+
+        var lines = normalized.split('\n');
+        var htmlBlocks = [];
+        var currentPara = [];
+
+        function flushPara() {
+            if (currentPara.length === 0) return;
+            var paraText = currentPara.join(' ').trim();
+            currentPara = [];
+            if (!paraText) return;
+
+            var escaped = escapeXml(paraText);
+
+            var labelMatch = paraText.match(/^([A-Z\s]{2,30}|[A-Z][a-z\s]{2,25}):\s*(.*)$/);
+            if (labelMatch) {
+                var label = escapeXml(labelMatch[1]);
+                var val = convertUrlsToLinksInHtml(formatCaseNamesInHtml(escapeXml(labelMatch[2])));
+                htmlBlocks.push(
+                    '<p style="font-size: 11pt; line-height: 1.5; color: #111827; margin-top: 0pt; margin-bottom: 6pt; text-align: justify;">' +
+                    '<strong style="font-weight: bold; color: #000000;">' + label + ':</strong> ' + (val || '&nbsp;') +
+                    '</p>'
+                );
+                return;
+            }
+
+            if (isHeadingLine(paraText)) {
+                var formattedHeader = convertUrlsToLinksInHtml(escaped);
+                var isMainTitle = /^(IN THE|SUPREME COURT|HIGH COURT|BEFORE THE|PETITION|MEMORANDUM|DEED|AGREEMENT|SPECIAL LEAVE|RECORD OF PROCEEDINGS)\b/i.test(paraText.trim());
+                if (isMainTitle) {
+                    htmlBlocks.push(
+                        '<h1 style="font-size: 14pt; font-weight: bold; color: #000000; margin-top: 14pt; margin-bottom: 6pt; line-height: 1.3; text-align: center;">' +
+                        formattedHeader +
+                        '</h1>'
+                    );
+                } else {
+                    htmlBlocks.push(
+                        '<h3 style="font-size: 11.5pt; font-weight: bold; color: #000000; margin-top: 10pt; margin-bottom: 4pt; line-height: 1.3; text-align: left;">' +
+                        formattedHeader +
+                        '</h3>'
+                    );
+                }
+                return;
+            }
+
+            var formattedBody = convertUrlsToLinksInHtml(formatCaseNamesInHtml(escaped));
+            htmlBlocks.push(
+                '<p style="font-size: 11pt; line-height: 1.5; color: #111827; margin-top: 0pt; margin-bottom: 6pt; text-align: justify;">' +
+                formattedBody +
+                '</p>'
+            );
+        }
+
+        lines.forEach(function(rawLine) {
+            var line = String(rawLine || '').trim();
+            if (!line) {
+                flushPara();
+            } else if (isHeadingLine(line) || /^([A-Z\s]{2,30}|[A-Z][a-z\s]{2,25}):\s*/.test(line)) {
+                flushPara();
+                currentPara.push(line);
+                flushPara();
+            } else {
+                currentPara.push(line);
+            }
+        });
+        flushPara();
+
+        return '<div style="font-family: inherit; font-size: 11pt; line-height: 1.5; color: #111827;">\n' + htmlBlocks.join('\n') + '\n</div>';
+    }
+
     function applyAutoFormat() {
         getSelectedText(function(selectedText) {
             var cleaned = formatPlainText(selectedText);
@@ -174,20 +273,35 @@
                 return;
             }
 
-            suppressSelectionSyncUntil = Date.now() + 1200;
+            suppressSelectionSyncUntil = Date.now() + 1500;
             lastSelectionSnapshot = '';
 
+            var htmlPayload = formatLegalDocumentHtml(selectedText);
+
             try {
-                window.Asc.plugin.executeMethod('PasteText', [cleaned]);
+                if (htmlPayload) {
+                    window.Asc.plugin.executeMethod('PasteHtml', [htmlPayload]);
+                } else {
+                    window.Asc.plugin.executeMethod('PasteText', [cleaned]);
+                }
                 postToParent({
                     type: 'ONLYOFFICE_AUTOFORMAT_DONE',
                     applied: true
                 });
             } catch (error) {
-                postToParent({
-                    type: 'ONLYOFFICE_AUTOFORMAT_ERROR',
-                    message: error && error.message ? error.message : 'Auto format failed.'
-                });
+                console.warn('[ONLYOFFICE Plugin] PasteHtml auto-format failed, falling back to PasteText:', error);
+                try {
+                    window.Asc.plugin.executeMethod('PasteText', [cleaned]);
+                    postToParent({
+                        type: 'ONLYOFFICE_AUTOFORMAT_DONE',
+                        applied: true
+                    });
+                } catch (fallbackErr) {
+                    postToParent({
+                        type: 'ONLYOFFICE_AUTOFORMAT_ERROR',
+                        message: fallbackErr && fallbackErr.message ? fallbackErr.message : 'Auto format failed.'
+                    });
+                }
             }
         });
     }
@@ -202,9 +316,95 @@
         });
     }
 
+    function detectVariablesFromDocument() {
+        try {
+            window.Asc.plugin.callCommand(function() {
+                var oDocument = Api.GetDocument();
+                var foundVars = [];
+                var ignoreSet = {
+                    'THE': 1, 'AND': 1, 'FOR': 1, 'THAT': 1, 'THIS': 1, 'WITH': 1, 'FROM': 1,
+                    'SHALL': 1, 'BEING': 1, 'UNDER': 1, 'UPON': 1, 'SAID': 1, 'HERETO': 1,
+                    'OTHER': 1, 'COURT': 1, 'HIGH': 1, 'INDIA': 1, 'ACT': 1, 'SECTION': 1
+                };
+
+                // 1. Scan Content Controls by tag
+                var aControls = oDocument.GetAllContentControls();
+                if (aControls && aControls.length > 0) {
+                    for (var i = 0; i < aControls.length; i++) {
+                        var tag = aControls[i].GetTag();
+                        if (tag && tag.trim() && foundVars.indexOf(tag.trim()) === -1) {
+                            foundVars.push(tag.trim());
+                        }
+                    }
+                }
+
+                // 2. Scan Document Text for ALL_CAPS placeholders / bracketed tags
+                var docText = oDocument.GetText();
+                if (docText) {
+                    var regex = /\[([A-Z0-9_]{2,40})\]|\{([A-Z0-9_]{2,40})\}|\b([A-Z0-9_]{3,35})\b/g;
+                    var match;
+                    while ((match = regex.exec(docText)) !== null) {
+                        var v = (match[1] || match[2] || match[3] || '').trim();
+                        if (v && v.length >= 3 && !ignoreSet[v] && foundVars.indexOf(v) === -1) {
+                            if (/^[A-Z0-9_]+$/.test(v)) {
+                                foundVars.push(v);
+                            }
+                        }
+                    }
+                }
+                return foundVars;
+            }, false, true, function(result) {
+                if (Array.isArray(result) && result.length > 0) {
+                    postToParent({
+                        type: 'ONLYOFFICE_VARIABLES_DETECTED',
+                        variables: result
+                    });
+                }
+            });
+        } catch (e) {
+            console.warn('[ONLYOFFICE Plugin] Variable detection failed:', e);
+        }
+    }
+
+    function navigateToVariableInDocument(tagToFind) {
+        if (!tagToFind) return;
+        try {
+            window.Asc.scope.targetTag = tagToFind;
+            window.Asc.plugin.callCommand(function() {
+                var oDocument = Api.GetDocument();
+                var target = Asc.scope.targetTag;
+                if (!target) return;
+
+                // 1. Try content control by tag
+                var aContentControls = oDocument.GetContentControlsByTag(target);
+                if (aContentControls && aContentControls.length > 0) {
+                    aContentControls[0].GetRange().Select();
+                    return;
+                }
+
+                // 2. Try exact search for tag or [tag] or {tag}
+                var aSearch = oDocument.Search(target, false);
+                if (aSearch && aSearch.length > 0) {
+                    aSearch[0].Select();
+                    return;
+                }
+
+                var bracketSearch = oDocument.Search('[' + target + ']', false);
+                if (bracketSearch && bracketSearch.length > 0) {
+                    bracketSearch[0].Select();
+                }
+            }, false);
+        } catch (e) {
+            console.warn('[ONLYOFFICE Plugin] Navigate to variable failed:', e);
+        }
+    }
+
     window.Asc.plugin.init = function() {
         postToParent({ type: 'ONLYOFFICE_PLUGIN_READY' });
         startSelectionWatcher();
+        setTimeout(function() {
+            detectVariablesFromDocument();
+        }, 1200);
     };
 
     window.Asc.plugin.button = function(id) {
@@ -230,12 +430,38 @@
                     hasSelection: !!String(text || '').trim()
                 });
             });
+        } else if (event.data.type === 'ONLYOFFICE_INSERT_HTML') {
+            var rawHtml = String(event.data.html || '');
+            console.log('[ONLYOFFICE Plugin] Received ONLYOFFICE_INSERT_HTML payload (length: ' + rawHtml.length + ')');
+            try {
+                window.Asc.plugin.executeMethod('PasteHtml', [rawHtml]);
+                console.log('[ONLYOFFICE Plugin] PasteHtml executed successfully.');
+            } catch (err) {
+                console.error('[ONLYOFFICE Plugin] PasteHtml execution failed:', err);
+            }
         } else if (event.data.type === 'ONLYOFFICE_INSERT_TEXT') {
-            window.Asc.plugin.executeMethod('PasteText', [event.data.text]);
+            var rawText = String(event.data.text || '');
+            var formattedHtml = formatLegalDocumentHtml(rawText);
+            try {
+                if (formattedHtml) {
+                    window.Asc.plugin.executeMethod('PasteHtml', [formattedHtml]);
+                } else {
+                    window.Asc.plugin.executeMethod('PasteText', [rawText]);
+                }
+            } catch (err) {
+                console.warn('[ONLYOFFICE Plugin] PasteHtml failed in ONLYOFFICE_INSERT_TEXT, falling back to PasteText:', err);
+                try {
+                    window.Asc.plugin.executeMethod('PasteText', [rawText]);
+                } catch (e) {}
+            }
         } else if (event.data.type === 'ONLYOFFICE_AUTO_FORMAT_SELECTION') {
             applyAutoFormat();
         } else if (event.data.type === 'ONLYOFFICE_ENHANCE_WITH_AI') {
             requestEnhanceSelection();
+        } else if (event.data.type === 'ONLYOFFICE_DETECT_VARIABLES') {
+            detectVariablesFromDocument();
+        } else if (event.data.type === 'ONLYOFFICE_NAVIGATE_TO_VARIABLE') {
+            navigateToVariableInDocument(event.data.tag);
         }
     });
 })(window, undefined);

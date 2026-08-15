@@ -132,6 +132,17 @@ def rebuild_pdf_document(blocks: Sequence[Block], output_path: str | Path) -> Pa
 
     canvas_file = canvas.Canvas(str(output_path))
 
+    if not pages:
+        canvas_file.setPageSize(letter)
+        canvas_file.setFont("Helvetica-Bold", 14)
+        canvas_file.drawString(40, letter[1] - 60, "No Searchable Text Detected")
+        canvas_file.setFont("Helvetica", 10)
+        canvas_file.drawString(40, letter[1] - 90, "This document appears to contain scanned images or no selectable text.")
+        canvas_file.drawString(40, letter[1] - 110, "To translate this document, please upload a searchable PDF or a DOCX document.")
+        canvas_file.showPage()
+        canvas_file.save()
+        return output_path
+
     for page_number in sorted(pages):
         page_blocks = pages[page_number]
         page_width = max((block.bounding_box[2] for block in page_blocks), default=letter[0]) + 40

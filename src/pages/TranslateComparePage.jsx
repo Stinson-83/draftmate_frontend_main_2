@@ -40,9 +40,11 @@ const TranslateComparePage = () => {
     const [synchronizedScrolling, setSynchronizedScrolling] = useState(false);
     const [zoomLevel, setZoomLevel] = useState(100);
 
-    // DOM Refs for panels and sync control
+    // DOM Refs for panels, iframes and sync control
     const leftPanelRef = useRef(null);
     const rightPanelRef = useRef(null);
+    const leftIframeRef = useRef(null);
+    const rightIframeRef = useRef(null);
     const isSyncing = useRef(false);
 
     const { data: jobDetails, isLoading, isError } = useQuery({
@@ -99,35 +101,104 @@ const TranslateComparePage = () => {
     useEffect(() => {
         if (!synchronizedScrolling) return;
 
-        const left = leftPanelRef.current;
-        const right = rightPanelRef.current;
-        if (!left || !right) return;
+        const leftIframe = leftIframeRef.current;
+        const rightIframe = rightIframeRef.current;
+        const leftOuter = leftPanelRef.current;
+        const rightOuter = rightPanelRef.current;
 
-        const handleScroll = (source, target) => {
-            if (isSyncing.current) {
-                isSyncing.current = false;
-                return;
+        const getWinDoc = (iframe) => {
+            try {
+                const win = iframe?.contentWindow;
+                const doc = iframe?.contentDocument || win?.document;
+                const targetEl = doc?.scrollingElement || doc?.documentElement || doc?.body;
+                return { win, doc, targetEl };
+            } catch (e) {
+                return { win: null, doc: null, targetEl: null };
             }
-            isSyncing.current = true;
-            
-            const maxSource = source.scrollHeight - source.clientHeight;
-            const maxTarget = target.scrollHeight - target.clientHeight;
-            
-            if (maxSource <= 0 || maxTarget <= 0) return;
-            
-            const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
-            target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
         };
 
-        const onLeftScroll = () => handleScroll(left, right);
-        const onRightScroll = () => handleScroll(right, left);
+        const syncScroll = (sourceIsLeft) => {
+            if (isSyncing.current) return;
+            isSyncing.current = true;
 
-        left.addEventListener('scroll', onLeftScroll);
-        right.addEventListener('scroll', onRightScroll);
+            const srcIframe = sourceIsLeft ? leftIframe : rightIframe;
+            const tgtIframe = sourceIsLeft ? rightIframe : leftIframe;
+            const srcOuter = sourceIsLeft ? leftOuter : rightOuter;
+            const tgtOuter = sourceIsLeft ? rightOuter : leftOuter;
+
+            // 1. Sync inner iframe scrolling
+            const { targetEl: srcEl } = getWinDoc(srcIframe);
+            const { targetEl: tgtEl } = getWinDoc(tgtIframe);
+
+            if (srcEl && tgtEl) {
+                const maxSrc = srcEl.scrollHeight - srcEl.clientHeight;
+                const maxTgt = tgtEl.scrollHeight - tgtEl.clientHeight;
+                if (maxSrc > 0 && maxTgt > 0) {
+                    const ratio = srcEl.scrollTop / maxSrc;
+                    tgtEl.scrollTop = ratio * maxTgt;
+                }
+            }
+
+            // 2. Sync outer container scrolling
+            if (srcOuter && tgtOuter) {
+                const maxSrcOut = srcOuter.scrollHeight - srcOuter.clientHeight;
+                const maxTgtOut = tgtOuter.scrollHeight - tgtOuter.clientHeight;
+                if (maxSrcOut > 0 && maxTgtOut > 0) {
+                    tgtOuter.scrollTop = (srcOuter.scrollTop / maxSrcOut) * maxTgtOut;
+                }
+            }
+
+            requestAnimationFrame(() => {
+                isSyncing.current = false;
+            });
+        };
+
+        let cleanupFns = [];
+
+        const attachListeners = () => {
+            cleanupFns.forEach(fn => fn());
+            cleanupFns = [];
+
+            const leftWin = getWinDoc(leftIframe).win;
+            const rightWin = getWinDoc(rightIframe).win;
+
+            const onLeft = () => syncScroll(true);
+            const onRight = () => syncScroll(false);
+
+            if (leftWin) {
+                try {
+                    leftWin.addEventListener('scroll', onLeft, { passive: true });
+                    cleanupFns.push(() => leftWin.removeEventListener('scroll', onLeft));
+                } catch(e){}
+            }
+            if (rightWin) {
+                try {
+                    rightWin.addEventListener('scroll', onRight, { passive: true });
+                    cleanupFns.push(() => rightWin.removeEventListener('scroll', onRight));
+                } catch(e){}
+            }
+            if (leftOuter) {
+                leftOuter.addEventListener('scroll', onLeft, { passive: true });
+                cleanupFns.push(() => leftOuter.removeEventListener('scroll', onLeft));
+            }
+            if (rightOuter) {
+                rightOuter.addEventListener('scroll', onRight, { passive: true });
+                cleanupFns.push(() => rightOuter.removeEventListener('scroll', onRight));
+            }
+        };
+
+        attachListeners();
+
+        const onLeftLoad = () => attachListeners();
+        const onRightLoad = () => attachListeners();
+
+        leftIframe?.addEventListener('load', onLeftLoad);
+        rightIframe?.addEventListener('load', onRightLoad);
 
         return () => {
-            left.removeEventListener('scroll', onLeftScroll);
-            right.removeEventListener('scroll', onRightScroll);
+            cleanupFns.forEach(fn => fn());
+            leftIframe?.removeEventListener('load', onLeftLoad);
+            rightIframe?.removeEventListener('load', onRightLoad);
         };
     }, [synchronizedScrolling, isLoading]);
 
@@ -232,6 +303,7 @@ const TranslateComparePage = () => {
                     </div>
                     <div ref={leftPanelRef} className="flex-grow overflow-auto p-4 bg-slate-900 scroll-smooth">
                         <iframe 
+                            ref={leftIframeRef}
                             src={jobDetails.source_file_url} 
                             title="Source Document" 
                             className="w-full h-full border-none bg-white shadow-2xl transition-transform duration-300"
@@ -256,6 +328,7 @@ const TranslateComparePage = () => {
                     </div>
                     <div ref={rightPanelRef} className="flex-grow overflow-auto p-4 bg-slate-900 scroll-smooth">
                         <iframe 
+                            ref={rightIframeRef}
                             src={jobDetails.translated_file_url} 
                             title="Translated Document" 
                             className="w-full h-full border-none bg-white shadow-2xl transition-transform duration-300"

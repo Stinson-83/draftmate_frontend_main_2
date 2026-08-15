@@ -166,6 +166,18 @@ def _classify_and_rewrite(query: str, context: str) -> str:
     return query  # Fallback to original
 
 
+def needs_llm_rewrite(query: str) -> bool:
+    """Check if query actually needs an LLM pass to resolve context references (~0ms)."""
+    words = query.lower().strip().split()
+    reference_words = {'it', 'this', 'that', 'they', 'them', 'their', 'he', 'she', 'his', 'her', 'above', 'same', 'former', 'latter'}
+    has_ref = any(w in reference_words for w in words)
+    
+    # If there are no reference pronouns and query is 4+ words, it is self-contained
+    if not has_ref and len(words) >= 4:
+        return False
+    return True
+
+
 # ============ Main Entry Point ============
 def rewrite_query(
     query: str,
@@ -178,17 +190,8 @@ def rewrite_query(
     
     Flow:
     1. Expand abbreviations (rule-based, ~0ms)
-    2. If user has conversation context → single LLM call to classify + rewrite (~300ms)
-    3. If no context → return expanded query directly (~0ms)
-    
-    Args:
-        query: Original user query
-        user_id: For mem0 context
-        session_id: For session context
-        chat_history: Pre-fetched chat history (avoids duplicate DB reads)
-        
-    Returns:
-        Rewritten query or original
+    2. Check if self-contained (fast-path ~0ms)
+    3. If user has conversation context and references → single LLM call (~300ms)
     """
     original = query.strip()
     
@@ -197,8 +200,12 @@ def rewrite_query(
     if expanded != original:
         logger.info(f"🔄 Expanded abbreviations: {expanded[:60]}...")
     
-    # Use the expanded version going forward
     working_query = expanded
+    
+    # Fast path: Skip LLM rewrite if query is self-contained (~0ms)
+    if not needs_llm_rewrite(working_query):
+        logger.debug(f"⚡ Query is self-contained, skipping LLM rewrite pass: {working_query[:50]}")
+        return working_query
     
     # 2. If user has context, do single-pass classify + rewrite
     if user_id or session_id:

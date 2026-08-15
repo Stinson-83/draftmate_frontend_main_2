@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Clock3, Download, Eye, FileSearch, FileText, Languages, Loader2, Sparkles, Upload, Split } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { caseService } from '../services/library/caseService';
 
 const SOURCE_LANGUAGE_OPTIONS = [
   { value: 'auto', label: 'Auto-detect' },
@@ -81,7 +82,15 @@ const getCurrentUserId = () => {
 const formatJobDate = (value) => {
   if (!value) return 'Unknown';
 
-  const date = new Date(value);
+  let isoStr = String(value).trim();
+  if (isoStr.includes(' ') && !isoStr.includes('T')) {
+    isoStr = isoStr.replace(' ', 'T');
+  }
+  if (!isoStr.endsWith('Z') && !isoStr.includes('+') && !isoStr.includes('-')) {
+    isoStr += 'Z';
+  }
+
+  const date = new Date(isoStr);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
@@ -94,8 +103,9 @@ const formatJobDate = (value) => {
 
 const TranslateDocumentPage = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [sourceLanguage, setSourceLanguage] = useState('auto');
+  const [sourceLanguage, setSourceLanguage] = useState('en-IN');
   const [targetLanguage, setTargetLanguage] = useState('hi-IN');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [activeJobId, setActiveJobId] = useState(null);
@@ -169,6 +179,87 @@ const TranslateDocumentPage = () => {
   const isFailed = job?.status === 'failed';
   const displayProgress = selectedJobId ? Math.max(uploadProgress, job?.progress ?? 0) : uploadProgress;
 
+  const savedJobsRef = React.useRef(new Set());
+
+  // Helper to format clean, short document names without long UUIDs
+  const cleanDocName = (rawName, targetLang = 'HI') => {
+    if (!rawName) return 'Translated_Document.pdf';
+    let cleaned = rawName
+      .replace(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?/, '')
+      .replace(/^[0-9a-fA-F]{32}[_-]?/, '')
+      .replace(/^Translated_[A-Z_a-z-]+_/i, '')
+      .replace(/^Translated_/i, '');
+
+    const langCode = targetLang.split('-')[0].toUpperCase();
+    return `Translated_${langCode}_${cleaned}`;
+  };
+
+  // Auto-save active completed job to Document Management ("Translated Documents" folder)
+  React.useEffect(() => {
+    if (job && job.status === 'completed') {
+      const jobId = job.job_id || job.id || selectedJobId;
+      if (jobId && !savedJobsRef.current.has(jobId)) {
+        savedJobsRef.current.add(jobId);
+        const baseName = job.file_name || 'Document.pdf';
+        const docName = cleanDocName(baseName, job.target_language || 'HI');
+
+        caseService.addCaseDocument(null, {
+          name: docName,
+          filename: docName,
+          source: 'translate',
+          url: api.getTranslationDownloadUrl(jobId) + '?raw=1',
+          type: baseName.split('.').pop() || 'pdf'
+        }).then(() => {
+          console.log('[TranslateDocumentPage] Auto-saved translated document to Document Management');
+        }).catch((err) => {
+          console.warn('[TranslateDocumentPage] Auto-save error:', err);
+        });
+      }
+    }
+  }, [job, selectedJobId]);
+
+  // 20-second auto-reset timer upon job completion to reset buttons, form and progressbar
+  React.useEffect(() => {
+    if (job?.status === 'completed') {
+      const timer = setTimeout(() => {
+        setSelectedFile(null);
+        setActiveJobId(null);
+        setUploadProgress(0);
+        setStatusMessage('Choose a document to start translation.');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }, 20000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [job?.status, job?.id]);
+
+  // Auto-save history completed jobs to Document Management
+  React.useEffect(() => {
+    if (historyJobs && historyJobs.length > 0) {
+      historyJobs.forEach(async (hJob) => {
+        const jobId = hJob.job_id || hJob.id;
+        if (hJob.status === 'completed' && jobId && !savedJobsRef.current.has(jobId)) {
+          savedJobsRef.current.add(jobId);
+          const baseName = hJob.file_name || 'Document.pdf';
+          const docName = cleanDocName(baseName, hJob.target_language || 'HI');
+          try {
+            await caseService.addCaseDocument(null, {
+              name: docName,
+              filename: docName,
+              source: 'translate',
+              url: api.getTranslationDownloadUrl(jobId) + '?raw=1',
+              type: baseName.split('.').pop() || 'pdf'
+            });
+          } catch (err) {
+            console.warn('[TranslateDocumentPage] Auto-save history error:', err);
+          }
+        }
+      });
+    }
+  }, [historyJobs]);
+
   const liveStatusMessage = useMemo(() => {
     if (!job) return statusMessage;
     if (job.status === 'processing') {
@@ -186,6 +277,11 @@ const TranslateDocumentPage = () => {
   const downloadUrl = useMemo(() => {
     if (!selectedJobId) return null;
     return api.getTranslationDownloadUrl(selectedJobId);
+  }, [selectedJobId]);
+
+  const sourceUrl = useMemo(() => {
+    if (!selectedJobId) return null;
+    return api.getTranslationSourceUrl(selectedJobId);
   }, [selectedJobId]);
 
   const previewAllowed = useMemo(() => {
@@ -259,70 +355,92 @@ const TranslateDocumentPage = () => {
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-10 lg:grid-cols-[1.1fr_0.9fr] lg:px-12">
-        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-10 lg:grid-cols-2 lg:px-12 min-w-0 overflow-hidden">
+        <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 min-w-0 overflow-hidden">
+          <form onSubmit={handleSubmit} className="space-y-6 min-w-0 overflow-hidden">
+            <div className="grid gap-4 min-w-0 overflow-hidden">
+              <label className="space-y-2 block min-w-0 overflow-hidden">
                 <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
                   <FileText className="h-4 w-4 text-indigo-600" />
                   Source document
                 </span>
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70 overflow-hidden min-w-0">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".pdf,.docx,.html,.htm"
                     onChange={handleFileChange}
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700 dark:text-slate-300"
+                    className="hidden"
                   />
+                  <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Choose File
+                    </button>
+                    <span
+                      className="truncate min-w-0 flex-1 text-sm font-medium text-slate-600 dark:text-slate-300"
+                      title={selectedFile ? selectedFile.name : 'No file chosen'}
+                    >
+                      {selectedFile ? selectedFile.name : 'No file chosen'}
+                    </span>
+                  </div>
                   {selectedFile && (
-                    <p className="mt-3 truncate text-xs text-slate-500 dark:text-slate-400">
+                    <p
+                      className="mt-2.5 truncate text-xs font-semibold text-indigo-600 dark:text-indigo-400 min-w-0 block w-full overflow-hidden"
+                      title={selectedFile.name}
+                    >
                       Selected: {selectedFile.name}
                     </p>
                   )}
                 </div>
               </label>
 
-              <label className="space-y-2">
-                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  <Languages className="h-4 w-4 text-indigo-600" />
-                  Source language
-                </span>
-                <select
-                  value={sourceLanguage}
-                  onChange={(e) => handleSourceLanguageChange(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                >
-                  {SOURCE_LANGUAGE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <Languages className="h-4 w-4 text-indigo-600" />
+                    Source language
+                  </span>
+                  <select
+                    value={sourceLanguage}
+                    onChange={(e) => handleSourceLanguageChange(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  >
+                    {SOURCE_LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label className="space-y-2">
-                <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  <Languages className="h-4 w-4 text-indigo-600" />
-                  Target language
-                </span>
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                >
-                  {targetLanguageOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label className="space-y-2">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    <Languages className="h-4 w-4 text-indigo-600" />
+                    Target language
+                  </span>
+                  <select
+                    value={targetLanguage}
+                    onChange={(e) => setTargetLanguage(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  >
+                    {targetLanguageOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-              <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
-                <span>{liveStatusMessage}</span>
+              <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300 min-w-0 overflow-hidden">
+                <span className="truncate min-w-0 flex-1" title={liveStatusMessage}>{liveStatusMessage}</span>
                 <span className="shrink-0 font-semibold text-indigo-600 dark:text-indigo-400">
                   {selectedJobId ? `Job #${selectedJobId}` : uploadMutation.isPending ? 'Submitting…' : 'Ready'}
                 </span>
@@ -352,7 +470,7 @@ const TranslateDocumentPage = () => {
               {downloadUrl && isCompleted && (
                 <>
                   <a
-                    href={downloadUrl}
+                    href={downloadUrl + '?raw=1'}
                     className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
                   >
                     <Download className="h-4 w-4" />
@@ -364,7 +482,7 @@ const TranslateDocumentPage = () => {
                     className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
                   >
                     <Split className="h-4 w-4" />
-                    Open Side-by-Side Comparison View
+                    Full Screen View
                   </button>
                 </>
               )}
@@ -372,7 +490,7 @@ const TranslateDocumentPage = () => {
           </form>
         </section>
 
-        <aside className="space-y-6">
+        <aside className="space-y-6 min-w-0 overflow-hidden">
           <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-950 dark:text-white">
               <FileSearch className="h-5 w-5 text-indigo-600" />
@@ -382,12 +500,29 @@ const TranslateDocumentPage = () => {
             <div className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
               <StatusRow label="File" value={job?.file_name || selectedFile?.name || 'Waiting for a document'} />
               <StatusRow label="Source" value={getLanguageLabel(job?.source_language || sourceLanguage)} />
-              <StatusRow label="Status" value={job?.status || (uploadMutation.isPending ? 'uploading' : 'idle')} />
+              <StatusRow label="Status" value={job?.status ? `${job.status} (${job?.progress ?? Math.round(uploadProgress)}%)` : (uploadMutation.isPending ? 'uploading' : 'idle')} />
               <StatusRow label="Stage" value={job?.stage || 'waiting'} />
               <StatusRow label="Progress" value={`${job?.progress ?? Math.round(uploadProgress)}%`} />
               <StatusRow label="Target" value={getLanguageLabel(job?.target_language || targetLanguage)} />
               <StatusRow label="Created" value={formatJobDate(job?.created_at)} />
             </div>
+
+            {(job || uploadMutation.isPending) && (
+              <div className="mt-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50/50 to-sky-50/50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                <div className="mb-2 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <span>DOCUMENT COMPLETION</span>
+                  <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-sm">
+                    {job?.progress ?? Math.round(displayProgress)}%
+                  </span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500 transition-all duration-500"
+                    style={{ width: `${Math.max(4, job?.progress ?? Math.round(displayProgress))}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {translationJobQuery.isError && (
               <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
@@ -451,17 +586,17 @@ const TranslateDocumentPage = () => {
                         : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/50'
                         }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">
+                      <div className="flex items-start justify-between gap-3 min-w-0">
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <p className="truncate block w-full text-sm font-semibold text-slate-950 dark:text-white" title={historyJob.file_name}>
                             {historyJob.file_name}
                           </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                             <span>{getLanguageLabel(historyJob.source_language || 'auto')}</span>
                             <span>→</span>
                             <span>{historyJob.target_language?.toUpperCase()}</span>
                             <span>•</span>
-                            <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex items-center gap-1 shrink-0">
                               <CalendarDays className="h-3.5 w-3.5" />
                               {formatJobDate(historyJob.created_at)}
                             </span>
@@ -481,11 +616,12 @@ const TranslateDocumentPage = () => {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
+                          disabled={historyJob.status !== 'completed' && !historyJob.download_available}
                           onClick={() => {
-                            setSelectedFile(null);
-                            setActiveJobId(historyJob.job_id);
+                            if (historyJob.status !== 'completed' && !historyJob.download_available) return;
+                            window.open(api.getTranslationDownloadUrl(historyJob.job_id), '_blank', 'noopener,noreferrer');
                           }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           View
@@ -493,15 +629,15 @@ const TranslateDocumentPage = () => {
 
                         <button
                           type="button"
-                          disabled={!historyJob.download_available}
+                          disabled={historyJob.status !== 'completed' && !historyJob.download_available}
                           onClick={() => {
-                            if (!historyJob.download_available) return;
-                            window.open(api.getTranslationDownloadUrl(historyJob.job_id), '_blank', 'noopener,noreferrer');
+                            if (historyJob.status !== 'completed' && !historyJob.download_available) return;
+                            window.open(api.getTranslationDownloadUrl(historyJob.job_id) + '?raw=1', '_blank', 'noopener,noreferrer');
                           }}
                           className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          {historyJob.download_available ? 'Download' : 'Pending'}
+                          {historyJob.status === 'completed' || historyJob.download_available ? 'Download' : 'Pending'}
                         </button>
                       </div>
                     </div>
@@ -516,36 +652,63 @@ const TranslateDocumentPage = () => {
               </p>
             )}
           </div>
-
-          {isCompleted && downloadUrl && (
-            <div className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Preview</h3>
-                <ArrowRight className="h-4 w-4 text-slate-400" />
-              </div>
-              {previewAllowed ? (
-                <iframe
-                  src={downloadUrl}
-                  className="mt-4 h-[420px] w-full rounded-2xl border border-slate-200 bg-white dark:border-slate-800"
-                  title="Translated document preview"
-                />
-              ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-                  Browser preview is unavailable for this file type. Use the download button to open the translated document.
-                </div>
-              )}
-            </div>
-          )}
         </aside>
       </div>
+
+      {isCompleted && downloadUrl && (
+        <div className="mx-auto max-w-6xl px-4 pb-12 md:px-10 lg:px-12">
+          <div id="preview-section" className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_16px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-3 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Side-by-Side Document Preview</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Comparing original source and target translation</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(`/dashboard/translate/compare/${selectedJobId}`)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
+              >
+                <Split className="h-3.5 w-3.5" />
+                Full Screen View
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-6 md:grid-cols-2">
+              {/* Left Column: Original */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="bg-slate-100 px-3.5 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800">
+                  Original ({getLanguageLabel(job?.source_language || sourceLanguage)})
+                </div>
+                <iframe
+                  src={sourceUrl}
+                  className="h-[460px] w-full border-0 bg-white"
+                  title="Original document preview"
+                />
+              </div>
+
+              {/* Right Column: Translated */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+                <div className="bg-slate-100 px-3.5 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-indigo-700 dark:bg-slate-800 dark:text-indigo-300 border-b border-slate-200 dark:border-slate-800">
+                  Translation ({getLanguageLabel(job?.target_language || targetLanguage)})
+                </div>
+                <iframe
+                  src={downloadUrl}
+                  className="h-[460px] w-full border-0 bg-white"
+                  title="Translated document preview"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 const StatusRow = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900/70">
-    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</span>
-    <span className="text-sm font-semibold text-slate-900 dark:text-white">{value}</span>
+  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900/70 overflow-hidden min-w-0">
+    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400 shrink-0">{label}</span>
+    <span className="text-sm font-semibold text-slate-900 dark:text-white truncate min-w-0 max-w-[200px] sm:max-w-[260px] text-right" title={typeof value === 'string' ? value : undefined}>{value}</span>
   </div>
 );
 

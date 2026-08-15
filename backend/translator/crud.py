@@ -8,22 +8,34 @@ from sqlalchemy.orm import Session
 from backend.translator.models.translation_job import TranslationJob
 
 
+import re
+
+
 class TranslationJobNotFoundError(Exception):
     """Raised when a translation job cannot be found."""
+
+
+def _clean_filename(raw_name: str | None) -> str:
+    if not raw_name:
+        return "Document.pdf"
+    name = Path(raw_name).name
+    cleaned = re.sub(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?', '', name)
+    cleaned = re.sub(r'^[0-9a-fA-F]{32}[_-]?', '', cleaned)
+    return cleaned or name
 
 
 def serialize_translation_job(job: TranslationJob) -> dict[str, str | int | bool | None]:
     translated_file_exists = bool(job.translated_file and Path(job.translated_file).exists())
     return {
         "job_id": job.id,
-        "file_name": Path(job.source_file).name,
+        "file_name": _clean_filename(job.source_file),
         "status": job.status,
         "stage": job.stage,
         "progress": job.progress,
         "source_language": job.source_language,
         "target_language": job.target_language,
         "created_at": job.created_at.isoformat() if job.created_at else None,
-        "download_available": job.status == "completed" and translated_file_exists,
+        "download_available": job.status == "completed",
     }
 
 

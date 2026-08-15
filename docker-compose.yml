@@ -1,5 +1,36 @@
 services:
 
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - BACKEND_API_URL=http://backend
+      - ONLYOFFICE_API_URL=http://onlyoffice-server
+      - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+      - VITE_PUBLIC_APP_URL=https://www.draftmate.in
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+    depends_on:
+      - backend
+    volumes:
+      - .:/app
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: sync
+          path: ./public
+          target: /app/public
+        - action: sync
+          path: ./index.html
+          target: /app/index.html
+        - action: rebuild
+          path: package.json
+
   onlyoffice-server:
     image: onlyoffice/documentserver:latest
     env_file:
@@ -13,11 +44,15 @@ services:
     volumes:
       - ./shared_drafts:/var/www/onlyoffice/Data/shared
       - ./public/plugins/assistant:/var/www/onlyoffice/documentserver/sdkjs-plugins/assistant
+      - onlyoffice_cache:/var/lib/onlyoffice/documentserver/App_Data/cache/files/data
     ports:
       - "8081:80"
     extra_hosts:
       - "drafter-service:host-gateway"
       - "host.docker.internal:host-gateway"
+    depends_on:
+      backend:
+        condition: service_started
     restart: unless-stopped
 
   redis:
@@ -31,25 +66,15 @@ services:
       - "3310:3310"
 
   db:
-    # Pinned to 15 to match the existing postgres_data volume (initialised by
-    # PostgreSQL 15). Postgres refuses to start on a data dir from an older
-    # major version, so don't bump this without migrating/recreating the volume.
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
-      - POSTGRES_DB=${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Draftmate9989
+      - POSTGRES_DB=postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Init SQL runs once on first boot (empty volume)
-      - ./docker-initdb:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -66,19 +91,29 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_CLIENT_ID=${VITE_CLIENT_ID}
+    env_file:
+      - .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
-      # host:container — nginx inside the image listens on 80 (see nginx.conf),
-      # despite the Dockerfile EXPOSE 8080. Map host 80 -> container 80.
-      - "80:80"
+      # host:container — nginx inside the image listens on 80.
+      # Map host 8080 -> container 8080.
+      - "8080:8080"
+      - "8003:8003"
     environment:
+      - DRAFTER_SELF_URL=http://backend:8003
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_ENABLE_HF_TRANSFER=0
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
-      - POSTGRES_DB=${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
       - GOOGLE_SERP_API_KEY=${GOOGLE_SERP_API_KEY}
@@ -115,15 +150,17 @@ services:
       - TEST_MODE=${TEST_MODE}
       - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS}
       - PREFERRED_DOMAINS=${PREFERRED_DOMAINS}
+      - SMTP_SERVER=${SMTP_SERVER:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-preetkakdiya@gmail.com}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-ciej ysdb qdkm bxot}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
       - INPUT_JSON=${INPUT_JSON}
       - INTERACTIVE=${INTERACTIVE}
       - SSH_KEY_PATH=/app/bastion.key.pem
       - BASTION_IP=${BASTION_IP}
       - SSH_USER=${SSH_USER}
-      # Override POSTGRES_DSN so all services use the local db container,
-      # not the RDS URL baked into .env.
-      - POSTGRES_DSN=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-lex_bot_db}
+      - POSTGRES_DSN=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - AUTH_SERVICE_URL=http://127.0.0.1:8009
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - FRONTEND_URL_DEV=${FRONTEND_URL_DEV}
@@ -138,13 +175,25 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - ADVOCATE_PROFILE_PORT=8007
       - NOTIFICATION_SERVICE_URL=http://127.0.0.1:8015
+      - SHARED_STORAGE_PATH=/app/shared_drafts
+      - SARVAM_API_KEY=${SARVAM_API_KEY}
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_started
       qdrant:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/lexbot/config/llm')"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     volumes:
       - ./backend:/app/backend
+      - /app/backend/models
+      - ./src/data/bareacts:/app/src/data/bareacts
+      - ./shared_drafts:/app/shared_drafts
+      - onlyoffice_cache:/onlyoffice_cache
     develop:
       watch:
         - action: sync
@@ -161,3 +210,4 @@ volumes:
   qdrant_data:
   translator_original_data:
   translator_translated_data:
+  onlyoffice_cache:

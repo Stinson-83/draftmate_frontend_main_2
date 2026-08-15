@@ -337,9 +337,10 @@ class ManagerAgent(BaseAgent):
         law_ctx = state.get("law_context", [])
         case_ctx = state.get("case_context", [])
         document_ctx = state.get("document_context", [])
+        citation_ctx = state.get("citation_context", [])
         
         # Combine all candidates
-        all_docs = law_ctx + case_ctx + document_ctx
+        all_docs = law_ctx + case_ctx + document_ctx + citation_ctx
         
         # Context Management: Rerank everything against original query
         # Limit to 10 for token optimization
@@ -523,7 +524,7 @@ class ManagerAgent(BaseAgent):
             - No style keyword → Use this default structured format:
               1. **Brief Answer** (2-3 lines summarizing the legal position)
               2. **Detailed Analysis** (organized by legal issues)
-              3. **Relevant Citations** (with proper formatting)
+              3. **Relevant Citations** (List 5 to 10 verified Indian court case judgments from the retrieved context. Format each item as: '[1] [Case Name v. Case Name](URL), Court Name, Judgment Date, Citation. Case Relevance & Impact: [Explain why our case outcome depends on this precedent].' Always preserve clickable markdown links '[Case Name](URL)' so advocates can click to view the full judgment on Indian Kanoon. Prefer newer 2020+ decisions over older ones. Do NOT list bare statute names like 'Article 14' or 'Act Name' under Relevant Citations — only list case law judgments.)
               4. **Practical Implications** (if applicable)
               5. **Caveats/Limitations** (if any)
 

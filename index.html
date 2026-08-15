@@ -57,10 +57,23 @@
                         "display": ["Inter", "sans-serif"]
                     },
                     borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    animation: {
+                        "marquee-left": "marqueeLeft 35s linear infinite",
+                        "marquee-right": "marqueeRight 38s linear infinite",
+                        "marquee-x-left": "marqueeXLeft 40s linear infinite",
+                        "marquee-x-right": "marqueeXRight 44s linear infinite",
+                    },
+                    keyframes: {
+                        marqueeLeft: { "0%": { transform: "translateX(0)" }, "100%": { transform: "translateX(-50%)" } },
+                        marqueeRight: { "0%": { transform: "translateX(-50%)" }, "100%": { transform: "translateX(0)" } },
+                        marqueeXLeft: { "0%": { transform: "translateX(0)" }, "100%": { transform: "translateX(-50%)" } },
+                        marqueeXRight: { "0%": { transform: "translateX(-50%)" }, "100%": { transform: "translateX(0)" } },
+                    }
                 },
             },
         }
     </script>
+
     <style>
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;

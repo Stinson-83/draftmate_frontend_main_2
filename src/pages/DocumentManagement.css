@@ -1,0 +1,62 @@
+/* Document Management System Core Stylesheet */
+
+.dms-table th {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.dark .dms-table th {
+  color: #94a3b8;
+  border-bottom: 1px solid #1e293b;
+  background-color: #0f172a;
+}
+
+.dms-table td {
+  font-size: 0.875rem;
+  padding: 0.95rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
+}
+
+.dark .dms-table td {
+  border-bottom: 1px solid #1e293b;
+  color: #cbd5e1;
+}
+
+.dms-table tr {
+  transition: background-color 0.15s ease;
+}
+
+.dms-table tr:hover td {
+  background-color: #f8fafc;
+}
+
+.dark .dms-table tr:hover td {
+  background-color: rgba(30, 41, 59, 0.4);
+}
+
+@keyframes spin-sync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sync-spin {
+  animation: spin-sync 2.2s linear infinite;
+  display: inline-block;
+}
+
+.pill-filter {
+  transition: all 0.2s ease;
+}
+
+.pill-filter:hover {
+  background-color: #e2e8f0;
+}
+
+.dark .pill-filter:hover {
+  background-color: #334155;
+}

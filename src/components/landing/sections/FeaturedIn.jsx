@@ -49,8 +49,7 @@ function MarqueeRow({ items, reverse }) {
   return (
     <div className="overflow-hidden">
       <div
-        className={`flex w-max ${reverse ? "animate-marquee-right" : "animate-marquee-left"
-          }`}
+        className={reverse ? "flex w-max animate-marquee-right" : "flex w-max animate-marquee-left"}
         style={{ willChange: "transform" }}
       >
         {doubled.map((item, i) => (

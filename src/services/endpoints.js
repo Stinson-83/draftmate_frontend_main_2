@@ -117,6 +117,7 @@ export const API_CONFIG = {
             GET_PROFILE: (userId) => `/profile/${userId}`, // GET
             UPDATE_PROFILE: '/profile/update', // POST
             FORGOT_PASSWORD: '/forgot-password', // POST
+            VERIFY_OTP: '/verify-otp', // POST
             RESET_PASSWORD: '/reset-password', // POST
         }
     },
@@ -164,6 +165,7 @@ export const API_CONFIG = {
             LOGIN: '/api/v1/auth/login',
             REFRESH: '/api/v1/auth/refresh',
             LOGOUT: '/api/v1/auth/logout',
+            SESSION_LOGIN: '/api/v1/auth/session-login',
             // Profile
             MY_PROFILE: '/api/v1/profiles/me',
             COMPLETE_ONBOARDING: '/api/v1/profiles/me/complete-onboarding',
@@ -207,6 +209,32 @@ export const API_CONFIG = {
             ADMIN_VERIFICATIONS: '/api/v1/admin/verifications',
             UPDATE_VERIFICATION_STATUS: (id) => `/api/v1/admin/verifications/${id}/status`,
             ADMIN_STATS: '/api/v1/admin/stats',
+        }
+    },
+
+    // Service: backend/Library_Service (Port 8008) — routed via /library-api/
+    LIBRARY: {
+        BASE_URL: import.meta.env.VITE_LIBRARY_API_BASE_URL || '/library-api',
+        ENDPOINTS: {
+            // Indian Kanoon endpoints
+            INDIAN_KANOON: {
+                PING: '/api/v1/library/indiankanoon/ping',
+                SEARCH: '/api/v1/library/indiankanoon/search',
+                SEARCH_BY_CITATION: '/api/v1/library/indiankanoon/search/citation',
+                SEARCH_BY_ACT: '/api/v1/library/indiankanoon/search/act',
+                DOCUMENT: (docId) => `/api/v1/library/indiankanoon/document/${docId}`,
+                DOCUMENT_METADATA: (docId) => `/api/v1/library/indiankanoon/document/${docId}/metadata`
+            },
+            // Bare Acts endpoints
+            BARE_ACTS: {
+                GET_ACTS: '/api/v1/library/bareacts',
+                SEARCH_ACTS: '/api/v1/library/bareacts/search',
+                GET_CATEGORIES: '/api/v1/library/bareacts/categories',
+                GET_ACT: (actId) => `/api/v1/library/bareacts/${actId}`,
+                GET_SECTIONS: (actId) => `/api/v1/library/bareacts/${actId}/sections`,
+                GET_SECTION: (actId, sectionId) => `/api/v1/library/bareacts/${actId}/sections/${sectionId}`,
+                SEARCH_SECTIONS: '/api/v1/library/bareacts/search/sections'
+            }
         }
     }
 };

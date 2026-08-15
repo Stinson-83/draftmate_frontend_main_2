@@ -26,20 +26,46 @@ venv/
 env/
 .env
 apprunner_config.json
+new-task-def.json
+setup.md
 
 LEXBOT_LATENCY_ANALYSIS.md
 UPGRADE_PLAN.md
 
-# Compiled Python bytecode
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+.ipynb_checkpoints/
 
-shared_drafts/*
-!shared_drafts/.gitkeep
-scratch/*
-!scratch/.gitkeep
-backend/Deep_research/lex_bot/data/uploads/*
-!backend/Deep_research/lex_bot/data/uploads/.gitkeep
-backend/Drafter/__pycache__/
+# Nightly 2am Proof Report files
+NIGHTLY_2AM_PROOF.md
+NIGHTLY_2AM_PROOF.json
+
+# Local user uploads & shared drafts
+backend/Deep_research/lex_bot/data/uploads/
+shared_drafts/
+
+# Local testing and scratch files
+scratch/
+test_*.py
+capture_2am_proof.py
+check_aws_config.sh
+supervisord_auth_snippet.conf
+
+# Compressed assets
+*.gz
+
+# Translation storage
+backend/translator/storage/
+
+# AWS Task Definition files (contain live credentials/ARNs - never commit)
+task-def-current.json
+loadtest/clean-task-def.json
+
+# Loadtest scratch and generated files
+loadtest/check_db_tables.py
+loadtest/trivy-report.html
+loadtest/__pycache__/

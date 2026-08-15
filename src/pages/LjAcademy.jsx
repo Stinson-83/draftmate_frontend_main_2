@@ -1,6 +1,7 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, MonitorPlay, Award, Target, ArrowRight, BookOpen, Clock } from 'lucide-react';
+import { Users, MonitorPlay, Award, Target, ArrowRight, BookOpen, Clock, Scale, FileText, Edit3, Library, Briefcase, Trophy, Sparkles } from 'lucide-react';
 
 // Import your existing global components
 import Navbar from '../components/landing/sections/Navbar';
@@ -8,6 +9,17 @@ import Footer from '../components/landing/sections/Footer';
 import FAQSection from '../components/landing/sections/FAQSection';
 import ScrollReveal from '../components/landing/ScrollReveal';
 import LenisProvider from '../components/landing/LenisProvider';
+
+const STUDENT_FEATURES = [
+    { icon: Scale, title: "AI Live Courtroom", desc: "Practice real courtroom proceedings with AI judges and opposing counsel, receiving instant feedback to sharpen your advocacy skills." },
+    { icon: FileText, title: "Moot Memorial Lab", desc: "Build professional moot memorials with AI-assisted legal research, argument structuring, and drafting guidance designed for law students." },
+    { icon: Edit3, title: "Smart Drafting Learn Mode", desc: "Master legal drafting through step-by-step AI explanations that teach the purpose behind every clause while improving your drafting skills." },
+    { icon: BookOpen, title: "AI Legal Notebook", desc: "Upload judgments, bare acts, and notes to chat with your documents, generate case briefs, and receive answers with precise legal citations." },
+    { icon: Library, title: "Bare Acts AI", desc: "Understand complex legal provisions through simplified explanations, landmark judgments, and intelligent cross-references." },
+    { icon: Target, title: "Exam & Moot Preparation", desc: "Prepare for CLAT PG, Judiciary, AIBE, and university exams with AI-powered mock tests, flashcards, and practice questions." },
+    { icon: Briefcase, title: "Internship & Career Hub", desc: "Discover verified internships, build an ATS-ready legal CV, earn certifications, and connect with experienced mentors." },
+    { icon: Trophy, title: "Certifications & Leaderboards", desc: "Earn verifiable DraftMate certifications, showcase your legal achievements, and compete with students nationwide." },
+];
 
 /* ─────────────────────────────────────────────────────────────
    Updated Course & Faculty Data (Native Indian Context)
@@ -96,13 +108,93 @@ const FEATURES = [
 ];
 
 export default function LjAcademy() {
-    return (
-        <LenisProvider>
-            <main className="flex flex-col bg-[#F8FAFF] min-h-screen">
-                <Navbar />
+    const location = useLocation();
+    const isDashboard = window.location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/dashboard');
+    console.log("LJ Academy Render: pathname =", window.location.pathname, "routerPath =", location.pathname, "isDashboard =", isDashboard);
 
-                {/* ── HERO SECTION ── */}
-                <section className="pt-32 pb-20 lg:pt-40 lg:pb-24 relative overflow-hidden">
+    const content = (
+        <main className="flex flex-col bg-[#F8FAFF] min-h-screen">
+                {!isDashboard && <Navbar />}
+
+                {/* ── DRAFTMATE STUDENT CENTER (COMING SOON) ── */}
+                <section className={`pb-16 lg:pb-20 relative overflow-hidden ${isDashboard ? 'pt-24' : 'pt-40 lg:pt-48'}`}>
+                    {/* Infinite Marquee Banner */}
+                    <div className="absolute top-10 left-0 w-full overflow-hidden bg-amber-300 py-3 z-20 shadow-lg -rotate-1 scale-110 border-y border-amber-400">
+                        <div className="flex w-max animate-marquee-right items-center gap-10" style={{ willChange: "transform" }}>
+                            {Array(15).fill("COMING SOON").map((text, i) => (
+                                <div key={i} className="flex items-center gap-10">
+                                    <span className="text-[13px] tracking-[0.3em] font-black text-amber-900 uppercase whitespace-nowrap">
+                                        {text}
+                                    </span>
+                                    <Sparkles className="w-4 h-4 text-amber-700" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-400/10 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+                    
+                    <div className="container-xl px-5 md:px-10 mx-auto max-w-7xl relative z-10 text-center">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                            className="max-w-3xl mx-auto space-y-6"
+                        >
+                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#0F1C2E] leading-[1.15]">
+                                DraftMate <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500">Student Center</span>
+                            </h1>
+                            
+                            <p className="text-[#475569] text-lg leading-relaxed md:text-xl">
+                                The ultimate AI-powered ecosystem designed exclusively for law students. Prepare for exams, practice moot courts, and build your career with next-generation legal technology.
+                            </p>
+                        </motion.div>
+                    </div>
+                </section>
+
+                <section className="py-16 bg-white border-y border-slate-200/60">
+                    <div className="container-xl px-5 md:px-10 mx-auto max-w-7xl">
+                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {STUDENT_FEATURES.map((feat, i) => (
+                                <ScrollReveal key={i} delay={i * 50}>
+                                    <div className="bg-[#F8FAFF] p-8 rounded-2xl border border-slate-100 h-full hover:shadow-lg hover:-translate-y-1 hover:border-blue-200 transition-all duration-300">
+                                        <div className="w-14 h-14 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-sm flex items-center justify-center mb-6 text-blue-600 border border-blue-200/50">
+                                            <feat.icon className="w-7 h-7" strokeWidth={1.5} />
+                                        </div>
+                                        <h4 className="font-bold text-[#0F1C2E] text-lg mb-3 leading-tight">{feat.title}</h4>
+                                        <p className="text-sm text-[#475569] leading-relaxed">{feat.desc}</p>
+                                    </div>
+                                </ScrollReveal>
+                            ))}
+                        </div>
+
+                        {/* Notification CTA */}
+                        <ScrollReveal delay={400}>
+                            <div className="mt-16 bg-gradient-to-r from-[#0F1C2E] to-blue-900 rounded-3xl p-10 text-center text-white shadow-xl relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+                                <div className="relative z-10 max-w-2xl mx-auto">
+                                    <h3 className="text-2xl md:text-3xl font-black mb-4">Want early access?</h3>
+                                    <p className="text-blue-100 mb-8">Join the waitlist to be the first to experience the DraftMate Student Center when we launch.</p>
+                                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                        <input 
+                                            type="email" 
+                                            placeholder="Enter your student email address" 
+                                            className="px-6 py-3.5 rounded-xl text-[#0F1C2E] w-full sm:w-96 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                        />
+                                        <button className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-8 rounded-xl transition-colors whitespace-nowrap shadow-lg shadow-blue-900/50">
+                                            Join Waitlist
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </ScrollReveal>
+                    </div>
+                </section>
+
+                <div className="py-12 bg-[#F8FAFF]"></div>
+
+                {/* ── LJ ACADEMY HERO SECTION ── */}
+                <section className="pb-20 lg:pb-24 relative overflow-hidden pt-12">
                     {/* Background Glows */}
                     <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-400/10 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
                     <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-cyan-400/10 rounded-full blur-3xl pointer-events-none translate-x-1/3 translate-y-1/3" />
@@ -329,8 +421,13 @@ export default function LjAcademy() {
                 {/* ── FAQ SECTION (Reusing your global one) ── */}
                 {/* <FAQSection /> */}
 
-                <Footer />
+                {!isDashboard && <Footer />}
             </main>
-        </LenisProvider>
     );
+
+    // Only use Lenis smooth-scroll on the public landing page.
+    // Inside the dashboard the scroll container is a nested div, not window —
+    // Lenis blocks touch/finger scrolling while the scrollbar still works.
+    if (isDashboard) return content;
+    return <LenisProvider>{content}</LenisProvider>;
 }
