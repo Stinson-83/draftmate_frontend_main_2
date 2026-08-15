@@ -2330,6 +2330,132 @@ async def export_chronology_pdf_report(request: Dict[str, Any], authorization: O
     )
 
 
+@app.post("/v2/chronology/export_docx")
+async def export_chronology_docx_report(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    case_id = request.get("case_id")
+    sort_order = request.get("sort_order") or "asc"
+    
+    if not case_id:
+        raise HTTPException(status_code=400, detail="case_id is required")
+        
+    async with httpx.AsyncClient() as client:
+        # Get Case name
+        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
+        case_resp.raise_for_status()
+        case_name = case_resp.json().get("name", "Timeline Matter")
+        
+        # Get events
+        events_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}")
+        events_resp.raise_for_status()
+        events = events_resp.json().get("events", [])
+        
+    # filter only accepted/pending events, skip rejected
+    filtered_events = [e for e in events if e.get("status") != "rejected"]
+    
+    # 1. Create a draft UUID
+    import uuid
+    draft_id = str(uuid.uuid4())
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    draft_dir = os.path.join(shared_storage_path, draft_id)
+    os.makedirs(draft_dir, exist_ok=True)
+    
+    file_name = f"{case_name.replace(' ', '_')}_Chronology.docx"
+    output_path = os.path.join(draft_dir, file_name)
+    
+    # 2. Build the DOCX file
+    import docx
+    from docx.shared import Inches, Pt
+    
+    doc = docx.Document()
+    
+    title_p = doc.add_paragraph()
+    run = title_p.add_run(f"Chronology of Events - {case_name}")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(14)
+    run.bold = True
+    title_p.paragraph_format.space_after = Pt(12)
+    
+    # Sort
+    def get_sort_key(ev):
+        val = ev.get("timestamp") or ev.get("date_normalized") or ev.get("event_date") or ""
+        return str(val)
+        
+    sorted_events = sorted(filtered_events, key=get_sort_key, reverse=(sort_order == "desc"))
+    
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    
+    hdr_cells = table.rows[0].cells
+    headers = ["SL.no", "Date", "Particulars", "Page no"]
+    col_widths = [Inches(0.6), Inches(1.2), Inches(4.5), Inches(0.8)]
+    
+    for idx, name in enumerate(headers):
+        hdr_cells[idx].text = name
+        hdr_cells[idx].paragraphs[0].runs[0].font.name = 'Times New Roman'
+        hdr_cells[idx].paragraphs[0].runs[0].font.size = Pt(11)
+        hdr_cells[idx].paragraphs[0].runs[0].bold = True
+        
+    for sl_no, ev in enumerate(sorted_events, start=1):
+        row_cells = table.add_row().cells
+        
+        # Sl.no
+        row_cells[0].text = str(sl_no)
+        # Date
+        row_cells[1].text = str(ev.get("event_date") or ev.get("date") or "")
+        # Particulars
+        row_cells[2].text = str(ev.get("event_description") or ev.get("event") or "")
+        # Page no
+        row_cells[3].text = str(ev.get("source_page") or ev.get("citation", {}).get("source_page", "") or "")
+        
+        for idx, cell in enumerate(row_cells):
+            cell.width = col_widths[idx]
+            for p in cell.paragraphs:
+                for r in p.runs:
+                    r.font.name = 'Times New Roman'
+                    r.font.size = Pt(10.5)
+                    
+    doc.save(output_path)
+    
+    # 3. Read bytes to also replicate in uploads
+    with open(output_path, "rb") as f:
+        file_bytes = f.read()
+        
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+    os.makedirs(lex_bot_upload_dir, exist_ok=True)
+    lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
+    with open(lex_bot_path, "wb") as f:
+        f.write(file_bytes)
+        
+    # 4. Register in database
+    document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/register",
+                json={
+                    "draft_id": draft_id,
+                    "name": file_name,
+                    "filename": file_name,
+                    "document_key": document_key,
+                    "created_by": user_id,
+                    "variables_detected": [],
+                    "status": "In progress"
+                },
+                timeout=10.0
+            )
+    except Exception as reg_err:
+        logger.warning(f"Failed to register chronology draft: {reg_err}")
+        
+    return {
+        "id": draft_id,
+        "draftId": draft_id,
+        "filename": file_name,
+        "documentKey": document_key
+    }
+
+
 # ── ONLYOFFICE AI Redlining Router Endpoints ───────────────────────────
 
 REDLINE_AI_PROMPT = """

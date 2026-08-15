@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { 
@@ -9,7 +10,9 @@ import { API_CONFIG } from '../services/endpoints';
 import './ChronologyWorkspace.css';
 
 const ChronologyWorkspace = () => {
+  const navigate = useNavigate();
   const [cases, setCases] = useState([]);
+  const [sortOrder, setSortOrder] = useState('asc');
   const [selectedCaseId, setSelectedCaseId] = useState('');
   const [caseNameInput, setCaseNameInput] = useState('');
   const [documents, setDocuments] = useState([]);
@@ -219,29 +222,46 @@ const ChronologyWorkspace = () => {
   };
 
   // Export approved timeline to PDF
-  const handleExportPDF = async () => {
+  // Generate Docx table and open in OnlyOffice editor
+  const handleOpenInOnlyOffice = async () => {
     setPdfLoading(true);
     try {
-      const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/chronology/export`;
-      const response = await axios.post(url, { case_id: selectedCaseId }, {
-        headers,
-        responseType: 'blob'
+      const url = `${API_CONFIG.DRAFTER.BASE_URL}/v2/chronology/export_docx`;
+      const response = await axios.post(url, { 
+        case_id: selectedCaseId,
+        sort_order: sortOrder
+      }, { headers });
+      
+      const draft = response.data;
+      toast.success('Chronology document created! Redirecting to ONLYOFFICE...');
+      
+      navigate('/dashboard/workspace', {
+        state: {
+          draftId: draft.id,
+          id: draft.id,
+          filename: draft.filename,
+          documentKey: draft.documentKey,
+          variablesDetected: [],
+          onlyofficeConfig: null
+        }
       });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const dlLink = document.createElement('a');
-      dlLink.href = window.URL.createObjectURL(blob);
-      dlLink.download = `${cases.find(c => c.id === selectedCaseId)?.name || 'case'}_chronology.pdf`;
-      dlLink.click();
-      toast.success('PDF report exported successfully!');
     } catch (err) {
       console.error(err);
-      toast.error('Export failed.');
+      toast.error('Failed to generate chronology document.');
     } finally {
       setPdfLoading(false);
     }
   };
 
   const activeCase = cases.find(c => c.id === selectedCaseId);
+
+  const sortedEventsInUI = [...events].sort((a, b) => {
+    const keyA = a.timestamp || a.date_normalized || a.event_date || "";
+    const keyB = b.timestamp || b.date_normalized || b.event_date || "";
+    return sortOrder === 'asc' 
+      ? String(keyA).localeCompare(String(keyB)) 
+      : String(keyB).localeCompare(String(keyA));
+  });
 
   return (
     <div className="chronology-workspace-container">
@@ -303,14 +323,27 @@ const ChronologyWorkspace = () => {
               </button>
 
               {activeTab === 'timeline' && events.length > 0 && (
-                <button 
-                  className="export-pdf-btn ml-auto" 
-                  onClick={handleExportPDF}
-                  disabled={pdfLoading}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  <span>{pdfLoading ? 'Exporting...' : 'Export PDF'}</span>
-                </button>
+                <div className="timeline-controls ml-auto flex items-center gap-3">
+                  <div className="sort-selector flex items-center gap-1.5 bg-white border border-[#B9D9EB] rounded-lg px-2.5 py-1 text-xs">
+                    <span className="text-slate-500 font-medium">Order:</span>
+                    <select 
+                      value={sortOrder} 
+                      onChange={e => setSortOrder(e.target.value)}
+                      className="bg-transparent border-0 outline-none font-semibold text-slate-700 cursor-pointer"
+                    >
+                      <option value="asc">Earliest to Latest</option>
+                      <option value="desc">Latest to Earliest</option>
+                    </select>
+                  </div>
+                  <button 
+                    className="export-pdf-btn" 
+                    onClick={handleOpenInOnlyOffice}
+                    disabled={pdfLoading}
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    <span>{pdfLoading ? 'Opening Workspace...' : 'Open in ONLYOFFICE'}</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -335,139 +368,82 @@ const ChronologyWorkspace = () => {
                   </div>
                 ) : (
                   <div className="timeline-scroller">
-                    {events.map((ev, index) => {
-                      const isEditing = editEventId === ev.id;
-                      const hasConflict = ev.is_conflict;
+                    <table className="chronology-table">
+                      <thead>
+                        <tr>
+                          <th>SL.no</th>
+                          <th>Date</th>
+                          <th>Particulars</th>
+                          <th>Page no</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedEventsInUI.map((ev, index) => {
+                          const pageNo = ev.source_page || ev.citations?.[0]?.source_page || 1;
+                          const docName = ev.source_document || ev.citations?.[0]?.source_document || 'Doc';
 
-                      return (
-                        <div key={ev.id} className={`timeline-entry-card ${ev.status === 'rejected' ? 'rejected-card' : ''} ${hasConflict ? 'conflict-card' : ''}`}>
-                          {/* Left node anchor */}
-                          <div className="timeline-node-pin">
-                            <div className={`node-circle-dot ${ev.status === 'accepted' ? 'accepted' : ev.status === 'disputed' ? 'disputed' : ''}`}></div>
-                            {index < events.length - 1 && <div className="node-line-link"></div>}
-                          </div>
-
-                          {/* Event card content */}
-                          <div className="event-card-body">
-                            {isEditing ? (
-                              <div className="edit-form-grid">
-                                <input 
-                                  type="text" 
-                                  value={editFormData.event_date} 
-                                  onChange={e => setEditFormData(prev => ({...prev, event_date: e.target.value}))}
-                                  placeholder="YYYY-MM-DD"
-                                  className="edit-field"
-                                />
-                                <select 
-                                  value={editFormData.date_type}
-                                  onChange={e => setEditFormData(prev => ({...prev, date_type: e.target.value}))}
-                                  className="edit-field"
-                                >
-                                  <option value="exact">Exact</option>
-                                  <option value="inferred">Inferred</option>
-                                  <option value="approximate">Approximate</option>
-                                </select>
-                                <textarea 
-                                  value={editFormData.event_description} 
-                                  onChange={e => setEditFormData(prev => ({...prev, event_description: e.target.value}))}
-                                  placeholder="Event description..."
-                                  className="edit-field col-span-2"
-                                  rows={2}
-                                />
-                                <input 
-                                  type="text" 
-                                  value={editFormData.actors} 
-                                  onChange={e => setEditFormData(prev => ({...prev, actors: e.target.value}))}
-                                  placeholder="Actors (comma separated)..."
-                                  className="edit-field col-span-2"
-                                />
-                                <div className="edit-actions col-span-2">
-                                  <button onClick={() => saveEventEdit(ev.id)} className="save-btn">
-                                    <Save className="h-4 w-4 mr-1" /> Save
-                                  </button>
-                                  <button onClick={() => setEditEventId(null)} className="cancel-btn">
-                                    Cancel
-                                  </button>
+                          return (
+                            <tr key={ev.id} className={ev.status === 'rejected' ? 'rejected-row' : ''}>
+                              <td>{index + 1}</td>
+                              <td className="date-cell">
+                                <div className="date-display">
+                                  <span>{ev.event_date || 'No Date'}</span>
+                                  {ev.user_modified && <span className="modified-indicator">Edited</span>}
                                 </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="event-header-row">
-                                  <div className="date-badge-wrap">
-                                    <span className="event-date-text">{ev.event_date || 'No Date'}</span>
-                                    <span className={`date-type-badge ${ev.date_type}`}>{ev.date_type}</span>
-                                    {ev.user_modified && <span className="modified-badge">Edited</span>}
-                                  </div>
-
-                                  <div className="action-buttons-wrap">
+                              </td>
+                              <td className="particulars-cell">
+                                <div className="particulars-display">
+                                  <p>{ev.event_description}</p>
+                                  <div className="row-actions">
                                     <button 
                                       onClick={() => handleUpdateStatus(ev.id, 'accepted')} 
-                                      className={`action-icon-btn check ${ev.status === 'accepted' ? 'active' : ''}`}
-                                      title="Verify Event"
+                                      className={`row-action check ${ev.status === 'accepted' ? 'active' : ''}`}
                                     >
-                                      <Check className="h-4 w-4" />
-                                    </button>
-                                    <button 
-                                      onClick={() => handleUpdateStatus(ev.id, 'disputed')} 
-                                      className={`action-icon-btn dispute ${ev.status === 'disputed' ? 'active' : ''}`}
-                                      title="Mark Disputed"
-                                    >
-                                      <AlertTriangle className="h-4 w-4" />
+                                      Verify
                                     </button>
                                     <button 
                                       onClick={() => handleUpdateStatus(ev.id, 'rejected')} 
-                                      className={`action-icon-btn reject ${ev.status === 'rejected' ? 'active' : ''}`}
-                                      title="Reject Event"
+                                      className={`row-action reject ${ev.status === 'rejected' ? 'active' : ''}`}
                                     >
-                                      <X className="h-4 w-4" />
+                                      Reject
                                     </button>
-                                    <button onClick={() => startEditEvent(ev)} className="action-icon-btn edit">
-                                      <Edit3 className="h-4 w-4" />
+                                    <button 
+                                      onClick={() => {
+                                        const newDesc = prompt("Edit Particulars:", ev.event_description);
+                                        if (newDesc !== null && newDesc.trim() !== '') {
+                                          axios.put(`${API_CONFIG.DRAFTER.BASE_URL}/v2/chronology/events/${ev.id}`, {
+                                            ...ev,
+                                            event_description: newDesc.trim()
+                                          }, { headers }).then(() => {
+                                            setEvents(prev => prev.map(item => item.id === ev.id ? { ...item, event_description: newDesc.trim(), user_modified: true } : item));
+                                            toast.success('Particulars updated!');
+                                          }).catch(err => {
+                                            console.error(err);
+                                            toast.error('Failed to save edit.');
+                                          });
+                                        }
+                                      }} 
+                                      className="row-action edit"
+                                    >
+                                      Edit
                                     </button>
                                   </div>
                                 </div>
-
-                                <p className="event-desc-text">{ev.event_description}</p>
-
-                                {ev.actors?.length > 0 && (
-                                  <div className="actors-row">
-                                    <strong>Actors:</strong> {ev.actors.join(', ')}
-                                  </div>
-                                )}
-
-                                {/* Citations pills */}
-                                <div className="citations-tray">
-                                  {ev.citations?.map((cit, cIdx) => (
-                                    <span 
-                                      key={cIdx} 
-                                      className="citation-pill"
-                                      onClick={() => handleViewCitation(cit, ev.source_document || cit.source_document)}
-                                    >
-                                      {ev.source_document || cit.source_document} (p.{cit.source_page || 1})
-                                    </span>
-                                  ))}
-                                </div>
-
-                                {/* Conflicts Warning */}
-                                {hasConflict && ev.conflict_details?.length > 0 && (
-                                  <div className="conflict-warning-box">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500 mr-2 flex-shrink-0" />
-                                    <div>
-                                      <strong>⚠️ Date Conflict Flagged:</strong> Other documents state different dates for this event:
-                                      <ul className="conflict-list">
-                                        {ev.conflict_details.map((cf, cfIdx) => (
-                                          <li key={cfIdx}><b>{cf.date}</b> — {cf.source}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </td>
+                              <td className="page-cell">
+                                <span 
+                                  className="page-pill" 
+                                  onClick={() => handleViewCitation(ev.citations?.[0] || { source_page: pageNo, source_text: ev.event_description }, docName)}
+                                  title="View original citation snippet"
+                                >
+                                  {docName} (p.{pageNo})
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
