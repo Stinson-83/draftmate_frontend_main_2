@@ -2406,7 +2406,14 @@ async def export_chronology_docx_report(request: Dict[str, Any], authorization: 
         # Particulars
         row_cells[2].text = str(ev.get("event_description") or ev.get("event") or "")
         # Page no
-        row_cells[3].text = str(ev.get("source_page") or ev.get("citation", {}).get("source_page", "") or "")
+        c_list = ev.get("citations") or []
+        if not c_list:
+            doc_name = ev.get('source_document', '') or ''
+            page_no = str(ev.get('source_page', 1) or '')
+            cite_str = f"{doc_name} p.{page_no}" if doc_name else page_no
+        else:
+            cite_str = "; ".join(list(set([f"{c.get('source_document', '') or ''} p.{c.get('source_page', 1) or ''}" for c in c_list])))
+        row_cells[3].text = cite_str
         
         for idx, cell in enumerate(row_cells):
             cell.width = col_widths[idx]
