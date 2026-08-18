@@ -4,6 +4,7 @@ import { judgmentCategories, judgmentCourts } from '../../data/mockJudgments';
 import { searchJudgments } from '../../services/library/judgmentApi';
 import { judgmentService } from '../../services/library/judgmentService';
 import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 const Judgments = () => {
   const [searchTerm, setSearchTerm]           = useState('');
@@ -69,6 +70,10 @@ const Judgments = () => {
       <div className="max-w-7xl mx-auto w-full space-y-6 flex-1">
 
         {/* ── Header ── */}
+        <Link to="/dashboard/library" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#2563EB] mb-2 transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Library
+        </Link>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Judgment Library</h1>

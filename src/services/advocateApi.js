@@ -95,7 +95,12 @@ async function _fetch(url, options = {}, isRetry = false) {
             if (res.status === 422 && Array.isArray(err.detail)) {
                 detail = err.detail.map(d => `${d.loc ? d.loc.slice(-1)[0] : 'Field'}: ${d.msg}`).join(', ');
             } else {
-                detail = err.detail || err.message || detail;
+                let parsedDetail = err.detail || err.message || detail;
+                if (typeof parsedDetail === 'object') {
+                    detail = JSON.stringify(parsedDetail);
+                } else {
+                    detail = parsedDetail;
+                }
             }
         } catch { /* ignore */ }
         

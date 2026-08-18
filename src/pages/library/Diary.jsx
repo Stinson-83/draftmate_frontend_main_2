@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { diaryService } from '../../services/library/diaryService';
 import { diaryCategories } from '../../data/mockDiary';
@@ -73,9 +74,13 @@ const Diary = () => {
     <div className="p-6 md:p-8 h-full overflow-y-auto">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
+        <Link to="/dashboard/library" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#2563EB] mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Library
+        </Link>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Lawyer Diary</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Client Management</h1>
             <p className="text-slate-600 dark:text-slate-400 mt-1">
               Manage your hearings and case schedule
             </p>

@@ -45,7 +45,7 @@ const libraryCards = [
     color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
   },
   {
-    title: 'Lawyer Diary',
+    title: 'Client Management',
     icon: 'calendar_month',
     path: '/dashboard/library/diary',
     description: 'Manage your hearings, case schedule, and daily practice.',
@@ -79,27 +79,9 @@ const libraryCards = [
     description: 'Manage your client relationships and CRM.',
     color: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400',
   },
-  {
-    title: 'Cases',
-    icon: 'gavel',
-    path: '/dashboard/library/cases',
-    description: 'Central case management for all your matters.',
-    color: 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400',
-  },
-  {
-    title: 'Case Tracking',
-    icon: 'track_changes',
-    path: '/dashboard/library/case-tracking',
-    description: 'Track cases with e-Courts integration readiness.',
-    color: 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
-  },
-  {
-    title: 'Integration Settings',
-    icon: 'settings',
-    path: '/dashboard/library/integrations/ecourts',
-    description: 'Manage your e-Courts and third-party integrations.',
-    color: 'bg-slate-50 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  },
+
+
+
 ];
 
 const LibraryDashboard = () => {

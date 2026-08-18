@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { bookmarkService } from '../../services/library/bookmarkService';
 import { toast } from 'sonner';
 
@@ -88,6 +89,10 @@ const Bookmarks = () => {
 
         {/* Main Content */}
         <div className="flex-1">
+          <Link to="/dashboard/library" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#2563EB] mb-4 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Library
+          </Link>
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Saved Provisions</h1>
             <p className="text-slate-600 dark:text-slate-400 mt-1">Quick access to your bookmarked sections.</p>

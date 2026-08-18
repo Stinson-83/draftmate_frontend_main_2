@@ -164,3 +164,22 @@ class Bookmark(Base):
     section_number = Column(String(255))
     section_title = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class BareAct(Base):
+    __tablename__ = "library_bare_acts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False, index=True)
+    short_title = Column(String(255))
+    act_number = Column(String(255))
+    year = Column(String(10), index=True)
+    state = Column(String(255), index=True)
+    category = Column(String(255), index=True)
+    department = Column(String(255))
+    description = Column(Text)
+    pdf_url = Column(String(1024))
+    language = Column(String(50), default="English")
+    status = Column(String(50), default="Active")
+    effective_date = Column(Date)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -238,8 +238,7 @@ function App() {
                 <Route path="library/video-links" element={<VideoLinks />} />
                 <Route path="library/clients" element={<Clients />} />
                 <Route path="library/clients/:clientId" element={<ClientDetails />} />
-                <Route path="library/cases" element={<Cases />} />
-                <Route path="library/cases/:caseId" element={<CaseDetails />} />
+
                 <Route path="library/case-tracking" element={<CaseTracking />} />
                 <Route path="library/case-tracking/:trackingId" element={<CaseTrackingDetails />} />
                 <Route path="library/integrations/ecourts" element={<IntegrationSettings />} />

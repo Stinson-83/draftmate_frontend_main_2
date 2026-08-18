@@ -77,7 +77,7 @@ export default function AdvocateDashboard() {
     const [profile, setProfile] = useState(null);
     const [consultations, setConsultations] = useState([]);
     const [messages, setMessages] = useState([]);
-    const [analytics, setAnalytics] = useState(null);
+    const [analytics, setAnalytics] = useState({});
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -128,78 +128,84 @@ export default function AdvocateDashboard() {
             setLoading(true);
             setLoadError(null);
 
-            // 1. Check local storage first
-            const savedLocal = localStorage.getItem('lawyer_profile');
-            let initialProf = DEFAULT_PROFILE;
+            try {
+                // 1. Check local storage first
+                const savedLocal = localStorage.getItem('lawyer_profile');
+                let initialProf = DEFAULT_PROFILE;
 
-            if (savedLocal) {
-                try {
-                    const parsed = JSON.parse(savedLocal);
-                    // If local storage has the old mock default name, reset it to blank
-                    if (parsed && parsed.title !== 'Adv. Preet Kakdiya') {
-                        initialProf = parsed;
-                    } else {
+                if (savedLocal) {
+                    try {
+                        const parsed = JSON.parse(savedLocal);
+                        // If local storage has the old mock default name, reset it to blank
+                        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.title !== 'Adv. Preet Kakdiya') {
+                            initialProf = { ...DEFAULT_PROFILE, ...parsed };
+                        } else {
+                            localStorage.removeItem('lawyer_profile');
+                        }
+                    } catch {
                         localStorage.removeItem('lawyer_profile');
                     }
-                } catch {
-                    localStorage.removeItem('lawyer_profile');
                 }
-            }
-            
-            // Ensure array fields exist
-            initialProf.experience = Array.isArray(initialProf.experience) ? initialProf.experience : [];
-            initialProf.education = Array.isArray(initialProf.education) ? initialProf.education : [];
-            initialProf.certifications = Array.isArray(initialProf.certifications) ? initialProf.certifications : [];
-            initialProf.languages = Array.isArray(initialProf.languages) ? initialProf.languages : [];
-            initialProf.social_links = initialProf.social_links || { linkedin: '', twitter: '', facebook: '', instagram: '', website: '' };
-            
-            setProfile(initialProf);
-            setPracticeAreas(Array.isArray(initialProf.practice_areas) ? initialProf.practice_areas : []);
-            if (initialProf.profile_image_url) setImagePreview(initialProf.profile_image_url);
+                
+                // Ensure array fields exist
+                initialProf.experience = Array.isArray(initialProf.experience) ? initialProf.experience : [];
+                initialProf.education = Array.isArray(initialProf.education) ? initialProf.education : [];
+                initialProf.certifications = Array.isArray(initialProf.certifications) ? initialProf.certifications : [];
+                initialProf.languages = Array.isArray(initialProf.languages) ? initialProf.languages : [];
+                initialProf.social_links = initialProf.social_links || { linkedin: '', twitter: '', facebook: '', instagram: '', website: '' };
+                
+                setProfile(initialProf);
+                setPracticeAreas(Array.isArray(initialProf.practice_areas) ? initialProf.practice_areas : []);
+                if (initialProf.profile_image_url) setImagePreview(initialProf.profile_image_url);
 
-            // 2. Optional background sync with backend if token exists
-            if (tokens.getAccess()) {
-                try {
-                    const profRes = await advocateProfile.getMe();
-                    if (profRes && profRes.data) {
-                        const p = profRes.data;
-                        p.experience = Array.isArray(p.experience) ? p.experience : initialProf.experience;
-                        p.education = Array.isArray(p.education) ? p.education : initialProf.education;
-                        p.certifications = Array.isArray(p.certifications) ? p.certifications : initialProf.certifications;
-                        p.languages = Array.isArray(p.languages) ? p.languages : initialProf.languages;
-                        setProfile(p);
-                        setPracticeAreas(Array.isArray(p.practice_areas) ? p.practice_areas : initialProf.practice_areas);
-                        if (p.profile_image_url) setImagePreview(p.profile_image_url);
-                        localStorage.setItem('lawyer_profile', JSON.stringify(p));
-                    }
-                    
-                    // Fetch Consultations
-                    const consultRes = await advocateConsultations.getMyConsultations();
-                    if (consultRes && consultRes.data) {
-                        setConsultations(consultRes.data);
-                    }
-                    
-                    // Fetch Messages
-                    const msgRes = await advocateMessages.getConversations();
-                    if (msgRes && msgRes.data) {
-                        setMessages(msgRes.data);
-                    }
-
-                    // Fetch Analytics
+                // 2. Optional background sync with backend if token exists
+                if (tokens.getAccess()) {
                     try {
-                        const analyticsRes = await advocateAnalytics.getDashboard();
-                        if (analyticsRes && analyticsRes.status === 'success') {
-                            setAnalytics(analyticsRes);
+                        const profRes = await advocateProfile.getMe();
+                        if (profRes && profRes.data) {
+                            const p = profRes.data;
+                            p.experience = Array.isArray(p.experience) ? p.experience : initialProf.experience;
+                            p.education = Array.isArray(p.education) ? p.education : initialProf.education;
+                            p.certifications = Array.isArray(p.certifications) ? p.certifications : initialProf.certifications;
+                            p.languages = Array.isArray(p.languages) ? p.languages : initialProf.languages;
+                            setProfile(p);
+                            setPracticeAreas(Array.isArray(p.practice_areas) ? p.practice_areas : initialProf.practice_areas);
+                            if (p.profile_image_url) setImagePreview(p.profile_image_url);
+                            localStorage.setItem('lawyer_profile', JSON.stringify(p));
+                        }
+                        
+                        // Fetch Consultations
+                        const consultRes = await advocateConsultations.getMyConsultations();
+                        if (consultRes && consultRes.data) {
+                            setConsultations(Array.isArray(consultRes.data) ? consultRes.data : []);
+                        }
+                        
+                        // Fetch Messages
+                        const msgRes = await advocateMessages.getConversations();
+                        if (msgRes && msgRes.data) {
+                            setMessages(Array.isArray(msgRes.data) ? msgRes.data : []);
+                        }
+
+                        // Fetch Analytics
+                        try {
+                            const analyticsRes = await advocateAnalytics.getDashboard();
+                            if (analyticsRes && analyticsRes.status === 'success') {
+                                setAnalytics(analyticsRes);
+                            }
+                        } catch (e) {
+                            console.info('Analytics sync failed:', e);
                         }
                     } catch (e) {
-                        console.info('Analytics sync failed:', e);
+                        console.info('Backend dashboard sync skipped/failed:', e);
                     }
-                } catch (e) {
-                    console.info('Backend dashboard sync skipped/failed:', e);
                 }
+            } catch (err) {
+                console.error("Dashboard render protection caught error:", err);
+                setProfile(DEFAULT_PROFILE);
+                setPracticeAreas([]);
+            } finally {
+                setLoading(false);
             }
-
-            setLoading(false);
         }
 
         loadProfileData();

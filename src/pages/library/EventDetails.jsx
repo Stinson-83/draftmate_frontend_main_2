@@ -33,7 +33,7 @@ const EventDetails = () => {
 
   const handleDelete = async () => {
     if (event?.isDiaryEvent) {
-      toast.error('Diary events must be deleted from Lawyer Diary');
+      toast.error('Diary events must be deleted from Client Management');
       return;
     }
     if (window.confirm('Are you sure you want to delete this event?')) {
@@ -81,7 +81,7 @@ const EventDetails = () => {
                 </span>
                 {event.isDiaryEvent && (
                   <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                    From Lawyer Diary
+                    From Client Management
                   </span>
                 )}
               </div>
