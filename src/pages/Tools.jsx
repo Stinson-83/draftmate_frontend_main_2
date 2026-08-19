@@ -1002,33 +1002,6 @@ const Tools = () => {
     // List of all tools for uniform dynamic grid representation
     const allTools = [
         {
-            id: 'create-draft',
-            icon: 'edit_document',
-            title: 'Create New Draft',
-            description: 'Start a new document with AI guidance or an empty workspace.',
-            onClick: () => handleDraftingClick(),
-            accentColor: '#3b82f6',
-            category: 'Drafting'
-        },
-        {
-            id: 'existing-doc',
-            icon: 'upload_file',
-            title: 'Work on Existing Document',
-            description: 'Upload a `.docx` or `.pdf` file and continue in the workspace.',
-            onClick: () => handleUploadClick(),
-            accentColor: '#6366f1',
-            category: 'Drafting'
-        },
-        {
-            id: 'review-draft',
-            icon: 'description',
-            title: 'Review Your Draft',
-            description: 'Review your previously created drafts.',
-            onClick: () => navigate('/dashboard/drafts'),
-            accentColor: '#f59e0b',
-            category: 'Drafting'
-        },
-        {
             id: 'pdf-toolkit',
             icon: 'book',
             title: 'PDF Tool kit',
@@ -1361,7 +1334,6 @@ const Tools = () => {
 
     const categories = [
         { id: 'All features', icon: 'grid_view', label: 'All features' },
-        { id: 'Drafting', icon: 'edit_document', label: 'Drafting' },
         { id: 'PDF Tools', icon: 'picture_as_pdf', label: 'PDF Tools' },
         { id: 'Research', icon: 'search', label: 'Research' },
         { id: 'Utilities', icon: 'construction', label: 'Utilities' },

@@ -434,6 +434,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     case_context: caseContext || prompt,
                     document_type: draftSummary?.basis?.documentType || 'Legal Document',
                     file_target_name: slugifyFileName(prompt || draftSummary?.basis?.documentType || 'AI Draft'),
+                    section: 'guided_intake',
                 }),
             });
 
@@ -632,6 +633,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                 formData.append('files', file);
             });
             formData.append('prompt', prompt);
+            formData.append('section', 'documents_with_ai');
 
             const response = await fetch(`${DRAFTER_API_URL}/v2/draft/compile_with_documents`, {
                 method: 'POST',
@@ -853,6 +855,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     ],
                     document_type: draftSummary?.basis?.documentType || 'Legal Document',
                     file_target_name: slugifyFileName(prompt || draftSummary?.basis?.documentType || 'AI Draft'),
+                    section: 'guided_intake',
                 }),
             });
 

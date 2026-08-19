@@ -141,9 +141,9 @@ async def create_translation_job(
     valid_targets = get_supported_target_language_codes(normalized_source_language)
 
     if normalized_source_language not in valid_sources:
-        raise HTTPException(status_code=400, detail="Unsupported source language for Sarvam AI")
+        raise HTTPException(status_code=400, detail="Unsupported source language for translation")
     if normalized_target_language not in valid_targets:
-        raise HTTPException(status_code=400, detail="Unsupported target language for Sarvam AI")
+        raise HTTPException(status_code=400, detail="Unsupported target language for translation")
 
     file_path = get_original_upload_path(file.filename)
     store_bytes_at_rest(file_path, contents)
@@ -362,15 +362,14 @@ def download_translated_file(job_id: int, request: Request, raw: str | None = Qu
     # Stylized, clean inline translation simulation block rendered to HTML frame canvas
     html_fallback = f"""
     <html>
-      <body style="font-family: system-ui, sans-serif; padding: 24px; color: #1e293b; background-color: #f0fdf4; line-height: 1.6;">
-        <h3 style="color: #14532d; margin-top: 0; border-bottom: 2px solid #bbf7d0; padding-bottom: 12px;">अनुवादित दस्तावेज़ — Translated Output</h3>
-        <p style="font-size: 14px; margin-bottom: 20px;"><strong>टारगेट भाषा (Target Language):</strong> <span style="background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:4px; font-weight:bold;">{job.target_language}</span></p>
-        <div style="background: white; border: 1px solid #bbf7d0; padding: 24px; border-radius: 8px; min-height: 300px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-          <span style="color: #16a34a; font-weight: bold; display: block; margin-bottom: 12px;">✓ सरवम एआई अनुवाद इंजन सक्रिय (Sarvam AI Pipeline Verified)</span>
-          <p>यह आपके कानूनी दस्तावेज़ का अनुवादित संस्करण है। सरवम एआई अनुवाद पाइपलाइन ने आपके दस्तावेज़ के लेआउट संरचना को बनाए रखते हुए पाठ का सफलतापूर्वक अनुवाद कर दिया है।</p>
+      <body style="font-family: system-ui, sans-serif; padding: 24px; color: #000000; background-color: #ffffff; line-height: 1.6;">
+        <h3 style="color: #000000; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px;">अनुवादित दस्तावेज़ — Translated Output</h3>
+        <p style="font-size: 14px; margin-bottom: 20px;"><strong>टारगेट भाषा (Target Language):</strong> <span style="background:#f1f5f9; color:#0f172a; padding:2px 6px; border-radius:4px; font-weight:bold;">{job.target_language}</span></p>
+        <div style="background: white; border: 1px solid #e2e8f0; padding: 24px; border-radius: 8px; min-height: 300px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #000000;">
+          <p>यह आपके कानूनी दस्तावेज़ का अनुवादित संस्करण है। अनुवाद इंजन ने आपके दस्तावेज़ के लेआउट संरचना को बनाए रखते हुए पाठ का सफलतापूर्वक अनुवाद कर दिया है।</p>
           <p>आप इस इंटरफ़ेस का उपयोग करके दोनों प्रतियों का एक साथ तुलनात्मक अध्ययन कर सकते हैं।</p>
-          <hr style="border:0; border-top: 1px dashed #bbf7d0; margin:20px 0;" />
-          <p style="font-size:12px; color:#166534;"><strong>सुरक्षित भंडारण फ़ाइल पथ संदर्भ:</strong><br/><code>{job.translated_file}</code></p>
+          <hr style="border:0; border-top: 1px dashed #e2e8f0; margin:20px 0;" />
+          <p style="font-size:12px; color:#64748b;"><strong>सुरक्षित भंडारण फ़ाइल पथ संदर्भ:</strong><br/><code>{job.translated_file}</code></p>
         </div>
       </body>
     </html>

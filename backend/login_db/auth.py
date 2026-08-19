@@ -1,7 +1,7 @@
 import os
 import uuid
 import psycopg2
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List, Dict
 from pydantic import BaseModel
@@ -1036,6 +1036,7 @@ class DraftRegister(BaseModel):
     created_by: str
     variables_detected: Optional[List[Any]] = []
     status: Optional[str] = "In progress"
+    section: Optional[str] = "unknown"
 
 class DraftShare(BaseModel):
     draft_id: str
@@ -1052,6 +1053,29 @@ class FolderRename(BaseModel):
 
 class FolderDelete(BaseModel):
     id: str
+
+# Helper to verify folder ownership
+def _verify_folder_owner(folder_id: str, user_id: str, cur):
+    cur.execute("SELECT user_id FROM folders WHERE id = %s", (folder_id,))
+    row = cur.fetchone()
+    if not row or str(row[0]) != str(user_id):
+        raise HTTPException(status_code=403, detail="Not authorized to access this folder")
+
+# Helper to verify draft ownership/access
+def _verify_draft_access(draft_id: str, user_id: str, cur, require_write=True):
+    cur.execute("""
+        SELECT access_level FROM draft_access 
+        WHERE draft_id = %s AND user_id = %s
+    """, (draft_id, user_id))
+    row = cur.fetchone()
+    if not row:
+        # Check if they created it
+        cur.execute("SELECT created_by FROM drafts WHERE id = %s", (draft_id,))
+        creator_row = cur.fetchone()
+        if creator_row and str(creator_row[0]) == str(user_id):
+            return "edit"
+        raise HTTPException(status_code=403, detail="No access to this draft")
+    return row[0]
 
 class DraftDelete(BaseModel):
     id: str
@@ -1086,14 +1110,15 @@ def register_draft(draft: DraftRegister):
         variables_json = json.dumps(draft.variables_detected or [])
         # Insert draft
         cur.execute("""
-            INSERT INTO drafts (id, name, filename, document_key, created_by, variables_detected, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO drafts (id, name, filename, document_key, created_by, variables_detected, status, section)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 filename = EXCLUDED.filename,
                 variables_detected = EXCLUDED.variables_detected,
+                section = EXCLUDED.section,
                 updated_at = CURRENT_TIMESTAMP
-        """, (draft.draft_id, draft.name, draft.filename, draft.document_key, draft.created_by, variables_json, draft.status))
+        """, (draft.draft_id, draft.name, draft.filename, draft.document_key, draft.created_by, variables_json, draft.status, draft.section or "unknown"))
         
         # Ensure creator has access
         cur.execute("""
@@ -1854,6 +1879,7 @@ class DraftRegister(BaseModel):
     created_by: str
     variables_detected: Optional[List[Any]] = []
     status: Optional[str] = "In progress"
+    section: Optional[str] = "unknown"
 
 
 @app.post("/internal/draft/register")
@@ -1864,14 +1890,15 @@ def register_draft(draft: DraftRegister):
         import json
         variables_json = json.dumps(draft.variables_detected or [])
         cur.execute("""
-            INSERT INTO drafts (id, name, filename, document_key, created_by, variables_detected, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO drafts (id, name, filename, document_key, created_by, variables_detected, status, section)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 filename = EXCLUDED.filename,
                 variables_detected = EXCLUDED.variables_detected,
+                section = EXCLUDED.section,
                 updated_at = CURRENT_TIMESTAMP
-        """, (draft.draft_id, draft.name, draft.filename, draft.document_key, draft.created_by, variables_json, draft.status))
+        """, (draft.draft_id, draft.name, draft.filename, draft.document_key, draft.created_by, variables_json, draft.status, draft.section or "unknown"))
         
         cur.execute("""
             INSERT INTO draft_access (draft_id, user_id, access_level)
@@ -1960,6 +1987,66 @@ def get_draft_internal(draft_id: str):
         raise he
     except Exception as e:
         print(f"Get draft internal error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/draft/analytics")
+def get_draft_analytics(user_id: Optional[str] = Query(None)):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Grouped counts by section
+        if user_id:
+            cur.execute("""
+                SELECT section, COUNT(*) 
+                FROM drafts 
+                WHERE created_by = %s 
+                GROUP BY section
+            """, (user_id,))
+        else:
+            cur.execute("""
+                SELECT section, COUNT(*) 
+                FROM drafts 
+                GROUP BY section
+            """)
+        summary_rows = cur.fetchall()
+        summary = {row[0]: row[1] for row in summary_rows}
+
+        # Log of generated documents
+        if user_id:
+            cur.execute("""
+                SELECT id, name, filename, created_by, section, created_at 
+                FROM drafts 
+                WHERE created_by = %s 
+                ORDER BY created_at DESC
+            """, (user_id,))
+        else:
+            cur.execute("""
+                SELECT id, name, filename, created_by, section, created_at 
+                FROM drafts 
+                ORDER BY created_at DESC
+            """)
+        log_rows = cur.fetchall()
+        logs = []
+        for r in log_rows:
+            logs.append({
+                "draft_id": str(r[0]),
+                "name": r[1],
+                "filename": r[2],
+                "user_id": str(r[3]),
+                "section": r[4],
+                "created_at": r[5].isoformat() if r[5] else None
+            })
+
+        return {
+            "summary": summary,
+            "logs": logs
+        }
+    except Exception as e:
+        print(f"Get draft analytics error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cur.close()

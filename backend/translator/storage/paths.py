@@ -21,6 +21,12 @@ def get_translated_upload_path(filename: str | None) -> Path:
 
 
 def get_storage_root() -> Path:
+    import os
+    shared_path = os.getenv("SHARED_STORAGE_PATH")
+    if shared_path and os.path.exists(shared_path):
+        translator_root = Path(shared_path) / "translator"
+        translator_root.mkdir(parents=True, exist_ok=True)
+        return translator_root
     return Path(__file__).resolve().parent
 
 

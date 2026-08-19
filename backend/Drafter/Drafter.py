@@ -1007,6 +1007,7 @@ class DraftCompileRequest(BaseModel):
     legal_documents: Optional[str] = None
     document_type: str = "Legal Document"
     file_target_name: str = "draftmate_draft.docx"
+    section: Optional[str] = "unknown"
 
 
 class ForceSaveRequest(BaseModel):
@@ -1664,7 +1665,8 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
                         "document_key": document_key,
                         "created_by": user_id,
                         "variables_detected": placeholders_list,
-                        "status": "In progress"
+                        "status": "In progress",
+                        "section": request.section or "unknown"
                     },
                     timeout=10.0
                 )
@@ -1730,6 +1732,7 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
 async def compile_with_documents(
     prompt: str = Form(...),
     files: List[UploadFile] = File(...),
+    section: str = Form("documents_with_ai"),
     authorization: Optional[str] = Header(default=None)
 ):
     try:
@@ -1830,7 +1833,8 @@ async def compile_with_documents(
                         "document_key": document_key,
                         "created_by": user_id,
                         "variables_detected": placeholders_list,
-                        "status": "In progress"
+                        "status": "In progress",
+                        "section": section
                     },
                     timeout=10.0
                 )
@@ -3431,6 +3435,26 @@ async def export_judge_report_pdf(request: Dict[str, Any], authorization: Option
         media_type="application/pdf",
         filename=f"Auditor_Report_{filename.split('.')[0]}.pdf"
     )
+
+
+@app.get("/v2/draft/analytics")
+async def get_draft_analytics(authorization: Optional[str] = Header(default=None)):
+    try:
+        user_id = await verify_token(authorization)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/analytics",
+                params={"user_id": user_id},
+                timeout=10.0
+            )
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch analytics from auth service")
+            return response.json()
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.exception("Failed to retrieve draft analytics.")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

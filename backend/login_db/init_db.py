@@ -117,6 +117,7 @@ def init_db():
             folder_id VARCHAR(50) REFERENCES folders(id) ON DELETE SET NULL,
             variables_detected JSONB DEFAULT '[]'::jsonb,
             status VARCHAR(50) DEFAULT 'In progress',
+            section VARCHAR(100) DEFAULT 'unknown',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -136,6 +137,14 @@ def init_db():
 
         conn.commit()
         print("✅ Tables created successfully.")
+
+        # Run database migrations
+        print("Running migrations...")
+        cur.execute("""
+        ALTER TABLE drafts ADD COLUMN IF NOT EXISTS section VARCHAR(100) DEFAULT 'unknown';
+        """)
+        conn.commit()
+        print("✅ Database migrations completed.")
 
         # Create profiles table
         cur.execute("""
