@@ -66,7 +66,7 @@ COPY src/data/bareacts/ src/data/bareacts/
 
 
 # Pre-download models if they are missing (e.g. for local development builds)
-RUN if [ ! -d "backend/models/embedding" ] || [ ! -d "backend/models/rerank" ]; then python backend/download_models.py; fi
+RUN if [ ! -f "backend/models/embedding/config.json" ] || [ ! -f "backend/models/rerank/config.json" ]; then python backend/download_models.py; fi
 
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf

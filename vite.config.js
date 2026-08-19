@@ -113,7 +113,10 @@ export default defineConfig(({ mode }) => {
           target: onlyofficeTarget,
           changeOrigin: true,
         }
-      }
+      },
+    },
+    build: {
+      chunkSizeWarningLimit: 8000,
     }
   }
 })

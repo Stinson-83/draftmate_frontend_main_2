@@ -80,7 +80,7 @@ export const formatInlineText = (text, sources = []) => {
   const bracketedUrlRegex = /\[([^\]]*?)(https?:\/\/[^\s\]]+|(?:www\.)?indiankanoon\.org\/[^\s\]]+)([^\]]*?)\]/gi;
   str = str.replace(bracketedUrlRegex, (match, prefix, rawUrl, suffix) => {
     const validUrl = cleanTargetUrl(rawUrl);
-    const labelText = (prefix + suffix).replace(/^[-:\s]+|[-:\s]+$/g, '').trim();
+    const labelText = (prefix + suffix).replace(new RegExp('^[' + '-:\\\\s' + ']+|[' + '-:\\\\s' + ']+$', 'g'), '').trim();
     const displayLabel = labelText ? `[${escapeHtml(labelText)} - ${validUrl}]` : `[${validUrl}]`;
     return addPlaceholder(`<a href="${validUrl}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">${displayLabel}</a>`);
   });

@@ -19,8 +19,15 @@ import boto3
 load_dotenv()
 
 # Load Model
-# Load Model
-EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+from pathlib import Path
+_models_dir = Path(__file__).parent.parent / "models"
+_local_embed = _models_dir / "embedding"
+
+if _local_embed.is_dir() and (_local_embed / "config.json").exists():
+    EMBEDDING_MODEL_NAME = str(_local_embed)
+else:
+    EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL") or "sentence-transformers/all-MiniLM-L6-v2"
+
 print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
 try:
     model = SentenceTransformer(EMBEDDING_MODEL_NAME)

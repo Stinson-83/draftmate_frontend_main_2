@@ -3,6 +3,7 @@ import { Check, FileText, Lock, Loader2, PenTool, Sparkles, Square, X, UploadClo
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
+import { api } from '../services/api';
 import PromptQualityBar from './PromptQualityBar';
 import './DraftingModal.css';
 
@@ -45,6 +46,30 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     const [isEditingSummary, setIsEditingSummary] = useState(false);
     const [editedSummary, setEditedSummary] = useState(INITIAL_SUMMARY);
     const fileInputRef = useRef(null);
+    const [isEnhancing, setIsEnhancing] = useState(false);
+
+    const handleEnhancePrompt = async () => {
+        if (!prompt.trim()) {
+            toast.error('Please write something first to enhance.');
+            return;
+        }
+
+        setIsEnhancing(true);
+        try {
+            const res = await api.enhancePrompt(prompt);
+            if (res.enhanced_prompt) {
+                setPrompt(res.enhanced_prompt);
+                toast.success('Prompt enhanced successfully!');
+            } else {
+                throw new Error('No enhanced prompt returned');
+            }
+        } catch (error) {
+            console.error('Enhance prompt error:', error);
+            toast.error('Failed to enhance prompt. Please try again.');
+        } finally {
+            setIsEnhancing(false);
+        }
+    };
 
     // Save active intake progress whenever key state updates
     useEffect(() => {
@@ -707,6 +732,43 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={4}
                 />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px', marginBottom: '12px' }}>
+                    <button
+                        type="button"
+                        className="btn-enhance"
+                        onClick={handleEnhancePrompt}
+                        disabled={isEnhancing || !prompt.trim()}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 14px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)',
+                            opacity: (!prompt.trim() || isEnhancing) ? 0.5 : 1,
+                            pointerEvents: (!prompt.trim() || isEnhancing) ? 'none' : 'auto'
+                        }}
+                    >
+                        {isEnhancing ? (
+                            <>
+                                <Loader2 className="animate-spin" size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                <span>Enhancing Prompt...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={14} />
+                                <span>Enhance Prompt</span>
+                            </>
+                        )}
+                    </button>
+                </div>
                 <PromptQualityBar prompt={prompt} />
             </div>
 
@@ -874,6 +936,43 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={6}
                 />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px', marginBottom: '12px' }}>
+                    <button
+                        type="button"
+                        className="btn-enhance"
+                        onClick={handleEnhancePrompt}
+                        disabled={isEnhancing || !prompt.trim()}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 14px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)',
+                            opacity: (!prompt.trim() || isEnhancing) ? 0.5 : 1,
+                            pointerEvents: (!prompt.trim() || isEnhancing) ? 'none' : 'auto'
+                        }}
+                    >
+                        {isEnhancing ? (
+                            <>
+                                <Loader2 className="animate-spin" size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                <span>Enhancing Prompt...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={14} />
+                                <span>Enhance Prompt</span>
+                            </>
+                        )}
+                    </button>
+                </div>
                 <PromptQualityBar prompt={prompt} />
             </div>
 

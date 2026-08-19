@@ -31,6 +31,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+import google.generativeai as genai
+if os.getenv("GEMINI_API_KEY"):
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices
 
 import sys
@@ -2435,6 +2438,999 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
         logger.exception("OnlyOffice callback processing failed.")
 
     return {"error": 0}
+
+
+# ── Chronology PDF Generation Helper ──────────────────────────────────
+
+def generate_chronology_pdf_file(case_name: str, events: list, output_path: str):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    import time
+    
+    doc = SimpleDocTemplate(output_path, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'TitleStyle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor('#1A2B4C'),
+        alignment=1, # Center
+        spaceAfter=12
+    )
+    
+    meta_style = ParagraphStyle(
+        'MetaStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#555555'),
+        alignment=1, # Center
+        spaceAfter=24
+    )
+    
+    cell_style = ParagraphStyle(
+        'CellStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        leading=12
+    )
+    
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=14,
+        textColor=colors.white,
+        fontName='Helvetica-Bold'
+    )
+    
+    story.append(Paragraph("CHRONOLOGY OF EVENTS", title_style))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"Matter: {case_name} | Prepared on: {time.strftime('%d %B %Y')}", meta_style))
+    story.append(Spacer(1, 15))
+    
+    # Table data
+    table_data = [[
+        Paragraph("Date", header_style),
+        Paragraph("Type", header_style),
+        Paragraph("Event Description", header_style),
+        Paragraph("Actors", header_style),
+        Paragraph("Source Citations", header_style)
+    ]]
+    
+    import html
+    for ev in events:
+        date_val = ev.get("event_date", "") or "—"
+        dtype = ev.get("date_type", "exact").capitalize()
+        actors_list = ev.get("actors", [])
+        actors_str = ", ".join(actors_list) if isinstance(actors_list, list) else str(actors_list)
+        desc = ev.get("event_description", "") or "—"
+        
+        # Citations formatting
+        c_list = ev.get("citations") or []
+        if not c_list:
+            doc_name = ev.get('source_document', '') or ''
+            cite_str = f"{html.escape(doc_name)} p.{ev.get('source_page', 1)}"
+        else:
+            cite_str = "; ".join(list(set([f"{html.escape(c.get('source_document', '') or '')} p.{c.get('source_page', 1)}" for c in c_list])))
+            
+        escaped_desc = html.escape(desc)
+        if ev.get("is_conflict"):
+            escaped_desc = f"<b>[CONFLICT]</b> {escaped_desc}"
+            
+        table_data.append([
+            Paragraph(html.escape(date_val), cell_style),
+            Paragraph(html.escape(dtype), cell_style),
+            Paragraph(escaped_desc, cell_style),
+            Paragraph(html.escape(actors_str), cell_style),
+            Paragraph(cite_str, cell_style)
+        ])
+        
+    t = Table(table_data, colWidths=[70, 60, 200, 90, 120])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1A2B4C')),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB')),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F9FAFB')])
+    ]))
+    story.append(t)
+    doc.build(story)
+
+
+# ── Chronology Router Endpoints ────────────────────────────────────────
+
+@app.post("/v2/chronology/case")
+async def create_chronology_case(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    case_name = request.get("name")
+    if not case_name:
+        raise HTTPException(status_code=400, detail="Case name is required")
+        
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case",
+            json={"name": case_name, "user_id": user_id},
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+@app.get("/v2/chronology/cases")
+async def list_chronology_cases(authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/cases/{user_id}",
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+@app.post("/v2/chronology/upload")
+async def upload_chronology_documents(
+    case_id: str = Form(...),
+    files: List[UploadFile] = File(...),
+    authorization: Optional[str] = Header(default=None)
+):
+    user_id = await verify_token(authorization)
+    
+    # Verify case ownership
+    async with httpx.AsyncClient() as client:
+        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
+        case_resp.raise_for_status()
+        case_data = case_resp.json()
+        if str(case_data.get("user_id")) != user_id:
+            raise HTTPException(status_code=403, detail="Unauthorized access to this case")
+            
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    upload_dir = os.path.join(shared_storage_path, "chronology", case_id)
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    registered_docs = []
+    
+    from chronology_engine import process_document_async
+    
+    for file in files:
+        file_name = os.path.basename(file.filename or "file")
+        file_bytes = await file.read()
+        file_size = len(file_bytes)
+        
+        # 1. Register doc metadata in postgres
+        async with httpx.AsyncClient() as client:
+            reg_resp = await client.post(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/document/register",
+                json={
+                    "case_id": case_id,
+                    "file_name": file_name,
+                    "file_size": file_size
+                },
+                timeout=10.0
+            )
+            reg_resp.raise_for_status()
+            doc_id = reg_resp.json().get("id")
+            
+        # 2. Write file to storage
+        target_path = os.path.join(upload_dir, f"{doc_id}_{file_name}")
+        with open(target_path, "wb") as f:
+            f.write(file_bytes)
+            
+        # 3. Trigger asynchronous background parsing & OCR
+        process_document_async(target_path, doc_id, AUTH_SERVICE_URL, upload_dir)
+        
+        registered_docs.append({
+            "id": doc_id,
+            "file_name": file_name,
+            "status": "processing"
+        })
+        
+    return {"documents": registered_docs}
+
+
+@app.get("/v2/chronology/case/{case_id}/status")
+async def get_case_processing_status(case_id: str, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/documents/{case_id}",
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        docs = resp.json().get("documents", [])
+        
+    if not docs:
+        return {"status": "empty", "progress": 100, "documents": []}
+        
+    # Check overall progress
+    total_pages = sum([d.get("total_pages", 0) for d in docs])
+    processed = sum([d.get("pages_processed", 0) for d in docs])
+    
+    overall_status = "done"
+    for d in docs:
+        if d.get("status") in ["pending", "processing"]:
+            overall_status = "processing"
+            break
+        elif d.get("status") == "failed":
+            overall_status = "failed"
+            
+    progress_percentage = 100
+    if total_pages > 0:
+        progress_percentage = int((processed / total_pages) * 100)
+        
+    return {
+        "status": overall_status,
+        "progress": progress_percentage,
+        "documents": docs
+    }
+
+
+@app.post("/v2/chronology/generate")
+async def generate_timeline_chronology(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    case_id = request.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=400, detail="case_id is required")
+        
+    # 1. Update case status to 'extracting'
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/status",
+            params={"case_id": case_id, "status": "extracting"},
+            timeout=10.0
+        )
+        
+        # 2. Get list of documents
+        doc_resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/documents/{case_id}",
+            timeout=10.0
+        )
+        doc_resp.raise_for_status()
+        docs = doc_resp.json().get("documents", [])
+        
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    upload_dir = os.path.join(shared_storage_path, "chronology", case_id)
+    
+    raw_events = []
+    
+    from chronology_engine import extract_events_from_page, run_chronology_engine
+    
+    # 3. Read cache files page-by-page and run AI event extraction
+    for doc in docs:
+        doc_id = doc.get("id")
+        doc_name = doc.get("file_name")
+        cache_path = os.path.join(upload_dir, f"{doc_id}_parsed.json")
+        
+        if os.path.exists(cache_path):
+            with open(cache_path, "r", encoding="utf-8") as f:
+                pages = json.load(f)
+                
+            for page in pages:
+                page_text = page.get("text", "")
+                page_num = page.get("page_number", 1)
+                
+                # Call LLM sequentially to extract events from each page
+                extracted = extract_events_from_page(page_text, page_num, doc_name)
+                raw_events.extend(extracted)
+                
+    # 4. Normalize and Deduplicate events
+    processed_events = run_chronology_engine(raw_events)
+    
+    # 5. Save results to Database
+    # Prepare payload
+    events_payload = []
+    for ev in processed_events:
+        events_payload.append({
+            "case_id": case_id,
+            "event_date": ev.get("event_date", ""),
+            "date_type": ev.get("date_type", "exact"),
+            "event_description": ev.get("event_description", ""),
+            "actors": ev.get("actors", []),
+            "source_document": ev.get("source_document", ""),
+            "source_page": ev.get("source_page", 1),
+            "source_text": ev.get("source_text", ""),
+            "confidence": float(ev.get("confidence", 1.0)),
+            "is_conflict": bool(ev.get("is_conflict", False)),
+            "conflict_details": ev.get("conflict_details", []),
+            "status": "pending"
+        })
+        
+    async with httpx.AsyncClient() as client:
+        # Save events
+        if events_payload:
+            save_resp = await client.post(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/register",
+                json=events_payload,
+                timeout=30.0
+            )
+            save_resp.raise_for_status()
+            
+        # Update case status to 'ready'
+        await client.post(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/status",
+            params={"case_id": case_id, "status": "ready"},
+            timeout=10.0
+        )
+        
+    return {"status": "ready", "events_extracted": len(events_payload)}
+
+
+@app.get("/v2/chronology/case/{case_id}/events")
+async def list_chronology_events(case_id: str, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}",
+            timeout=15.0
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+@app.put("/v2/chronology/events/{event_id}")
+async def update_chronology_event(
+    event_id: str,
+    request: Dict[str, Any],
+    authorization: Optional[str] = Header(default=None)
+):
+    await verify_token(authorization)
+    # Forward update to database
+    payload = dict(request)
+    payload["event_id"] = event_id
+    payload["user_modified"] = True
+    
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/event/update",
+            json=payload,
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+@app.get("/v2/chronology/document/{doc_id}/serve")
+async def serve_chronology_source_file(doc_id: str, case_id: str, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    
+    # Fetch document metadata
+    async with httpx.AsyncClient() as client:
+        docs_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/documents/{case_id}")
+        docs_resp.raise_for_status()
+        docs = docs_resp.json().get("documents", [])
+        
+    doc_meta = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc_meta:
+        raise HTTPException(status_code=404, detail="Document not found in case")
+        
+    file_name = doc_meta["file_name"]
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    file_path = os.path.join(shared_storage_path, "chronology", case_id, f"{doc_id}_{file_name}")
+    
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Physical file not found")
+        
+    # Guess mime type
+    import mimetypes
+    content_type, _ = mimetypes.guess_type(file_name)
+    if not content_type:
+        content_type = "application/octet-stream"
+        
+    return FileResponse(
+        path=file_path,
+        media_type=content_type,
+        filename=file_name
+    )
+
+
+@app.post("/v2/chronology/export")
+async def export_chronology_pdf_report(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    case_id = request.get("case_id")
+    if not case_id:
+        raise HTTPException(status_code=400, detail="case_id is required")
+        
+    async with httpx.AsyncClient() as client:
+        # Get Case name
+        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
+        case_resp.raise_for_status()
+        case_name = case_resp.json().get("name", "Timeline Matter")
+        
+        # Get events
+        events_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}")
+        events_resp.raise_for_status()
+        events = events_resp.json().get("events", [])
+        
+    # filter only accepted/pending events, skip rejected
+    filtered_events = [e for e in events if e.get("status") != "rejected"]
+    
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    os.makedirs(shared_storage_path, exist_ok=True)
+    pdf_path = os.path.join(shared_storage_path, f"chronology_{case_id}.pdf")
+    
+    # Generate the PDF file on disk
+    generate_chronology_pdf_file(case_name, filtered_events, pdf_path)
+    
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=f"{case_name.replace(' ', '_')}_chronology.pdf"
+    )
+
+
+@app.post("/v2/chronology/export_docx")
+async def export_chronology_docx_report(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    case_id = request.get("case_id")
+    sort_order = request.get("sort_order") or "asc"
+    
+    if not case_id:
+        raise HTTPException(status_code=400, detail="case_id is required")
+        
+    async with httpx.AsyncClient() as client:
+        # Get Case name
+        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
+        case_resp.raise_for_status()
+        case_name = case_resp.json().get("name", "Timeline Matter")
+        
+        # Get events
+        events_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}")
+        events_resp.raise_for_status()
+        events = events_resp.json().get("events", [])
+        
+    # filter only accepted/pending events, skip rejected
+    filtered_events = [e for e in events if e.get("status") != "rejected"]
+    
+    # 1. Check if a draft with the same filename already exists for this user (avoid duplicates)
+    file_name = f"{case_name.replace(' ', '_')}_Chronology.docx"
+    draft_id = None
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            find_resp = await client.get(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/find_by_filename",
+                params={"filename": file_name, "user_id": user_id},
+                timeout=10.0
+            )
+            if find_resp.status_code == 200:
+                find_data = find_resp.json()
+                draft_id = find_data.get("id")
+    except Exception as find_err:
+        logger.warning(f"Failed to check existing chronology draft: {find_err}")
+
+    if not draft_id:
+        import uuid
+        draft_id = str(uuid.uuid4())
+        
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    draft_dir = os.path.join(shared_storage_path, draft_id)
+    os.makedirs(draft_dir, exist_ok=True)
+    output_path = os.path.join(draft_dir, file_name)
+    
+    # 2. Build the DOCX file
+    import docx
+    from docx.shared import Inches, Pt
+    
+    doc = docx.Document()
+    
+    title_p = doc.add_paragraph()
+    run = title_p.add_run(f"Chronology of Events - {case_name}")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(14)
+    run.bold = True
+    title_p.paragraph_format.space_after = Pt(12)
+    
+    # Sort
+    def get_sort_key(ev):
+        val = ev.get("timestamp") or ev.get("date_normalized") or ev.get("event_date") or ""
+        return str(val)
+        
+    sorted_events = sorted(filtered_events, key=get_sort_key, reverse=(sort_order == "desc"))
+    
+    table = doc.add_table(rows=1, cols=4)
+    table.style = 'Table Grid'
+    
+    hdr_cells = table.rows[0].cells
+    headers = ["SL.no", "Date", "Particulars", "Page no"]
+    col_widths = [Inches(0.6), Inches(1.2), Inches(4.5), Inches(0.8)]
+    
+    for idx, name in enumerate(headers):
+        hdr_cells[idx].text = name
+        hdr_cells[idx].paragraphs[0].runs[0].font.name = 'Times New Roman'
+        hdr_cells[idx].paragraphs[0].runs[0].font.size = Pt(11)
+        hdr_cells[idx].paragraphs[0].runs[0].bold = True
+        
+    for sl_no, ev in enumerate(sorted_events, start=1):
+        row_cells = table.add_row().cells
+        
+        # Sl.no
+        row_cells[0].text = str(sl_no)
+        # Date
+        row_cells[1].text = str(ev.get("event_date") or ev.get("date") or "")
+        # Particulars
+        row_cells[2].text = str(ev.get("event_description") or ev.get("event") or "")
+        # Page no
+        c_list = ev.get("citations") or []
+        if not c_list:
+            doc_name = ev.get('source_document', '') or ''
+            page_no = str(ev.get('source_page', 1) or '')
+            cite_str = f"{doc_name} p.{page_no}" if doc_name else page_no
+        else:
+            cite_str = "; ".join(list(set([f"{c.get('source_document', '') or ''} p.{c.get('source_page', 1) or ''}" for c in c_list])))
+        row_cells[3].text = cite_str
+        
+        for idx, cell in enumerate(row_cells):
+            cell.width = col_widths[idx]
+            for p in cell.paragraphs:
+                for r in p.runs:
+                    r.font.name = 'Times New Roman'
+                    r.font.size = Pt(10.5)
+                    
+    doc.save(output_path)
+    
+    # 3. Read bytes to also replicate in uploads
+    with open(output_path, "rb") as f:
+        file_bytes = f.read()
+        
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+    os.makedirs(lex_bot_upload_dir, exist_ok=True)
+    lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
+    with open(lex_bot_path, "wb") as f:
+        f.write(file_bytes)
+        
+    # 4. Register in database
+    document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/register",
+                json={
+                    "draft_id": draft_id,
+                    "name": file_name,
+                    "filename": file_name,
+                    "document_key": document_key,
+                    "created_by": user_id,
+                    "variables_detected": [],
+                    "status": "In progress"
+                },
+                timeout=10.0
+            )
+    except Exception as reg_err:
+        logger.warning(f"Failed to register chronology draft: {reg_err}")
+        
+    return {
+        "id": draft_id,
+        "draftId": draft_id,
+        "filename": file_name,
+        "documentKey": document_key
+    }
+
+
+# ── ONLYOFFICE AI Redlining Router Endpoints ───────────────────────────
+
+REDLINE_AI_PROMPT = """
+You are an expert Legal Counsel and Document Editor.
+Your task is to revise the selected text based strictly on the user's instructions.
+
+GUIDELINES:
+1. ONLY modify the selected text. Do NOT modify or introduce any changes outside the selection bounds.
+2. Preserve defined terms and the legal intent unless explicitly asked to modify them.
+3. Keep the output clean. Do NOT include markdown code blocks or redline notation in the text response.
+4. Explain the change in a single concise sentence.
+5. Format your output strictly as a JSON object matching this schema:
+{
+  "revised_text": "Complete revised string",
+  "summary": "Short 1-sentence explanation of what changed"
+}
+"""
+
+@app.post("/v2/redline/propose")
+async def propose_redline(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    user_id = await verify_token(authorization)
+    draft_id = request.get("draft_id")
+    paragraph_id = request.get("paragraph_id")
+    selected_text = request.get("selected_text")
+    instruction = request.get("instruction")
+    
+    if not draft_id or not paragraph_id or not selected_text or not instruction:
+        raise HTTPException(status_code=400, detail="Missing required parameters")
+        
+    # Resolve draft_id to UUID if it's a documentKey hash
+    async with httpx.AsyncClient() as client:
+        resolve_resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/resolve_id/{draft_id}",
+            timeout=5.0
+        )
+        if resolve_resp.status_code == 200:
+            draft_id = resolve_resp.json().get("id")
+            
+    # Get optional context
+    doc_context = ""
+    try:
+        async with httpx.AsyncClient() as client:
+            draft_resp = await client.get(
+                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
+                timeout=5.0
+            )
+            if draft_resp.status_code == 200:
+                draft_data = draft_resp.json()
+                doc_context = f"Document Type: {draft_data.get('name', 'Contract')}\n"
+    except Exception as exc:
+        logger.warning(f"Failed to fetch draft context: {exc}")
+
+    # Call Gemini model
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=REDLINE_AI_PROMPT,
+            generation_config=genai.GenerationConfig(
+                temperature=0.1,
+                response_mime_type="application/json",
+                max_output_tokens=1024
+            )
+        )
+        prompt_content = f"{doc_context}SELECTED TEXT:\n\"{selected_text}\"\n\nINSTRUCTION:\n{instruction}"
+        response = model.generate_content(prompt_content)
+        
+        raw_text = response.text.strip()
+        payload = json.loads(raw_text)
+        revised_text = payload.get("revised_text", "").strip()
+        summary = payload.get("summary", "AI Redline Suggestion").strip()
+    except Exception as e:
+        logger.error(f"Redline LLM failed: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Redline generation failed: {str(e)}")
+
+    # Register proposed change in auth DB
+    async with httpx.AsyncClient() as client:
+        reg_resp = await client.post(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/redline/change/register",
+            json={
+                "draft_id": draft_id,
+                "paragraph_id": paragraph_id,
+                "original_text": selected_text,
+                "new_text": revised_text,
+                "summary": summary
+            },
+            timeout=10.0
+        )
+        reg_resp.raise_for_status()
+        change_id = reg_resp.json().get("id")
+
+    # Generate sequence diff
+    import difflib
+    matcher = difflib.SequenceMatcher(None, selected_text, revised_text)
+    opcodes = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        opcodes.append({
+            "op": tag,
+            "orig_start": i1,
+            "orig_end": i2,
+            "rev_start": j1,
+            "rev_end": j2,
+            "orig_chunk": selected_text[i1:i2],
+            "rev_chunk": revised_text[j1:j2]
+        })
+
+    return {
+        "change_id": change_id,
+        "revised_text": revised_text,
+        "summary": summary,
+        "opcodes": opcodes
+    }
+
+
+@app.get("/v2/redline/changes/{draft_id}")
+async def list_redline_changes(draft_id: str, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    async with httpx.AsyncClient() as client:
+        # Resolve draft_id to UUID if it's a documentKey hash
+        resolve_resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/resolve_id/{draft_id}",
+            timeout=5.0
+        )
+        if resolve_resp.status_code == 200:
+            draft_id = resolve_resp.json().get("id")
+
+        resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/redline/changes/{draft_id}",
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+@app.put("/v2/redline/changes/{change_id}")
+async def update_redline_change_status(
+    change_id: str,
+    request: Dict[str, Any],
+    authorization: Optional[str] = Header(default=None)
+):
+    await verify_token(authorization)
+    status = request.get("status")
+    if not status:
+        raise HTTPException(status_code=400, detail="status is required")
+        
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/redline/change/status",
+            json={"change_id": change_id, "status": status},
+            timeout=10.0
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+# ── AI Legal Draft Judge Router Endpoints ──────────────────────────────
+
+JUDGE_AI_PROMPT = """
+You are a senior Judge and experienced Legal Auditor.
+Evaluate the provided legal draft text based on standard litigation and transactional drafting criteria:
+- Structure & Logical Organization
+- Consistency & Clarity
+- Legal Reasoning & Argument Development
+- Supporting References & Citations
+- Repetition & Ambiguity
+- Vulnerability to Opposing Arguments
+
+Provide your analysis strictly in JSON format matching this schema:
+{
+  "overall_score": 84,
+  "grade": "Strong Draft",
+  "categories": {
+    "structure": 91,
+    "reasoning": 78,
+    "consistency": 86,
+    "support": 74,
+    "clarity": 92,
+    "persuasiveness": 81
+  },
+  "strengths": ["Clear organization", "Strong logic"],
+  "weaknesses": ["Counterargument needs details"],
+  "critical_issues": ["Conflicting dates"],
+  "suggestions": ["Verify the termination clause"],
+  "opposing_questions": ["What is the backing for the damages amount?"]
+}
+
+IMPORTANT:
+1. You MUST escape any double quotes inside JSON string values as \\" (e.g. \\"Force Majeure\\") to ensure that the output is syntactically valid JSON.
+2. Never output raw unescaped double quotes inside text fields.
+3. Output only the pure JSON structure, without any markdown code block wrapper (no ```json).
+"""
+
+@app.post("/v2/draft/judge")
+async def judge_draft(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    import os
+    user_id = await verify_token(authorization)
+    draft_id = request.get("draft_id")
+    if not draft_id:
+        raise HTTPException(status_code=400, detail="draft_id is required")
+        
+    # 1. Resolve draft_id to UUID if it's a documentKey hash
+    async with httpx.AsyncClient() as client:
+        resolve_resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/resolve_id/{draft_id}",
+            timeout=5.0
+        )
+        if resolve_resp.status_code == 200:
+            draft_id = resolve_resp.json().get("id")
+            
+        # 2. Get draft metadata
+        draft_resp = await client.get(
+            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
+            timeout=5.0
+        )
+        draft_resp.raise_for_status()
+        draft_data = draft_resp.json()
+        filename = draft_data.get("filename")
+        
+    if not filename:
+        raise HTTPException(status_code=404, detail="Filename not found for draft")
+        
+    # 3. Locate and parse docx file from shared storage
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    file_path = os.path.join(shared_storage_path, draft_id, filename)
+    
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Draft document file not found. Please edit/save draft in OnlyOffice first.")
+        
+    # Parse docx paragraphs
+    try:
+        import docx
+        doc = docx.Document(file_path)
+        full_text = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                full_text.append(para.text.strip())
+        document_text = "\n".join(full_text)
+    except Exception as parse_err:
+        logger.error(f"Docx parsing failed: {parse_err}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse document text: {str(parse_err)}")
+        
+    if not document_text.strip():
+        raise HTTPException(status_code=400, detail="The document appears to be empty. Add some text first.")
+
+    # 4. Invoke LLM for judgment
+    try:
+        import google.generativeai as genai
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=JUDGE_AI_PROMPT,
+            generation_config=genai.GenerationConfig(
+                temperature=0.1,
+                response_mime_type="application/json",
+                max_output_tokens=8192
+            )
+        )
+        prompt_content = f"LEGAL DRAFT FILENAME: {filename}\n\nCONTENT:\n{document_text}"
+        response = model.generate_content(prompt_content)
+        
+        raw_text = response.text.strip()
+        if raw_text.startswith("```"):
+            lines = raw_text.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines[-1].startswith("```"):
+                lines = lines[:-1]
+            raw_text = "\n".join(lines).strip()
+            
+        try:
+            payload = json.loads(raw_text)
+        except Exception as json_err:
+            logger.warning(f"Standard JSON decode failed: {json_err}. Trying ast.literal_eval fallback.")
+            try:
+                import ast
+                payload = ast.literal_eval(raw_text)
+                if not isinstance(payload, dict):
+                    raise ValueError("Parsed object is not a dictionary")
+            except Exception as ast_err:
+                logger.error(f"Both JSON and AST parsing failed. Raw response: {raw_text}")
+                raise json_err
+            
+        payload["filename"] = filename
+        return payload
+    except Exception as e:
+        logger.error(f"Draft Judge LLM failed: {e}")
+        raise HTTPException(status_code=500, detail=f"AI Draft Auditor failed: {str(e)}")
+
+
+@app.post("/v2/draft/judge/export")
+async def export_judge_report_pdf(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
+    filename = request.get("filename") or "document.docx"
+    score = request.get("overall_score", 0)
+    grade = request.get("grade") or "Draft"
+    categories = request.get("categories", {})
+    strengths = request.get("strengths", []) or []
+    weaknesses = request.get("weaknesses", []) or []
+    critical_issues = request.get("critical_issues", []) or []
+    suggestions = request.get("suggestions", []) or []
+    opposing_questions = request.get("opposing_questions", []) or []
+    
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
+    os.makedirs(shared_storage_path, exist_ok=True)
+    import time
+    pdf_path = os.path.join(shared_storage_path, f"judge_report_{int(time.time())}.pdf")
+    
+    import html
+    
+    # Compile ReportLab PDF
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'Title', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1E293B'), alignment=1, spaceAfter=8
+    )
+    meta_style = ParagraphStyle(
+        'Meta', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#64748B'), alignment=1, spaceAfter=18
+    )
+    section_title = ParagraphStyle(
+        'SecTitle', parent=styles['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#1E3A8A'), spaceBefore=14, spaceAfter=6
+    )
+    cell_style = ParagraphStyle(
+        'Cell', parent=styles['Normal'], fontSize=9, leading=12
+    )
+    body_style = ParagraphStyle(
+        'Body', parent=styles['Normal'], fontSize=9, leading=13, spaceAfter=4
+    )
+    
+    story.append(Paragraph("AI LEGAL DRAFT REVIEW", title_style))
+    story.append(Paragraph(f"Document: {html.escape(filename)} | Date: {time.strftime('%Y-%m-%d')}", meta_style))
+    
+    # Score banner
+    score_data = [[
+        Paragraph(f"<b>Overall Score: {score} / 100</b>", ParagraphStyle('Score', parent=title_style, textColor=colors.white)),
+        Paragraph(f"<b>Assessment: {html.escape(grade).upper()}</b>", ParagraphStyle('Grade', parent=title_style, textColor=colors.white))
+    ]]
+    score_table = Table(score_data, colWidths=[270, 270])
+    score_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1E3A8A')),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 10),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
+    ]))
+    story.append(score_table)
+    story.append(Spacer(1, 15))
+    
+    # Category scorecard
+    story.append(Paragraph("SCORECARD", section_title))
+    scorecard_data = [
+        [Paragraph("<b>Category</b>", cell_style), Paragraph("<b>Score</b>", cell_style)],
+        [Paragraph("Structure & Organization", cell_style), Paragraph(str(categories.get("structure", 0)), cell_style)],
+        [Paragraph("Consistency & Clarity", cell_style), Paragraph(str(categories.get("consistency", 0)), cell_style)],
+        [Paragraph("Legal Reasoning", cell_style), Paragraph(str(categories.get("reasoning", 0)), cell_style)],
+        [Paragraph("Supporting References", cell_style), Paragraph(str(categories.get("support", 0)), cell_style)],
+        [Paragraph("Clarity", cell_style), Paragraph(str(categories.get("clarity", 0)), cell_style)],
+        [Paragraph("Persuasiveness", cell_style), Paragraph(str(categories.get("persuasiveness", 0)), cell_style)],
+    ]
+    card_table = Table(scorecard_data, colWidths=[300, 240])
+    card_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+        ('PADDING', (0,0), (-1,-1), 4),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F8FAFC')])
+    ]))
+    story.append(card_table)
+    story.append(Spacer(1, 10))
+    
+    # Strengths
+    if strengths:
+        story.append(Paragraph("✓ STRENGTHS", section_title))
+        for s in strengths:
+            story.append(Paragraph(f"• {html.escape(s)}", body_style))
+            
+    # Weaknesses
+    if weaknesses:
+        story.append(Paragraph("⚠ WEAKNESSES", section_title))
+        for w in weaknesses:
+            story.append(Paragraph(f"• {html.escape(w)}", body_style))
+            
+    # Critical Issues
+    if critical_issues:
+        story.append(Paragraph("🔴 CRITICAL ISSUES", section_title))
+        for ci in critical_issues:
+            story.append(Paragraph(f"• {html.escape(ci)}", body_style))
+            
+    # Suggestions
+    if suggestions:
+        story.append(Paragraph("💡 SUGGESTIONS", section_title))
+        for sug in suggestions:
+            story.append(Paragraph(f"• {html.escape(sug)}", body_style))
+            
+    # Questions
+    if opposing_questions:
+        story.append(Paragraph("❓ QUESTIONS TO CONSIDER", section_title))
+        for q in opposing_questions:
+            story.append(Paragraph(f"• {html.escape(q)}", body_style))
+            
+    doc.build(story)
+    
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=f"Auditor_Report_{filename.split('.')[0]}.pdf"
+    )
 
 
 if __name__ == "__main__":

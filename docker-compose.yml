@@ -190,7 +190,6 @@ services:
       start_period: 120s
     volumes:
       - ./backend:/app/backend
-      - /app/backend/models
       - ./src/data/bareacts:/app/src/data/bareacts
       - ./shared_drafts:/app/shared_drafts
       - onlyoffice_cache:/onlyoffice_cache

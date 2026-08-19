@@ -331,9 +331,15 @@ class ChatStore:
         
         try:
             with self.SessionLocal() as session:
+                # Subquery to find session IDs that contain automated inline-AI instructions
+                direct_edit_subquery = session.query(ChatMessage.session_id).filter(
+                    ChatMessage.content.like("[DIRECT EDIT%")
+                ).distinct().subquery()
+
                 # Try to get from ChatSession table first
                 sessions = session.query(ChatSession).filter(
-                    ChatSession.user_id == user_id
+                    ChatSession.user_id == user_id,
+                    ChatSession.session_id.not_in(direct_edit_subquery)
                 ).order_by(ChatSession.created_at.desc()).limit(limit).all()
                 
                 if sessions:
@@ -348,7 +354,8 @@ class ChatStore:
                 
                 # Fallback to old method if no ChatSession records
                 results = session.query(ChatMessage.session_id).filter(
-                    ChatMessage.user_id == user_id
+                    ChatMessage.user_id == user_id,
+                    ChatMessage.session_id.not_in(direct_edit_subquery)
                 ).distinct().limit(limit).all()
                 return [{"session_id": r[0], "title": None, "created_at": None} for r in results]
         except Exception as e:

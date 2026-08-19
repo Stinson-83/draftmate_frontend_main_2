@@ -3,7 +3,7 @@ import uuid
 import psycopg2
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import Optional, List, Dict
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import bcrypt
@@ -178,6 +178,30 @@ def get_db_connection():
         db_path = os.path.join(os.path.dirname(__file__), "auth_fallback.db")
         return SQLitePooledConnectionProxy(db_path)
 
+def resolve_uuid_from_identifier(identifier: str, cur) -> Optional[str]:
+    import uuid
+    import hashlib
+    try:
+        uuid.UUID(identifier)
+        return identifier
+    except ValueError:
+        pass
+
+    cur.execute("SELECT id FROM drafts WHERE document_key = %s", (identifier,))
+    res = cur.fetchone()
+    if res:
+        return str(res[0])
+
+    cur.execute("SELECT id FROM drafts;")
+    all_drafts = cur.fetchall()
+    for d in all_drafts:
+        d_id_str = str(d[0])
+        d_hash = hashlib.sha256(d_id_str.encode('utf-8')).hexdigest()
+        if d_hash == identifier:
+            return d_id_str
+            
+    return None
+
 # Pydantic Models
 class UserLogin(BaseModel):
     email: str
@@ -211,6 +235,61 @@ class ProfileUpdate(BaseModel):
     workplace: Optional[str] = None
     bio: Optional[str] = None
     image: Optional[str] = None
+
+class ChronologyCaseCreate(BaseModel):
+    name: str
+    user_id: str
+
+class ChronologyDocumentRegister(BaseModel):
+    case_id: str
+    file_name: str
+    file_size: int
+
+class ChronologyDocumentUpdate(BaseModel):
+    doc_id: str
+    status: str
+    pages_processed: int
+    total_pages: int
+
+class ChronologyEventRegister(BaseModel):
+    case_id: str
+    event_date: str
+    date_type: str
+    event_description: str
+    actors: List[str]
+    source_document: str
+    source_page: int
+    source_text: str
+    confidence: float
+    is_conflict: bool
+    conflict_details: List[dict]
+    status: Optional[str] = "pending"
+
+class ChronologyEventUpdate(BaseModel):
+    event_id: str
+    event_date: Optional[str] = None
+    date_type: Optional[str] = None
+    event_description: Optional[str] = None
+    actors: Optional[List[str]] = None
+    source_document: Optional[str] = None
+    source_page: Optional[int] = None
+    source_text: Optional[str] = None
+    confidence: Optional[float] = None
+    is_conflict: Optional[bool] = None
+    conflict_details: Optional[List[dict]] = None
+    status: Optional[str] = None
+    user_modified: Optional[bool] = True
+
+class RedlineChangeRegister(BaseModel):
+    draft_id: str
+    paragraph_id: str
+    original_text: str
+    new_text: str
+    summary: str
+
+class RedlineChangeStatusUpdate(BaseModel):
+    change_id: str
+    status: str
 
 def get_profile_internal(cur, user_id):
     try:
@@ -311,6 +390,61 @@ def ensure_auth_schema():
             """)
         except Exception:
             pass
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chronology_cases (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(255) NOT NULL,
+                status VARCHAR(50) DEFAULT 'uploading',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chronology_documents (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                case_id UUID REFERENCES chronology_cases(id) ON DELETE CASCADE,
+                file_name VARCHAR(255) NOT NULL,
+                file_size INTEGER DEFAULT 0,
+                status VARCHAR(50) DEFAULT 'pending',
+                pages_processed INTEGER DEFAULT 0,
+                total_pages INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS chronology_events (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                case_id UUID REFERENCES chronology_cases(id) ON DELETE CASCADE,
+                event_date VARCHAR(50),
+                date_type VARCHAR(50) DEFAULT 'exact',
+                event_description TEXT NOT NULL,
+                actors JSONB DEFAULT '[]'::jsonb,
+                source_document VARCHAR(255),
+                source_page INTEGER DEFAULT 1,
+                source_text TEXT,
+                confidence REAL DEFAULT 1.0,
+                is_conflict BOOLEAN DEFAULT FALSE,
+                conflict_details JSONB DEFAULT '[]'::jsonb,
+                status VARCHAR(50) DEFAULT 'pending',
+                user_modified BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS redline_changes (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                draft_id UUID NOT NULL REFERENCES drafts(id) ON DELETE CASCADE,
+                paragraph_id VARCHAR(100) NOT NULL,
+                original_text TEXT,
+                new_text TEXT,
+                summary TEXT,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
         conn.commit()
         cur.close()
@@ -1002,6 +1136,10 @@ def verify_draft_access(draft_id: str, user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
+        resolved_id = resolve_uuid_from_identifier(draft_id, cur)
+        if resolved_id:
+            draft_id = resolved_id
+
         # Check if user is owner
         cur.execute("SELECT created_by FROM drafts WHERE id::text = %s OR document_key = %s", (draft_id, draft_id))
         res = cur.fetchone()
@@ -1031,7 +1169,11 @@ def get_draft_internal(draft_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, name, filename, document_key, created_by, folder_id, variables_detected, status FROM drafts WHERE id::text = %s OR document_key = %s", (draft_id, draft_id))
+        resolved_id = resolve_uuid_from_identifier(draft_id, cur)
+        if resolved_id:
+            draft_id = resolved_id
+
+        cur.execute("SELECT id, name, filename, document_key, created_by, folder_id, variables_detected, status FROM drafts WHERE id = %s", (draft_id,))
         r = cur.fetchone()
         if not r:
             raise HTTPException(status_code=404, detail="Draft not found")
@@ -1303,6 +1445,398 @@ def update_draft(draft: DraftUpdate, user_id: str = Depends(get_user_id_from_hea
         conn.rollback()
         print(f"Update draft error: {e}")
         raise HTTPException(status_code=500, detail="Failed to update draft")
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/chronology/case")
+def internal_create_case(case: ChronologyCaseCreate):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO chronology_cases (name, user_id) VALUES (%s, %s) RETURNING id",
+            (case.name, case.user_id)
+        )
+        case_id = cur.fetchone()[0]
+        conn.commit()
+        return {"id": str(case_id)}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal create case error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/chronology/case/{case_id}")
+def internal_get_case(case_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, name, status, created_at, user_id FROM chronology_cases WHERE id = %s", (case_id,))
+        r = cur.fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Case not found")
+        return {
+            "id": str(r[0]),
+            "name": r[1],
+            "status": r[2],
+            "created_at": r[3].isoformat() if r[3] else None,
+            "user_id": str(r[4])
+        }
+    except Exception as e:
+        print(f"Internal get case error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/chronology/case/status")
+def internal_update_case_status(case_id: str, status: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE chronology_cases SET status = %s WHERE id = %s", (status, case_id))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal update case status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/chronology/cases/{user_id}")
+def internal_list_cases(user_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, name, status, created_at FROM chronology_cases WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
+        res = cur.fetchall()
+        cases = []
+        for r in res:
+            cases.append({
+                "id": str(r[0]),
+                "name": r[1],
+                "status": r[2],
+                "created_at": r[3].isoformat() if r[3] else None
+            })
+        return {"cases": cases}
+    except Exception as e:
+        print(f"Internal list cases error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/chronology/document/register")
+def internal_register_document(doc: ChronologyDocumentRegister):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO chronology_documents (case_id, file_name, file_size) VALUES (%s, %s, %s) RETURNING id",
+            (doc.case_id, doc.file_name, doc.file_size)
+        )
+        doc_id = cur.fetchone()[0]
+        conn.commit()
+        return {"id": str(doc_id)}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal register doc error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/chronology/document/update")
+def internal_update_document(doc: ChronologyDocumentUpdate):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE chronology_documents SET status = %s, pages_processed = %s, total_pages = %s WHERE id = %s",
+            (doc.status, doc.pages_processed, doc.total_pages, doc.doc_id)
+        )
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal update doc error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/chronology/documents/{case_id}")
+def internal_list_documents(case_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT id, file_name, file_size, status, pages_processed, total_pages, created_at FROM chronology_documents WHERE case_id = %s ORDER BY created_at ASC",
+            (case_id,)
+        )
+        res = cur.fetchall()
+        docs = []
+        for r in res:
+            docs.append({
+                "id": str(r[0]),
+                "file_name": r[1],
+                "file_size": r[2],
+                "status": r[3],
+                "pages_processed": r[4],
+                "total_pages": r[5],
+                "created_at": r[6].isoformat() if r[6] else None
+            })
+        return {"documents": docs}
+    except Exception as e:
+        print(f"Internal list docs error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/chronology/events/register")
+def internal_register_events(events: List[ChronologyEventRegister]):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        import json
+        for event in events:
+            actors_json = json.dumps(event.actors)
+            conflict_json = json.dumps(event.conflict_details)
+            cur.execute("""
+                INSERT INTO chronology_events (case_id, event_date, date_type, event_description, actors, source_document, source_page, source_text, confidence, is_conflict, conflict_details, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (event.case_id, event.event_date, event.date_type, event.event_description, actors_json, event.source_document, event.source_page, event.source_text, event.confidence, event.is_conflict, conflict_json, event.status))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal register events error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/chronology/events/{case_id}")
+def internal_list_events(case_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Regex sorting fallback for SQLite vs Postgres
+        cur.execute("""
+            SELECT id, event_date, date_type, event_description, actors, source_document, source_page, source_text, confidence, is_conflict, conflict_details, status, user_modified 
+            FROM chronology_events 
+            WHERE case_id = %s 
+            ORDER BY 
+              CASE WHEN event_date LIKE '____-__-__' THEN event_date ELSE '9999-99-99' END ASC, 
+              created_at ASC
+        """, (case_id,))
+        res = cur.fetchall()
+        events = []
+        for r in res:
+            events.append({
+                "id": str(r[0]),
+                "event_date": r[1],
+                "date_type": r[2],
+                "event_description": r[3],
+                "actors": r[4] if r[4] is not None else [],
+                "source_document": r[5],
+                "source_page": r[6],
+                "source_text": r[7],
+                "confidence": r[8],
+                "is_conflict": r[9],
+                "conflict_details": r[10] if r[10] is not None else [],
+                "status": r[11],
+                "user_modified": r[12]
+            })
+        return {"events": events}
+    except Exception as e:
+        print(f"Internal list events error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/chronology/event/update")
+def internal_update_event(event: ChronologyEventUpdate):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        import json
+        updates = []
+        params = []
+        
+        if event.event_date is not None:
+            updates.append("event_date = %s")
+            params.append(event.event_date)
+        if event.date_type is not None:
+            updates.append("date_type = %s")
+            params.append(event.date_type)
+        if event.event_description is not None:
+            updates.append("event_description = %s")
+            params.append(event.event_description)
+        if event.actors is not None:
+            updates.append("actors = %s")
+            params.append(json.dumps(event.actors))
+        if event.source_document is not None:
+            updates.append("source_document = %s")
+            params.append(event.source_document)
+        if event.source_page is not None:
+            updates.append("source_page = %s")
+            params.append(event.source_page)
+        if event.source_text is not None:
+            updates.append("source_text = %s")
+            params.append(event.source_text)
+        if event.confidence is not None:
+            updates.append("confidence = %s")
+            params.append(event.confidence)
+        if event.is_conflict is not None:
+            updates.append("is_conflict = %s")
+            params.append(event.is_conflict)
+        if event.conflict_details is not None:
+            updates.append("conflict_details = %s")
+            params.append(json.dumps(event.conflict_details))
+        if event.status is not None:
+            updates.append("status = %s")
+            params.append(event.status)
+            
+        updates.append("user_modified = %s")
+        params.append(event.user_modified)
+        
+        if updates:
+            query = f"UPDATE chronology_events SET {', '.join(updates)} WHERE id = %s"
+            params.append(event.event_id)
+            cur.execute(query, tuple(params))
+            conn.commit()
+            
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal update event error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/draft/resolve_id/{identifier}")
+def internal_resolve_draft_id(identifier: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        resolved_id = resolve_uuid_from_identifier(identifier, cur)
+        if resolved_id:
+            return {"id": resolved_id}
+        raise HTTPException(status_code=404, detail="Draft not found by key")
+    except Exception as e:
+        print(f"Resolve draft ID error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/draft/find_by_filename")
+def internal_find_draft_by_filename(filename: str, user_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, document_key FROM drafts WHERE filename = %s AND created_by = %s LIMIT 1", (filename, user_id))
+        row = cur.fetchone()
+        if row:
+            return {"id": str(row[0]), "document_key": row[1]}
+        return {"id": None}
+    except Exception as e:
+        print(f"Find draft by filename error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+@app.post("/internal/redline/change/register")
+def internal_register_redline_change(change: RedlineChangeRegister):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO redline_changes (draft_id, paragraph_id, original_text, new_text, summary)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (change.draft_id, change.paragraph_id, change.original_text, change.new_text, change.summary))
+        change_id = cur.fetchone()[0]
+        conn.commit()
+        return {"id": str(change_id)}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal register redline error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.post("/internal/redline/change/status")
+def internal_update_redline_status(update: RedlineChangeStatusUpdate):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE redline_changes SET status = %s WHERE id = %s", (update.status, update.change_id))
+        conn.commit()
+        return {"ok": True}
+    except Exception as e:
+        conn.rollback()
+        print(f"Internal update redline status error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/internal/redline/changes/{draft_id}")
+def internal_list_redline_changes(draft_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, draft_id, paragraph_id, original_text, new_text, summary, status, created_at 
+            FROM redline_changes 
+            WHERE draft_id = %s 
+            ORDER BY created_at ASC
+        """, (draft_id,))
+        res = cur.fetchall()
+        changes = []
+        for r in res:
+            changes.append({
+                "id": str(r[0]),
+                "draft_id": str(r[1]),
+                "paragraph_id": r[2],
+                "original_text": r[3],
+                "new_text": r[4],
+                "summary": r[5],
+                "status": r[6],
+                "created_at": r[7].isoformat() if r[7] else None
+            })
+        return {"changes": changes}
+    except Exception as e:
+        print(f"Internal list redlines error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         cur.close()
         conn.close()

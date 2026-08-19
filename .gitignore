@@ -69,3 +69,6 @@ loadtest/clean-task-def.json
 loadtest/check_db_tables.py
 loadtest/trivy-report.html
 loadtest/__pycache__/
+
+# Local cached AI models (never commit heavy binaries to Git)
+backend/models/

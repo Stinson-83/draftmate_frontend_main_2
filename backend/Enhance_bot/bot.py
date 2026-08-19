@@ -695,6 +695,45 @@ def create_placeholders(html_content: str) -> str:
 #     web_context, _ = web_search_tool.run(search_query)
 #     return web_context
 
+def enhance_prompt(prompt: str) -> str:
+    """
+    Enhance a brief, raw user drafting prompt into a detailed, structured,
+    professional legal prompt.
+    """
+    if not GEMINI_API_KEY:
+        return f"{prompt} (Enhanced with mock system details, factual chronology, and relevant legal provisions)"
+
+    system_instruction = """You are an expert Senior Legal Architect.
+Your task is to take a brief, raw user prompt/idea for drafting a legal document and expand/enhance it into a highly detailed, professional, structured prompt suitable for an AI drafting engine.
+
+STRICT GUIDELINES:
+1. **Analyze the request**: Identify the type of document (e.g. legal notice, bail application, contract, writ petition).
+2. **Expand the requirements**: Add details that a professional lawyer would include (e.g., standard legal clauses, specific facts that need placeholders, statutory provisions of Indian law, jurisdiction considerations).
+3. **Structure the prompt**: Break down the enhanced instructions logically (e.g., Facts/Background, Legal Grounds, Specific Reliefs, Formatting Guidelines).
+4. **Tone**: Keep it highly professional, precise, and actionable for a document generation LLM.
+5. **Output**: Return ONLY the enhanced prompt. Do NOT explain your changes. Do NOT wrap output in markdown code blocks. Just output the enhanced text directly.
+"""
+
+    contents = f"Raw user prompt: {prompt}"
+
+    try:
+        model = genai.GenerativeModel(
+            model_name=LLM_MODEL,
+            system_instruction=system_instruction
+        )
+        response = model.generate_content(
+            contents=[contents],
+            generation_config={
+                "temperature": 0.3,
+                "max_output_tokens": 4096
+            },
+            request_options={"timeout": 30}
+        )
+        return response.text.strip()
+    except Exception as e:
+        logger.error(f"enhance_prompt error: {e}")
+        return f"{prompt}\n\n[Failed to automatically enhance: {e}]"
+
 # --- EXAMPLE USAGE ---
 if __name__ == "__main__":
     selected_text= "That the Applicant was arrested on [Date of arrest] and has been in judicial custody since [Date when judicial custody began]. The Applicant is currently"

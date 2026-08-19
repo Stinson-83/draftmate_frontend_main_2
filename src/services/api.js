@@ -228,6 +228,27 @@ export const api = {
         return response.json();
     },
 
+    /**
+     * Delete a specific chat session.
+     * @param {string} sessionId
+     * @param {string} userId
+     * @returns {Promise<Object>}
+     */
+    deleteSession: async (sessionId, userId) => {
+        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}?user_id=${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to delete session: ${response.status}`);
+        }
+
+        return response.json();
+    },
+
     submitTranslationJob: async ({ file, targetLanguage, sourceLanguage = 'auto', userId, onUploadProgress }) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -492,6 +513,27 @@ export const api = {
             console.warn('Notification service unavailable - delete all failed');
             return null;
         }
+    },
+
+    /**
+     * Enhance a brief, raw user drafting prompt.
+     * @param {string} prompt - The raw user prompt
+     * @returns {Promise<Object>} - { enhanced_prompt }
+     */
+    enhancePrompt: async (prompt) => {
+        const response = await fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_prompt`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to enhance prompt: ${response.status}`);
+        }
+
+        return response.json();
     },
 };
 

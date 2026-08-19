@@ -337,7 +337,7 @@ const ResearchChat = () => {
     //     ]);
     //     localStorage.setItem('last_chat_session_id', newId);
     //     // Optionally clear URL param
-    //     window.history.replaceState({}, '', '/research');
+    //     window.history.replaceState({}, '', '/dashboard/research');
     // };
 
     const safeUUID = () => {
@@ -368,7 +368,7 @@ const ResearchChat = () => {
 
         localStorage.setItem('last_chat_session_id', newId);
         // Optionally clear URL param
-        window.history.replaceState({}, '', '/research');
+        window.history.replaceState({}, '', '/dashboard/research');
     };
 
     const loadSession = async (id) => {
@@ -408,6 +408,37 @@ const ResearchChat = () => {
             console.error("Failed to load session:", error);
             toast.error("Failed to load chat");
             if (!isStreamingRef.current) startNewChat();
+        }
+    };
+
+    const handleDeleteSession = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this chat history?")) {
+            return;
+        }
+
+        const userProfileStr = localStorage.getItem('user_profile');
+        let userId = 'default_user';
+        if (userProfileStr) {
+            try {
+                const profile = JSON.parse(userProfileStr);
+                userId = profile.user_id || profile.id || 'default_user';
+            } catch (e) {}
+        }
+
+        try {
+            await api.deleteSession(id, userId);
+            toast.success("Chat deleted successfully.");
+            
+            // If the active session was deleted, start a new chat
+            if (id === sessionId) {
+                startNewChat();
+            }
+            
+            // Refresh sidebar list
+            fetchSessions();
+        } catch (error) {
+            console.error("Failed to delete session:", error);
+            toast.error("Failed to delete chat history.");
         }
     };
 
@@ -764,19 +795,36 @@ const ResearchChat = () => {
                                     <h3 className="px-3 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{group}</h3>
                                     <div className="space-y-1">
                                         {groupSessions.map(session => (
-                                            <button
+                                            <div 
                                                 key={session.session_id}
-                                                onClick={() => loadSession(session.session_id)}
-                                                className={`w-full text-left px-4 py-3 rounded-xl text-sm truncate transition-all flex items-center gap-3 border ${sessionId === session.session_id
-                                                    ? 'bg-blue-50 border-blue-100 text-blue-700 shadow-sm font-bold'
-                                                    : 'hover:bg-slate-100 border-transparent text-slate-600 hover:text-slate-900'
-                                                    }`}
+                                                className="relative group w-full"
                                             >
-                                                <span className={`material-symbols-outlined text-lg ${sessionId === session.session_id ? 'text-blue-600' : 'text-slate-400'}`}>
-                                                    {sessionId === session.session_id ? 'chat_bubble' : 'history'}
-                                                </span>
-                                                {session.title || "New Research Chat"}
-                                            </button>
+                                                <button
+                                                    onClick={() => loadSession(session.session_id)}
+                                                    className={`w-full text-left pl-4 pr-10 py-3 rounded-xl text-sm truncate transition-all flex items-center gap-3 border ${sessionId === session.session_id
+                                                        ? 'bg-blue-50 border-blue-100 text-blue-700 shadow-sm font-bold'
+                                                        : 'hover:bg-slate-100 border-transparent text-slate-600 hover:text-slate-900'
+                                                        }`}
+                                                >
+                                                    <span className={`material-symbols-outlined text-lg shrink-0 ${sessionId === session.session_id ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                        {sessionId === session.session_id ? 'chat_bubble' : 'history'}
+                                                    </span>
+                                                    <span className="truncate flex-1">
+                                                        {session.title || "New Research Chat"}
+                                                    </span>
+                                                </button>
+                                                
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteSession(session.session_id);
+                                                    }}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all z-10 flex items-center justify-center"
+                                                    title="Delete Chat"
+                                                >
+                                                    <span className="material-symbols-outlined text-base">delete</span>
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>

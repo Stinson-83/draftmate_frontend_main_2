@@ -341,6 +341,41 @@ const DraftingLanding = () => {
                 </div>
             </section>
 
+            {/* 📅 AI Legal Chronology Builder Banner */}
+            <section className="chronology-banner-section hover-lift" onClick={() => navigate('/dashboard/chronology')}>
+                <div className="chronology-banner-content">
+                    <div className="chronology-banner-text">
+                        <div className="chronology-badge">
+                            <Sparkles className="h-3 w-3 mr-1 text-indigo-300" />
+                            <span>New Feature</span>
+                        </div>
+                        <h2 className="chronology-banner-title">AI Legal Chronology Builder</h2>
+                        <p className="chronology-banner-desc">
+                            Upload case documents (PDF, DOCX, TXT) and automatically compile a normalized, fact-checked timeline of events with page-level source citations.
+                        </p>
+                        <button className="chronology-banner-btn">
+                            Build Case Chronology →
+                        </button>
+                    </div>
+                    <div className="chronology-banner-graphic">
+                        <div className="graphic-timeline">
+                            <div className="graphic-node active">
+                                <div className="node-dot"></div>
+                                <span className="node-label">15 Jun 2023 - Terminated</span>
+                            </div>
+                            <div className="graphic-node">
+                                <div className="node-dot"></div>
+                                <span className="node-label">18 Jun 2023 - Notice Sent</span>
+                            </div>
+                            <div className="graphic-node warning">
+                                <div className="node-dot"></div>
+                                <span className="node-label">⚠️ Date Conflict Detected</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* ✨ Features Highlight Grid */}
             <section className="features-grid-section">
                 <h2 className="section-title">Inside the Drafting Suite</h2>

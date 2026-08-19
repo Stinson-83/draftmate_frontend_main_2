@@ -815,7 +815,7 @@ async def get_session(session_id: str, user_id: str = Depends(verify_token)):
 
 
 @app.delete("/sessions/{session_id}")
-async def delete_session(session_id: str, user_id: str):
+async def delete_session(session_id: str, user_id: str = Depends(verify_token)):
     """Delete a session."""
     success = chat_store.delete_session(user_id, session_id)
     if not success:
