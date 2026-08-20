@@ -1,0 +1,26 @@
+{
+  "name": "AI Redline",
+  "guid": "asc.{bf7a0491-137a-4290-9519-756184a51e60}",
+  "version": "1.0.10",
+  "variations": [
+    {
+      "description": "Contextual AI revision and tracked changes tool.",
+      "url": "sidebar.html?v=10",
+      "icons": [ "icon.png" ],
+      "isViewer": false,
+      "isVisual": true,
+      "isModal": false,
+      "isInsideMode": true,
+      "initDataType": "text",
+      "initData": "",
+      "buttons": [],
+      "size": [ 320, 600 ],
+      "store": {
+        "background": {
+          "script": "plugin.js",
+          "templates": [ "onSelectionChanged" ]
+        }
+      }
+    }
+  ]
+}
