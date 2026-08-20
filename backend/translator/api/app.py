@@ -359,21 +359,8 @@ def download_translated_file(job_id: int, request: Request, raw: str | None = Qu
         response.headers["Content-Disposition"] = f'{disp_type}; filename="{clean_name}"'
         return response
 
-    # Stylized, clean inline translation simulation block rendered to HTML frame canvas
-    html_fallback = f"""
-    <html>
-      <body style="font-family: system-ui, sans-serif; padding: 24px; color: #000000; background-color: #ffffff; line-height: 1.6;">
-        <h3 style="color: #000000; margin-top: 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px;">अनुवादित दस्तावेज़ — Translated Output</h3>
-        <p style="font-size: 14px; margin-bottom: 20px;"><strong>टारगेट भाषा (Target Language):</strong> <span style="background:#f1f5f9; color:#0f172a; padding:2px 6px; border-radius:4px; font-weight:bold;">{job.target_language}</span></p>
-        <div style="background: white; border: 1px solid #e2e8f0; padding: 24px; border-radius: 8px; min-height: 300px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); color: #000000;">
-          <p>यह आपके कानूनी दस्तावेज़ का अनुवादित संस्करण है। अनुवाद इंजन ने आपके दस्तावेज़ के लेआउट संरचना को बनाए रखते हुए पाठ का सफलतापूर्वक अनुवाद कर दिया है।</p>
-          <p>आप इस इंटरफ़ेस का उपयोग करके दोनों प्रतियों का एक साथ तुलनात्मक अध्ययन कर सकते हैं।</p>
-          <hr style="border:0; border-top: 1px dashed #e2e8f0; margin:20px 0;" />
-          <p style="font-size:12px; color:#64748b;"><strong>सुरक्षित भंडारण फ़ाइल पथ संदर्भ:</strong><br/><code>{job.translated_file}</code></p>
-        </div>
-      </body>
-    </html>
-    """
+    # Return blank white page — no text, no labels
+    html_fallback = """<html><body style="margin:0;padding:0;background:#ffffff;"></body></html>"""
     return Response(content=html_fallback, media_type="text/html")
 
 
