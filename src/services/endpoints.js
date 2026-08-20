@@ -55,7 +55,6 @@ export const API_CONFIG = {
             ENHANCE_CLAUSE: '/enhance_clause', // POST
             CREATE_PLACEHOLDERS: '/create_placeholders', // POST
             SUMMARISE_CONTEXT: '/summarise_context', // POST
-            ENHANCE_PROMPT: '/enhance_prompt', // POST
         }
     },
 

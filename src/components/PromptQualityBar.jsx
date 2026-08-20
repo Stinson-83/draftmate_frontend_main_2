@@ -100,13 +100,13 @@ const PromptQualityBar = ({ prompt }) => {
     return (
         <div style={{ marginTop: '12px', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main, inherit)' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#111318' }}>
                     Prompt Quality: <span style={{ color: color }}>{status}</span>
                 </span>
             </div>
 
             {/* Progress Bar Background */}
-            <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--border-color, #e2e8f0)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
                 {/* Progress Bar Fill */}
                 <div
                     style={{
@@ -118,7 +118,7 @@ const PromptQualityBar = ({ prompt }) => {
                 />
             </div>
 
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary, #64748b)', marginTop: '6px', lineHeight: '1.4' }}>
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '6px', lineHeight: '1.4' }}>
                 {message}
             </p>
         </div>

@@ -55,9 +55,18 @@ export default function AdvocateOnboarding() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const res = await advocateProfile.getMe();
-        const p = res.data || {};
+        let p = {};
+        try {
+            const res = await advocateProfile.getMe();
+            p = res.data || {};
+        } catch(e) {}
+        
+        const storedProfile = JSON.parse(localStorage.getItem('user_profile') || '{}');
+        
         setFormData({
+          name: p.name || storedProfile.name || storedProfile.firstName || '',
+          email: p.email || storedProfile.email || '',
+          social_links: p.social_links || { linkedin: '', twitter: '', website: '' },
           bar_council_number: p.bar_council_number || '',
           years_experience: p.years_experience || '',
           consultation_fee: p.consultation_fee || '',
@@ -71,7 +80,7 @@ export default function AdvocateOnboarding() {
           experience: Array.isArray(p.experience) && p.experience.length ? p.experience : [{ company: '', role: '', start_date: '', end_date: '', is_current: false, description: '' }],
           certifications: Array.isArray(p.certifications) && p.certifications.length ? p.certifications : [{ title: '', type: '', date_achieved: '' }],
         });
-        if (p.profile_image_url) setProfileImagePreview(p.profile_image_url);
+        if (p.profile_image_url || storedProfile.image) setProfileImagePreview(p.profile_image_url || storedProfile.image);
       } catch (err) {
         // Ignore
       }

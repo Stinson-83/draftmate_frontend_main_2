@@ -1,6 +1,6 @@
-from __future__ import annotations
 import logging
 import os
+from s3_helper import upload_file_to_s3_background, ensure_file_exists_locally
 from dotenv import load_dotenv
 
 # Walk up and load the workspace root .env if it exists
@@ -12,6 +12,10 @@ else:
     load_dotenv()
 
 ONLYOFFICE_API_URL = os.getenv("ONLYOFFICE_API_URL", "http://onlyoffice-server")
+# URL OnlyOffice uses to reach THIS service to fetch the document and post callbacks.
+# In Docker Compose this is the service hostname (drafter-service:8003).
+# On AWS Fargate all containers share localhost, so default to 127.0.0.1:8003.
+DRAFTER_SELF_URL = os.getenv("DRAFTER_SELF_URL", "http://127.0.0.1:8003")
 
 import logging
 import hashlib
@@ -31,10 +35,29 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-import google.generativeai as genai
-if os.getenv("GEMINI_API_KEY"):
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices
+
+logger = logging.getLogger(__name__)
+
+def get_backend_public_url(request: Optional[Any] = None) -> str:
+    env_url = (
+        os.getenv("BACKEND_PUBLIC_URL")
+        or os.getenv("PUBLIC_DRAFTER_URL")
+    )
+    if env_url and env_url.strip():
+        base = env_url.strip().rstrip("/")
+        return f"{base}/drafter" if not base.endswith("/drafter") else base
+
+    if request:
+        try:
+            scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+            host = request.headers.get("x-forwarded-host", request.headers.get("host", ""))
+            if host and "draftmate.in" not in host and "localhost" not in host:
+                return f"{scheme}://{host}/drafter"
+        except Exception as err:
+            logger.debug(f"Request header resolution fallback notice: {err}")
+
+    return "http://ecs-express-gateway-alb-220524834.ap-south-1.elb.amazonaws.com/drafter"
 
 import sys
 import re
@@ -72,33 +95,6 @@ except ImportError:
     rerank_documents = None
 
 PLACEHOLDER_REGEX = re.compile(r'\b[A-Z][A-Z0-9_]{3,}\b')
-
-
-def get_internal_backend_url() -> str:
-    """
-    Returns the absolute base URL of the backend service.
-    Guarantees compatibility between Docker Compose networks and AWS ECS Fargate awsvpc.
-    """
-    # 1. Check for explicit environmental overrides first
-    raw_override = os.getenv("ONLYOFFICE_CALLBACK_HOST") or os.getenv("EXTERNAL_SERVER_URL")
-    if raw_override:
-        clean_url = raw_override.strip().rstrip('/')
-        # Security Strip: Remove trailing '/drafter' suffix if accidentally hardcoded in ECS env
-        if clean_url.endswith('/drafter'):
-            clean_url = clean_url[:-8]
-        return clean_url
-
-    # 2. Local Docker Compose Bridge network discovery
-    import socket
-    for target_host in ["backend", "drafter-service"]:
-        try:
-            socket.getaddrinfo(target_host, 8080, proto=socket.IPPROTO_TCP)
-            return f"http://{target_host}:8080"
-        except Exception:
-            continue
-
-    # 3. AWS ECS Fargate (awsvpc network mode) localhost loopback fallback
-    return "http://127.0.0.1:8080"
 
 def extract_and_cache_docx(file_path: str):
     try:
@@ -146,15 +142,118 @@ JWT_SECRET = os.getenv("JWT_SECRET", "draftmate_jwt_production_signing_key_2026"
 JWT_ALGORITHM = "HS256"
 
 
+# ---------------------------------------------------------------------------
+# Pydantic models (must be defined before helper functions that reference them)
+# ---------------------------------------------------------------------------
+
+class DraftCompileRequest(BaseModel):
+    case_context: Optional[str] = None
+    case_metadata_context: Optional[List[Dict[str, Any]]] = None
+    legal_documents: Optional[str] = None
+    document_type: str = "Legal Document"
+    file_target_name: str = "draftmate_draft.docx"
+
+
+class ForceSaveRequest(BaseModel):
+    document_key: str
+
+
+class IntakeAnalyzeRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    initial_prompt: str = Field(
+        default="",
+        validation_alias=AliasChoices("initial_prompt", "prompt", "case_context", "user_prompt"),
+    )
+    current_round_index: int = 0
+    accumulated_answers: Dict[str, Any] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices("accumulated_answers", "answers"),
+    )
+
+
+class ClarifyingOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    value: str
+
+
+class ClarifyingQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    question: str
+    type: str = "single"
+    options: List[ClarifyingOption] = Field(default_factory=list)
+    required: bool = True
+
+
+class DraftBasis(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_type: str
+    jurisdiction: str
+    representation_position: str
+    key_legal_positions: List[str] = Field(default_factory=list)
+
+
+class DraftSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    basis: DraftBasis
+    assumptions: List[str] = Field(default_factory=list)
+
+
+class IntakeAnalyzeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sufficiency_met: bool
+    current_round_index: int
+    next_round_index: int
+    questions: List[ClarifyingQuestion] = Field(default_factory=list)
+    draft_summary: Optional[DraftSummary] = None
+    validation_metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CaseSearchRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    raw_text: str = Field(
+        default="",
+        validation_alias=AliasChoices("raw_text", "highlighted_text", "selection", "query", "text"),
+    )
+    document_vehicle: Optional[str] = None
+    jurisdiction_context: Optional[str] = None
+    limit: int = 8
+
+
+class CaseSearchItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_name: str
+    court: str
+    citation: str
+    relevance_justification: str
+    holding_summary: str
+    source_url: Optional[str] = None
+    docid: Optional[str] = None
+
+
+class CaseSearchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tokens: Dict[str, str]
+    cases: List[CaseSearchItem] = Field(default_factory=list)
+    source: str = "indian_kanoon"
+
+
+
 async def verify_token(authorization: Optional[str]) -> str:
     if not authorization or not authorization.startswith("Bearer "):
-        if os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true" or os.getenv("ENVIRONMENT", "").lower() == "development":
-            return "dev_counsel_bypass"
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header.")
     session_id = authorization.split(" ", 1)[1].strip()
     if not session_id:
-        if os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true" or os.getenv("ENVIRONMENT", "").lower() == "development":
-            return "dev_counsel_bypass"
         raise HTTPException(status_code=401, detail="Missing session token.")
 
     verify_url = f"{AUTH_SERVICE_URL.rstrip('/')}/verify_session/{session_id}"
@@ -168,17 +267,22 @@ async def verify_token(authorization: Optional[str]) -> str:
         raise HTTPException(status_code=503, detail="Auth service unavailable.")
 
     if resp.status_code != 200:
-        if os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true" or session_id.startswith("local-test") or session_id.startswith("dev_"):
+        if os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true":
+            logger.warning("Session verification status non-200; DEV_BYPASS_AUTH active, returning dev_counsel_bypass.")
             return "dev_counsel_bypass"
         raise HTTPException(status_code=401, detail="Invalid session.")
 
     try:
         data = resp.json()
     except Exception:
+        if os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true":
+            return "dev_counsel_bypass"
         raise HTTPException(status_code=502, detail="Auth service returned invalid JSON.")
 
     user_id = data.get("user_id")
     if not user_id:
+        if os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true":
+            return "dev_counsel_bypass"
         raise HTTPException(status_code=502, detail="Auth service response missing user_id.")
     return str(user_id)
 
@@ -236,32 +340,12 @@ def _strip_json_block(text: str) -> str:
 def _safe_json_loads(text: str) -> Optional[Dict[str, Any]]:
     if not text:
         return None
-    cleaned = _strip_json_block(text)
     try:
-        payload = json.loads(cleaned)
+        payload = json.loads(_strip_json_block(text))
         if isinstance(payload, dict):
             return payload
     except Exception:
-        pass
-
-    try:
-        repaired = re.sub(r",\s*([\]}])", r"\1", cleaned)
-        payload = json.loads(repaired)
-        if isinstance(payload, dict):
-            return payload
-    except Exception:
-        pass
-
-    try:
-        def sanitize_string_literals(match):
-            return match.group(0).replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
-        repaired_strings = re.sub(r'"([^"\\]*(?:\\.[^"\\]*)*)"', sanitize_string_literals, cleaned)
-        payload = json.loads(repaired_strings)
-        if isinstance(payload, dict):
-            return payload
-    except Exception:
-        pass
-
+        return None
     return None
 
 
@@ -361,8 +445,8 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
     if ans_doc_type:
         document_type = ans_doc_type
 
-    jurisdiction = "Not specified"
-    for candidate in ["india", "indian", "delhi", "mumbai", "maharashtra", "karnataka", "tamil nadu", "california", "new york"]:
+    jurisdiction = "India"
+    for candidate in ["india", "indian", "delhi", "mumbai", "maharashtra", "karnataka", "tamil nadu"]:
         if candidate in text:
             jurisdiction = candidate.title()
             break
@@ -391,8 +475,6 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
 
     questions: List[ClarifyingQuestion] = []
     missing_key_inputs = []
-    if jurisdiction == "Not specified" and not ans_jurisdiction:
-        missing_key_inputs.append("jurisdiction")
     if document_type == "Legal Document" and not ans_doc_type:
         missing_key_inputs.append("document_type")
     if rep_position == "Not specified" and not ans_position:
@@ -401,19 +483,6 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
         missing_key_inputs.append("commercial_terms")
 
     if missing_key_inputs:
-        if "jurisdiction" in missing_key_inputs:
-            questions.append(
-                _build_clarifying_question(
-                    "jurisdiction",
-                    "Which jurisdiction's laws should govern this document?",
-                    [
-                        ("Maharashtra (Mumbai)", "Maharashtra"),
-                        ("Delhi", "Delhi"),
-                        ("Karnataka (Bengaluru)", "Karnataka"),
-                        ("Other Indian State / Union Territory", "Other India"),
-                    ],
-                )
-            )
         if "document_type" in missing_key_inputs:
             questions.append(
                 _build_clarifying_question(
@@ -446,13 +515,13 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
         jurisdiction=jurisdiction,
         representation_position=rep_position,
         key_legal_positions=[
-            "Use market-standard allocation of risk where the prompt is silent.",
-            "Preserve internal consistency across definitions, remedies, and termination rights.",
+            "Use Indian law standards and risk allocation where the prompt is silent.",
+            "Preserve internal consistency across definitions, remedies, and statutory references.",
         ],
     )
     assumptions = [
-        "Market-standard boilerplate will be used for missing administrative clauses.",
-        "Ambiguous commercial inputs will be resolved conservatively in favor of internal consistency.",
+        "Indian standard legal boilerplate will be used for missing administrative clauses.",
+        "Ambiguous commercial inputs will be resolved conservatively under Indian contract principles.",
     ]
 
     sufficient = len(questions) == 0
@@ -474,27 +543,23 @@ def _heuristic_intake_analysis(initial_prompt: str, accumulated_answers: Dict[st
 def _build_intake_prompt(initial_prompt: str, accumulated_answers: Dict[str, Any], current_round_index: int) -> str:
     answers_text = _flatten_answers(accumulated_answers)
     return f"""
-You are a Senior Indian Transactional Lawyer performing intake analysis for a legal drafting workflow.
+You are a Senior Indian Legal Advocate and Transactional Specialist performing intake analysis for an Indian legal drafting workflow.
 
-IMPORTANT CONTEXT: This platform (Draftmate) is exclusively for Indian legal practice.
-- All jurisdiction options MUST be Indian states, High Courts, or Indian legal frameworks.
-- Do NOT suggest US states (e.g., Delaware, New York, California) or UK/EU jurisdictions.
-- Use Indian legal terminology: refer to Acts (e.g., Indian Contract Act 1872, Companies Act 2013,
-  Transfer of Property Act 1882, Specific Relief Act 1963, Arbitration & Conciliation Act 1996).
-- For jurisdiction questions, offer Indian options such as: Maharashtra, Delhi, Karnataka,
-  Tamil Nadu, Gujarat, Telangana, Rajasthan, West Bengal, or 'Pan-India / Central'.
-- For dispute resolution, refer to Indian courts (High Courts, District Courts, NCLT, NCDRC)
-  or Indian arbitration bodies (DIAC, MCIA, Mumbai Centre for International Arbitration).
+CRITICAL JURISDICTION INSTRUCTION:
+- DraftMate is an AI legal platform built EXCLUSIVELY for INDIAN LAW and INDIAN COURTS.
+- ALL legal drafting and intake questions MUST be grounded in the Laws of India (Constitution of India, Bharatiya Nyaya Sanhita (BNS), Bharatiya Nagarik Suraksha Sanhita (BNSS), Bharatiya Sakshya Adhiniyam (BSA), IPC, CrPC, CPC, Indian Contract Act, Supreme Court of India, High Courts, District & Sessions Courts, Magistrate Courts, NCLT, Consumer Fora, etc.).
+- NEVER generate questions or options referencing US States (e.g. California, Texas, New York), US Federal Courts, US legal terminology, or foreign jurisdictions.
+- If asking about Court or Forum, options MUST be Indian judicial forums (e.g., Supreme Court of India, High Court, Sessions / Magistrate Court, Consumer Court / NCLT).
 
 Follow these steps:
-1. Document Identification.
-2. Requirement Extraction.
+1. Document Identification under Indian Law.
+2. Requirement Extraction under Indian Legal Standards.
 3. Gap Analysis.
 
 If critical structural or commercial risk information is missing, return up to 5 concise clarifying questions.
-Prefer multiple-choice questions with 3-4 options relevant to Indian law and practice.
-If the matter is sufficiently clear or Indian market-standard provisions can close the gaps,
-return sufficiency_met true, and include:
+Prefer multiple-choice questions with 3-4 options tailored specifically for Indian law and practice.
+If the matter is sufficiently clear or Indian market-standard provisions can close the gaps, return sufficiency_met true,
+and include:
 - Step 6 assumptions
 - Step 8 draft summary basis
 
@@ -631,11 +696,8 @@ jurisdiction_context: {jurisdiction_context or ""}
 """.strip()
             raw = _llm_text_response(llm, prompt)
             parsed = _safe_json_loads(raw) or {}
-            issue_str = str(parsed.get("legal_issue") or "").strip()
-            if not issue_str or any(p in issue_str.lower() for p in ["not found", "unspecified", "none", "n/a", "unknown"]):
-                issue_str = base_text[:120] if len(base_text) > 5 else "Legal issue"
             return {
-                "legal_issue": issue_str,
+                "legal_issue": str(parsed.get("legal_issue") or base_text[:220] or "legal issue"),
                 "jurisdiction_context": str(parsed.get("jurisdiction_context") or jurisdiction_context or "unspecified"),
                 "document_vehicle": str(parsed.get("document_vehicle") or document_vehicle or "unspecified"),
                 "core_proposition": str(parsed.get("core_proposition") or base_text[:320] or "unspecified"),
@@ -653,7 +715,7 @@ jurisdiction_context: {jurisdiction_context or ""}
     elif any(word in lowered for word in ["contract", "agreement", "breach", "indemnity"]):
         issue = "Contract interpretation or breach"
     else:
-        issue = base_text[:120] or "Legal issue"
+        issue = base_text[:160] or "legal issue"
 
     return {
         "legal_issue": issue,
@@ -663,56 +725,22 @@ jurisdiction_context: {jurisdiction_context or ""}
     }
 
 
-def _case_search_queries(tokens: Dict[str, str], raw_text: str = "") -> List[str]:
-    base_text = (raw_text or tokens.get("raw_text") or tokens.get("core_proposition") or tokens.get("legal_issue") or "").strip()
-    queries: List[str] = []
-
-    # 1. Extract explicit case titles e.g. "N. S. Gujral v. Custodian Of Evacuee Property"
-    case_match = re.search(r'([A-Z0-9\.\s]{2,35}\s+(?:v\.|vs\.|versus)\s+[A-Z0-9\.\s]{2,40})', base_text, re.IGNORECASE)
-    if case_match:
-        found = case_match.group(1).strip()
-        found = re.sub(r'^(?:[a-z0-9_]+\s+)*', '', found, flags=re.IGNORECASE).strip(' ,.;')
-        if len(found) >= 5:
-            queries.append(found)
-
-    # 2. Extract citations e.g. "(1968) AIR 457"
-    cite_matches = re.findall(r'\b(?:\(\d{4}\)|\d{4})\s*(?:AIR|SCR|SCC|SCALE|ILR|CriLJ)\s*\d*\b', base_text, re.IGNORECASE)
-    for cite in cite_matches:
-        clean_c = cite.strip(' ,.;')
-        if len(clean_c) >= 4:
-            queries.append(clean_c)
-
-    # 3. Extract Acts e.g. "Administration of Evacuee Property Act"
-    act_matches = re.findall(r'([A-Z][a-zA-A0-9\s]+\bAct\b)', base_text)
-    for act in act_matches:
-        clean_act = act.strip(' ,.;')
-        if len(clean_act) >= 8 and len(clean_act.split()) <= 6:
-            queries.append(clean_act)
-
-    # 4. Extract 4-6 concise key legal terms (strip common stop words)
-    stopwords = {'the', 'a', 'an', 'in', 'of', 'and', 'or', 'to', 'for', 'with', 'on', 'at', 'from', 'by', 'is', 'are', 'was', 'were', 'been', 'being', 'that', 'this', 'these', 'those', 'addressed', 'significant', 'questions', 'concerning', 'landmark', 'decision', 'court', 'india', 'judgment', 'clarified', 'interplay', 'between', 'enshrined', 'herein', 'therein', 'matter', 'case'}
-    words = [w for w in re.findall(r'\b[a-zA-Z]{3,}\b', base_text) if w.lower() not in stopwords]
-    if words:
-        queries.append(' '.join(words[:6]))
-        if len(words) > 6:
-            queries.append(' '.join(words[3:9]))
-
-    # 5. Include concise legal_issue / core_proposition if present
-    for key in ("legal_issue", "core_proposition"):
-        val = (tokens.get(key) or "").strip()
-        if val and val != "unspecified" and len(val.split()) <= 8:
-            queries.append(val)
-
-    # Deduplicate while preserving order
+def _case_search_queries(tokens: Dict[str, str]) -> List[str]:
+    queries = [
+        " ".join(part for part in [tokens.get("legal_issue"), tokens.get("jurisdiction_context")] if part and part != "unspecified").strip(),
+        " ".join(part for part in [tokens.get("core_proposition"), tokens.get("jurisdiction_context")] if part and part != "unspecified").strip(),
+        " ".join(part for part in [tokens.get("document_vehicle"), tokens.get("legal_issue")] if part and part != "unspecified").strip(),
+    ]
     seen: Set[str] = set()
     final_queries: List[str] = []
-    for q in queries:
-        norm = q.lower().strip()
-        if norm and norm not in seen:
-            seen.add(norm)
-            final_queries.append(q.strip())
-
-    return final_queries[:6]
+    for query in queries:
+        normalized = query.strip()
+        if normalized and normalized.lower() not in seen:
+            seen.add(normalized.lower())
+            final_queries.append(normalized)
+    if tokens.get("legal_issue") and tokens["legal_issue"].lower() not in seen:
+        final_queries.append(tokens["legal_issue"])
+    return final_queries[:5]
 
 
 def _court_label(candidate: Dict[str, Any]) -> str:
@@ -736,27 +764,11 @@ def _case_weight(candidate: Dict[str, Any], tokens: Dict[str, str]) -> float:
     ]:
         needle = (needle or "").lower().strip()
         if needle and needle != "unspecified" and needle in haystack:
-            weight += 4.0
-
-    # Court Hierarchy Weight (SC > HC > Tribunal)
-    if "supreme court" in haystack:
-        weight += 15.0
-    elif "high court" in haystack:
-        weight += 8.0
-
-    # Citation Presence
+            weight += 2.0
+    if "supreme" in haystack or "high court" in haystack:
+        weight += 1.25
     if candidate.get("citation"):
-        weight += 2.0
-
-    # Recency Bonus (2020-2026 = +6, 2010-2019 = +3)
-    year_match = re.search(r'\b(20[12]\d)\b', haystack)
-    if year_match:
-        year = int(year_match.group(1))
-        if year >= 2020:
-            weight += 6.0
-        elif year >= 2010:
-            weight += 3.0
-
+        weight += 0.5
     return weight
 
 
@@ -767,13 +779,10 @@ def _summarize_case_candidate(candidate: Dict[str, Any], tokens: Dict[str, str])
     court = _court_label(candidate)
     relevance = candidate.get("relevance_justification")
     if not isinstance(relevance, str) or not relevance.strip():
-        issue_raw = str(tokens.get('legal_issue') or '').strip()
-        invalid_patterns = ["not found", "unspecified", "none", "n/a", "legal issue", "unknown"]
-        if not issue_raw or any(p in issue_raw.lower() for p in invalid_patterns) or len(issue_raw) > 100:
-            relevance = "Identified as a matching judicial precedent for the highlighted text and legal proposition."
-        else:
-            relevance = f"Relevant to the legal issue of '{issue_raw}' identified in the highlighted selection."
-
+        relevance = (
+            f"Matched the issue profile around {tokens.get('legal_issue', 'the highlighted issue')} "
+            f"and aligns with the stated proposition."
+        )
     holding = candidate.get("holding_summary")
     if not isinstance(holding, str) or not holding.strip():
         holding = snippet[:320] if snippet else "Holding summary unavailable from the retrieved source."
@@ -792,7 +801,7 @@ def _fetch_case_candidates(query: str, limit: int) -> List[Dict[str, Any]]:
     if ik_api is None:
         return []
     try:
-        results = ik_api.search(query, max_results=max(8, min(limit * 2, 16)))
+        results = ik_api.search(query, max_results=max(5, min(limit, 10)))
     except Exception as exc:
         logger.warning(f"Indian Kanoon search failed for query '{query}': {exc}")
         return []
@@ -816,7 +825,7 @@ def _rank_case_candidates(candidates: List[Dict[str, Any]], tokens: Dict[str, st
                         "metadata": candidate,
                     }
                 )
-            ranked = rerank_documents(query=query, candidates=docs, top_n=min(12, len(docs)))
+            ranked = rerank_documents(query=query, candidates=docs, top_n=min(10, len(docs)))
             if isinstance(ranked, list) and ranked:
                 ranked_candidates: List[Dict[str, Any]] = []
                 for item in ranked:
@@ -908,21 +917,6 @@ def _apply_run_style(run, font_size: Pt, bold: bool):
     run.bold = bold
 
 
-def _sanitize_filename(raw_name: str, max_len: int = 40) -> str:
-    if not raw_name:
-        return "Legal_Draft.docx"
-    clean = raw_name.strip()
-    if clean.lower().endswith(".docx"):
-        clean = clean[:-5]
-    clean = re.sub(r'[^a-zA-Z0-9_\-]', '_', clean)
-    clean = re.sub(r'_+', '_', clean).strip('_')
-    if len(clean) > max_len:
-        clean = clean[:max_len].rstrip('_')
-    if not clean:
-        clean = "Legal_Draft"
-    return clean + ".docx"
-
-
 def build_docx_with_controls(ai_data: dict, file_target_name: str) -> str:
     shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
     if not shared_storage_path:
@@ -930,7 +924,9 @@ def build_docx_with_controls(ai_data: dict, file_target_name: str) -> str:
 
     os.makedirs(shared_storage_path, exist_ok=True)
 
-    safe_name = _sanitize_filename(file_target_name)
+    safe_name = (file_target_name or "").strip() or "draftmate_draft.docx"
+    if not safe_name.lower().endswith(".docx"):
+        safe_name = safe_name + ".docx"
     output_path = os.path.join(shared_storage_path, safe_name)
 
     doc = Document()
@@ -1001,108 +997,6 @@ def build_docx_with_controls(ai_data: dict, file_target_name: str) -> str:
     return output_path
 
 
-class DraftCompileRequest(BaseModel):
-    case_context: Optional[str] = None
-    case_metadata_context: Optional[List[Dict[str, Any]]] = None
-    legal_documents: Optional[str] = None
-    document_type: str = "Legal Document"
-    file_target_name: str = "draftmate_draft.docx"
-    section: Optional[str] = "unknown"
-
-
-class ForceSaveRequest(BaseModel):
-    document_key: str
-
-
-class IntakeAnalyzeRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
-
-    initial_prompt: str = Field(
-        default="",
-        validation_alias=AliasChoices("initial_prompt", "prompt", "case_context", "user_prompt"),
-    )
-    current_round_index: int = 0
-    accumulated_answers: Dict[str, Any] = Field(
-        default_factory=dict,
-        validation_alias=AliasChoices("accumulated_answers", "answers"),
-    )
-
-
-class ClarifyingOption(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    label: str
-    value: str
-
-
-class ClarifyingQuestion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    question: str
-    type: str = "single"
-    options: List[ClarifyingOption] = Field(default_factory=list)
-    required: bool = True
-
-
-class DraftBasis(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    document_type: str
-    jurisdiction: str
-    representation_position: str
-    key_legal_positions: List[str] = Field(default_factory=list)
-
-
-class DraftSummary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    basis: DraftBasis
-    assumptions: List[str] = Field(default_factory=list)
-
-
-class IntakeAnalyzeResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    sufficiency_met: bool
-    current_round_index: int
-    next_round_index: int
-    questions: List[ClarifyingQuestion] = Field(default_factory=list)
-    draft_summary: Optional[DraftSummary] = None
-    validation_metadata: Dict[str, Any] = Field(default_factory=dict)
-
-
-class CaseSearchRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
-
-    raw_text: str = Field(
-        default="",
-        validation_alias=AliasChoices("raw_text", "highlighted_text", "selection", "query", "text"),
-    )
-    document_vehicle: Optional[str] = None
-    jurisdiction_context: Optional[str] = None
-    limit: int = 8
-
-
-class CaseSearchItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    case_name: str
-    court: str
-    citation: str
-    relevance_justification: str
-    holding_summary: str
-    source_url: Optional[str] = None
-    docid: Optional[str] = None
-
-
-class CaseSearchResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    tokens: Dict[str, str]
-    cases: List[CaseSearchItem] = Field(default_factory=list)
-    source: str = "indian_kanoon"
-
 
 @app.post("/v2/draft/intake/analyze", response_model=IntakeAnalyzeResponse)
 async def intake_analyze(request: IntakeAnalyzeRequest, authorization: Optional[str] = Header(default=None)):
@@ -1123,7 +1017,7 @@ async def research_cases(request: CaseSearchRequest, authorization: Optional[str
         document_vehicle=request.document_vehicle,
         jurisdiction_context=request.jurisdiction_context,
     )
-    queries = _case_search_queries(tokens, raw_text=request.raw_text)
+    queries = _case_search_queries(tokens)
 
     candidates: List[Dict[str, Any]] = []
     for query in queries:
@@ -1178,6 +1072,11 @@ async def sync_variable_value(request: VariableSyncRequest, authorization: Optio
                     
         if modified:
             doc.save(file_path)
+            # Push updated file to S3
+            s3_key = request.filename.replace("\\", "/")
+            if "/" not in s3_key:
+                s3_key = os.path.basename(file_path)
+            upload_file_to_s3_background(file_path, s3_key)
             return {"status": "synchronized", "updated": True}
             
         return {"status": "unchanged", "updated": False}
@@ -1196,8 +1095,17 @@ def serve_draft_file(filename: str):
         raise HTTPException(status_code=400, detail="Invalid filename.")
 
     file_path = os.path.join(shared_storage_path, safe_name)
+    ensure_file_exists_locally(safe_name, file_path)
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found.")
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            doc = Document()
+            doc.add_paragraph("")
+            doc.save(file_path)
+            upload_file_to_s3_background(file_path, safe_name)
+        except Exception as create_err:
+            logger.error(f"Failed to auto-generate blank docx: {create_err}")
+            raise HTTPException(status_code=404, detail="File not found.")
 
     return FileResponse(
         path=file_path,
@@ -1208,397 +1116,267 @@ def serve_draft_file(filename: str):
 
 @app.get("/v2/draft/serve/{draft_id}/{filename}")
 async def serve_draft(draft_id: str, filename: str):
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+    if not shared_storage_path:
+        raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
 
-    from urllib.parse import unquote
-    raw_filename = unquote(unquote(filename or ""))
-    raw_draft_id = unquote(unquote(draft_id or ""))
-    safe_draft_id = os.path.basename(raw_draft_id.replace("\\", "/"))
-    safe_name = os.path.basename(raw_filename.replace("\\", "/"))
+    safe_draft_id = os.path.basename(draft_id.replace("\\", "/"))
+    safe_name = os.path.basename((filename or "").replace("\\", "/"))
+    if not safe_name or not safe_draft_id:
+        raise HTTPException(status_code=400, detail="Invalid path parameter.")
 
-    file_path = None
-    if safe_draft_id:
-        candidate = os.path.join(shared_storage_path, safe_draft_id, safe_name)
-        if os.path.isfile(candidate):
-            file_path = candidate
-        else:
-            draft_dir = os.path.join(shared_storage_path, safe_draft_id)
-            if os.path.isdir(draft_dir):
-                dir_files = [f for f in os.listdir(draft_dir) if os.path.isfile(os.path.join(draft_dir, f))]
-                if dir_files:
-                    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else 'docx'
-                    ext_matches = [f for f in dir_files if f.lower().endswith(f".{ext}")]
-                    selected_file = ext_matches[0] if ext_matches else dir_files[0]
-                    file_path = os.path.join(draft_dir, selected_file)
-
-    if not file_path:
+    file_path = os.path.join(shared_storage_path, safe_draft_id, safe_name)
+    s3_key = f"{safe_draft_id}/{safe_name}"
+    ensure_file_exists_locally(s3_key, file_path)
+    if not os.path.isfile(file_path):
         root_path = os.path.join(shared_storage_path, safe_name)
+        ensure_file_exists_locally(safe_name, root_path)
         if os.path.isfile(root_path):
             file_path = root_path
-
-    if not file_path:
-        norm_target = safe_name.lower()
-        for dp, dn, filenames in os.walk(shared_storage_path):
-            for f in filenames:
-                if f.lower() == norm_target or unquote(f).lower() == norm_target:
-                    file_path = os.path.join(dp, f)
-                    break
-            if file_path:
-                break
-
-    if not file_path or not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="File not found.")
+        else:
+            # Wait 1.5 seconds for in-flight S3 upload/sync if just created
+            import time
+            time.sleep(1.5)
+            ensure_file_exists_locally(s3_key, file_path)
+            if not os.path.isfile(file_path):
+                raise HTTPException(status_code=404, detail="Requested draft document is still compiling or not found.")
 
     return FileResponse(
         path=file_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=safe_name,
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0"
-        }
     )
 
 
-@app.get("/v2/draft/pdf/{draft_id}/{filename}")
-@app.get("/v2/draft/pdf/{filename}")
-async def serve_draft_pdf(draft_id: str = "", filename: str = ""):
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
-    from urllib.parse import unquote
-    raw_filename = unquote(unquote(filename or draft_id or ""))
-    raw_draft_id = unquote(unquote(draft_id or ""))
-    safe_draft_id = os.path.basename(raw_draft_id.replace("\\", "/"))
-    safe_name = os.path.basename(raw_filename.replace("\\", "/"))
-
-    file_path = None
-    if safe_draft_id and safe_draft_id != safe_name:
-        candidate = os.path.join(shared_storage_path, safe_draft_id, safe_name)
-        if os.path.isfile(candidate):
-            file_path = candidate
-        else:
-            draft_dir = os.path.join(shared_storage_path, safe_draft_id)
-            if os.path.isdir(draft_dir):
-                dir_files = [f for f in os.listdir(draft_dir) if os.path.isfile(os.path.join(draft_dir, f))]
-                if dir_files:
-                    file_path = os.path.join(draft_dir, dir_files[0])
-
-    if not file_path or not os.path.isfile(file_path):
-        root_path = os.path.join(shared_storage_path, safe_name)
-        if os.path.isfile(root_path):
-            file_path = root_path
-
-    search_dirs = [
-        shared_storage_path,
-        "/app/backend/translator/storage",
-        "/app/backend/translator",
-        "/app/backend/Deep_research/lex_bot/data/uploads",
-        "/app/backend",
-        "/tmp"
-    ]
-
-    if not file_path or not os.path.isfile(file_path):
-        import re
-        uuid_match = re.search(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', f"{safe_draft_id}_{safe_name}")
-        search_uuid = uuid_match.group(0).lower() if uuid_match else None
-        words = [w.lower() for w in re.split(r'[^a-zA-Z0-9]', f"{safe_draft_id}_{safe_name}") if len(w) >= 4 and w.lower() not in {"translated", "notice", "document", "draft", "docx", "pdf"}]
-
-        norm_target = safe_name.lower()
-        for base_dir in search_dirs:
-            if not os.path.exists(base_dir):
-                continue
-            for dp, dn, filenames_list in os.walk(base_dir):
-                for f in filenames_list:
-                    f_lower = f.lower()
-                    if search_uuid and search_uuid in f_lower:
-                        file_path = os.path.join(dp, f)
-                        break
-                    if f_lower == norm_target or unquote(f).lower() == norm_target or norm_target in f_lower or f_lower in norm_target:
-                        file_path = os.path.join(dp, f)
-                        break
-                    if words and any(w in f_lower for w in words):
-                        file_path = os.path.join(dp, f)
-                        break
-                if file_path:
-                    break
-            if file_path:
-                break
-
-    if not file_path or not os.path.isfile(file_path):
-        pdf_name = safe_name if safe_name.lower().endswith(".pdf") else (safe_name.rsplit(".", 1)[0] + ".pdf")
-        tmp_pdf = os.path.join("/tmp", pdf_name)
-        if os.path.isfile(tmp_pdf) and os.path.getsize(tmp_pdf) > 0:
-            file_path = tmp_pdf
-        else:
-            file_path = generate_fallback_pdf(safe_name)
-
-    if file_path and os.path.isfile(file_path):
-        if file_path.lower().endswith(".pdf"):
-            pdf_disp_name = safe_name if safe_name.lower().endswith(".pdf") else (safe_name.rsplit(".", 1)[0] + ".pdf")
-            return FileResponse(
-                path=file_path,
-                media_type="application/pdf",
-                headers={"Content-Disposition": f"inline; filename=\"{pdf_disp_name}\""}
-            )
-
-    pdf_path = file_path.rsplit(".", 1)[0] + ".pdf"
-    if not os.path.exists(pdf_path) or os.path.getmtime(file_path) > os.path.getmtime(pdf_path):
-        try:
-            import subprocess
-            cmd = ["soffice", "--headless", "--convert-to", "pdf", "--outdir", os.path.dirname(file_path), file_path]
-            subprocess.run(cmd, check=True, timeout=30)
-        except Exception as e:
-            logger.warning(f"LibreOffice PDF conversion fallback: {e}")
-            return FileResponse(
-                path=file_path,
-                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                filename=safe_name
-            )
-
-    pdf_filename = safe_name.rsplit(".", 1)[0] + ".pdf"
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename=\"{pdf_filename}\""}
-    )
+class HeaderFooterApplyRequest(BaseModel):
+    filename: str
+    header_html: Optional[str] = None
+    footer_html: Optional[str] = None
+    draft_id: Optional[str] = None
+    header_apply_to: Optional[str] = "first_page" # "first_page", "all_pages", "body_top", "custom"
+    footer_apply_to: Optional[str] = "first_page" # "first_page", "all_pages", "body_bottom", "custom"
+    header_custom_pages: Optional[str] = "1"
+    footer_custom_pages: Optional[str] = "1"
 
 
-def convert_to_valid_pdf(file_path: Optional[str], doc_name: str) -> str:
-    """Converts any docx/txt or generates a guaranteed 100% valid PDF starting with %PDF- header."""
-    import subprocess
-    clean_name = os.path.basename(doc_name)
-    if not clean_name.lower().endswith(".pdf"):
-        clean_name = os.path.splitext(clean_name)[0] + ".pdf"
+@app.post("/v2/draft/header/apply")
+async def apply_header_to_draft(request: HeaderFooterApplyRequest, authorization: Optional[str] = Header(default=None)):
+    await verify_token(authorization)
     
-    out_pdf = os.path.join("/tmp", clean_name)
-
-    # 1. If file_path exists and is already a valid PDF starting with %PDF-
-    if file_path and os.path.isfile(file_path):
-        try:
-            with open(file_path, "rb") as f:
-                header = f.read(5)
-            if header.startswith(b"%PDF-"):
-                return file_path
-        except Exception:
-            pass
-
-        # 2. Try converting .docx / .doc using soffice
-        try:
-            out_dir = "/tmp"
-            cmd = ["soffice", "--headless", "--convert-to", "pdf", "--outdir", out_dir, file_path]
-            subprocess.run(cmd, check=True, timeout=30)
-            
-            conv_pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(file_path))[0] + ".pdf")
-            if os.path.isfile(conv_pdf) and os.path.getsize(conv_pdf) > 0:
-                with open(conv_pdf, "rb") as f:
-                    if f.read(5).startswith(b"%PDF-"):
-                        return conv_pdf
-        except Exception as conv_err:
-            logger.warning(f"soffice conversion error for {file_path}: {conv_err}")
-
-        # 3. Try reading docx with python-docx and building valid PDF with ReportLab
-        try:
-            import docx
-            doc_obj = docx.Document(file_path)
-            paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
-            
-            from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib import colors
-
-            pdf_doc = SimpleDocTemplate(out_pdf, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-            styles = getSampleStyleSheet()
-            story = []
-
-            title_style = ParagraphStyle(
-                'DocTitle',
-                parent=styles['Heading1'],
-                fontSize=18,
-                leading=22,
-                textColor=colors.HexColor('#0f172a'),
-                spaceAfter=12
-            )
-            story.append(Paragraph(f"<b>{clean_name.rsplit('.', 1)[0]}</b>", title_style))
-            story.append(Spacer(1, 10))
-
-            for p_text in paragraphs:
-                safe_text = p_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                story.append(Paragraph(safe_text, styles['Normal']))
-                story.append(Spacer(1, 8))
-
-            pdf_doc.build(story)
-            if os.path.isfile(out_pdf) and os.path.getsize(out_pdf) > 0:
-                with open(out_pdf, "rb") as f:
-                    if f.read(5).startswith(b"%PDF-"):
-                        return out_pdf
-        except Exception as docx_err:
-            logger.warning(f"docx -> reportlab extraction error: {docx_err}")
-
-    # 4. Final Fallback: Build a clean valid PDF with ReportLab
-    try:
-        from reportlab.lib.pagesizes import letter
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib import colors
-        from datetime import datetime
-
-        pdf_doc = SimpleDocTemplate(out_pdf, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-        styles = getSampleStyleSheet()
-        story = []
-
-        title_style = ParagraphStyle(
-            'DocTitle',
-            parent=styles['Heading1'],
-            fontSize=20,
-            leading=24,
-            textColor=colors.HexColor('#0f172a'),
-            alignment=1,
-            spaceAfter=15
-        )
-        story.append(Paragraph("<b>DraftMate AI Legal Platform</b>", title_style))
-        story.append(Paragraph(f"Official Shared Document: {clean_name}", styles['Heading2']))
-        story.append(Spacer(1, 15))
-
-        body_text = "This legal document was generated and shared via DraftMate AI Legal Platform. " \
-                    "This PDF file is attached directly to your email for offline access at all times."
-        story.append(Paragraph(body_text, styles['Normal']))
-        story.append(Spacer(1, 20))
-
-        data = [
-            ["Document Title", clean_name],
-            ["Format", "Portable Document Format (.pdf)"],
-            ["Offline Access", "Enabled (Direct Email Attachment)"],
-            ["Generated Date", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")]
-        ]
-        t = Table(data, colWidths=[150, 320])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f1f5f9')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1e293b')),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-        ]))
-        story.append(t)
-        pdf_doc.build(story)
-        return out_pdf
-    except Exception as final_err:
-        logger.error(f"Failed to generate final fallback PDF: {final_err}")
-
-    return out_pdf
-
-
-class ShareAndEmailRequest(BaseModel):
-    draft_id: str
-    doc_name: str
-    recipient_email: str
-    sender_email: Optional[str] = None
-    sender_name: Optional[str] = None
-    access_level: Optional[str] = "edit"
-    share_url: Optional[str] = None
-    template_style: Optional[str] = "standard"
-
-
-@app.post("/v2/draft/share_and_email")
-async def share_and_email_document(req: ShareAndEmailRequest, authorization: Optional[str] = Header(default=None)):
-    """Automated backend pipeline: PDF conversion, ACL share, and SMTP email dispatch with PDF attachment."""
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
-    from urllib.parse import unquote, quote
-    safe_draft_id = os.path.basename(unquote(req.draft_id).replace("\\", "/"))
-    safe_name = os.path.basename(unquote(req.doc_name).replace("\\", "/"))
-
-    file_path = None
-    if safe_draft_id and safe_draft_id != safe_name:
-        candidate = os.path.join(shared_storage_path, safe_draft_id, safe_name)
-        if os.path.isfile(candidate):
-            file_path = candidate
-
-    search_dirs = [
-        shared_storage_path,
-        "/app/backend/translator/storage",
-        "/app/backend/translator",
-        "/app/backend/Deep_research/lex_bot/data/uploads",
-        "/app/backend",
-        "/tmp"
-    ]
-
-    if not file_path or not os.path.isfile(file_path):
-        import re
-        uuid_match = re.search(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', f"{safe_draft_id}_{safe_name}")
-        search_uuid = uuid_match.group(0).lower() if uuid_match else None
-        words = [w.lower() for w in re.split(r'[^a-zA-Z0-9]', f"{safe_draft_id}_{safe_name}") if len(w) >= 4 and w.lower() not in {"translated", "notice", "document", "draft", "docx", "pdf"}]
-
-        norm_target = safe_name.lower()
-        for base_dir in search_dirs:
-            if not os.path.exists(base_dir):
-                continue
-            for dp, dn, filenames_list in os.walk(base_dir):
-                for f in filenames_list:
-                    f_lower = f.lower()
-                    if search_uuid and search_uuid in f_lower:
-                        file_path = os.path.join(dp, f)
-                        break
-                    if f_lower == norm_target or unquote(f).lower() == norm_target or norm_target in f_lower or f_lower in norm_target:
-                        file_path = os.path.join(dp, f)
-                        break
-                    if words and any(w in f_lower for w in words):
-                        file_path = os.path.join(dp, f)
-                        break
-                if file_path:
-                    break
-            if file_path:
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+    if not shared_storage_path:
+        raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        
+    filename = os.path.basename(request.filename)
+    file_path = os.path.join(shared_storage_path, request.draft_id, filename) if request.draft_id else os.path.join(shared_storage_path, filename)
+    if not os.path.exists(file_path):
+        file_path = os.path.join(shared_storage_path, filename)
+        
+    if not os.path.exists(file_path):
+        for root, dirs, files in os.walk(shared_storage_path):
+            if filename in files:
+                file_path = os.path.join(root, filename)
                 break
 
-    # Ensure a 100% valid PDF document starting with %PDF- magic header
-    final_attachment = convert_to_valid_pdf(file_path, req.doc_name)
-
-    # Register ACL in Auth Service
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Target document '{filename}' not found.")
+        
     try:
-        async with httpx.AsyncClient() as client:
-            headers = {}
-            if authorization:
-                headers["Authorization"] = authorization
-            await client.post(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/v2/draft/share",
-                headers=headers,
-                json={"draft_id": req.draft_id, "email": req.recipient_email, "access_level": req.access_level or "edit"},
-                timeout=5.0
-            )
-    except Exception as acl_err:
-        logger.warning(f"ACL share registration warning: {acl_err}")
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Pt
+        import re, time, hashlib
+        
+        doc = Document(file_path)
+        section = doc.sections[0] if doc.sections else doc.add_section()
+        modified = False
 
-    # Dispatch HTML Email via Notification Service
-    try:
-        clean_url = req.share_url or f"https://www.draftmate.in/drafter/v2/draft/pdf/{quote(req.draft_id)}/{quote(req.doc_name)}"
-        subject_prefix = "[URGENT REVIEW] " if req.template_style == "urgent" else ""
-        email_subject = f"{subject_prefix}Shared Legal Document (PDF): {req.doc_name}"
-        sender_label = f"{req.sender_name} ({req.sender_email})" if (req.sender_name and req.sender_email) else (req.sender_email or "A colleague")
-        email_body = f"Hello,\n\n{sender_label} has shared a legal document '{req.doc_name}' with you on DraftMate Legal Platform.\n\nThe PDF document is attached directly to this email for offline download and view:\n{clean_url}\n\nBest regards,\nDraftMate Team"
+        # --- APPLY HEADER ---
+        if request.header_html and request.header_html.strip():
+            raw_h = request.header_html.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n').replace('</p>', '\n').replace('</div>', '\n')
+            header_lines = [line.strip() for line in re.sub(r'<[^>]+>', '', raw_h).split('\n') if line.strip()]
+            if header_lines:
+                target_mode = (request.header_apply_to or "first_page").lower()
+                if target_mode == "first_page":
+                    section.different_first_page_header_page = True
+                    header_obj = section.first_page_header
+                    for p in list(header_obj.paragraphs):
+                        p.text = ""
+                    header_para = header_obj.paragraphs[0] if header_obj.paragraphs else header_obj.add_paragraph()
+                    for idx, line_text in enumerate(header_lines):
+                        if idx > 0:
+                            header_para = header_obj.add_paragraph()
+                        header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = header_para.add_run(line_text)
+                        run.bold = (idx == 0)
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(14 if idx == 0 else 11)
+                elif target_mode == "all_pages":
+                    header_obj = section.header
+                    for p in list(header_obj.paragraphs):
+                        p.text = ""
+                    header_para = header_obj.paragraphs[0] if header_obj.paragraphs else header_obj.add_paragraph()
+                    for idx, line_text in enumerate(header_lines):
+                        if idx > 0:
+                            header_para = header_obj.add_paragraph()
+                        header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = header_para.add_run(line_text)
+                        run.bold = (idx == 0)
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(14 if idx == 0 else 11)
+                elif target_mode == "custom":
+                    page_nums = set()
+                    raw = (request.header_custom_pages or "1").strip()
+                    for part in raw.split(','):
+                        part = part.strip()
+                        if '-' in part:
+                            try:
+                                start, end = map(int, part.split('-'))
+                                page_nums.update(range(start, end + 1))
+                            except ValueError:
+                                pass
+                        elif part.isdigit():
+                            page_nums.add(int(part))
+                    if not page_nums:
+                        page_nums = {1}
+                    
+                    section.different_first_page_header_page = True
+                    if 1 in page_nums:
+                        header_obj = section.first_page_header
+                        for p in list(header_obj.paragraphs):
+                            p.text = ""
+                        header_para = header_obj.paragraphs[0] if header_obj.paragraphs else header_obj.add_paragraph()
+                        for idx, line_text in enumerate(header_lines):
+                            if idx > 0:
+                                header_para = header_obj.add_paragraph()
+                            header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            run = header_para.add_run(line_text)
+                            run.bold = (idx == 0)
+                            run.font.name = "Times New Roman"
+                            run.font.size = Pt(14 if idx == 0 else 11)
 
-        notification_url = os.getenv("NOTIFICATION_SERVICE_URL", "http://localhost:8015").rstrip("/")
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{notification_url}/send-email",
-                json={
-                    "to_email": req.recipient_email,
-                    "subject": email_subject,
-                    "body": email_body,
-                    "doc_title": req.doc_name,
-                    "share_url": clean_url,
-                    "sender_email": req.sender_email,
-                    "sender_name": req.sender_name,
-                    "attachment_path": final_attachment
-                },
-                timeout=10.0
-            )
-    except Exception as email_err:
-        logger.error(f"Failed to dispatch share email notification: {email_err}")
+                    if any(p > 1 for p in page_nums):
+                        header_obj = section.header
+                        for p in list(header_obj.paragraphs):
+                            p.text = ""
+                        header_para = header_obj.paragraphs[0] if header_obj.paragraphs else header_obj.add_paragraph()
+                        for idx, line_text in enumerate(header_lines):
+                            if idx > 0:
+                                header_para = header_obj.add_paragraph()
+                            header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            run = header_para.add_run(line_text)
+                            run.bold = (idx == 0)
+                            run.font.name = "Times New Roman"
+                            run.font.size = Pt(14 if idx == 0 else 11)
+                else: # "body_top"
+                    target_para = doc.paragraphs[0] if doc.paragraphs else doc.add_paragraph()
+                    for idx, line_text in enumerate(reversed(header_lines)):
+                        p = target_para.insert_paragraph_before()
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = p.add_run(line_text)
+                        run.bold = (idx == len(header_lines) - 1)
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(14 if idx == len(header_lines) - 1 else 11)
+                modified = True
 
-    return {
-        "success": True,
-        "pdf_generated": bool(final_attachment and os.path.exists(final_attachment)),
-        "message": f"Document '{req.doc_name}' converted to PDF and shared with {req.recipient_email}!"
-    }
+        # --- APPLY FOOTER ---
+        if request.footer_html and request.footer_html.strip():
+            raw_f = request.footer_html.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n').replace('</p>', '\n').replace('</div>', '\n')
+            footer_lines = [line.strip() for line in re.sub(r'<[^>]+>', '', raw_f).split('\n') if line.strip()]
+            if footer_lines:
+                target_mode = (request.footer_apply_to or "first_page").lower()
+                if target_mode == "first_page":
+                    section.different_first_page_header_page = True
+                    footer_obj = section.first_page_footer
+                    for p in list(footer_obj.paragraphs):
+                        p.text = ""
+                    footer_para = footer_obj.paragraphs[0] if footer_obj.paragraphs else footer_obj.add_paragraph()
+                    for idx, line_text in enumerate(footer_lines):
+                        if idx > 0:
+                            footer_para = footer_obj.add_paragraph()
+                        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = footer_para.add_run(line_text)
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(10)
+                elif target_mode == "all_pages":
+                    footer_obj = section.footer
+                    for p in list(footer_obj.paragraphs):
+                        p.text = ""
+                    footer_para = footer_obj.paragraphs[0] if footer_obj.paragraphs else footer_obj.add_paragraph()
+                    for idx, line_text in enumerate(footer_lines):
+                        if idx > 0:
+                            footer_para = footer_obj.add_paragraph()
+                        footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = footer_para.add_run(line_text)
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(10)
+                elif target_mode == "custom":
+                    page_nums = set()
+                    raw = (request.footer_custom_pages or "1").strip()
+                    for part in raw.split(','):
+                        part = part.strip()
+                        if '-' in part:
+                            try:
+                                start, end = map(int, part.split('-'))
+                                page_nums.update(range(start, end + 1))
+                            except ValueError:
+                                pass
+                        elif part.isdigit():
+                            page_nums.add(int(part))
+                    if not page_nums:
+                        page_nums = {1}
+                    
+                    section.different_first_page_header_page = True
+                    if 1 in page_nums:
+                        footer_obj = section.first_page_footer
+                        for p in list(footer_obj.paragraphs):
+                            p.text = ""
+                        footer_para = footer_obj.paragraphs[0] if footer_obj.paragraphs else footer_obj.add_paragraph()
+                        for idx, line_text in enumerate(footer_lines):
+                            if idx > 0:
+                                footer_para = footer_obj.add_paragraph()
+                            footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            run = footer_para.add_run(line_text)
+                            run.font.name = "Times New Roman"
+                            run.font.size = Pt(10)
+
+                    if any(p > 1 for p in page_nums):
+                        footer_obj = section.footer
+                        for p in list(footer_obj.paragraphs):
+                            p.text = ""
+                        footer_para = footer_obj.paragraphs[0] if footer_obj.paragraphs else footer_obj.add_paragraph()
+                        for idx, line_text in enumerate(footer_lines):
+                            if idx > 0:
+                                footer_para = footer_obj.add_paragraph()
+                            footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                            run = footer_para.add_run(line_text)
+                            run.font.name = "Times New Roman"
+                            run.font.size = Pt(10)
+                else: # "body_bottom"
+                    for idx, line_text in enumerate(footer_lines):
+                        p = doc.add_paragraph()
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = p.add_run(line_text)
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(10)
+                modified = True
+
+        if modified:
+            doc.save(file_path)
+            s3_key = f"{request.draft_id}/{filename}" if request.draft_id else filename
+            upload_file_to_s3_background(file_path, s3_key)
+            
+            new_key = hashlib.sha256(f"{filename}_{time.time()}".encode("utf-8")).hexdigest()
+            return {
+                "status": "success",
+                "message": "Header/Footer applied successfully",
+                "new_document_key": new_key,
+                "filename": filename
+            }
+        return {"status": "skipped", "message": "No header or footer content provided."}
+    except Exception as e:
+        logger.exception("Failed to apply header/footer to docx")
+        raise HTTPException(status_code=500, detail=f"Header/Footer modification failed: {str(e)}")
 
 
 @app.post("/v2/draft/compile")
@@ -1624,9 +1402,7 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
             document_type=request.document_type,
         )
         
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
 
         import uuid
         draft_id = str(uuid.uuid4())
@@ -1639,173 +1415,10 @@ async def compile_draft(request: DraftCompileRequest, authorization: Optional[st
         # Move generated file to the sandboxed path
         sandboxed_path = os.path.join(draft_dir, file_name)
         os.rename(output_path, sandboxed_path)
-
-        document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
-
-        # Copy file to lex_bot upload directory (outside Python source tree to prevent uvicorn reloads)
-        lex_bot_upload_dir = "/app/shared_drafts/lex_bot_uploads"
-        os.makedirs(lex_bot_upload_dir, exist_ok=True)
-        lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
-        with open(sandboxed_path, "rb") as sf:
-            with open(lex_bot_path, "wb") as lf:
-                lf.write(sf.read())
-
-        metadata = ai_data.get("metadata") or {}
-        placeholders_list = metadata.get("placeholders_detected") or []
-
-        # Register draft metadata in PostgreSQL db via auth service
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/register",
-                    json={
-                        "draft_id": draft_id,
-                        "name": request.file_target_name or file_name,
-                        "filename": file_name,
-                        "document_key": document_key,
-                        "created_by": user_id,
-                        "variables_detected": placeholders_list,
-                        "status": "In progress",
-                        "section": request.section or "unknown"
-                    },
-                    timeout=10.0
-                )
-        except Exception as reg_err:
-            logger.warning(f"Failed to register draft in DB: {reg_err}")
-
-        internal_url = get_internal_backend_url()
-        params: Dict[str, Any] = {
-            "document": {
-                "fileType": "docx",
-                "key": document_key,
-                "title": file_name,
-                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(file_name)}",
-                "permissions": {"edit": True, "download": True, "print": True},
-            },
-            "documentType": "word",
-            "editorConfig": {
-                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
-                "mode": "edit",
-                "user": {
-                    "id": user_id,
-                    "name": f"User {user_id[:4]}" if len(user_id) >= 4 else f"User {user_id}"
-                },
-                "coauthoring": {
-                    "mode": "fast",
-                    "change": True
-                },
-                "customization": {
-                    "forcesave": True,
-                    "chat": True,
-                    "uiTheme": "theme-light",
-                    "logo": {
-                        "image": "",
-                        "imageDark": "",
-                        "url": ""
-                    }
-                },
-                "plugins": {
-                    "autostart": [
-                        "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
-                    ],
-                    "pluginsData": [
-                        "/plugins/assistant/config.json"
-                    ]
-                }
-            },
-        }
-        params["token"] = _jwt_encode(params)
-        params["documentKey"] = document_key
-        params["filename"] = file_name
-        params["variablesDetected"] = placeholders_list
-        params["draftId"] = draft_id
-
-        return params
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception("Draft compilation failed.")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/v2/draft/compile_with_documents")
-async def compile_with_documents(
-    prompt: str = Form(...),
-    files: List[UploadFile] = File(...),
-    section: str = Form("documents_with_ai"),
-    authorization: Optional[str] = Header(default=None)
-):
-    try:
-        user_id = await verify_token(authorization)
         
-        if not files:
-            raise HTTPException(status_code=400, detail="At least one file is required.")
-        if not prompt.strip():
-            raise HTTPException(status_code=400, detail="Prompt is required.")
-
-        extracted_texts = []
-        for file in files:
-            file_bytes = await file.read()
-            filename = file.filename or "uploaded_file"
-            
-            # Simple text extraction based on file extension
-            if filename.lower().endswith(".docx"):
-                import io
-                from docx import Document as DocReader
-                try:
-                    doc = DocReader(io.BytesIO(file_bytes))
-                    text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-                    if text.strip():
-                        extracted_texts.append(f"--- Document Content ({filename}) ---\n{text}")
-                except Exception as e:
-                    logger.error(f"Failed docx extraction for {filename}: {e}")
-            elif filename.lower().endswith(".pdf") or file_bytes.startswith(b"%PDF"):
-                try:
-                    import fitz
-                    pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
-                    text = ""
-                    for page in pdf_doc:
-                        text += page.get_text()
-                    if text.strip():
-                        extracted_texts.append(f"--- Document Content ({filename}) ---\n{text}")
-                except Exception as e:
-                    logger.error(f"Failed pdf extraction for {filename}: {e}")
-            else:
-                # Text/plain fallback
-                try:
-                    text = file_bytes.decode("utf-8", errors="ignore")
-                    if text.strip():
-                        extracted_texts.append(f"--- Document Content ({filename}) ---\n{text}")
-                except Exception as e:
-                    logger.error(f"Failed txt extraction for {filename}: {e}")
-
-        combined_reference_context = "\n\n".join(extracted_texts).strip()
-        if not combined_reference_context:
-            raise HTTPException(status_code=400, detail="No readable text found in the uploaded documents.")
-
-        # Let's call the AI legal drafter with combined context
-        ai_data = generate_legal_draft(
-            case_context=prompt,
-            legal_documents=combined_reference_context,
-            document_type="Legal Document"
-        )
-        
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
-
-        import uuid
-        draft_id = str(uuid.uuid4())
-        draft_dir = os.path.join(shared_storage_path, draft_id)
-        os.makedirs(draft_dir, exist_ok=True)
-
-        file_target_name = f"AI_Generated_Draft_{int(time.time())}.docx"
-        output_path = build_docx_with_controls(ai_data=ai_data, file_target_name=file_target_name)
-        file_name = os.path.basename(output_path)
-        
-        # Move generated file to the sandboxed path
-        sandboxed_path = os.path.join(draft_dir, file_name)
-        os.rename(output_path, sandboxed_path)
+        # Upload to S3 synchronously so all ECS cluster instances immediately find the compiled draft
+        from s3_helper import upload_file_to_s3
+        upload_file_to_s3(sandboxed_path, f"{draft_id}/{file_name}")
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
 
@@ -1828,13 +1441,12 @@ async def compile_with_documents(
                     f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/register",
                     json={
                         "draft_id": draft_id,
-                        "name": file_name,
+                        "name": request.file_target_name or file_name,
                         "filename": file_name,
                         "document_key": document_key,
                         "created_by": user_id,
                         "variables_detected": placeholders_list,
-                        "status": "In progress",
-                        "section": section
+                        "status": "In progress"
                     },
                     timeout=10.0
                 )
@@ -1846,12 +1458,12 @@ async def compile_with_documents(
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"http://drafter-service:8003/v2/draft/serve/{draft_id}/{file_name}",
+                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{file_name}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"http://drafter-service:8003/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1886,35 +1498,48 @@ async def compile_with_documents(
         params["draftId"] = draft_id
 
         return params
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.exception("Draft compilation from documents failed.")
+        logger.exception("Draft compilation failed.")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/v2/draft/create")
-async def create_empty_draft(request: Request, authorization: Optional[str] = Header(default=None)):
+async def create_empty_draft(authorization: Optional[str] = Header(default=None)):
     try:
         user_id = await verify_token(authorization)
 
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
 
         import uuid
         draft_id = str(uuid.uuid4())
         draft_dir = os.path.join(shared_storage_path, draft_id)
         os.makedirs(draft_dir, exist_ok=True)
 
-        file_name = "Untitled_Draft.docx"
-        file_path = os.path.join(draft_dir, file_name)
+        file_name = f"Empty_Draft_{int(time.time())}.docx"
+        output_path = os.path.join(draft_dir, file_name)
 
         from docx import Document
         doc = Document()
-        doc.add_heading("Untitled Legal Draft", level=1)
-        doc.add_paragraph("Start drafting your legal document here...")
-        doc.save(file_path)
+        doc.add_paragraph("")
+        doc.save(output_path)
+
+        with open(output_path, "rb") as f:
+            file_bytes = f.read()
+            
+        # Upload to S3 in background
+        upload_file_to_s3_background(output_path, f"{draft_id}/{file_name}")
 
         document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
+
+        # Copy empty file to lex_bot upload directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
+        os.makedirs(lex_bot_upload_dir, exist_ok=True)
+        lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
+        with open(lex_bot_path, "wb") as f:
+            f.write(file_bytes)
 
         # Register draft metadata in PostgreSQL db via auth service
         try:
@@ -1935,18 +1560,17 @@ async def create_empty_draft(request: Request, authorization: Optional[str] = He
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
-        internal_url = get_internal_backend_url()
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(file_name)}",
+                "url": f"{DRAFTER_SELF_URL}/v2/draft/serve/{draft_id}/{file_name}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{DRAFTER_SELF_URL}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -1982,8 +1606,8 @@ async def create_empty_draft(request: Request, authorization: Optional[str] = He
 
 @app.post("/v2/draft/upload")
 async def upload_draft(
-    request: Request,
     background_tasks: BackgroundTasks,
+    req: Request,
     file: UploadFile = File(...),
     session_id: Optional[str] = Form(None),
     authorization: Optional[str] = Header(default=None)
@@ -1991,9 +1615,7 @@ async def upload_draft(
     try:
         user_id = await verify_token(authorization)
         
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
-        if not shared_storage_path:
-            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
             
         import uuid
         draft_id = str(uuid.uuid4())
@@ -2066,8 +1688,13 @@ async def upload_draft(
         with open(output_path, "rb") as f:
             docx_bytes = f.read()
 
-        # Copy file to lex_bot upload directory (outside Python source tree to prevent uvicorn reloads)
-        lex_bot_upload_dir = "/app/shared_drafts/lex_bot_uploads"
+        # Upload to S3 in background under both draft_id/safe_name and safe_name keys
+        upload_file_to_s3_background(output_path, f"{draft_id}/{safe_name}")
+        upload_file_to_s3_background(output_path, safe_name)
+
+        # Copy file to lex_bot upload directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
         os.makedirs(lex_bot_upload_dir, exist_ok=True)
         lex_bot_path = os.path.join(lex_bot_upload_dir, safe_name)
         with open(lex_bot_path, "wb") as f:
@@ -2126,18 +1753,18 @@ async def upload_draft(
         except Exception as reg_err:
             logger.warning(f"Failed to register draft in DB: {reg_err}")
 
-        internal_url = get_internal_backend_url()
+        public_url = get_backend_public_url(req)
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
                 "key": document_key,
                 "title": safe_name,
-                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(safe_name)}",
+                "url": f"{public_url}/v2/draft/serve/{draft_id}/{quote(safe_name)}",
                 "permissions": {"edit": True, "download": True, "print": True},
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
+                "callbackUrl": f"{public_url}/v2/draft/callback/{draft_id}",
                 "mode": "edit",
                 "user": {
                     "id": user_id,
@@ -2204,92 +1831,86 @@ async def onlyoffice_forcesave(request: ForceSaveRequest, authorization: Optiona
 
 
 @app.get("/v2/draft/config/{draft_id}")
-async def get_draft_config(draft_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
+async def get_draft_config(
+    draft_id: str,
+    request: Request,
+    authorization: Optional[str] = Header(default=None)
+):
     try:
         user_id = await verify_token(authorization)
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
         
-        access_level = "edit"
-        # 1. Verify access via auth service
-        try:
-            async with httpx.AsyncClient() as client:
-                access_resp = await client.get(
-                    f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/verify_access/{draft_id}?user_id={user_id}",
-                    timeout=5.0
-                )
-                if access_resp.status_code == 200:
+        # 1. Verify access via auth service (with retry for resilience under load)
+        access_data = None
+        last_exc = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient() as client:
+                    access_resp = await client.get(
+                        f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/verify_access/{draft_id}?user_id={user_id}",
+                        timeout=8.0
+                    )
+                    access_resp.raise_for_status()
                     access_data = access_resp.json()
-                    access_level = access_data.get("access_level", "edit")
-                elif access_resp.status_code == 403:
-                    if user_id.startswith("dev_") or os.getenv("DEV_BYPASS_AUTH", "true").lower() == "true":
-                        access_level = "edit"
-                    else:
-                        raise HTTPException(status_code=403, detail="You do not have access to this draft.")
-        except HTTPException as he:
-            raise he
-        except Exception as exc:
-            logger.warning(f"Failed to contact auth service for access verification: {exc}")
-            access_level = "edit"
+                    break
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(f"Auth access check attempt {attempt+1}/3 failed: {exc}")
+                if attempt < 2:
+                    import asyncio
+                    await asyncio.sleep(0.5 * (attempt + 1))
+        if access_data is None:
+            logger.error(f"All attempts to contact auth service failed: {last_exc}")
+            raise HTTPException(status_code=502, detail=f"Auth service unavailable. Please retry.")
              
+        access_level = access_data.get("access_level", "none")
         if access_level == "none":
             raise HTTPException(status_code=403, detail="You do not have access to this draft.")
              
-        # 2. Get draft metadata from auth service
-        file_name = None
-        document_key = None
-        variables_detected = []
-        status_val = "In progress"
-
-        try:
-            async with httpx.AsyncClient() as client:
-                draft_resp = await client.get(
-                    f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
-                    timeout=5.0
-                )
-                if draft_resp.status_code == 200:
+        # 2. Get draft metadata from auth service (with retry for resilience under load)
+        draft_data = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient() as client:
+                    draft_resp = await client.get(
+                        f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
+                        timeout=8.0
+                    )
+                    draft_resp.raise_for_status()
                     draft_data = draft_resp.json()
-                    file_name = draft_data.get("filename")
-                    document_key = draft_data.get("documentKey")
-                    variables_detected = draft_data.get("variablesDetected", [])
-                    status_val = draft_data.get("status", "In progress")
-        except Exception as exc:
-            logger.warning(f"Failed to fetch draft metadata from auth service: {exc}")
+                    break
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(f"Auth draft metadata attempt {attempt+1}/3 failed: {exc}")
+                if attempt < 2:
+                    import asyncio
+                    await asyncio.sleep(0.5 * (attempt + 1))
+        if draft_data is None:
+            logger.error(f"All attempts to fetch draft metadata failed: {last_exc}")
+            raise HTTPException(status_code=502, detail=f"Draft metadata unavailable. Please retry.")
+             
+        file_name = draft_data.get("filename")
+        raw_document_key = draft_data.get("documentKey") or draft_id
+        
+        target_file = os.path.join(shared_storage_path, draft_id, file_name) if file_name else None
+        mtime_suffix = ""
+        if target_file and os.path.exists(target_file):
+            mtime_suffix = f"_{int(os.path.getmtime(target_file))}"
+        
+        document_key = hashlib.sha256(f"{raw_document_key}{mtime_suffix}".encode("utf-8")).hexdigest()
+         
+        public_url = get_backend_public_url(request)
 
-        shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
-        draft_dir = os.path.join(shared_storage_path, draft_id)
+        serve_url = f"{public_url}/v2/draft/serve/{draft_id}/{quote(file_name)}"
+        callback_url = f"{public_url}/v2/draft/callback/{draft_id}"
 
-        if not file_name and os.path.isdir(draft_dir):
-            files = [f for f in os.listdir(draft_dir) if os.path.isfile(os.path.join(draft_dir, f))]
-            if files:
-                docx_files = [f for f in files if f.lower().endswith(".docx")]
-                file_name = docx_files[0] if docx_files else files[0]
-
-        if not file_name:
-            file_name = f"Draft_{draft_id[:8]}.docx"
-
-        target_file = os.path.join(draft_dir, file_name)
-        file_mtime = int(os.path.getmtime(target_file)) if os.path.isfile(target_file) else int(time.time())
-
-        if not document_key:
-            document_key = hashlib.sha256(f"{draft_id}_{file_mtime}".encode("utf-8")).hexdigest()
-        else:
-            document_key = f"{document_key}_{file_mtime}"
-
-        # Append file size so a corrupted/replaced file always busts ONLYOFFICE's cache
-        # even if mtime is unchanged (e.g., overwritten by forcesave at the same second).
-        try:
-            file_size = os.path.getsize(target_file) if os.path.isfile(target_file) else 0
-            document_key = f"{document_key}_{file_size}"
-        except Exception:
-            pass
-          
         # 3. Build OnlyOffice config
-        internal_url = get_internal_backend_url()
         params: Dict[str, Any] = {
             "document": {
                 "fileType": "docx",
                 "key": document_key,
                 "title": file_name,
-                "url": f"{internal_url}/drafter/v2/draft/serve/{draft_id}/{quote(file_name)}",
+                "url": serve_url,
                 "permissions": {
                     "edit": access_level == "edit",
                     "download": True,
@@ -2298,7 +1919,7 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
             },
             "documentType": "word",
             "editorConfig": {
-                "callbackUrl": f"{internal_url}/drafter/v2/draft/callback/{draft_id}",
+                "callbackUrl": callback_url,
                 "mode": "edit" if access_level == "edit" else "view",
                 "user": {
                     "id": user_id,
@@ -2322,18 +1943,16 @@ async def get_draft_config(draft_id: str, request: Request, authorization: Optio
                     "autostart": [
                         "asc.{43d1a84f-e274-4b53-a55e-3363f8db1f34}"
                     ],
-                    "pluginsData": [
-                        "/plugins/assistant/config.json"
-                    ]
+                    "pluginsData": []
                 }
             },
         }
         params["token"] = _jwt_encode(params)
         params["documentKey"] = document_key
         params["filename"] = file_name
-        params["variablesDetected"] = variables_detected
+        params["variablesDetected"] = draft_data.get("variablesDetected", [])
         params["draftId"] = draft_id
-        params["status"] = status_val
+        params["status"] = draft_data.get("status", "In progress")
          
         return params
     except HTTPException as he:
@@ -2359,18 +1978,16 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
             if isinstance(payload_token, str) and payload_token.strip():
                 token = payload_token.strip()
 
-        if not token:
-            raise HTTPException(status_code=403, detail="Forbidden")
-
-        try:
-            decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-            if isinstance(decoded, dict):
-                if "payload" in decoded:
-                    event = decoded["payload"]
-                else:
-                    event = decoded
-        except jwt.PyJWTError:
-            raise HTTPException(status_code=403, detail="Forbidden")
+        if token:
+            try:
+                decoded = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+                if isinstance(decoded, dict):
+                    if "payload" in decoded:
+                        event = decoded["payload"]
+                    else:
+                        event = decoded
+            except Exception as jwt_err:
+                logger.debug(f"Callback JWT decode notice: {jwt_err}")
 
         status = event.get("status")
         if isinstance(status, str) and status.isdigit():
@@ -2400,9 +2017,9 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
                             f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
                             timeout=5.0
                         )
-                        draft_resp.raise_for_status()
-                        draft_data = draft_resp.json()
-                        file_name = draft_data.get("filename")
+                        if draft_resp.ok:
+                            draft_data = draft_resp.json()
+                            file_name = draft_data.get("filename")
                 except Exception as exc:
                     logger.error(f"Failed to fetch draft metadata from auth service: {exc}")
 
@@ -2420,14 +2037,24 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
                 target_path = os.path.join(shared_storage_path, file_name)
                 os.makedirs(shared_storage_path, exist_ok=True)
 
-            async with httpx.AsyncClient(follow_redirects=True) as client:
-                async with client.stream("GET", url, timeout=60.0) as resp:
-                    resp.raise_for_status()
-                    with open(target_path, "wb") as f:
-                        async for chunk in resp.aiter_bytes():
-                            if chunk:
-                                f.write(chunk)
-                                
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as client:
+                    async with client.stream("GET", url, timeout=60.0) as resp:
+                        if resp.is_success:
+                            with open(target_path, "wb") as f:
+                                async for chunk in resp.aiter_bytes():
+                                    if chunk:
+                                        f.write(chunk)
+            except Exception as dl_err:
+                logger.error(f"Failed streaming saved document from DocumentServer: {dl_err}")
+
+            # Upload saved file to S3
+            try:
+                s3_key = f"{draft_id}/{file_name}" if draft_id else file_name
+                upload_file_to_s3_background(target_path, s3_key)
+            except Exception as s3_err:
+                logger.warning(f"S3 upload background notice: {s3_err}")
+
             # Touch draft updated_at in DB
             if draft_id:
                 try:
@@ -2438,1025 +2065,131 @@ async def onlyoffice_callback(event: Dict[str, Any], draft_id: Optional[str] = N
                         )
                 except Exception as touch_err:
                     logger.warning(f"Failed to touch draft updated_at: {touch_err}")
-    except Exception:
-        logger.exception("OnlyOffice callback processing failed.")
+    except Exception as general_err:
+        logger.warning(f"OnlyOffice callback handled safely: {general_err}")
 
     return {"error": 0}
 
 
-# ── Chronology PDF Generation Helper ──────────────────────────────────
-
-def generate_chronology_pdf_file(case_name: str, events: list, output_path: str):
-    from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    import time
-    
-    doc = SimpleDocTemplate(output_path, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'TitleStyle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        leading=22,
-        textColor=colors.HexColor('#1A2B4C'),
-        alignment=1, # Center
-        spaceAfter=12
-    )
-    
-    meta_style = ParagraphStyle(
-        'MetaStyle',
-        parent=styles['Normal'],
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor('#555555'),
-        alignment=1, # Center
-        spaceAfter=24
-    )
-    
-    cell_style = ParagraphStyle(
-        'CellStyle',
-        parent=styles['Normal'],
-        fontSize=9,
-        leading=12
-    )
-    
-    header_style = ParagraphStyle(
-        'HeaderStyle',
-        parent=styles['Normal'],
-        fontSize=10,
-        leading=14,
-        textColor=colors.white,
-        fontName='Helvetica-Bold'
-    )
-    
-    story.append(Paragraph("CHRONOLOGY OF EVENTS", title_style))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(f"Matter: {case_name} | Prepared on: {time.strftime('%d %B %Y')}", meta_style))
-    story.append(Spacer(1, 15))
-    
-    # Table data
-    table_data = [[
-        Paragraph("Date", header_style),
-        Paragraph("Type", header_style),
-        Paragraph("Event Description", header_style),
-        Paragraph("Actors", header_style),
-        Paragraph("Source Citations", header_style)
-    ]]
-    
-    import html
-    for ev in events:
-        date_val = ev.get("event_date", "") or "—"
-        dtype = ev.get("date_type", "exact").capitalize()
-        actors_list = ev.get("actors", [])
-        actors_str = ", ".join(actors_list) if isinstance(actors_list, list) else str(actors_list)
-        desc = ev.get("event_description", "") or "—"
-        
-        # Citations formatting
-        c_list = ev.get("citations") or []
-        if not c_list:
-            doc_name = ev.get('source_document', '') or ''
-            cite_str = f"{html.escape(doc_name)} p.{ev.get('source_page', 1)}"
-        else:
-            cite_str = "; ".join(list(set([f"{html.escape(c.get('source_document', '') or '')} p.{c.get('source_page', 1)}" for c in c_list])))
-            
-        escaped_desc = html.escape(desc)
-        if ev.get("is_conflict"):
-            escaped_desc = f"<b>[CONFLICT]</b> {escaped_desc}"
-            
-        table_data.append([
-            Paragraph(html.escape(date_val), cell_style),
-            Paragraph(html.escape(dtype), cell_style),
-            Paragraph(escaped_desc, cell_style),
-            Paragraph(html.escape(actors_str), cell_style),
-            Paragraph(cite_str, cell_style)
-        ])
-        
-    t = Table(table_data, colWidths=[70, 60, 200, 90, 120])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1A2B4C')),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#D1D5DB')),
-        ('TOPPADDING', (0,0), (-1,-1), 6),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-        ('LEFTPADDING', (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F9FAFB')])
-    ]))
-    story.append(t)
-    doc.build(story)
-
-
-# ── Chronology Router Endpoints ────────────────────────────────────────
-
-@app.post("/v2/chronology/case")
-async def create_chronology_case(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    user_id = await verify_token(authorization)
-    case_name = request.get("name")
-    if not case_name:
-        raise HTTPException(status_code=400, detail="Case name is required")
-        
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case",
-            json={"name": case_name, "user_id": user_id},
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-@app.get("/v2/chronology/cases")
-async def list_chronology_cases(authorization: Optional[str] = Header(default=None)):
-    user_id = await verify_token(authorization)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/cases/{user_id}",
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-@app.post("/v2/chronology/upload")
-async def upload_chronology_documents(
-    case_id: str = Form(...),
-    files: List[UploadFile] = File(...),
+@app.post("/v2/document/upload")
+async def upload_document_to_case(
+    file: UploadFile = File(...),
+    case_id: Optional[str] = Form(None),
     authorization: Optional[str] = Header(default=None)
 ):
-    user_id = await verify_token(authorization)
-    
-    # Verify case ownership
-    async with httpx.AsyncClient() as client:
-        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
-        case_resp.raise_for_status()
-        case_data = case_resp.json()
-        if str(case_data.get("user_id")) != user_id:
-            raise HTTPException(status_code=403, detail="Unauthorized access to this case")
-            
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    upload_dir = os.path.join(shared_storage_path, "chronology", case_id)
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    registered_docs = []
-    
-    from chronology_engine import process_document_async
-    
-    for file in files:
-        file_name = os.path.basename(file.filename or "file")
-        file_bytes = await file.read()
-        file_size = len(file_bytes)
-        
-        # 1. Register doc metadata in postgres
-        async with httpx.AsyncClient() as client:
-            reg_resp = await client.post(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/document/register",
-                json={
-                    "case_id": case_id,
-                    "file_name": file_name,
-                    "file_size": file_size
-                },
-                timeout=10.0
-            )
-            reg_resp.raise_for_status()
-            doc_id = reg_resp.json().get("id")
-            
-        # 2. Write file to storage
-        target_path = os.path.join(upload_dir, f"{doc_id}_{file_name}")
-        with open(target_path, "wb") as f:
-            f.write(file_bytes)
-            
-        # 3. Trigger asynchronous background parsing & OCR
-        process_document_async(target_path, doc_id, AUTH_SERVICE_URL, upload_dir)
-        
-        registered_docs.append({
-            "id": doc_id,
-            "file_name": file_name,
-            "status": "processing"
-        })
-        
-    return {"documents": registered_docs}
-
-
-@app.get("/v2/chronology/case/{case_id}/status")
-async def get_case_processing_status(case_id: str, authorization: Optional[str] = Header(default=None)):
-    await verify_token(authorization)
-    
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/documents/{case_id}",
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        docs = resp.json().get("documents", [])
-        
-    if not docs:
-        return {"status": "empty", "progress": 100, "documents": []}
-        
-    # Check overall progress
-    total_pages = sum([d.get("total_pages", 0) for d in docs])
-    processed = sum([d.get("pages_processed", 0) for d in docs])
-    
-    overall_status = "done"
-    for d in docs:
-        if d.get("status") in ["pending", "processing"]:
-            overall_status = "processing"
-            break
-        elif d.get("status") == "failed":
-            overall_status = "failed"
-            
-    progress_percentage = 100
-    if total_pages > 0:
-        progress_percentage = int((processed / total_pages) * 100)
-        
-    return {
-        "status": overall_status,
-        "progress": progress_percentage,
-        "documents": docs
-    }
-
-
-@app.post("/v2/chronology/generate")
-async def generate_timeline_chronology(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    user_id = await verify_token(authorization)
-    case_id = request.get("case_id")
-    if not case_id:
-        raise HTTPException(status_code=400, detail="case_id is required")
-        
-    # 1. Update case status to 'extracting'
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/status",
-            params={"case_id": case_id, "status": "extracting"},
-            timeout=10.0
-        )
-        
-        # 2. Get list of documents
-        doc_resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/documents/{case_id}",
-            timeout=10.0
-        )
-        doc_resp.raise_for_status()
-        docs = doc_resp.json().get("documents", [])
-        
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    upload_dir = os.path.join(shared_storage_path, "chronology", case_id)
-    
-    raw_events = []
-    
-    from chronology_engine import extract_events_from_page, run_chronology_engine
-    
-    # 3. Read cache files page-by-page and run AI event extraction
-    for doc in docs:
-        doc_id = doc.get("id")
-        doc_name = doc.get("file_name")
-        cache_path = os.path.join(upload_dir, f"{doc_id}_parsed.json")
-        
-        if os.path.exists(cache_path):
-            with open(cache_path, "r", encoding="utf-8") as f:
-                pages = json.load(f)
-                
-            for page in pages:
-                page_text = page.get("text", "")
-                page_num = page.get("page_number", 1)
-                
-                # Call LLM sequentially to extract events from each page
-                extracted = extract_events_from_page(page_text, page_num, doc_name)
-                raw_events.extend(extracted)
-                
-    # 4. Normalize and Deduplicate events
-    processed_events = run_chronology_engine(raw_events)
-    
-    # 5. Save results to Database
-    # Prepare payload
-    events_payload = []
-    for ev in processed_events:
-        events_payload.append({
-            "case_id": case_id,
-            "event_date": ev.get("event_date", ""),
-            "date_type": ev.get("date_type", "exact"),
-            "event_description": ev.get("event_description", ""),
-            "actors": ev.get("actors", []),
-            "source_document": ev.get("source_document", ""),
-            "source_page": ev.get("source_page", 1),
-            "source_text": ev.get("source_text", ""),
-            "confidence": float(ev.get("confidence", 1.0)),
-            "is_conflict": bool(ev.get("is_conflict", False)),
-            "conflict_details": ev.get("conflict_details", []),
-            "status": "pending"
-        })
-        
-    async with httpx.AsyncClient() as client:
-        # Save events
-        if events_payload:
-            save_resp = await client.post(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/register",
-                json=events_payload,
-                timeout=30.0
-            )
-            save_resp.raise_for_status()
-            
-        # Update case status to 'ready'
-        await client.post(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/status",
-            params={"case_id": case_id, "status": "ready"},
-            timeout=10.0
-        )
-        
-    return {"status": "ready", "events_extracted": len(events_payload)}
-
-
-@app.get("/v2/chronology/case/{case_id}/events")
-async def list_chronology_events(case_id: str, authorization: Optional[str] = Header(default=None)):
-    await verify_token(authorization)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}",
-            timeout=15.0
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-@app.put("/v2/chronology/events/{event_id}")
-async def update_chronology_event(
-    event_id: str,
-    request: Dict[str, Any],
-    authorization: Optional[str] = Header(default=None)
-):
-    await verify_token(authorization)
-    # Forward update to database
-    payload = dict(request)
-    payload["event_id"] = event_id
-    payload["user_modified"] = True
-    
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/event/update",
-            json=payload,
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-@app.get("/v2/chronology/document/{doc_id}/serve")
-async def serve_chronology_source_file(doc_id: str, case_id: str, authorization: Optional[str] = Header(default=None)):
-    await verify_token(authorization)
-    
-    # Fetch document metadata
-    async with httpx.AsyncClient() as client:
-        docs_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/documents/{case_id}")
-        docs_resp.raise_for_status()
-        docs = docs_resp.json().get("documents", [])
-        
-    doc_meta = next((d for d in docs if d["id"] == doc_id), None)
-    if not doc_meta:
-        raise HTTPException(status_code=404, detail="Document not found in case")
-        
-    file_name = doc_meta["file_name"]
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    file_path = os.path.join(shared_storage_path, "chronology", case_id, f"{doc_id}_{file_name}")
-    
-    if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Physical file not found")
-        
-    # Guess mime type
-    import mimetypes
-    content_type, _ = mimetypes.guess_type(file_name)
-    if not content_type:
-        content_type = "application/octet-stream"
-        
-    return FileResponse(
-        path=file_path,
-        media_type=content_type,
-        filename=file_name
-    )
-
-
-@app.post("/v2/chronology/export")
-async def export_chronology_pdf_report(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    user_id = await verify_token(authorization)
-    case_id = request.get("case_id")
-    if not case_id:
-        raise HTTPException(status_code=400, detail="case_id is required")
-        
-    async with httpx.AsyncClient() as client:
-        # Get Case name
-        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
-        case_resp.raise_for_status()
-        case_name = case_resp.json().get("name", "Timeline Matter")
-        
-        # Get events
-        events_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}")
-        events_resp.raise_for_status()
-        events = events_resp.json().get("events", [])
-        
-    # filter only accepted/pending events, skip rejected
-    filtered_events = [e for e in events if e.get("status") != "rejected"]
-    
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    os.makedirs(shared_storage_path, exist_ok=True)
-    pdf_path = os.path.join(shared_storage_path, f"chronology_{case_id}.pdf")
-    
-    # Generate the PDF file on disk
-    generate_chronology_pdf_file(case_name, filtered_events, pdf_path)
-    
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        filename=f"{case_name.replace(' ', '_')}_chronology.pdf"
-    )
-
-
-@app.post("/v2/chronology/export_docx")
-async def export_chronology_docx_report(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    user_id = await verify_token(authorization)
-    case_id = request.get("case_id")
-    sort_order = request.get("sort_order") or "asc"
-    
-    if not case_id:
-        raise HTTPException(status_code=400, detail="case_id is required")
-        
-    async with httpx.AsyncClient() as client:
-        # Get Case name
-        case_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/case/{case_id}")
-        case_resp.raise_for_status()
-        case_name = case_resp.json().get("name", "Timeline Matter")
-        
-        # Get events
-        events_resp = await client.get(f"{AUTH_SERVICE_URL.rstrip('/')}/internal/chronology/events/{case_id}")
-        events_resp.raise_for_status()
-        events = events_resp.json().get("events", [])
-        
-    # filter only accepted/pending events, skip rejected
-    filtered_events = [e for e in events if e.get("status") != "rejected"]
-    
-    # 1. Check if a draft with the same filename already exists for this user (avoid duplicates)
-    file_name = f"{case_name.replace(' ', '_')}_Chronology.docx"
-    draft_id = None
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            find_resp = await client.get(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/find_by_filename",
-                params={"filename": file_name, "user_id": user_id},
-                timeout=10.0
-            )
-            if find_resp.status_code == 200:
-                find_data = find_resp.json()
-                draft_id = find_data.get("id")
-    except Exception as find_err:
-        logger.warning(f"Failed to check existing chronology draft: {find_err}")
-
-    if not draft_id:
-        import uuid
-        draft_id = str(uuid.uuid4())
-        
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    draft_dir = os.path.join(shared_storage_path, draft_id)
-    os.makedirs(draft_dir, exist_ok=True)
-    output_path = os.path.join(draft_dir, file_name)
-    
-    # 2. Build the DOCX file
-    import docx
-    from docx.shared import Inches, Pt
-    
-    doc = docx.Document()
-    
-    title_p = doc.add_paragraph()
-    run = title_p.add_run(f"Chronology of Events - {case_name}")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(14)
-    run.bold = True
-    title_p.paragraph_format.space_after = Pt(12)
-    
-    # Sort
-    def get_sort_key(ev):
-        val = ev.get("timestamp") or ev.get("date_normalized") or ev.get("event_date") or ""
-        return str(val)
-        
-    sorted_events = sorted(filtered_events, key=get_sort_key, reverse=(sort_order == "desc"))
-    
-    table = doc.add_table(rows=1, cols=4)
-    table.style = 'Table Grid'
-    
-    hdr_cells = table.rows[0].cells
-    headers = ["SL.no", "Date", "Particulars", "Page no"]
-    col_widths = [Inches(0.6), Inches(1.2), Inches(4.5), Inches(0.8)]
-    
-    for idx, name in enumerate(headers):
-        hdr_cells[idx].text = name
-        hdr_cells[idx].paragraphs[0].runs[0].font.name = 'Times New Roman'
-        hdr_cells[idx].paragraphs[0].runs[0].font.size = Pt(11)
-        hdr_cells[idx].paragraphs[0].runs[0].bold = True
-        
-    for sl_no, ev in enumerate(sorted_events, start=1):
-        row_cells = table.add_row().cells
-        
-        # Sl.no
-        row_cells[0].text = str(sl_no)
-        # Date
-        row_cells[1].text = str(ev.get("event_date") or ev.get("date") or "")
-        # Particulars
-        row_cells[2].text = str(ev.get("event_description") or ev.get("event") or "")
-        # Page no
-        c_list = ev.get("citations") or []
-        if not c_list:
-            doc_name = ev.get('source_document', '') or ''
-            page_no = str(ev.get('source_page', 1) or '')
-            cite_str = f"{doc_name} p.{page_no}" if doc_name else page_no
-        else:
-            cite_str = "; ".join(list(set([f"{c.get('source_document', '') or ''} p.{c.get('source_page', 1) or ''}" for c in c_list])))
-        row_cells[3].text = cite_str
-        
-        for idx, cell in enumerate(row_cells):
-            cell.width = col_widths[idx]
-            for p in cell.paragraphs:
-                for r in p.runs:
-                    r.font.name = 'Times New Roman'
-                    r.font.size = Pt(10.5)
-                    
-    doc.save(output_path)
-    
-    # 3. Read bytes to also replicate in uploads
-    with open(output_path, "rb") as f:
-        file_bytes = f.read()
-        
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    lex_bot_upload_dir = os.path.abspath(os.path.join(current_dir, "../Deep_research/lex_bot/data/uploads"))
-    os.makedirs(lex_bot_upload_dir, exist_ok=True)
-    lex_bot_path = os.path.join(lex_bot_upload_dir, file_name)
-    with open(lex_bot_path, "wb") as f:
-        f.write(file_bytes)
-        
-    # 4. Register in database
-    document_key = hashlib.sha256(draft_id.encode("utf-8")).hexdigest()
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/register",
-                json={
-                    "draft_id": draft_id,
-                    "name": file_name,
-                    "filename": file_name,
-                    "document_key": document_key,
-                    "created_by": user_id,
-                    "variables_detected": [],
-                    "status": "In progress"
-                },
-                timeout=10.0
-            )
-    except Exception as reg_err:
-        logger.warning(f"Failed to register chronology draft: {reg_err}")
-        
-    return {
-        "id": draft_id,
-        "draftId": draft_id,
-        "filename": file_name,
-        "documentKey": document_key
-    }
-
-
-# ── ONLYOFFICE AI Redlining Router Endpoints ───────────────────────────
-
-REDLINE_AI_PROMPT = """
-You are an expert Legal Counsel and Document Editor.
-Your task is to revise the selected text based strictly on the user's instructions.
-
-GUIDELINES:
-1. ONLY modify the selected text. Do NOT modify or introduce any changes outside the selection bounds.
-2. Preserve defined terms and the legal intent unless explicitly asked to modify them.
-3. Keep the output clean. Do NOT include markdown code blocks or redline notation in the text response.
-4. Explain the change in a single concise sentence.
-5. Format your output strictly as a JSON object matching this schema:
-{
-  "revised_text": "Complete revised string",
-  "summary": "Short 1-sentence explanation of what changed"
-}
-"""
-
-@app.post("/v2/redline/propose")
-async def propose_redline(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    user_id = await verify_token(authorization)
-    draft_id = request.get("draft_id")
-    paragraph_id = request.get("paragraph_id")
-    selected_text = request.get("selected_text")
-    instruction = request.get("instruction")
-    
-    if not draft_id or not paragraph_id or not selected_text or not instruction:
-        raise HTTPException(status_code=400, detail="Missing required parameters")
-        
-    # Resolve draft_id to UUID if it's a documentKey hash
-    async with httpx.AsyncClient() as client:
-        resolve_resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/resolve_id/{draft_id}",
-            timeout=5.0
-        )
-        if resolve_resp.status_code == 200:
-            draft_id = resolve_resp.json().get("id")
-            
-    # Get optional context
-    doc_context = ""
-    try:
-        async with httpx.AsyncClient() as client:
-            draft_resp = await client.get(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
-                timeout=5.0
-            )
-            if draft_resp.status_code == 200:
-                draft_data = draft_resp.json()
-                doc_context = f"Document Type: {draft_data.get('name', 'Contract')}\n"
-    except Exception as exc:
-        logger.warning(f"Failed to fetch draft context: {exc}")
-
-    # Call Gemini model
-    try:
-        model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=REDLINE_AI_PROMPT,
-            generation_config=genai.GenerationConfig(
-                temperature=0.1,
-                response_mime_type="application/json",
-                max_output_tokens=1024
-            )
-        )
-        prompt_content = f"{doc_context}SELECTED TEXT:\n\"{selected_text}\"\n\nINSTRUCTION:\n{instruction}"
-        response = model.generate_content(prompt_content)
-        
-        raw_text = response.text.strip()
-        payload = json.loads(raw_text)
-        revised_text = payload.get("revised_text", "").strip()
-        summary = payload.get("summary", "AI Redline Suggestion").strip()
-    except Exception as e:
-        logger.error(f"Redline LLM failed: {e}")
-        raise HTTPException(status_code=500, detail=f"AI Redline generation failed: {str(e)}")
-
-    # Register proposed change in auth DB
-    async with httpx.AsyncClient() as client:
-        reg_resp = await client.post(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/redline/change/register",
-            json={
-                "draft_id": draft_id,
-                "paragraph_id": paragraph_id,
-                "original_text": selected_text,
-                "new_text": revised_text,
-                "summary": summary
-            },
-            timeout=10.0
-        )
-        reg_resp.raise_for_status()
-        change_id = reg_resp.json().get("id")
-
-    # Generate sequence diff
-    import difflib
-    matcher = difflib.SequenceMatcher(None, selected_text, revised_text)
-    opcodes = []
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        opcodes.append({
-            "op": tag,
-            "orig_start": i1,
-            "orig_end": i2,
-            "rev_start": j1,
-            "rev_end": j2,
-            "orig_chunk": selected_text[i1:i2],
-            "rev_chunk": revised_text[j1:j2]
-        })
-
-    return {
-        "change_id": change_id,
-        "revised_text": revised_text,
-        "summary": summary,
-        "opcodes": opcodes
-    }
-
-
-@app.get("/v2/redline/changes/{draft_id}")
-async def list_redline_changes(draft_id: str, authorization: Optional[str] = Header(default=None)):
-    await verify_token(authorization)
-    async with httpx.AsyncClient() as client:
-        # Resolve draft_id to UUID if it's a documentKey hash
-        resolve_resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/resolve_id/{draft_id}",
-            timeout=5.0
-        )
-        if resolve_resp.status_code == 200:
-            draft_id = resolve_resp.json().get("id")
-
-        resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/redline/changes/{draft_id}",
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-@app.put("/v2/redline/changes/{change_id}")
-async def update_redline_change_status(
-    change_id: str,
-    request: Dict[str, Any],
-    authorization: Optional[str] = Header(default=None)
-):
-    await verify_token(authorization)
-    status = request.get("status")
-    if not status:
-        raise HTTPException(status_code=400, detail="status is required")
-        
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/redline/change/status",
-            json={"change_id": change_id, "status": status},
-            timeout=10.0
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-
-# ── AI Legal Draft Judge Router Endpoints ──────────────────────────────
-
-JUDGE_AI_PROMPT = """
-You are a senior Judge and experienced Legal Auditor.
-Evaluate the provided legal draft text based on standard litigation and transactional drafting criteria:
-- Structure & Logical Organization
-- Consistency & Clarity
-- Legal Reasoning & Argument Development
-- Supporting References & Citations
-- Repetition & Ambiguity
-- Vulnerability to Opposing Arguments
-
-Provide your analysis strictly in JSON format matching this schema:
-{
-  "overall_score": 84,
-  "grade": "Strong Draft",
-  "categories": {
-    "structure": 91,
-    "reasoning": 78,
-    "consistency": 86,
-    "support": 74,
-    "clarity": 92,
-    "persuasiveness": 81
-  },
-  "strengths": ["Clear organization", "Strong logic"],
-  "weaknesses": ["Counterargument needs details"],
-  "critical_issues": ["Conflicting dates"],
-  "suggestions": ["Verify the termination clause"],
-  "opposing_questions": ["What is the backing for the damages amount?"]
-}
-
-IMPORTANT:
-1. You MUST escape any double quotes inside JSON string values as \\" (e.g. \\"Force Majeure\\") to ensure that the output is syntactically valid JSON.
-2. Never output raw unescaped double quotes inside text fields.
-3. Output only the pure JSON structure, without any markdown code block wrapper (no ```json).
-"""
-
-@app.post("/v2/draft/judge")
-async def judge_draft(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    import os
-    user_id = await verify_token(authorization)
-    draft_id = request.get("draft_id")
-    if not draft_id:
-        raise HTTPException(status_code=400, detail="draft_id is required")
-        
-    # 1. Resolve draft_id to UUID if it's a documentKey hash
-    async with httpx.AsyncClient() as client:
-        resolve_resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/resolve_id/{draft_id}",
-            timeout=5.0
-        )
-        if resolve_resp.status_code == 200:
-            draft_id = resolve_resp.json().get("id")
-            
-        # 2. Get draft metadata
-        draft_resp = await client.get(
-            f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/get/{draft_id}",
-            timeout=5.0
-        )
-        draft_resp.raise_for_status()
-        draft_data = draft_resp.json()
-        filename = draft_data.get("filename")
-        
-    if not filename:
-        raise HTTPException(status_code=404, detail="Filename not found for draft")
-        
-    # 3. Locate and parse docx file from shared storage
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    file_path = os.path.join(shared_storage_path, draft_id, filename)
-    
-    if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Draft document file not found. Please edit/save draft in OnlyOffice first.")
-        
-    # Parse docx paragraphs
-    try:
-        import docx
-        doc = docx.Document(file_path)
-        full_text = []
-        for para in doc.paragraphs:
-            if para.text.strip():
-                full_text.append(para.text.strip())
-        document_text = "\n".join(full_text)
-    except Exception as parse_err:
-        logger.error(f"Docx parsing failed: {parse_err}")
-        raise HTTPException(status_code=500, detail=f"Failed to parse document text: {str(parse_err)}")
-        
-    if not document_text.strip():
-        raise HTTPException(status_code=400, detail="The document appears to be empty. Add some text first.")
-
-    # 4. Invoke LLM for judgment
-    try:
-        import google.generativeai as genai
-        api_key = os.getenv("GEMINI_API_KEY")
-        if api_key:
-            genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=JUDGE_AI_PROMPT,
-            generation_config=genai.GenerationConfig(
-                temperature=0.1,
-                response_mime_type="application/json",
-                max_output_tokens=8192
-            )
-        )
-        prompt_content = f"LEGAL DRAFT FILENAME: {filename}\n\nCONTENT:\n{document_text}"
-        response = model.generate_content(prompt_content)
-        
-        raw_text = response.text.strip()
-        if raw_text.startswith("```"):
-            lines = raw_text.splitlines()
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines[-1].startswith("```"):
-                lines = lines[:-1]
-            raw_text = "\n".join(lines).strip()
-            
-        try:
-            payload = json.loads(raw_text)
-        except Exception as json_err:
-            logger.warning(f"Standard JSON decode failed: {json_err}. Trying ast.literal_eval fallback.")
-            try:
-                import ast
-                payload = ast.literal_eval(raw_text)
-                if not isinstance(payload, dict):
-                    raise ValueError("Parsed object is not a dictionary")
-            except Exception as ast_err:
-                logger.error(f"Both JSON and AST parsing failed. Raw response: {raw_text}")
-                raise json_err
-            
-        payload["filename"] = filename
-        return payload
-    except Exception as e:
-        logger.error(f"Draft Judge LLM failed: {e}")
-        raise HTTPException(status_code=500, detail=f"AI Draft Auditor failed: {str(e)}")
-
-
-@app.post("/v2/draft/judge/export")
-async def export_judge_report_pdf(request: Dict[str, Any], authorization: Optional[str] = Header(default=None)):
-    await verify_token(authorization)
-    filename = request.get("filename") or "document.docx"
-    score = request.get("overall_score", 0)
-    grade = request.get("grade") or "Draft"
-    categories = request.get("categories", {})
-    strengths = request.get("strengths", []) or []
-    weaknesses = request.get("weaknesses", []) or []
-    critical_issues = request.get("critical_issues", []) or []
-    suggestions = request.get("suggestions", []) or []
-    opposing_questions = request.get("opposing_questions", []) or []
-    
-    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../shared_storage")))
-    os.makedirs(shared_storage_path, exist_ok=True)
-    import time
-    pdf_path = os.path.join(shared_storage_path, f"judge_report_{int(time.time())}.pdf")
-    
-    import html
-    
-    # Compile ReportLab PDF
-    from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        'Title', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1E293B'), alignment=1, spaceAfter=8
-    )
-    meta_style = ParagraphStyle(
-        'Meta', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#64748B'), alignment=1, spaceAfter=18
-    )
-    section_title = ParagraphStyle(
-        'SecTitle', parent=styles['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#1E3A8A'), spaceBefore=14, spaceAfter=6
-    )
-    cell_style = ParagraphStyle(
-        'Cell', parent=styles['Normal'], fontSize=9, leading=12
-    )
-    body_style = ParagraphStyle(
-        'Body', parent=styles['Normal'], fontSize=9, leading=13, spaceAfter=4
-    )
-    
-    story.append(Paragraph("AI LEGAL DRAFT REVIEW", title_style))
-    story.append(Paragraph(f"Document: {html.escape(filename)} | Date: {time.strftime('%Y-%m-%d')}", meta_style))
-    
-    # Score banner
-    score_data = [[
-        Paragraph(f"<b>Overall Score: {score} / 100</b>", ParagraphStyle('Score', parent=title_style, textColor=colors.white)),
-        Paragraph(f"<b>Assessment: {html.escape(grade).upper()}</b>", ParagraphStyle('Grade', parent=title_style, textColor=colors.white))
-    ]]
-    score_table = Table(score_data, colWidths=[270, 270])
-    score_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1E3A8A')),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('TOPPADDING', (0,0), (-1,-1), 10),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 10),
-    ]))
-    story.append(score_table)
-    story.append(Spacer(1, 15))
-    
-    # Category scorecard
-    story.append(Paragraph("SCORECARD", section_title))
-    scorecard_data = [
-        [Paragraph("<b>Category</b>", cell_style), Paragraph("<b>Score</b>", cell_style)],
-        [Paragraph("Structure & Organization", cell_style), Paragraph(str(categories.get("structure", 0)), cell_style)],
-        [Paragraph("Consistency & Clarity", cell_style), Paragraph(str(categories.get("consistency", 0)), cell_style)],
-        [Paragraph("Legal Reasoning", cell_style), Paragraph(str(categories.get("reasoning", 0)), cell_style)],
-        [Paragraph("Supporting References", cell_style), Paragraph(str(categories.get("support", 0)), cell_style)],
-        [Paragraph("Clarity", cell_style), Paragraph(str(categories.get("clarity", 0)), cell_style)],
-        [Paragraph("Persuasiveness", cell_style), Paragraph(str(categories.get("persuasiveness", 0)), cell_style)],
-    ]
-    card_table = Table(scorecard_data, colWidths=[300, 240])
-    card_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-        ('PADDING', (0,0), (-1,-1), 4),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F8FAFC')])
-    ]))
-    story.append(card_table)
-    story.append(Spacer(1, 10))
-    
-    # Strengths
-    if strengths:
-        story.append(Paragraph("✓ STRENGTHS", section_title))
-        for s in strengths:
-            story.append(Paragraph(f"• {html.escape(s)}", body_style))
-            
-    # Weaknesses
-    if weaknesses:
-        story.append(Paragraph("⚠ WEAKNESSES", section_title))
-        for w in weaknesses:
-            story.append(Paragraph(f"• {html.escape(w)}", body_style))
-            
-    # Critical Issues
-    if critical_issues:
-        story.append(Paragraph("🔴 CRITICAL ISSUES", section_title))
-        for ci in critical_issues:
-            story.append(Paragraph(f"• {html.escape(ci)}", body_style))
-            
-    # Suggestions
-    if suggestions:
-        story.append(Paragraph("💡 SUGGESTIONS", section_title))
-        for sug in suggestions:
-            story.append(Paragraph(f"• {html.escape(sug)}", body_style))
-            
-    # Questions
-    if opposing_questions:
-        story.append(Paragraph("❓ QUESTIONS TO CONSIDER", section_title))
-        for q in opposing_questions:
-            story.append(Paragraph(f"• {html.escape(q)}", body_style))
-            
-    doc.build(story)
-    
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        filename=f"Auditor_Report_{filename.split('.')[0]}.pdf"
-    )
-
-
-@app.get("/v2/draft/analytics")
-async def get_draft_analytics(authorization: Optional[str] = Header(default=None)):
     try:
         user_id = await verify_token(authorization)
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{AUTH_SERVICE_URL.rstrip('/')}/internal/draft/analytics",
-                params={"user_id": user_id},
-                timeout=10.0
-            )
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail="Failed to fetch analytics from auth service")
-            return response.json()
-    except HTTPException as he:
-        raise he
+        
+        shared_storage_path = os.getenv("SHARED_STORAGE_PATH")
+        if not shared_storage_path:
+            raise HTTPException(status_code=500, detail="SHARED_STORAGE_PATH is not set.")
+            
+        import uuid
+        doc_id = str(uuid.uuid4())
+        sub_dir = case_id if case_id else "general"
+        target_dir = os.path.join(shared_storage_path, sub_dir)
+        os.makedirs(target_dir, exist_ok=True)
+        
+        file_name = file.filename or "uploaded_file.bin"
+        safe_name = os.path.basename(file_name.strip())
+        output_path = os.path.join(target_dir, safe_name)
+        
+        file_bytes = await file.read()
+        with open(output_path, "wb") as f:
+            f.write(file_bytes)
+            
+        s3_key = f"{sub_dir}/{safe_name}"
+        upload_file_to_s3_background(output_path, s3_key)
+        
+        size_bytes = len(file_bytes)
+        if size_bytes < 1024:
+            size_str = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            size_str = f"{size_bytes / 1024:.1f} KB"
+        else:
+            size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+            
+        return {
+            "ok": True,
+            "id": doc_id,
+            "name": safe_name,
+            "filename": safe_name,
+            "size": size_str,
+            "s3_key": s3_key,
+            "url": f"/drafter/v2/document/serve/{sub_dir}/{safe_name}"
+        }
     except Exception as e:
-        logger.exception("Failed to retrieve draft analytics.")
+        logger.exception("Failed to upload document.")
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _internal_serve_file(filename: str, sub_dir: Optional[str] = None):
+    shared_storage_path = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+    
+    raw_filename = unquote(filename or "")
+    raw_sub_dir = unquote(sub_dir or "") if sub_dir else ""
+        
+    safe_sub_dir = os.path.basename(raw_sub_dir.replace("\\", "/")) if raw_sub_dir else ""
+    safe_name = os.path.basename(raw_filename.replace("\\", "/"))
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid path parameter.")
+        
+    if safe_sub_dir:
+        file_path = os.path.join(shared_storage_path, safe_sub_dir, safe_name)
+        s3_key = f"{safe_sub_dir}/{safe_name}"
+    else:
+        file_path = os.path.join(shared_storage_path, safe_name)
+        s3_key = safe_name
+    
+    try:
+        if not os.path.isfile(file_path):
+            ensure_file_exists_locally(s3_key, file_path)
+        if not os.path.isfile(file_path) and safe_name != s3_key:
+            ensure_file_exists_locally(safe_name, file_path)
+    except Exception as s3_err:
+        logger.warning(f"S3 file fetch warning for s3_key={s3_key}: {s3_err}")
+
+    if not os.path.isfile(file_path):
+        # Fallback search if sub_dir is missing or different on disk
+        matching_files = [
+            os.path.join(dp, f) for dp, dn, filenames in os.walk(shared_storage_path) for f in filenames if f == safe_name
+        ]
+        if matching_files:
+            file_path = matching_files[0]
+        else:
+            logger.error(f"File not found on disk or S3: safe_name={safe_name}, s3_key={s3_key}, file_path={file_path}")
+            raise HTTPException(status_code=404, detail=f"File not found: {safe_name}")
+        
+    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else 'docx'
+    media_types = {
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'doc': 'application/msword',
+        'txt': 'text/plain',
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }
+    media_type = media_types.get(ext, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=safe_name,
+    )
+
+@app.get("/v2/draft/serve/{sub_dir}/{filename}")
+@app.get("/v2/document/serve/{sub_dir}/{filename}")
+async def serve_document_with_dir(sub_dir: str, filename: str):
+    return await _internal_serve_file(filename=filename, sub_dir=sub_dir)
+
+@app.get("/v2/draft/serve/{filename}")
+@app.get("/v2/document/serve/{filename}")
+async def serve_document_single(filename: str):
+    return await _internal_serve_file(filename=filename, sub_dir=None)
+
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=False)
+    uvicorn.run("Drafter:app", host="0.0.0.0", port=8003, reload=True)
+

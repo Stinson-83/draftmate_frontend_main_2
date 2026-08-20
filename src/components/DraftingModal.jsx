@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, FileText, Lock, Loader2, PenTool, Sparkles, Square, X, UploadCloud } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Check, FileText, Lock, Loader2, PenTool, Square, X, Folder } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { API_CONFIG } from '../services/endpoints';
-import { api } from '../services/api';
+import { caseService } from '../services/library/caseService';
 import PromptQualityBar from './PromptQualityBar';
 import './DraftingModal.css';
 
@@ -17,99 +17,56 @@ const INITIAL_SUMMARY = {
     assumptions: [],
 };
 
-const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', onDraftCreated }) => {
+const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', onDraftCreated, caseId }) => {
     const navigate = useNavigate();
-
-    // Restore saved intake progress from sessionStorage if present
-    const savedIntake = useMemo(() => {
-        try {
-            const raw = sessionStorage.getItem('draftmate_active_intake');
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
-    }, []);
-
     const isDashboardEntryMode = initialEntryMode === 'dashboard';
-    const [intakeStep, setIntakeStep] = useState(savedIntake?.intakeStep || (isDashboardEntryMode ? 'selection' : 'prompt_input'));
-    const [questions, setQuestions] = useState(savedIntake?.questions || []);
-    const [answers, setAnswers] = useState(savedIntake?.answers || {});
-    const [draftSummary, setDraftSummary] = useState(savedIntake?.draftSummary || INITIAL_SUMMARY);
-    const [prompt, setPrompt] = useState(savedIntake?.prompt || initialPrompt || '');
-    const [customInstructions, setCustomInstructions] = useState(savedIntake?.customInstructions || '');
+    const [intakeStep, setIntakeStep] = useState(isDashboardEntryMode ? 'selection' : 'prompt_input');
+    const [questions, setQuestions] = useState([]);
+    const [answers, setAnswers] = useState({});
+    const [draftSummary, setDraftSummary] = useState(INITIAL_SUMMARY);
+    const [prompt, setPrompt] = useState(initialPrompt || '');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('Loading...');
-    const [allQuestions, setAllQuestions] = useState(savedIntake?.allQuestions || {});
-    const [currentRoundIndex, setCurrentRoundIndex] = useState(savedIntake?.currentRoundIndex || 0);
-    const [selectedFiles, setSelectedFiles] = useState([]);
-    const [otherInputs, setOtherInputs] = useState({});
-    const [isEditingSummary, setIsEditingSummary] = useState(false);
-    const [editedSummary, setEditedSummary] = useState(INITIAL_SUMMARY);
+    const [allQuestions, setAllQuestions] = useState({});
+    const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
+    const [availableFolders, setAvailableFolders] = useState([]);
+    const [selectedFolderId, setSelectedFolderId] = useState(null);
     const fileInputRef = useRef(null);
-    const [isEnhancing, setIsEnhancing] = useState(false);
-
-    const handleEnhancePrompt = async () => {
-        if (!prompt.trim()) {
-            toast.error('Please write something first to enhance.');
-            return;
-        }
-
-        setIsEnhancing(true);
-        try {
-            const res = await api.enhancePrompt(prompt);
-            if (res.enhanced_prompt) {
-                setPrompt(res.enhanced_prompt);
-                toast.success('Prompt enhanced successfully!');
-            } else {
-                throw new Error('No enhanced prompt returned');
-            }
-        } catch (error) {
-            console.error('Enhance prompt error:', error);
-            toast.error('Failed to enhance prompt. Please try again.');
-        } finally {
-            setIsEnhancing(false);
-        }
-    };
-
-    // Save active intake progress whenever key state updates
-    useEffect(() => {
-        if (intakeStep && intakeStep !== 'selection' && intakeStep !== 'loading') {
-            sessionStorage.setItem('draftmate_active_intake', JSON.stringify({
-                intakeStep,
-                prompt,
-                questions,
-                answers,
-                allQuestions,
-                currentRoundIndex,
-                draftSummary,
-                customInstructions,
-            }));
-        }
-    }, [intakeStep, prompt, questions, answers, allQuestions, currentRoundIndex, draftSummary, customInstructions]);
-
-    const handleCloseModal = () => {
-        sessionStorage.removeItem('draftmate_active_intake');
-        if (typeof onClose === 'function') onClose();
-    };
 
     useEffect(() => {
-        if (initialEntryMode === 'dashboard' && !savedIntake) {
+        const loadFolders = async () => {
+            try {
+                const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+                if (token) {
+                    const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (Array.isArray(data.folders)) {
+                            setAvailableFolders(data.folders);
+                            return;
+                        }
+                    }
+                }
+            } catch (err) {}
+            try {
+                const localFolders = JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
+                setAvailableFolders(localFolders);
+            } catch (err) {}
+        };
+        loadFolders();
+    }, []);
+
+    useEffect(() => {
+        if (initialEntryMode === 'dashboard') {
             setIntakeStep('selection');
         }
-    }, [initialEntryMode, savedIntake]);
+    }, [initialEntryMode]);
 
     useEffect(() => {
-        if (!savedIntake && initialPrompt) {
-            setPrompt(initialPrompt);
-        }
-    }, [initialPrompt, savedIntake]);
-
-    useEffect(() => {
-        if (intakeStep === 'summary') {
-            setEditedSummary(draftSummary);
-            setIsEditingSummary(false);
-        }
-    }, [intakeStep, draftSummary]);
+        setPrompt(initialPrompt || '');
+    }, [initialPrompt]);
 
     const sessionToken = localStorage.getItem('session_id') || '';
     const DRAFTER_API_URL = API_CONFIG.DRAFTER.BASE_URL;
@@ -121,6 +78,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             name: record.name || record.filename || record.title || 'Untitled Draft',
             filename: record.filename || record.title || record.name || 'Untitled Draft.docx',
             documentKey: record.documentKey || record.id || '',
+            folderId: selectedFolderId || record.folderId || null,
             lastModified: record.lastModified || new Date().toISOString(),
             status: record.status || 'In progress',
             trackingParams: record.trackingParams || {
@@ -154,9 +112,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             .trim()
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_|_$/g, '')
-            .slice(0, 40)
-            .replace(/_$/, '');
+            .replace(/^_|_$/g, '');
         return `${raw || 'ai_draft'}.docx`;
     };
 
@@ -247,82 +203,18 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         };
     };
 
-    const buildAnswerContext = (currentAnswers = answers, customInst = customInstructions) => {
+    const buildAnswerContext = (currentAnswers = answers) => {
         const answerLines = Object.entries(currentAnswers).map(([key, value]) => {
             const questionText = allQuestions[key] || key;
-            let displayValue = '';
-            if (value === 'others_option') {
-                displayValue = otherInputs[key] || '';
-            } else if (value === 'skip_option') {
-                displayValue = '[Skipped]';
-            } else {
-                displayValue = Array.isArray(value) ? value.join(', ') : String(value);
-            }
+            const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
             return `Question: ${questionText}\n  Answer: ${displayValue}`;
         });
 
         return [
+            `Jurisdiction & Applicable Laws: India (Indian Courts, BNS, BNSS, BSA, IPC, CrPC, Indian Contract Act)`,
             `Matter: ${prompt.trim()}`,
             answerLines.length > 0 ? `Clarifications:\n${answerLines.map((line) => `- ${line}`).join('\n\n')}` : 'Clarifications: none',
-            customInst && customInst.trim() ? `Custom Instructions:\n${customInst.trim()}` : null,
-        ].filter(Boolean).join('\n\n');
-    };
-
-    const handleApplyCustomInstructionsAI = async () => {
-        if (!customInstructions.trim()) {
-            toast.error('Please enter custom instructions before updating.');
-            return;
-        }
-
-        upsertLoading('Updating draft summary with AI based on custom instructions...');
-
-        try {
-            const answerCtx = buildAnswerContext(answers, customInstructions);
-
-            const response = await fetch(`${DRAFTER_API_URL}/v2/draft/intake/analyze`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${sessionToken}`,
-                },
-                body: JSON.stringify({
-                    case_context: answerCtx,
-                    prompt: answerCtx,
-                    prompt_input: answerCtx,
-                    initial_prompt: answerCtx,
-                    answers,
-                    questions: [],
-                    round_hint: 'custom_refinement',
-                    current_round_index: currentRoundIndex + 1,
-                }),
-            });
-
-            if (response.ok) {
-                const payload = await response.json();
-                const parsed = extractIntakePayload(payload);
-                setDraftSummary((prev) => ({
-                    basis: {
-                        documentType: parsed.summary.basis.documentType || prev.basis.documentType,
-                        jurisdiction: parsed.summary.basis.jurisdiction || prev.basis.jurisdiction,
-                        representationPosition: parsed.summary.basis.representationPosition || prev.basis.representationPosition,
-                        keyLegalPositions: parsed.summary.basis.keyLegalPositions.length > 0
-                            ? parsed.summary.basis.keyLegalPositions
-                            : prev.basis.keyLegalPositions,
-                    },
-                    assumptions: parsed.summary.assumptions.length > 0 ? parsed.summary.assumptions : prev.assumptions,
-                }));
-                toast.success('Draft summary re-analyzed & updated with AI!');
-            } else {
-                toast.success('Custom instructions saved to draft context.');
-            }
-        } catch (error) {
-            console.error('Custom instruction update error:', error);
-            toast.info('Custom instructions saved to draft context.');
-        } finally {
-            setIsLoading(false);
-            setLoadingMessage('Loading...');
-            setIntakeStep('summary');
-        }
+        ].join('\n\n');
     };
 
     const upsertLoading = (message) => {
@@ -338,16 +230,18 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
     };
 
     const navigateToWorkspace = (data, recordMeta = {}) => {
-        sessionStorage.removeItem('draftmate_active_intake');
         const fileName = data?.filename || data?.document?.title || recordMeta.filename || slugifyFileName(prompt || 'AI Draft');
+        const draftId = data?.draft_id || data?.id || data?.draftId || '';
         const documentKey = data?.documentKey || data?.document?.key || recordMeta.documentKey || '';
         const onlyofficeConfig = data?.onlyofficeConfig || data;
 
         persistWorkspaceDraft({
-            id: documentKey,
+            id: draftId || documentKey,
             name: fileName,
             filename: fileName,
+            draftId: draftId || documentKey,
             documentKey,
+            folderId: selectedFolderId || null,
             onlyofficeConfig,
             variablesDetected: data?.variablesDetected || [],
             status: 'In progress',
@@ -363,8 +257,11 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
 
         navigate('/dashboard/workspace', {
             state: {
+                draftId: draftId || documentKey,
+                id: draftId || documentKey,
                 documentKey,
                 filename: fileName,
+                folderId: selectedFolderId || null,
                 onlyofficeConfig,
                 variablesDetected: data?.variablesDetected || [],
                 trackingParams: {
@@ -434,7 +331,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     case_context: caseContext || prompt,
                     document_type: draftSummary?.basis?.documentType || 'Legal Document',
                     file_target_name: slugifyFileName(prompt || draftSummary?.basis?.documentType || 'AI Draft'),
-                    section: 'guided_intake',
                 }),
             });
 
@@ -473,15 +369,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             const formattedAnswers = {};
             Object.entries(currentAnswers).forEach(([key, val]) => {
                 const questionText = allQuestions[key] || key;
-                let displayVal = '';
-                if (val === 'others_option') {
-                    displayVal = otherInputs[key] || '';
-                } else if (val === 'skip_option') {
-                    displayVal = '[Skipped]';
-                } else {
-                    displayVal = val;
-                }
-                formattedAnswers[questionText] = displayVal;
+                formattedAnswers[questionText] = val;
             });
 
             const response = await fetch(`${DRAFTER_API_URL}/v2/draft/intake/analyze`, {
@@ -593,202 +481,10 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             return;
         }
 
-        if (choice === 'docs_with_ai') {
-            setSelectedFiles([]);
-            setPrompt('');
-            setIntakeStep('docs_with_ai');
-            return;
+        if (choice === 'empty') {
+            createWorkspaceEmptyDocument();
         }
     };
-
-    const handleFileChange = (e) => {
-        const files = Array.from(e.target.files);
-        if (selectedFiles.length + files.length > 5) {
-            toast.error("You can upload a maximum of 5 files.");
-            return;
-        }
-        setSelectedFiles(prev => [...prev, ...files]);
-    };
-
-    const handleRemoveFile = (index) => {
-        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleDocsWithAiSubmit = async () => {
-        if (selectedFiles.length === 0) {
-            toast.error("Please upload at least one document.");
-            return;
-        }
-        if (!prompt.trim()) {
-            toast.error("Please provide instructions for the AI.");
-            return;
-        }
-
-        setIsLoading(true);
-        setLoadingMessage("Synthesizing documents and draft...");
-
-        try {
-            const formData = new FormData();
-            selectedFiles.forEach((file) => {
-                formData.append('files', file);
-            });
-            formData.append('prompt', prompt);
-            formData.append('section', 'documents_with_ai');
-
-            const response = await fetch(`${DRAFTER_API_URL}/v2/draft/compile_with_documents`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${sessionToken}`,
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                let detail = 'Failed to generate draft from documents.';
-                try {
-                    const errorData = await response.json();
-                    detail = errorData?.detail || detail;
-                } catch {
-                    detail = response.statusText || detail;
-                }
-                throw new Error(detail);
-            }
-
-            const data = await response.json();
-            navigateToWorkspace(data, { source: 'docs_with_ai' });
-            toast.success("Draft generated successfully from documents!");
-            onClose();
-        } catch (error) {
-            console.error('Multi-document compile error:', error);
-            toast.error(error.message || 'Failed to generate draft.');
-        } finally {
-            setIsLoading(false);
-            setLoadingMessage('Loading...');
-        }
-    };
-
-    const renderDocsWithAiView = () => (
-        <div className="step-content fade-in">
-            <div className="modal-header">
-                <div className="icon-badge">
-                    <PenTool size={20} />
-                </div>
-                <h2 className="modal-title">Documents with AI</h2>
-            </div>
-            <p className="modal-subtitle">
-                Upload up to 5 reference documents and provide a prompt detailing how you want your draft structured.
-            </p>
-
-            <div className="input-area" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div 
-                    className="file-dropzone" 
-                    onClick={() => fileInputRef.current.click()}
-                    style={{
-                        border: '2px dashed var(--border-color, #cbd5e1)',
-                        borderRadius: '8px',
-                        padding: '24px',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        transition: 'border-color 0.2s',
-                    }}
-                >
-                    <UploadCloud className="h-8 w-8 text-slate-400" style={{ margin: '0 auto 12px auto' }} />
-                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #64748b)' }}>
-                        Click to upload files (PDF, DOCX)
-                    </p>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-muted, #94a3b8)' }}>
-                        Up to 5 files
-                    </p>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileChange} 
-                        multiple 
-                        accept=".pdf,.docx,.doc,.rtf,.txt"
-                        style={{ display: 'none' }} 
-                    />
-                </div>
-
-                {selectedFiles.length > 0 && (
-                    <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px' }}>
-                        {selectedFiles.map((file, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(0,0,0,0.05)', borderRadius: '6px' }}>
-                                <span style={{ fontSize: '13px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '80%' }}>
-                                    {file.name}
-                                </span>
-                                <button 
-                                    onClick={() => handleRemoveFile(idx)}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}
-                                >
-                                    <X size={14} />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                <textarea
-                    placeholder="Provide your prompt/instructions here..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    rows={4}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px', marginBottom: '12px' }}>
-                    <button
-                        type="button"
-                        className="btn-enhance"
-                        onClick={handleEnhancePrompt}
-                        disabled={isEnhancing || !prompt.trim()}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '8px 14px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)',
-                            opacity: (!prompt.trim() || isEnhancing) ? 0.5 : 1,
-                            pointerEvents: (!prompt.trim() || isEnhancing) ? 'none' : 'auto'
-                        }}
-                    >
-                        {isEnhancing ? (
-                            <>
-                                <Loader2 className="animate-spin" size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                                <span>Enhancing Prompt...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles size={14} />
-                                <span>Enhance Prompt</span>
-                            </>
-                        )}
-                    </button>
-                </div>
-                <PromptQualityBar prompt={prompt} />
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: '24px' }}>
-                <button
-                    className="btn btn-ghost"
-                    onClick={() => {
-                        setIntakeStep('selection');
-                    }}
-                >
-                    Back
-                </button>
-                <button className="btn btn-primary" onClick={handleDocsWithAiSubmit}>
-                    Generate
-                </button>
-            </div>
-        </div>
-    );
 
     const handlePromptSubmit = async () => {
         if (!prompt.trim()) {
@@ -833,8 +529,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             return;
         }
 
-        // Cleanly clear active intake from sessionStorage before compile starts so popup never reappears after success
-        sessionStorage.removeItem('draftmate_active_intake');
         upsertLoading('Generating your draft...');
 
         try {
@@ -851,11 +545,9 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                         { prompt },
                         { answers },
                         { draft_summary: draftSummary },
-                        { custom_instructions: customInstructions },
                     ],
                     document_type: draftSummary?.basis?.documentType || 'Legal Document',
                     file_target_name: slugifyFileName(prompt || draftSummary?.basis?.documentType || 'AI Draft'),
-                    section: 'guided_intake',
                 }),
             });
 
@@ -876,17 +568,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         } catch (error) {
             console.error('Final compile error:', error);
             toast.error(error.message || 'Failed to generate draft.');
-            // Re-save session storage ONLY if an error occurred during drafting process so user can retry
-            sessionStorage.setItem('draftmate_active_intake', JSON.stringify({
-                intakeStep: 'summary',
-                prompt,
-                questions,
-                answers,
-                allQuestions,
-                currentRoundIndex,
-                draftSummary,
-                customInstructions,
-            }));
+        } finally {
             safeCloseLoading('summary');
         }
     };
@@ -898,7 +580,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
             <div className="options-grid">
                 <button className="option-card" onClick={() => handleSelectionChoice('ai')}>
                     <div className="icon-box type">
-                        <PenTool size={28} />
+                        <PenTool size={24} />
                     </div>
                     <div className="text-content">
                         <h3>Generate with AI</h3>
@@ -906,13 +588,13 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     </div>
                 </button>
 
-                <button className="option-card" onClick={() => handleSelectionChoice('docs_with_ai')}>
+                <button className="option-card" onClick={() => handleSelectionChoice('empty')}>
                     <div className="icon-box upload">
-                        <UploadCloud size={28} />
+                        <FileText size={24} />
                     </div>
                     <div className="text-content">
-                        <h3>Documents with AI</h3>
-                        <p>Upload reference documents and write a prompt to generate a tailored legal draft.</p>
+                        <h3>Start Empty Document</h3>
+                        <p>Create an empty workspace immediately and begin editing without intake.</p>
                     </div>
                 </button>
             </div>
@@ -939,43 +621,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={6}
                 />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-8px', marginBottom: '12px' }}>
-                    <button
-                        type="button"
-                        className="btn-enhance"
-                        onClick={handleEnhancePrompt}
-                        disabled={isEnhancing || !prompt.trim()}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '8px 14px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)',
-                            opacity: (!prompt.trim() || isEnhancing) ? 0.5 : 1,
-                            pointerEvents: (!prompt.trim() || isEnhancing) ? 'none' : 'auto'
-                        }}
-                    >
-                        {isEnhancing ? (
-                            <>
-                                <Loader2 className="animate-spin" size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                                <span>Enhancing Prompt...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles size={14} />
-                                <span>Enhance Prompt</span>
-                            </>
-                        )}
-                    </button>
-                </div>
                 <PromptQualityBar prompt={prompt} />
             </div>
 
@@ -1027,13 +672,10 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                             {question.helperText ? (
                                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{question.helperText}</p>
                             ) : null}
-                             {hasOptions ? (
+
+                            {hasOptions ? (
                                 <div className="mt-4 grid gap-2">
-                                    {[
-                                        ...question.options,
-                                        { label: 'Others', value: 'others_option' },
-                                        { label: 'Skip', value: 'skip_option' }
-                                    ].map((option) => {
+                                    {question.options.map((option) => {
                                         const optionKey = String(option.value);
                                         const checked = question.multiple
                                             ? Array.isArray(currentValue) && currentValue.includes(optionKey)
@@ -1047,7 +689,7 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                                                 className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${checked
                                                     ? 'border-primary bg-primary/5 dark:bg-primary/10'
                                                     : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                                                }`}
+                                                    }`}
                                             >
                                                 <input
                                                     type={question.multiple ? 'checkbox' : 'radio'}
@@ -1065,18 +707,6 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
                                             </label>
                                         );
                                     })}
-                                    {currentValue === 'others_option' && (
-                                        <textarea
-                                            className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                            rows={2}
-                                            value={otherInputs[question.id] || ''}
-                                            placeholder="Enter your custom details here..."
-                                            onChange={(e) => {
-                                                const text = e.target.value;
-                                                setOtherInputs(prev => ({ ...prev, [question.id]: text }));
-                                            }}
-                                        />
-                                    )}
                                 </div>
                             ) : (
                                 <textarea
@@ -1108,330 +738,156 @@ const DraftingModal = ({ onClose, initialPrompt, initialEntryMode = 'legacy', on
         </div>
     );
 
-    const renderSummaryView = () => {
-        const basis = isEditingSummary ? editedSummary.basis : draftSummary.basis;
-        const assumptions = isEditingSummary ? editedSummary.assumptions : draftSummary.assumptions;
+    const renderSummaryView = () => (
+        <div className="step-content fade-in">
+            <div className="modal-header">
+                <div className="icon-badge">
+                    <Check size={20} />
+                </div>
+                <h2 className="modal-title">Draft summary</h2>
+            </div>
 
-        const handleMetadataChange = (field, value) => {
-            setEditedSummary(prev => ({
-                ...prev,
-                basis: {
-                    ...prev.basis,
-                    [field]: value
-                }
-            }));
-        };
+            <p className="modal-subtitle">
+                Review the generated basis and assumptions before we compile the final document.
+            </p>
 
-        const handleListChange = (listName, index, value) => {
-            setEditedSummary(prev => {
-                const nextList = [...prev[listName]];
-                nextList[index] = value;
-                return { ...prev, [listName]: nextList };
-            });
-        };
-
-        const handleAddListItem = (listName) => {
-            setEditedSummary(prev => ({
-                ...prev,
-                [listName]: [...prev[listName], '']
-            }));
-        };
-
-        const handleRemoveListItem = (listName, index) => {
-            setEditedSummary(prev => ({
-                ...prev,
-                [listName]: prev[listName].filter((_, i) => i !== index)
-            }));
-        };
-
-        const handleSaveEdits = () => {
-            setDraftSummary(editedSummary);
-            setIsEditingSummary(false);
-            toast.success("Summary updated successfully!");
-        };
-
-        return (
-            <div className="step-content fade-in">
-                <div className="modal-header flex items-center justify-between pr-12 mb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="icon-badge">
-                            <Sparkles size={22} className="text-blue-600" />
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Draft Basis</h3>
+                    <div className="mt-3 space-y-3 text-sm">
+                        <div>
+                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Document Type</div>
+                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.documentType || 'Legal Document'}</div>
                         </div>
                         <div>
-                            <h2 className="modal-title">Draft Summary</h2>
-                            <p className="text-xs text-slate-500 font-medium">Review generated legal basis, assumptions, and add optional customization before compiling.</p>
+                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Jurisdiction</div>
+                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.jurisdiction || 'Not specified'}</div>
                         </div>
-                    </div>
-                </div>
-
-                <div className="grid gap-5 md:grid-cols-2 mt-2">
-                    {/* Left Column: Draft Basis */}
-                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-5 shadow-xs">
-                        <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <FileText size={16} className="text-blue-600" />
-                                Draft Basis
-                            </h3>
-                            {!isEditingSummary && (
-                                <button 
-                                    type="button"
-                                    className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 hover:text-blue-600 text-slate-600 dark:text-slate-300 text-xs font-semibold transition-colors flex items-center gap-1.5"
-                                    onClick={() => setIsEditingSummary(true)}
-                                >
-                                    <PenTool size={12} />
-                                    <span>Edit Basis</span>
-                                </button>
-                            )}
+                        <div>
+                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Representation Position</div>
+                            <div className="mt-1 text-slate-900 dark:text-white">{draftSummary.basis.representationPosition || 'Not specified'}</div>
                         </div>
-
-                        <div className="space-y-3 text-sm">
-                            <div>
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Document Type</div>
-                                {isEditingSummary ? (
-                                    <input 
-                                        type="text"
-                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                        value={basis.documentType || ''}
-                                        onChange={(e) => handleMetadataChange('documentType', e.target.value)}
-                                    />
-                                ) : (
-                                    <div className="mt-1 text-slate-900 dark:text-white font-medium">{basis.documentType || 'Legal Document'}</div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Jurisdiction</div>
-                                {isEditingSummary ? (
-                                    <input 
-                                        type="text"
-                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                        value={basis.jurisdiction || ''}
-                                        onChange={(e) => handleMetadataChange('jurisdiction', e.target.value)}
-                                    />
-                                ) : (
-                                    <div className="mt-1 text-slate-900 dark:text-white font-medium">{basis.jurisdiction || 'Not specified'}</div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Representation Position</div>
-                                {isEditingSummary ? (
-                                    <input 
-                                        type="text"
-                                        className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                        value={basis.representationPosition || ''}
-                                        onChange={(e) => handleMetadataChange('representationPosition', e.target.value)}
-                                    />
-                                ) : (
-                                    <div className="mt-1 text-slate-900 dark:text-white font-medium">{basis.representationPosition || 'Not specified'}</div>
-                                )}
-                            </div>
-                            <div>
-                                <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Key Legal Positions</div>
-                                {isEditingSummary ? (
-                                    <div className="mt-2 space-y-2">
-                                        {basis.keyLegalPositions.map((item, idx) => (
-                                            <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <input 
-                                                    type="text"
-                                                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                    value={item}
-                                                    onChange={(e) => {
-                                                        const nextList = [...basis.keyLegalPositions];
-                                                        nextList[idx] = e.target.value;
-                                                        setEditedSummary(prev => ({
-                                                            ...prev,
-                                                            basis: { ...prev.basis, keyLegalPositions: nextList }
-                                                        }));
-                                                    }}
-                                                />
-                                                <button 
-                                                    onClick={() => {
-                                                        const nextList = basis.keyLegalPositions.filter((_, i) => i !== idx);
-                                                        setEditedSummary(prev => ({
-                                                            ...prev,
-                                                            basis: { ...prev.basis, keyLegalPositions: nextList }
-                                                        }));
-                                                    }}
-                                                    style={{ color: '#ef4444', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                        <button 
-                                            className="btn btn-ghost btn-sm"
-                                            onClick={() => {
-                                                setEditedSummary(prev => ({
-                                                    ...prev,
-                                                    basis: { ...prev.basis, keyLegalPositions: [...prev.basis.keyLegalPositions, ''] }
-                                                }));
-                                            }}
-                                            style={{ padding: '4px 8px', fontSize: '11px', marginTop: '4px' }}
-                                        >
-                                            + Add Position
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <ul className="mt-2 space-y-2">
-                                        {toStringList(basis.keyLegalPositions).length > 0 ? (
-                                            toStringList(basis.keyLegalPositions).map((item) => (
-                                                <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300 leading-relaxed">
-                                                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0" />
-                                                    <span>{item}</span>
-                                                </li>
-                                            ))
-                                        ) : (
-                                            <li className="text-slate-500 dark:text-slate-400 italic">No key positions identified yet.</li>
-                                        )}
-                                    </ul>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column: Assumptions Used */}
-                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-5 shadow-xs">
-                        <div className="flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800/80 pb-2">
-                            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <Check size={16} className="text-emerald-600" />
-                                Assumptions Used
-                            </h3>
-                        </div>
-                        {isEditingSummary ? (
-                            <div className="space-y-2">
-                                {assumptions.map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        <input 
-                                            type="text"
-                                            className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f1724] p-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                            value={item}
-                                            onChange={(e) => handleListChange('assumptions', idx, e.target.value)}
-                                        />
-                                        <button 
-                                            onClick={() => handleRemoveListItem('assumptions', idx)}
-                                            style={{ color: '#ef4444', padding: '4px', background: 'none', border: 'none', cursor: 'pointer' }}
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                                <button 
-                                    className="btn btn-ghost btn-sm"
-                                    onClick={() => handleAddListItem('assumptions')}
-                                    style={{ padding: '4px 8px', fontSize: '11px', marginTop: '4px' }}
-                                >
-                                    + Add Assumption
-                                </button>
-                            </div>
-                        ) : (
-                            <ul className="mt-2 space-y-2.5 text-sm">
-                                {toStringList(assumptions).length > 0 ? (
-                                    toStringList(assumptions).map((item) => (
-                                        <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300 leading-relaxed">
-                                            <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        <div>
+                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Key Legal Positions</div>
+                            <ul className="mt-2 space-y-2">
+                                {toStringList(draftSummary.basis.keyLegalPositions).length > 0 ? (
+                                    toStringList(draftSummary.basis.keyLegalPositions).map((item) => (
+                                        <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
+                                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
                                             <span>{item}</span>
                                         </li>
                                     ))
                                 ) : (
-                                    <li className="text-slate-500 dark:text-slate-400 italic">
-                                        Market-standard assumptions will be applied by the draft engine.
-                                    </li>
+                                    <li className="text-slate-500 dark:text-slate-400">No key positions identified yet.</li>
                                 )}
                             </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Assumptions Used</h3>
+                    <ul className="mt-3 space-y-2 text-sm">
+                        {toStringList(draftSummary.assumptions).length > 0 ? (
+                            toStringList(draftSummary.assumptions).map((item) => (
+                                <li key={item} className="flex gap-2 text-slate-700 dark:text-slate-300">
+                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                    <span>{item}</span>
+                                </li>
+                            ))
+                        ) : (
+                            <li className="text-slate-500 dark:text-slate-400">
+                                Market-standard assumptions will be applied by the draft engine.
+                            </li>
                         )}
-                    </div>
-                </div>
-
-                {/* Captured Context Box */}
-                <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
-                    <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Captured Context</div>
-                    <p className="mt-1.5 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                        {prompt.trim()}
-                    </p>
-                </div>
-
-                {/* Optional Customization Instructions Card */}
-                <div className="mt-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 p-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
-                            <Sparkles size={14} className="text-blue-600" />
-                            Customization Instructions
-                        </label>
-                        <span className="text-[11px] text-slate-500 font-medium">Optional field (Not required)</span>
-                    </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-2.5">
-                        Add any specific clause requirements, tone preferences, or custom terms. Leave blank to generate as-is, or click "Update Summary with AI" to refresh the basis with your instructions.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-2.5 items-stretch">
-                        <textarea
-                            className="flex-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0f1724] p-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 min-h-[72px] leading-relaxed"
-                            rows={2}
-                            value={customInstructions}
-                            onChange={(e) => setCustomInstructions(e.target.value)}
-                            placeholder="e.g. Include 3-year non-solicitation provision, set jurisdiction to Mumbai, use strict indemnification terms..."
-                        />
-                        {customInstructions.trim() && (
-                            <button
-                                type="button"
-                                onClick={handleApplyCustomInstructionsAI}
-                                className="px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex flex-row sm:flex-col items-center justify-center gap-1.5 transition-colors shrink-0 shadow-sm"
-                                title="Re-run AI analysis with custom instructions"
-                            >
-                                <Sparkles size={15} />
-                                <span>Update Summary with AI</span>
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="modal-actions">
-                    {isEditingSummary ? (
-                        <>
-                            <button
-                                className="btn btn-ghost"
-                                onClick={() => setIsEditingSummary(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button className="btn btn-primary" onClick={handleSaveEdits}>
-                                Save Summary
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className="btn btn-ghost"
-                                onClick={() => setIntakeStep('clarifying')}
-                            >
-                                Review Questions
-                            </button>
-                            <button className="btn btn-primary" onClick={handleGenerateAndOpen}>
-                                Generate & Open in Workspace
-                            </button>
-                        </>
-                    )}
+                    </ul>
                 </div>
             </div>
-        );
-    };
+
+            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#121a27] p-4">
+                <div className="text-xs uppercase font-semibold tracking-wide text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Folder size={14} className="text-primary" /> Save Location in My Drafts
+                </div>
+                <select
+                    value={selectedFolderId || ''}
+                    onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-2.5 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                    <option value="">📁 Main Folder (Root)</option>
+                    {availableFolders.map((f) => (
+                        <option key={f.id} value={f.id}>📂 {f.name}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 p-4">
+                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Captured context</div>
+                <p className="mt-2 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                    {prompt.trim()}
+                </p>
+            </div>
+
+            <div className="modal-actions">
+                <button
+                    className="btn btn-ghost"
+                    onClick={() => setIntakeStep('clarifying')}
+                >
+                    Review Questions
+                </button>
+                <button className="btn btn-primary" onClick={handleGenerateAndOpen}>
+                    Generate & Open in Workspace
+                </button>
+            </div>
+        </div>
+    );
 
     const renderLoadingView = () => (
-        <div className="step-content fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
-            <Loader2 size={48} className="spinner" style={{ marginBottom: '16px', color: '#4f46e5' }} />
-            <h2 className="modal-title">{loadingMessage}</h2>
-            <p className="modal-subtitle">Please wait while DraftMate prepares your workspace.</p>
+        <div
+            className="step-content fade-in"
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '400px',
+                textAlign: 'center',
+            }}
+        >
+            <Loader2
+                size={52}
+                className="spinner"
+                style={{ marginBottom: '20px' }}
+            />
+            <h2 className="modal-title" style={{ textAlign: 'center', maxWidth: '100%' }}>
+                {loadingMessage}
+            </h2>
+            <p className="modal-subtitle" style={{ marginBottom: '8px' }}>
+                Please wait while DraftMate prepares your workspace.
+            </p>
+
+            {/* Animated dots */}
+            <div className="loading-dots">
+                <span />
+                <span />
+                <span />
+            </div>
+
+            {/* Progress bar */}
+            <div className="loading-progress-bar">
+                <div className="loading-progress-fill" />
+            </div>
         </div>
     );
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content glass-panel">
-                <button className="close-btn" onClick={handleCloseModal} title="Close Drafting">
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="close-btn" onClick={(e) => { e.stopPropagation(); onClose(); }}>
                     <X size={20} />
                 </button>
 
                 {intakeStep === 'loading' || isLoading ? renderLoadingView() : null}
                 {!isLoading && intakeStep === 'selection' ? renderSelectionView() : null}
-                {!isLoading && intakeStep === 'docs_with_ai' ? renderDocsWithAiView() : null}
                 {!isLoading && intakeStep === 'prompt_input' ? renderPromptInputView() : null}
                 {!isLoading && intakeStep === 'clarifying' ? renderClarifyingView() : null}
                 {!isLoading && intakeStep === 'summary' ? renderSummaryView() : null}

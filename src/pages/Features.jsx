@@ -411,38 +411,6 @@ const MockVisual = ({ activeTab }) => (
           </div>
         </div>
       )}
-      {activeTab === 3 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 mb-5">
-            <span className="material-symbols-outlined text-sky-600 text-3xl">draw</span>
-            <span className="font-bold text-slate-900 text-lg">Digital E-Signature</span>
-            <span className="ml-auto text-xs px-2.5 py-0.5 bg-sky-100 text-sky-700 rounded-full font-medium flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />IT Act 2000
-            </span>
-          </div>
-          <div className="p-4 bg-sky-50 border border-sky-200 rounded-xl space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-600 font-semibold">
-              <span>Lease_Agreement_Final.docx</span>
-              <span className="text-sky-600 font-bold">Aadhaar eSign</span>
-            </div>
-            <div className="flex items-center gap-3 p-2 bg-white rounded-lg border border-sky-100 shadow-sm">
-              <span className="material-symbols-outlined text-sky-600 text-2xl">verified_user</span>
-              <div className="text-xs">
-                <p className="font-bold text-slate-800">Digitally Signed by Advocate R. Sharma</p>
-                <p className="text-slate-400">Timestamp: 2026-08-08 IST • Hash Verified</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1 h-9 bg-sky-600 rounded-lg flex items-center justify-center text-white text-xs font-bold gap-1.5 cursor-pointer hover:bg-sky-700 transition-colors">
-              <span className="material-symbols-outlined text-sm">edit_note</span> Request Client eSign
-            </div>
-            <div className="flex-1 h-9 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-slate-700 text-xs font-bold gap-1.5 cursor-pointer hover:bg-slate-200 transition-colors">
-              <span className="material-symbols-outlined text-sm">verified</span> Verify Audit Trail
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   </div>
 );
@@ -488,7 +456,6 @@ const Features = () => {
     { icon: 'library_books',   title: 'Lex Bot Research Assistant',     description: 'Your personal legal research companion. Ask complex queries about Indian law and get precise answers with verified citations from SC & HCs.', color: '#8B5CF6' },
     { icon: 'verified',        title: 'Verified Case Citations',         description: 'Every citation is real and verified. Our AI only references actual judgments from authentic sources, eliminating hallucinated case laws.', color: '#10B981' },
     { icon: 'picture_as_pdf',  title: 'Smart PDF Editor',               description: 'Upload case files and chat with them. Extract summaries, key arguments, and relevant sections instantly with AI-powered analysis.', color: '#F59E0B' },
-    { icon: 'draw',            title: 'Digital E-Signature & Signing', description: 'Execute agreements, affidavits, and legal contracts with legally binding Aadhaar-based eSign and secure digital signatures (IT Act compliant).', color: '#0284C7' },
     { icon: 'gavel',           title: 'eCourts Live Case Tracker',      description: 'Track case status, next hearing dates, cause lists, and auto-download latest orders directly synced with eCourts.', color: '#6366F1' },
     { icon: 'translate',       title: 'Vernacular Legal Translator',   description: 'Instant multi-language AI translation for court pleadings (Vernacular to English/Hindi) with side-by-side comparative editor.', color: '#E11D48' },
     { icon: 'menu_book',       title: 'Bare Acts & Judgment Library',   description: 'Search 500k+ Supreme Court & High Court precedents alongside updated Bare Acts including BNS, BNSS, and BSA.', color: '#059669' },
@@ -511,11 +478,6 @@ const Features = () => {
       title: 'Document Intelligence', icon: 'description', color: '#F59E0B',
       description: 'Upload any legal document and extract insights instantly',
       features: ['PDF chat — ask questions about uploaded documents', 'Automatic summarization of lengthy judgments', 'Key argument and ratio extraction', 'Cross-reference with relevant case laws', 'Annotation and highlight capabilities'],
-    },
-    {
-      title: 'Digital E-Signature', icon: 'draw', color: '#0284C7',
-      description: 'Sign and execute legal documents digitally with full IT Act compliance',
-      features: ['Aadhaar eSign & Digital Signature Certificate (DSC) integration', 'Multi-party sequential & parallel signing workflows', 'Tamper-evident audit trails with cryptographic verification', 'Instant email & WhatsApp signing invitations for clients', 'Full legal validity under Section 6A of Indian IT Act 2000'],
     },
   ];
 

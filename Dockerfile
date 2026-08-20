@@ -18,17 +18,12 @@ FROM python:3.11-slim-bookworm
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
-ENV LC_ALL=C.UTF-8
-ENV LANG=C.UTF-8
 ENV PYTHONPATH=/app
 ENV EMBED_MODEL=/app/backend/models/embedding
 ENV RERANK_MODEL=/app/backend/models/rerank
 ENV EASYOCR_MODULE_PATH=/app/backend/models/easyocr
 ENV SKIP_TUNNEL=true
-ENV HF_HUB_OFFLINE=1
-ENV TRANSFORMERS_OFFLINE=1
-ENV HF_HUB_ENABLE_HF_TRANSFER=0
+ENV HF_ENDPOINT=https://hf-mirror.com
 ENV SHARED_STORAGE_PATH=/app/shared_drafts
 
 # Set work directory
@@ -66,7 +61,7 @@ COPY src/data/bareacts/ src/data/bareacts/
 
 
 # Pre-download models if they are missing (e.g. for local development builds)
-RUN if [ ! -f "backend/models/embedding/config.json" ] || [ ! -f "backend/models/rerank/config.json" ]; then python backend/download_models.py; fi
+RUN if [ ! -d "backend/models/embedding" ] || [ ! -d "backend/models/rerank" ]; then python backend/download_models.py; fi
 
 # Copy supervisor configuration
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf

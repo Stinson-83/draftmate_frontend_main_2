@@ -19,30 +19,23 @@ import boto3
 load_dotenv()
 
 # Load Model
-from pathlib import Path
-_models_dir = Path(__file__).parent.parent / "models"
-_local_embed = _models_dir / "embedding"
-
-if _local_embed.is_dir() and (_local_embed / "config.json").exists():
-    EMBEDDING_MODEL_NAME = str(_local_embed)
-else:
-    EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL") or "sentence-transformers/all-MiniLM-L6-v2"
-
+# Load Model
+EMBEDDING_MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 print(f"Loading embedding model: {EMBEDDING_MODEL_NAME}...")
 try:
     model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     # Sanity check
     model.encode("warmup")
-    print("[OK] Embedding model loaded successfully.")
+    print("✅ Embedding model loaded successfully.")
 except Exception as e:
-    print(f"[ERROR] Failed to load model from {EMBEDDING_MODEL_NAME}: {e}")
+    print(f"⚠️ Failed to load model from {EMBEDDING_MODEL_NAME}: {e}")
     print("🔄 Attempting fallback download from HuggingFace...")
     try:
         model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         model.encode("warmup")
-        print("[OK] Fallback model loaded successfully.")
+        print("✅ Fallback model loaded successfully.")
     except Exception as e2:
-        print(f"[CRITICAL] Could not load embedding model: {e2}")
+        print(f"❌ CRITICAL: Could not load embedding model: {e2}")
         model = None
 
 s3_client = boto3.client(

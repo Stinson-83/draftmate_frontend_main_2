@@ -95,50 +95,18 @@ class IndianKanoonService:
     
     def _clean_text(self, text: str) -> str:
         """
-        Strip HTML tags, embedded CSS/JS code blocks, and site header boilerplate.
+        Strip HTML tags and clean up whitespace from text.
+        
+        Args:
+            text: Raw text from API response (may contain HTML).
+            
+        Returns:
+            Cleaned plain text.
         """
         if not text:
             return ""
-        
-        # 1. Remove script, style, header, nav, footer tags and their contents
-        text = re.sub(r"(?i)<script[\s\S]*?</script>", " ", text)
-        text = re.sub(r"(?i)<style[\s\S]*?</style>", " ", text)
-        text = re.sub(r"(?i)<noscript[\s\S]*?</noscript>", " ", text)
-        text = re.sub(r"(?i)<header[\s\S]*?</header>", " ", text)
-        text = re.sub(r"(?i)<nav[\s\S]*?</nav>", " ", text)
-
-        # 2. Remove all remaining HTML tags
         text = re.sub(r"<[^>]+>", " ", text)
-
-        # 3. Remove leftover CSS code blocks or variable declarations
-        text = re.sub(r"(?i):\s*root\s*\{[^}]*\}", " ", text)
-        text = re.sub(r"(?i)@[a-z-]+\s+[^{]+\{[^}]*\}", " ", text)
-        text = re.sub(r"(?i)(\.[a-zA-Z0-9_-]+|\#[a-zA-Z0-9_-]+)\s*\{[^}]*\}", " ", text)
-        text = re.sub(r"(?i)--[a-zA-Z0-9_-]+:\s*[^;\}]+;?", " ", text)
-
-        # 4. Remove website header & navigation boilerplate
-        boilerplate = [
-            r"(?i)Skip to main content",
-            r"(?i)Indian Kanoon\s*-\s*Search engine for Indian Law",
-            r"(?i)Search laws,\s*court judgments and everything",
-            r"(?i)Unlock Advanced Research with PRISM",
-            r"(?i)Free features\s+Premium\s+Prism AI\s+IKademy\s+Pricing\s+Login",
-            r"(?i)Mobile Navigation",
-            r"(?i)Know your Kanoon",
-            r"(?i)Doc Gen Hub",
-            r"(?i)Counter Argument",
-            r"(?i)Case Predict AI",
-            r"(?i)Talk with IK Doc",
-            r"(?i)Tools for analyzing structure and cite text of judgments",
-            r"(?i)Get in PDF",
-            r"(?i)Print it!",
-            r"(?i)Download Court Copy"
-        ]
-        for pat in boilerplate:
-            text = re.sub(pat, " ", text)
-
-        # 5. Normalize whitespace
-        text = re.sub(r"\s+", " ", text)
+        text = re.sub(r"\s{2,}", " ", text)
         return text.strip()
     
     def _normalize_judgment(self, doc: Dict[str, Any]) -> NormalizedJudgment:
@@ -342,47 +310,6 @@ class IndianKanoonService:
                     return self._clean_text(res.text)
         except Exception as web_err:
             logger.error(f"Web fetch for doc {doc_id} failed: {web_err}")
-
-        return None
-
-    async def get_document_pdf(self, doc_id: str, pdf_type: str = "pdf") -> Optional[bytes]:
-        """
-        Fetch official PDF bytes for a document from Indian Kanoon server-to-server.
-        """
-        logger.info(f"Fetching PDF for document ID: {doc_id} (type: {pdf_type})")
-        url = f"https://indiankanoon.org/doc/{doc_id}/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Referer": url
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
-                res1 = await client.get(url, headers=headers)
-                if res1.status_code != 200:
-                    logger.warning(f"Initial doc fetch for PDF returned status {res1.status_code}")
-                    return None
-
-                match = re.search(r'name=["\']csrfmiddlewaretoken["\'] value=["\']([^"\']+)["\']', res1.text)
-                csrf_token = match.group(1) if match else ""
-
-                data = {
-                    "type": pdf_type,
-                }
-                if csrf_token:
-                    data["csrfmiddlewaretoken"] = csrf_token
-
-                res2 = await client.post(url, data=data, headers=headers)
-                content_type = res2.headers.get("content-type", "").lower()
-                
-                if res2.status_code == 200 and ("application/pdf" in content_type or res2.content.startswith(b"%PDF")):
-                    logger.info(f"Successfully fetched PDF for doc {doc_id} (size: {len(res2.content)} bytes)")
-                    return res2.content
-                else:
-                    logger.warning(f"PDF POST request returned status {res2.status_code}, content-type: {content_type}")
-        except Exception as e:
-            logger.error(f"Failed to fetch PDF for doc {doc_id}: {e}")
 
         return None
     

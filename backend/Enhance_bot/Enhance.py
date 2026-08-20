@@ -8,7 +8,7 @@ import os
 # Ensure we can import from the current directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from bot import enhance_content, enhance_clause, create_placeholders, ENHANCEMENT_PRESETS, summarise_context, enhance_prompt
+from bot import enhance_content, enhance_clause, create_placeholders, ENHANCEMENT_PRESETS, summarise_context
 
 app = FastAPI()
 
@@ -130,19 +130,6 @@ async def create_placeholders_endpoint(request: CreatePlaceholdersRequest):
         print(f"Error processing placeholder request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-class EnhancePromptRequest(BaseModel):
-    prompt: str
-
-@app.post("/enhance_prompt")
-async def enhance_prompt_endpoint(request: EnhancePromptRequest):
-    try:
-        print("Received enhance prompt request...")
-        enhanced = enhance_prompt(request.prompt)
-        return {"enhanced_prompt": enhanced}
-    except Exception as e:
-        print(f"Error enhancing prompt: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8002)

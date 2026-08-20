@@ -15,7 +15,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, field_validator
 from passlib.context import CryptContext
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 import jwt
 from datetime import datetime, timedelta
 import os
@@ -25,7 +24,14 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
+
+def get_real_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+limiter = Limiter(key_func=get_real_ip)
 security = HTTPBearer()
 
 # ── Security ──────────────────────────────────────────────────────────────────
@@ -406,7 +412,14 @@ async def session_login(request: Request):
     if not res_data.get("valid") or not res_data.get("user_id"):
         raise HTTPException(status_code=401, detail="Invalid session.")
 
-    user_id = res_data["user_id"]
+    user_id_raw = res_data["user_id"]
+    import uuid
+    try:
+        user_id_obj = uuid.UUID(str(user_id_raw))
+        user_id = str(user_id_obj)
+    except ValueError:
+        # Map non-UUID dev strings like 'dev_counsel_bypass' to a valid UUID deterministically
+        user_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(user_id_raw)))
 
     conn = None
     try:

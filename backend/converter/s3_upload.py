@@ -1,22 +1,44 @@
+import boto3
+from dotenv import load_dotenv
 import os
-import shutil
-import logging
+from botocore.exceptions import BotoCoreError, ClientError
+from fastapi import HTTPException
 from typing import Tuple
 
-logger = logging.getLogger(__name__)
+load_dotenv()
+AWS_ACCESS_KEY_ID= os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY= os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION= os.getenv("AWS_REGION", "").strip()
+S3_REGION = os.getenv("S3_REGION", AWS_REGION).strip()
 
-SHARED_STORAGE_PATH = os.getenv("SHARED_STORAGE_PATH", "/app/shared_drafts")
+s3 = boto3.client(
+    "s3",
+    region_name=S3_REGION
+)
+
+# bucket_name="user-upload-s3-bucket"
+
+# def upload_to_s3(file_path: str, s3_key: str):
+#     s3.upload_file(file_path, bucket_name, s3_key)
+#     url = f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"
+#     return url
 
 def upload_to_s3(local_path: str, s3_key: str) -> Tuple[str, str]:
     """
-    Saves converted file to local EFS shared storage volume.
+    Uploads a local HTML file to S3 and returns its S3 URL.
     """
+    bucket_name=os.getenv("S3_BUCKET_NAME")
     try:
-        dest_path = os.path.join(SHARED_STORAGE_PATH, s3_key)
-        if os.path.abspath(local_path) != os.path.abspath(dest_path):
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            shutil.copy2(local_path, dest_path)
-        return dest_path, dest_path
-    except Exception as e:
-        logger.error(f"EFS converter save failed: {e}")
-        return local_path, local_path
+        s3.upload_file(
+            Filename=local_path,
+            Bucket=bucket_name,
+            Key=s3_key,
+            ExtraArgs={"ContentType": "text/html"}  # so browser knows it’s HTML
+        )
+        s3_uri = f"s3://{bucket_name}/{s3_key}"
+        https_url = f"https://{bucket_name}.s3.{S3_REGION}.amazonaws.com/{s3_key}"
+    except (BotoCoreError, ClientError) as e:
+        raise HTTPException(status_code=500, detail=f"S3 upload failed: {e}")
+
+    
+    return https_url, s3_uri  #f"https://{bucket_name}.s3.amazonaws.com/{s3_key}"

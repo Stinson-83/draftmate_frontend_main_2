@@ -70,12 +70,18 @@ export default function AdvocateCard({ advocate }) {
           </div>
           <div className="pt-1">
              <h3 className="font-black text-[#0F1C2E] text-[18px] group-hover:text-blue-600 transition-colors leading-tight mb-1 truncate">{name}</h3>
-             <p className="text-[13px] text-slate-500 font-bold truncate">{advocate.court_affiliation || 'High Court'}</p>
-             <div className="flex items-center gap-1.5 mt-2 bg-amber-50/50 w-max px-2 py-0.5 rounded-lg border border-amber-100/50">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span className="text-[13px] font-extrabold text-slate-700">{advocate.rating || '4.8'}</span>
-                <span className="text-[12px] font-medium text-slate-400">({advocate.review_count || '0'})</span>
-             </div>
+             {advocate.court_affiliation && <p className="text-[13px] text-slate-500 font-bold truncate">{advocate.court_affiliation}</p>}
+             {(advocate.rating || advocate.review_count) ? (
+                 <div className="flex items-center gap-1.5 mt-2 bg-amber-50/50 w-max px-2 py-0.5 rounded-lg border border-amber-100/50">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    {advocate.rating && <span className="text-[13px] font-extrabold text-slate-700">{advocate.rating}</span>}
+                    {advocate.review_count && <span className="text-[12px] font-medium text-slate-400">({advocate.review_count})</span>}
+                 </div>
+             ) : advocate.success_rate && (
+                 <div className="flex items-center gap-1.5 mt-2 bg-green-50/50 w-max px-2 py-0.5 rounded-lg border border-green-100/50">
+                    <span className="text-[12px] font-bold text-green-700">{advocate.success_rate}% Success Rate</span>
+                 </div>
+             )}
           </div>
        </div>
 
@@ -90,37 +96,35 @@ export default function AdvocateCard({ advocate }) {
 
        {/* Details Box */}
        <div className="space-y-3 mb-8 mt-auto bg-slate-50/60 p-4 rounded-[16px] border border-slate-100 group-hover:bg-white group-hover:border-blue-50 transition-colors duration-300 relative z-10">
-          <div className="flex items-center gap-3 text-[13.5px] text-slate-600 font-semibold">
-             <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors"><MapPin className="w-3.5 h-3.5" /></div>
-             {advocate.location || 'India'}
-          </div>
-          <div className="flex items-center gap-3 text-[13.5px] text-slate-600 font-semibold">
-             <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors"><Briefcase className="w-3.5 h-3.5" /></div>
-             {advocate.years_experience || '5+'} Years Exp.
-          </div>
-          <div className="flex items-center gap-3 text-[13.5px] text-slate-600 font-semibold">
-             <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors"><Globe className="w-3.5 h-3.5" /></div>
-             <span className="truncate">{languages.join(', ')}</span>
-          </div>
+          {advocate.location && (
+              <div className="flex items-center gap-3 text-[13.5px] text-slate-600 font-semibold">
+                 <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors"><MapPin className="w-3.5 h-3.5" /></div>
+                 {advocate.location}
+              </div>
+          )}
+          {advocate.years_experience && (
+              <div className="flex items-center gap-3 text-[13.5px] text-slate-600 font-semibold">
+                 <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors"><Briefcase className="w-3.5 h-3.5" /></div>
+                 {advocate.years_experience} Years Exp.
+              </div>
+          )}
+          {languages && languages.length > 0 && (
+              <div className="flex items-center gap-3 text-[13.5px] text-slate-600 font-semibold">
+                 <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors"><Globe className="w-3.5 h-3.5" /></div>
+                 <span className="truncate">{languages.join(', ')}</span>
+              </div>
+          )}
        </div>
 
        {/* Action Area */}
        <div className="mt-auto pt-4 border-t border-slate-100">
-           <div className="flex gap-2 relative overflow-hidden">
-            <Button 
-              className="flex-1 h-10 text-sm font-bold bg-slate-900 hover:bg-blue-600 text-white rounded-xl transition-all duration-150 active:scale-95 group/btn"
-              onClick={(e) => { e.stopPropagation(); navigate(`/advocate/${advocate.slug}?action=book`); }}
-            >
-              Book Consult
-            </Button>
-            <Button 
-              variant="outline"
-              className="px-3 h-10 text-sm font-bold border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all duration-150"
-              onClick={(e) => { e.stopPropagation(); navigate(`/advocate/${advocate.slug}?action=message`); }}
-            >
-              <MessageSquare className="w-4 h-4" />
-            </Button>
-           </div>
+           <Button 
+             className="w-full h-11 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all duration-300 group/btn flex items-center justify-center gap-2"
+             onClick={(e) => { e.stopPropagation(); navigate(`/advocate/${advocate.slug}`); }}
+           >
+             <span>View Profile</span>
+             <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
+           </Button>
        </div>
     </motion.div>
   );

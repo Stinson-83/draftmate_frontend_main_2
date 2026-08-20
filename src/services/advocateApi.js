@@ -60,7 +60,12 @@ async function _fetch(url, options = {}, isRetry = false) {
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
     };
 
-    const res = await fetch(url, { ...options, headers });
+    let res;
+    try {
+        res = await fetch(url, { ...options, headers });
+    } catch (err) {
+        throw new Error('Backend unavailable / connection problem');
+    }
 
     if (res.status === 401 && !isRetry) {
         const refreshed = await _tryRefresh();
@@ -87,8 +92,24 @@ async function _fetch(url, options = {}, isRetry = false) {
         let detail = `Request failed (${res.status})`;
         try {
             const err = await res.json();
-            detail = err.detail || err.message || detail;
+            if (res.status === 422 && Array.isArray(err.detail)) {
+                detail = err.detail.map(d => `${d.loc ? d.loc.slice(-1)[0] : 'Field'}: ${d.msg}`).join(', ');
+            } else {
+                let parsedDetail = err.detail || err.message || detail;
+                if (typeof parsedDetail === 'object') {
+                    detail = JSON.stringify(parsedDetail);
+                } else {
+                    detail = parsedDetail;
+                }
+            }
         } catch { /* ignore */ }
+        
+        if (res.status === 403) detail = 'Not authorized';
+        if (res.status === 404) detail = 'Resource not found';
+        if (res.status === 422) detail = `Validation error: ${detail}`;
+        if (res.status === 429) detail = 'Rate limited. Please try again later.';
+        if (res.status >= 500) detail = 'Server error. Please try again later.';
+        
         throw new Error(detail);
     }
 
@@ -163,19 +184,14 @@ export const advocateProfile = {
             body: JSON.stringify(payload),
         }),
 
-    updatePracticeAreas: (practiceAreas) =>
-        _fetch(`${BASE}${EP.UPDATE_PRACTICE_AREAS}`, {
-            method: 'PUT',
+    updateVisibility: (payload) =>
+        _fetch(`${BASE}/api/v1/profiles/me/visibility`, {
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ practice_areas: practiceAreas }),
+            body: JSON.stringify(payload),
         }),
 
-    updateDetails: (data) =>
-        _fetch(`${BASE}${EP.UPDATE_DETAILS}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        }),
+
 
     uploadImage: (file) => {
         const form = new FormData();
@@ -194,10 +210,10 @@ export const advocateDiscovery = {
         ).toString();
         return _fetch(`${BASE}${EP.SEARCH}?${qs}`);
     },
-    featured:    (limit = 5) => _fetch(`${BASE}${EP.FEATURED}?limit=${limit}`),
-    trending:    (limit = 5) => _fetch(`${BASE}${EP.TRENDING}?limit=${limit}`),
-    recent:      (limit = 5) => _fetch(`${BASE}${EP.RECENT}?limit=${limit}`),
-    recommended: (limit = 5) => _fetch(`${BASE}${EP.RECOMMENDED}?limit=${limit}`),
+    featured:    (limit = 5) => _fetch(`${BASE}${EP.FEATURED}?limit=${limit}&is_public=true`),
+    trending:    (limit = 5) => _fetch(`${BASE}${EP.TRENDING}?limit=${limit}&is_public=true`),
+    recent:      (limit = 5) => _fetch(`${BASE}${EP.RECENT}?limit=${limit}&is_public=true`),
+    recommended: (limit = 5) => _fetch(`${BASE}${EP.RECOMMENDED}?limit=${limit}&is_public=true`),
     practiceAreas: ()        => _fetch(`${BASE}${EP.PRACTICE_AREAS}`),
 };
 

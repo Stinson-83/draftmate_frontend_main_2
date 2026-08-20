@@ -147,6 +147,9 @@ app.include_router(bareacts.router)
 # Include e-Courts router (already has prefix)
 app.include_router(ecourts.router)
 
+from routers import ecourts_settings
+app.include_router(ecourts_settings.router)
+
 
 if __name__ == "__main__":
     import uvicorn

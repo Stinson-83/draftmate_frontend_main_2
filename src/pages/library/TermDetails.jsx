@@ -202,7 +202,7 @@ const TermDetails = () => {
 
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">example</span>
+              <span className="material-symbols-outlined text-primary">notes</span>
               Example
             </h2>
             <p className="text-slate-700 dark:text-slate-300 leading-relaxed">

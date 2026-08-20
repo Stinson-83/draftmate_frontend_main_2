@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ChevronRight, ChevronLeft, Send, Sparkles, StickyNote } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { processCitations, CitationLink } from '../utils/citationUtils';
 
 const AiSidebar = ({
@@ -331,7 +330,6 @@ const AiSidebar = ({
                                                 {msg.role === 'ai' ? (
                                                     <div className="markdown-content" style={{ fontSize: '13px', lineHeight: '1.6' }}>
                                                         <ReactMarkdown
-                                                            remarkPlugins={[remarkGfm]}
                                                             components={{
                                                                 p: ({ node, ...props }) => <p style={{ margin: '0 0 8px 0' }} {...props} />,
                                                                 ul: ({ node, ...props }) => <ul style={{ margin: '6px 0', paddingLeft: '14px' }} {...props} />,

@@ -265,9 +265,6 @@ export default function Dashboard() {
             const realActiveCases = casesList.filter(c => 
                 c.caseNumber !== 'GEN-0001' && 
                 c.caseTitle !== 'General Documents' && 
-                c.caseType !== 'Folder' &&
-                !c.caseNumber?.startsWith('DIR-') &&
-                !c.caseNumber?.startsWith('FLD-') &&
                 !['Closed', 'Archived'].includes(c.status)
             );
 
@@ -370,7 +367,7 @@ export default function Dashboard() {
             {/* ── ROW 2: SUMMARY KPI ── */}
             <div className="bg-white rounded-[24px] border border-slate-200 p-6 shadow-[0_8px_30px_rgb(37,99,235,0.04)] flex flex-wrap md:flex-nowrap items-center justify-between gap-6 overflow-x-auto scrollbar-hide">
                 {[
-                    { label: "Active Cases", value: kpiStats.casesCount, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50", path: "/dashboard/library/cases" },
+                    { label: "Active Cases", value: kpiStats.casesCount, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50", path: "/dashboard/library/case-tracking" },
                     { label: "Hearings", value: kpiStats.hearingsCount, icon: CalendarIcon, color: "text-rose-600", bg: "bg-rose-50", path: "/dashboard/library/hearings" },
                     { label: "Drafts", value: kpiStats.draftsCount, icon: FileText, color: "text-emerald-600", bg: "bg-emerald-50", path: "/dashboard/drafts" },
                     { label: "Researches Done", value: kpiStats.researchesCount, icon: Zap, color: "text-cyan-600", bg: "bg-cyan-50", path: "/dashboard/research" },

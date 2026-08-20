@@ -52,7 +52,7 @@ const setCached = (key, value) => {
     cache.timestamps.set(key, Date.now());
 };
 
-// Normalization: convert API response to clean structure without vendor branding
+// Normalization: convert Indian Kanoon API response to existing mock structure
 const normalizeJudgment = (apiJudgment) => ({
   id: apiJudgment.id,
   title: stripHtmlTags(apiJudgment.title),
@@ -64,9 +64,10 @@ const normalizeJudgment = (apiJudgment) => ({
   summary: stripHtmlTags(apiJudgment.summary),
   ratiodecidendi: stripHtmlTags(apiJudgment.summary),
   pdfUrl: apiJudgment.pdf_url,
-  source: apiJudgment.court || 'Court Judgment',
-  category: apiJudgment.court || 'Court Judgment',
-  tags: [apiJudgment.court || 'Judgment'],
+  source: apiJudgment.source || 'Indian Kanoon',
+  // Add mock-compatible fields for existing components to work
+  category: 'Indian Kanoon',
+  tags: ['Indian Kanoon'],
   parties: { petitioner: '', respondent: '' },
   isSaved: false
 });
@@ -78,7 +79,7 @@ const normalizeJudgmentList = (apiResults) => {
 };
 
 /**
- * Search judgments using Library Service (100% Real-Time)
+ * Search judgments using Indian Kanoon API via Library Service (100% Real-Time)
  */
 export const searchJudgments = debounce(async (query, page = 1) => {
     if (!query || !query.trim()) return [];
@@ -98,7 +99,7 @@ export const searchJudgments = debounce(async (query, page = 1) => {
         setCached(cacheKey, normalized);
         return normalized;
     } catch (error) {
-        console.error('Real-time API search failed:', error);
+        console.error('Real-time Kanoon API search failed:', error);
         return [];
     }
 }, SEARCH_DEBOUNCE_MS);
@@ -151,80 +152,14 @@ export const getMetadata = async (docId) => {
 };
 
 /**
- * Direct file download (fetches official PDF or fallback formatted .doc)
+ * Download judgment (opens in new tab)
  */
-export const downloadDocument = async (docId, judgmentObj = {}, fullText = '') => {
-  const title = judgmentObj.title || `Judgment_${docId}`;
-  const safeFilename = title.replace(/[^a-zA-Z0-9 _-]/g, '_').substring(0, 80);
-
-  // 1. Fetch official PDF from backend API (programmatic "Get in PDF" fetch)
-  try {
-    const pdfUrl = `${LIBRARY_BASE_URL}${API_CONFIG.LIBRARY.ENDPOINTS.INDIAN_KANOON.DOCUMENT(docId)}/pdf`;
-    const response = await fetch(pdfUrl);
-    if (response.ok) {
-      const blob = await response.blob();
-      if (blob && (blob.type.includes('pdf') || blob.size > 1000)) {
-        const url = URL.createObjectURL(blob);
-
-        // 1. Open official PDF directly in a new browser tab for viewing
-        window.open(url, '_blank');
-
-        // 2. Trigger automatic local PDF file download
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${safeFilename}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
+export const downloadDocument = (docId, pdfUrl) => {
+    if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+    } else {
+        window.open(`https://indiankanoon.org/doc/${docId}/`, '_blank');
     }
-  } catch (err) {
-    console.warn('Official PDF stream failed, falling back to formatted document generation:', err);
-  }
-
-  // 2. Fallback to formatted .doc Word file generation if PDF stream fails
-  const citation = judgmentObj.citation || '';
-  const court = judgmentObj.court || '';
-  const bench = judgmentObj.bench || (judgmentObj.judges?.length > 0 ? judgmentObj.judges.join(', ') : '');
-  const summary = judgmentObj.summary || judgmentObj.ratiodecidendi || '';
-  const text = fullText || '';
-
-  const htmlContent = `
-    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head><meta charset='utf-8'><title>${title}</title>
-    <style>
-      body { font-family: Calibri, Arial, sans-serif; margin: 40px; color: #1e293b; line-height: 1.6; }
-      h1 { color: #0f172a; font-size: 18pt; text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 15px; }
-      .meta { font-size: 11pt; color: #475569; text-align: center; margin-bottom: 25px; }
-      .section-title { font-size: 12pt; font-weight: bold; color: #1e40af; background: #eff6ff; padding: 8px 12px; border-left: 4px solid #2563eb; margin-top: 20px; margin-bottom: 10px; }
-      .content { font-size: 11pt; white-space: pre-wrap; margin-top: 10px; text-align: justify; }
-    </style>
-    </head>
-    <body>
-      <h1>${title}</h1>
-      <div class="meta">
-        <strong>Court:</strong> ${court || 'Supreme Court of India'} | <strong>Citation:</strong> ${citation || 'N/A'}<br/>
-        <strong>Bench:</strong> ${bench || 'Honourable Court'}
-      </div>
-      
-      ${summary ? `<div class="section-title">SUMMARY / RATIO DECIDENDI</div><div class="content">${summary}</div>` : ''}
-      
-      <div class="section-title">FULL JUDGMENT TEXT</div>
-      <div class="content">${text || 'Full text provided by DraftMate Library.'}</div>
-    </body>
-    </html>
-  `;
-
-  const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${safeFilename}.doc`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
 };
 
 export default {

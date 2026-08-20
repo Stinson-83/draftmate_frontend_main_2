@@ -149,7 +149,7 @@ const Login = () => {
 
             toast.dismiss(loadingToast);
             toast.success("Welcome back!");
-            navigate('/dashboard/home');
+            navigate('/auth-resolve');
         } catch (error) {
             toast.dismiss(loadingToast);
             toast.error(error.message);
@@ -214,7 +214,7 @@ const Login = () => {
                     localStorage.setItem('user_profile', JSON.stringify(profileData));
                     toast.dismiss(loadingToast);
                     toast.success("Welcome back!");
-                    navigate('/dashboard/home');
+                    navigate('/auth-resolve');
                     return;
                 }
             } catch (err) {
@@ -242,7 +242,7 @@ const Login = () => {
 
             toast.dismiss(loadingToast);
             toast.success(`Welcome back, ${userName}!`);
-            navigate('/dashboard/home');
+            navigate('/auth-resolve');
             setIsLoading(false);
         },
         onError: () => toast.error("Google Login Failed"),

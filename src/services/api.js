@@ -123,9 +123,6 @@ export const api = {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                if (response.status === 502 || errorText.includes('502 Bad Gateway')) {
-                    throw new Error('AI Assistant service is warming up. Please wait a moment and try again.');
-                }
                 throw new Error(`Stream failed: ${response.status} ${errorText}`);
             }
 
@@ -223,27 +220,6 @@ export const api = {
 
         if (!response.ok) {
             throw new Error(`Failed to fetch session history: ${response.status}`);
-        }
-
-        return response.json();
-    },
-
-    /**
-     * Delete a specific chat session.
-     * @param {string} sessionId
-     * @param {string} userId
-     * @returns {Promise<Object>}
-     */
-    deleteSession: async (sessionId, userId) => {
-        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}?user_id=${userId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('session_id')}`,
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to delete session: ${response.status}`);
         }
 
         return response.json();
@@ -513,27 +489,6 @@ export const api = {
             console.warn('Notification service unavailable - delete all failed');
             return null;
         }
-    },
-
-    /**
-     * Enhance a brief, raw user drafting prompt.
-     * @param {string} prompt - The raw user prompt
-     * @returns {Promise<Object>} - { enhanced_prompt }
-     */
-    enhancePrompt: async (prompt) => {
-        const response = await fetch(`${API_CONFIG.ENHANCE_BOT.BASE_URL}/enhance_prompt`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ prompt }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to enhance prompt: ${response.status}`);
-        }
-
-        return response.json();
     },
 };
 

@@ -201,6 +201,7 @@ export default function AdvocateDiscovery() {
       ...(location && { location }),
       ...(verifiedOnly && { verified_only: 'true' }),
       ...(selectedPracticeArea && { practice_area: selectedPracticeArea }),
+      is_public: 'true',
     }),
   });
 

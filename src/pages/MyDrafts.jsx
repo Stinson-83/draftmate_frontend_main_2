@@ -7,20 +7,8 @@ import { caseService } from '../services/library/caseService';
 
 const MyDrafts = () => {
     const navigate = useNavigate();
-    const [drafts, setDrafts] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem('my_drafts') || '[]');
-        } catch {
-            return [];
-        }
-    });
-    const [folders, setFolders] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem('my_draft_folders') || '[]');
-        } catch {
-            return [];
-        }
-    });
+    const [drafts, setDrafts] = useState([]);
+    const [folders, setFolders] = useState([]);
     const [currentFolder, setCurrentFolder] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('date');
@@ -30,12 +18,6 @@ const MyDrafts = () => {
     const [editingFolderId, setEditingFolderId] = useState(null);
     const [folderNameInput, setFolderNameInput] = useState('');
     const [isDraggingOverId, setIsDraggingOverId] = useState(null);
-    const [selectedDraftIds, setSelectedDraftIds] = useState([]);
-
-    // Clear selections when switching folders
-    useEffect(() => {
-        setSelectedDraftIds([]);
-    }, [currentFolder]);
 
     const [deleteModalState, setDeleteModalState] = useState({
         isOpen: false,
@@ -49,29 +31,21 @@ const MyDrafts = () => {
         let loadedFolders = [];
         let success = false;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-
         try {
             const token = localStorage.getItem('session_id') || localStorage.getItem('token');
             if (token) {
                 const response = await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/list`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    signal: controller.signal,
+                    headers: { Authorization: `Bearer ${token}` }
                 });
-                clearTimeout(timeoutId);
                 if (response.ok) {
                     const data = await response.json();
                     loadedDrafts = data.drafts || [];
                     loadedFolders = data.folders || [];
                     success = true;
-                    localStorage.setItem('my_drafts', JSON.stringify(loadedDrafts));
-                    localStorage.setItem('my_draft_folders', JSON.stringify(loadedFolders));
                 }
             }
         } catch (error) {
-            clearTimeout(timeoutId);
-            console.warn("Backend draft list endpoint timeout/unavailable, using local storage fallback:", error);
+            console.warn("Backend draft list endpoint unavailable, using local storage fallback:", error);
         }
 
         if (!success) {
@@ -84,19 +58,6 @@ const MyDrafts = () => {
             }
         }
 
-        // Always filter out locally-deleted drafts so they never resurrect after navigation
-        try {
-            const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
-            if (deletedIds.length > 0) {
-                loadedDrafts = loadedDrafts.filter(d => {
-                    const candidates = [d.id, d.documentKey, d.filename, d.name]
-                        .filter(Boolean)
-                        .map(v => String(v).trim().toLowerCase());
-                    return !candidates.some(c => deletedIds.includes(c));
-                });
-            }
-        } catch (e) {}
-
         setDrafts(loadedDrafts);
         setFolders(loadedFolders);
     };
@@ -107,46 +68,30 @@ const MyDrafts = () => {
 
     const performDeleteDraft = async (id) => {
         const targetDraft = drafts.find(d => String(d.id) === String(id));
-        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
-        const deleteTargets = Array.from(new Set([id, targetDraft?.documentKey, targetDraft?.filename, targetDraft?.name].filter(Boolean)));
-
-        for (const targetId of deleteTargets) {
-            try {
-                if (token) {
-                    await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({ id: targetId }),
-                    });
-                }
-            } catch (error) {}
-
-            try {
-                await caseService.deleteCaseDocument(null, targetId);
-            } catch (dmsErr) {}
-        }
-
-        // Save to deleted IDs in localStorage so local fallbacks never resurrect it
         try {
-            const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
-            deleteTargets.forEach(tid => {
-                const s = String(tid).trim().toLowerCase();
-                if (s && !deletedIds.includes(s)) deletedIds.push(s);
-            });
-            localStorage.setItem('draftmate_deleted_doc_ids', JSON.stringify(deletedIds));
-        } catch (e) {}
+            const token = localStorage.getItem('session_id') || localStorage.getItem('token');
+            if (token) {
+                await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ id }),
+                });
+            }
+        } catch (error) {}
+
+        // Delete from Document Management as well
+        try {
+            await caseService.deleteCaseDocument(null, id);
+            if (targetDraft?.name || targetDraft?.filename) {
+                await caseService.deleteCaseDocument(null, targetDraft.name || targetDraft.filename);
+            }
+        } catch (dmsErr) {}
 
         setDrafts(prev => {
-            const updated = prev.filter(d => 
-                String(d.id) !== String(id) && 
-                (!targetDraft?.documentKey || d.documentKey !== targetDraft.documentKey) &&
-                (!targetDraft?.name || d.name !== targetDraft.name)
-            );
+            const updated = prev.filter(draft => String(draft.id) !== String(id));
             localStorage.setItem('my_drafts', JSON.stringify(updated));
             return updated;
         });
-
-        window.dispatchEvent(new Event('my_drafts_updated'));
         toast.success("Draft deleted successfully.");
     };
 
@@ -158,73 +103,6 @@ const MyDrafts = () => {
             message: 'Are you sure you want to delete this draft? This action cannot be undone.',
             onConfirm: () => performDeleteDraft(id)
         });
-    };
-
-    const handleToggleSelectDraft = (id, e) => {
-        e.stopPropagation();
-        setSelectedDraftIds(prev => 
-            prev.includes(id) 
-                ? prev.filter(item => item !== id) 
-                : [...prev, id]
-        );
-    };
-
-    const handleSelectAll = () => {
-        const allDraftIds = sortedDrafts.map(d => String(d.id));
-        const allSelected = allDraftIds.every(id => selectedDraftIds.includes(id));
-        
-        if (allSelected) {
-            setSelectedDraftIds(prev => prev.filter(id => !allDraftIds.includes(id)));
-        } else {
-            setSelectedDraftIds(prev => Array.from(new Set([...prev, ...allDraftIds])));
-        }
-    };
-
-    const performBulkDeleteDrafts = async () => {
-        const token = localStorage.getItem('session_id') || localStorage.getItem('token');
-        const idsToDelete = [...selectedDraftIds];
-        
-        const loadingToast = toast.loading(`Deleting ${idsToDelete.length} drafts...`);
-        
-        for (const id of idsToDelete) {
-            const targetDraft = drafts.find(d => String(d.id) === String(id));
-            const deleteTargets = Array.from(new Set([id, targetDraft?.documentKey, targetDraft?.filename, targetDraft?.name].filter(Boolean)));
-            
-            for (const targetId of deleteTargets) {
-                try {
-                    if (token) {
-                        await fetch(`${API_CONFIG.AUTH.BASE_URL}/v2/draft/delete`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                            body: JSON.stringify({ id: targetId }),
-                        });
-                    }
-                } catch (error) {}
-
-                try {
-                    await caseService.deleteCaseDocument(null, targetId);
-                } catch (dmsErr) {}
-            }
-            
-            try {
-                const deletedIds = JSON.parse(localStorage.getItem('draftmate_deleted_doc_ids') || '[]');
-                deleteTargets.forEach(tid => {
-                    const s = String(tid).trim().toLowerCase();
-                    if (s && !deletedIds.includes(s)) deletedIds.push(s);
-                });
-                localStorage.setItem('draftmate_deleted_doc_ids', JSON.stringify(deletedIds));
-            } catch (e) {}
-        }
-        
-        setDrafts(prev => {
-            const updated = prev.filter(d => !idsToDelete.includes(String(d.id)));
-            localStorage.setItem('my_drafts', JSON.stringify(updated));
-            return updated;
-        });
-        
-        setSelectedDraftIds([]);
-        window.dispatchEvent(new Event('my_drafts_updated'));
-        toast.success(`Successfully deleted ${idsToDelete.length} drafts.`, { id: loadingToast });
     };
 
     const handleOpenDraft = (draft) => {
@@ -788,19 +666,6 @@ const MyDrafts = () => {
                                 <span>Date Timeline</span>
                             </button>
                         )}
-                        {sortedDrafts.length > 0 && (
-                            <button
-                                onClick={handleSelectAll}
-                                className="btn-lift flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition-all cursor-pointer"
-                            >
-                                <span className="material-symbols-outlined text-lg">
-                                    {sortedDrafts.every(d => selectedDraftIds.includes(String(d.id))) ? 'check_box' : 'check_box_outline_blank'}
-                                </span>
-                                <span>
-                                    {sortedDrafts.every(d => selectedDraftIds.includes(String(d.id))) ? 'Deselect All' : 'Select All'}
-                                </span>
-                            </button>
-                        )}
                         <button
                             onClick={() => setSortOrder(prev => prev === 'date' ? 'alpha' : 'date')}
                             className="sort-btn-anim hidden sm:flex items-center space-x-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-medium transition-colors cursor-pointer"
@@ -894,27 +759,8 @@ const MyDrafts = () => {
                                         {/* Card Content */}
                                         <div className="p-5 flex-1" onClick={() => handleOpenDraft(draft)}>
                                             <div className="flex justify-between items-start mb-4">
-                                                <div className="draft-icon-wrap p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg relative w-12 h-12 flex items-center justify-center">
-                                                    {/* File Icon */}
-                                                    <span className={`material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl absolute transition-opacity duration-200 ${
-                                                        selectedDraftIds.length > 0 || selectedDraftIds.includes(String(draft.id)) ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0 group-hover:pointer-events-none'
-                                                    }`}>article</span>
-                                                    
-                                                    {/* Selection Checkbox */}
-                                                    <div 
-                                                        onClick={(e) => handleToggleSelectDraft(String(draft.id), e)}
-                                                        className={`w-5 h-5 rounded border-2 transition-all duration-200 cursor-pointer flex items-center justify-center ${
-                                                            selectedDraftIds.includes(String(draft.id))
-                                                                ? 'bg-primary border-primary text-white scale-100'
-                                                                : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 opacity-0 group-hover:opacity-100 hover:border-primary'
-                                                        } ${selectedDraftIds.length > 0 ? 'opacity-100' : ''}`}
-                                                    >
-                                                        {selectedDraftIds.includes(String(draft.id)) ? (
-                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
-                                                            </svg>
-                                                        ) : null}
-                                                    </div>
+                                                <div className="draft-icon-wrap p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                                    <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">article</span>
                                                 </div>
                                                 <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                     <div className="text-slate-400 cursor-grab active:cursor-grabbing" title="Drag to move">
@@ -1017,38 +863,6 @@ const MyDrafts = () => {
                                     {editingFolderId ? 'Save Changes' : 'Create Folder'}
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Floating Bulk Actions Footer */}
-                {selectedDraftIds.length > 0 && (
-                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md px-6 py-3.5 rounded-full shadow-2xl border border-slate-700/50 flex items-center gap-6 animate-fadeInUp">
-                        <span className="text-sm font-medium text-slate-200">
-                            {selectedDraftIds.length} draft{selectedDraftIds.length > 1 ? 's' : ''} selected
-                        </span>
-                        <div className="h-4 w-px bg-slate-700"></div>
-                        <div className="flex items-center gap-4">
-                            <button 
-                                onClick={() => setSelectedDraftIds([])} 
-                                className="text-xs font-semibold text-slate-400 hover:text-white transition-colors"
-                            >
-                                Clear
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    setDeleteModalState({
-                                        isOpen: true,
-                                        title: `Delete ${selectedDraftIds.length} Drafts`,
-                                        message: `Are you sure you want to delete the ${selectedDraftIds.length} selected drafts? This action cannot be undone.`,
-                                        onConfirm: performBulkDeleteDrafts
-                                    });
-                                }}
-                                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg transition-all cursor-pointer"
-                            >
-                                <span className="material-symbols-outlined text-sm">delete_sweep</span>
-                                <span>Delete Selected</span>
-                            </button>
                         </div>
                     </div>
                 )}

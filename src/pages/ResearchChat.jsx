@@ -20,10 +20,10 @@ import DraftingModal from '../components/DraftingModal';
 import { processCitations, CitationLink } from '../utils/citationUtils';
 
 const LLM_OPTIONS = [
-    { value: 'gemini-2.5-flash', label: 'Fast', description: 'High speed responses' },
-    { value: 'gemini-2.5-pro', label: 'Advanced', description: 'Deep reasoning & analysis' },
-    { value: 'gpt-4o', label: 'Reasoning', description: 'Complex problem solving' },
-    { value: 'gpt-4o-mini', label: 'Fast & Efficient', description: 'Balanced performance' },
+    { value: 'gemini-2.5-flash', label: 'Lex - Fast', description: 'High speed responses' },
+    { value: 'gemini-2.5-pro', label: 'Themis - Advanced', description: 'Deep reasoning & analysis' },
+    { value: 'gpt-4o', label: 'Neeti - Reasoning', description: 'Complex problem solving' },
+    { value: 'gpt-4o-mini', label: 'Vidhi - Fast & Efficient', description: 'Balanced performance' },
 ];
 
 const NODE_LABELS = {
@@ -40,117 +40,43 @@ const NODE_LABELS = {
     'memory_store': 'Committing insights to memory'
 };
 
-const ResearchProgressTimeline = ({ activeNodes, streamLength }) => {
+const ResearchProgressTimeline = ({ activeNodes }) => {
     const stages = [
-        { ids: ['router', 'memory_recall'], label: 'Analyzing Query' },
-        { ids: ['research_agent', 'law_agent', 'case_agent', 'document_agent'], label: 'Gathering Facts' },
-        { ids: ['citation_agent', 'strategy_agent', 'explainer_agent'], label: 'Verifying Citations' },
-        { ids: ['manager_aggregate', 'memory_store'], label: 'Compiling Research' }
+        { id: 'router', label: 'Analyzing Query' },
+        { id: 'research_agent', label: 'Gathering Facts' },
+        { id: 'citation_agent', label: 'Verifying Citations' },
+        { id: 'manager_aggregate', label: 'Compiling Research' }
     ];
 
-    let activeStageIndex = 0;
-    stages.forEach((stage, idx) => {
-        const hasNode = activeNodes.some(n => stage.ids.includes(n.node));
-        if (hasNode) {
-            activeStageIndex = Math.max(activeStageIndex, idx);
-        }
-    });
-
-    // Advance stages dynamically based on stream token length
-    if (streamLength > 50) activeStageIndex = Math.max(activeStageIndex, 1);
-    if (streamLength > 200) activeStageIndex = Math.max(activeStageIndex, 2);
-    if (streamLength > 500) activeStageIndex = Math.max(activeStageIndex, 3);
-
-    const [progress, setProgress] = useState(15);
-
-    useEffect(() => {
-        let targetProgress = 20;
-        if (streamLength > 0) {
-            targetProgress = Math.min(99, 35 + Math.floor(streamLength / 8));
-        } else if (activeStageIndex === 1) {
-            targetProgress = 45;
-        } else if (activeStageIndex === 2) {
-            targetProgress = 70;
-        } else if (activeStageIndex === 3) {
-            targetProgress = 90;
-        }
-
-        const interval = setInterval(() => {
-            setProgress((prev) => {
-                if (prev < targetProgress) {
-                    const step = Math.max(1, (targetProgress - prev) * 0.2);
-                    return Math.min(targetProgress, prev + step);
-                }
-                return prev;
-            });
-        }, 30);
-
-        return () => clearInterval(interval);
-    }, [activeStageIndex, streamLength]);
-
-    const displayPercent = Math.round(progress);
-
     return (
-        <div className="bg-white border border-blue-100 rounded-2xl p-5 mb-6 shadow-[0_4px_25px_rgba(37,99,235,0.06)] relative overflow-hidden text-slate-800 backdrop-blur-md animate-fade-in">
+        <div className="bg-white border border-blue-100 rounded-2xl p-6 mb-6 shadow-[0_4px_20px_rgba(37,99,235,0.04)] relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-blue-50/50 to-transparent pointer-events-none" />
-
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
-                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                        Autonomous Research Pipeline
-                    </h3>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-end gap-1 h-3">
-                        <div className="w-1 bg-blue-600 rounded-full animate-[bounce_1s_infinite_100ms] h-full" />
-                        <div className="w-1 bg-indigo-600 rounded-full animate-[bounce_1s_infinite_300ms] h-2/3" />
-                        <div className="w-1 bg-purple-600 rounded-full animate-[bounce_1s_infinite_200ms] h-full" />
-                    </div>
-                    <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full shadow-sm border text-blue-700 bg-blue-50 border-blue-200">
-                        {displayPercent}%
-                    </span>
-                </div>
+            <div className="flex items-center justify-between mb-5">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    Autonomous Research Pipeline
+                </h3>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">LIVE</span>
             </div>
-
-            {/* VLC / Spotify Continuous Progress Bar Track */}
-            <div className="relative my-5 px-1">
-                <div className="h-2.5 bg-slate-100 rounded-full w-full relative overflow-hidden border border-slate-200/80 shadow-inner">
-                    <div
-                        className="h-full rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(37,99,235,0.4)] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                <div
-                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-2 border-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.5)] transition-all duration-300 ease-out z-20 pointer-events-none"
-                    style={{ left: `calc(${progress}% - 8px)` }}
-                />
-            </div>
-
-            {/* Stage Nodes */}
-            <div className="grid grid-cols-4 gap-2 pt-1">
+            <div className="flex items-center justify-between w-full overflow-x-auto pb-2 scrollbar-hide">
                 {stages.map((stage, idx) => {
-                    const stageThreshold = (idx + 1) * 25;
-                    const isPassed = progress >= stageThreshold - 10;
-                    const isCurrent = progress >= (idx * 25) && progress < stageThreshold;
+                    const isCompleted = activeNodes.some(n => n.node === stage.id && n.status === 'completed');
+                    const isRunning = activeNodes.some(n => n.node === stage.id && n.status === 'running');
 
                     return (
-                        <div key={stage.label} className="flex flex-col items-center text-center">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 text-xs font-bold mb-1.5 transition-all duration-300 ${
-                                isPassed
-                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                                    : isCurrent
-                                        ? 'bg-blue-50 border-blue-600 text-blue-600 animate-pulse font-extrabold'
-                                        : 'bg-slate-50 border-slate-200 text-slate-400'
-                            }`}>
-                                {isPassed ? <span className="material-symbols-outlined text-xs">check</span> : (idx + 1)}
+                        <React.Fragment key={stage.id}>
+                            <div className="flex flex-col items-center gap-2 min-w-[90px] shrink-0">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${isCompleted ? 'bg-blue-600 border-blue-600 text-white' :
+                                    isRunning ? 'border-blue-500 text-blue-500 animate-pulse' : 'border-slate-200 text-slate-300'
+                                    }`}>
+                                    {isCompleted ? <span className="material-symbols-outlined text-sm">check</span> : <span className="text-[10px] font-bold">{idx + 1}</span>}
+                                </div>
+                                <span className={`text-[10px] font-bold text-center whitespace-nowrap ${isRunning ? 'text-blue-600' : isCompleted ? 'text-slate-700' : 'text-slate-400'}`}>
+                                    {stage.label}
+                                </span>
                             </div>
-                            <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${
-                                isPassed ? 'text-slate-800' : isCurrent ? 'text-blue-600' : 'text-slate-400'
-                            }`}>
-                                {stage.label}
-                            </span>
-                        </div>
+                            {idx < stages.length - 1 && <div className={`h-[2px] flex-1 min-w-[30px] mx-2 transition-colors duration-500 ${isCompleted ? 'bg-blue-600' : 'bg-slate-100'}`} />}
+                        </React.Fragment>
                     );
                 })}
             </div>
@@ -229,45 +155,40 @@ const ResearchChat = () => {
     }, []);
 
     // Original Fetch Sessions
+    // Fetch Sessions with local storage fallback
     const fetchSessions = async () => {
+        let loadedSessions = [];
         try {
             setIsLoadingSessions(true);
             const data = await api.getSessions();
-            setSessions(data.sessions || []);
+            if (data && data.sessions && data.sessions.length > 0) {
+                loadedSessions = data.sessions;
+                localStorage.setItem('lexbot_sessions', JSON.stringify(data.sessions));
+            }
         } catch (error) {
-            console.error("Failed to fetch sessions:", error);
-            toast.error("Failed to load chat history");
-        } finally {
-            setIsLoadingSessions(false);
+            console.warn("Backend session history endpoint unavailable, using local storage fallback:", error);
         }
-    };
 
-    // Mock Fetch Sessions
-    // const fetchSessions = async () => {
-    //     setIsLoadingSessions(true);
-    //     setTimeout(() => {
-    //         setSessions([
-    //             { session_id: 'mock-1', title: 'Supreme Court Guidelines on Bail', created_at: new Date().toISOString() },
-    //             { session_id: 'mock-2', title: 'Section 138 NI Act Dispute', created_at: new Date(Date.now() - 86400000).toISOString() }, // Yesterday
-    //             { session_id: 'mock-3', title: 'Corporate Merger Due Diligence', created_at: new Date(Date.now() - 86400000 * 3).toISOString() } // 3 days ago
-    //         ]);
-    //         setIsLoadingSessions(false);
-    //     }, 800);
-    // };
+        if (loadedSessions.length === 0) {
+            try {
+                loadedSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
+            } catch (e) {
+                loadedSessions = [];
+            }
+        }
+        setSessions(loadedSessions);
+        setIsLoadingSessions(false);
+    };
 
     // Initialize
     useEffect(() => {
-        // hasInitializedRef prevents React StrictMode's double-invocation from
-        // calling loadSession after startNewChat already ran — which would race
-        // with the user's first message and wipe it from state.
         if (hasInitializedRef.current) return;
         hasInitializedRef.current = true;
 
-        // Fetch current LLM config on mount
         const fetchLLMConfig = async () => {
             try {
                 const config = await api.getLLMConfig();
-                if (config.current_model) {
+                if (config && config.current_model) {
                     setSelectedLLM(config.current_model);
                 }
             } catch (error) {
@@ -277,8 +198,6 @@ const ResearchChat = () => {
         fetchLLMConfig();
         fetchSessions();
 
-        // Check for existing session in URL or localStorage
-        // For now, let's start fresh or load if ID is present
         const storedSessionId = localStorage.getItem('last_chat_session_id');
         if (storedSessionId) {
             loadSession(storedSessionId);
@@ -290,6 +209,15 @@ const ResearchChat = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    // Save messages to local storage whenever messages change
+    useEffect(() => {
+        if (sessionId && messages.length > 0) {
+            try {
+                localStorage.setItem(`lexbot_messages_${sessionId}`, JSON.stringify(messages));
+            } catch (e) {}
+        }
+    }, [messages, sessionId]);
 
     // Group Sessions by Date
     const groupSessions = (sessions) => {
@@ -308,7 +236,7 @@ const ResearchChat = () => {
         lastWeek.setDate(lastWeek.getDate() - 7);
 
         sessions.forEach(session => {
-            const date = new Date(session.created_at);
+            const date = new Date(session.created_at || Date.now());
             if (date >= today) {
                 groups['Today'].push(session);
             } else if (date >= yesterday) {
@@ -325,36 +253,10 @@ const ResearchChat = () => {
 
     const sessionGroups = groupSessions(sessions);
 
-    // const startNewChat = () => {
-    //     const newId = crypto.randomUUID();
-    //     setSessionId(newId);
-    //     setMessages([
-    //         {
-    //             id: 1,
-    //             role: 'ai',
-    //             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?'
-    //         }
-    //     ]);
-    //     localStorage.setItem('last_chat_session_id', newId);
-    //     // Optionally clear URL param
-    //     window.history.replaceState({}, '', '/dashboard/research');
-    // };
-
-    const safeUUID = () => {
-        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-            try {
-                return crypto.randomUUID();
-            } catch (e) {
-                // fallback
-            }
-        }
-        return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
-    };
-
     const startNewChat = () => {
-        const newId = safeUUID();
+        const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
         setSessionId(newId);
-        setMessages([{
+        const initMsg = [{
             id: 1,
             role: 'ai',
             content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
@@ -364,81 +266,70 @@ const ResearchChat = () => {
                 "Draft a Legal Notice for breach of contract.",
                 "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
             ]
-        }]);
+        }];
+        setMessages(initMsg);
 
         localStorage.setItem('last_chat_session_id', newId);
-        // Optionally clear URL param
-        window.history.replaceState({}, '', '/dashboard/research');
+        try {
+            const existingSessions = JSON.parse(localStorage.getItem('lexbot_sessions') || '[]');
+            if (!existingSessions.some(s => s.session_id === newId)) {
+                existingSessions.unshift({
+                    session_id: newId,
+                    title: 'New Research Chat',
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('lexbot_sessions', JSON.stringify(existingSessions));
+                setSessions(existingSessions);
+            }
+        } catch (e) {}
+        window.history.replaceState({}, '', '/research');
     };
 
     const loadSession = async (id) => {
+        setSessionId(id);
+        localStorage.setItem('last_chat_session_id', id);
+
+        let loadedMessages = [];
         try {
-            setSessionId(id);
-            localStorage.setItem('last_chat_session_id', id);
-
             const data = await api.getSessionHistory(id);
-
-            // Don't overwrite messages if the user has already sent a message
-            // and the bot is currently responding — that would wipe their message.
-            if (isStreamingRef.current) return;
-
-            if (data.messages && data.messages.length > 0) {
-                // Map backend messages to frontend format
-                const formattedMessages = data.messages.map((msg, idx) => ({
+            if (data && data.messages && data.messages.length > 0) {
+                loadedMessages = data.messages.map((msg, idx) => ({
                     id: msg.id || idx,
                     role: msg.role === 'assistant' ? 'ai' : msg.role,
                     content: msg.content,
                     sources: msg.metadata?.sources,
                 }));
-                setMessages(formattedMessages);
-            } else {
-                setMessages([{
-                    id: 1,
-                    role: 'ai',
-                    content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
-                    isIntro: true,
-                    followups: [
-                        "What are the latest Supreme Court judgments on Section 138 of NI Act?",
-                        "Draft a Legal Notice for breach of contract.",
-                        "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
-                    ]
-                }]);
             }
         } catch (error) {
-            console.error("Failed to load session:", error);
-            toast.error("Failed to load chat");
-            if (!isStreamingRef.current) startNewChat();
-        }
-    };
-
-    const handleDeleteSession = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this chat history?")) {
-            return;
+            console.warn("Backend getSessionHistory unavailable, trying local cache:", error);
         }
 
-        const userProfileStr = localStorage.getItem('user_profile');
-        let userId = 'default_user';
-        if (userProfileStr) {
+        // Local cache fallback
+        if (loadedMessages.length === 0) {
             try {
-                const profile = JSON.parse(userProfileStr);
-                userId = profile.user_id || profile.id || 'default_user';
-            } catch (e) {}
+                const cached = localStorage.getItem(`lexbot_messages_${id}`);
+                if (cached) {
+                    loadedMessages = JSON.parse(cached);
+                }
+            } catch (err) {}
         }
 
-        try {
-            await api.deleteSession(id, userId);
-            toast.success("Chat deleted successfully.");
-            
-            // If the active session was deleted, start a new chat
-            if (id === sessionId) {
-                startNewChat();
-            }
-            
-            // Refresh sidebar list
-            fetchSessions();
-        } catch (error) {
-            console.error("Failed to delete session:", error);
-            toast.error("Failed to delete chat history.");
+        if (isStreamingRef.current) return;
+
+        if (loadedMessages.length > 0) {
+            setMessages(loadedMessages);
+        } else {
+            setMessages([{
+                id: 1,
+                role: 'ai',
+                content: 'Hello! I am your advanced AI Legal Research Assistant. I can help you find relevant case laws, explain complex legal concepts, or draft research memos.\n\nHow can I assist you today?',
+                isIntro: true,
+                followups: [
+                    "What are the latest Supreme Court judgments on Section 138 of NI Act?",
+                    "Draft a Legal Notice for breach of contract.",
+                    "Summarize the key provisions of the Digital Personal Data Protection Act, 2023."
+                ]
+            }]);
         }
     };
 
@@ -795,36 +686,19 @@ const ResearchChat = () => {
                                     <h3 className="px-3 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">{group}</h3>
                                     <div className="space-y-1">
                                         {groupSessions.map(session => (
-                                            <div 
+                                            <button
                                                 key={session.session_id}
-                                                className="relative group w-full"
+                                                onClick={() => loadSession(session.session_id)}
+                                                className={`w-full text-left px-4 py-3 rounded-xl text-sm truncate transition-all flex items-center gap-3 border ${sessionId === session.session_id
+                                                    ? 'bg-blue-50 border-blue-100 text-blue-700 shadow-sm font-bold'
+                                                    : 'hover:bg-slate-100 border-transparent text-slate-600 hover:text-slate-900'
+                                                    }`}
                                             >
-                                                <button
-                                                    onClick={() => loadSession(session.session_id)}
-                                                    className={`w-full text-left pl-4 pr-10 py-3 rounded-xl text-sm truncate transition-all flex items-center gap-3 border ${sessionId === session.session_id
-                                                        ? 'bg-blue-50 border-blue-100 text-blue-700 shadow-sm font-bold'
-                                                        : 'hover:bg-slate-100 border-transparent text-slate-600 hover:text-slate-900'
-                                                        }`}
-                                                >
-                                                    <span className={`material-symbols-outlined text-lg shrink-0 ${sessionId === session.session_id ? 'text-blue-600' : 'text-slate-400'}`}>
-                                                        {sessionId === session.session_id ? 'chat_bubble' : 'history'}
-                                                    </span>
-                                                    <span className="truncate flex-1">
-                                                        {session.title || "New Research Chat"}
-                                                    </span>
-                                                </button>
-                                                
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteSession(session.session_id);
-                                                    }}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition-all z-10 flex items-center justify-center"
-                                                    title="Delete Chat"
-                                                >
-                                                    <span className="material-symbols-outlined text-base">delete</span>
-                                                </button>
-                                            </div>
+                                                <span className={`material-symbols-outlined text-lg ${sessionId === session.session_id ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                    {sessionId === session.session_id ? 'chat_bubble' : 'history'}
+                                                </span>
+                                                {session.title || "New Research Chat"}
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
@@ -1031,13 +905,7 @@ const ResearchChat = () => {
                     <div className="max-w-4xl mx-auto w-full">
 
                         {/* Progress Timeline & Tasks UI */}
-                        {/* Progress Timeline & Tasks UI - auto-hides once reply arrives */}
-                        {isTyping && (
-                            <ResearchProgressTimeline
-                                activeNodes={activeNodes}
-                                streamLength={messages[messages.length - 1]?.role === 'ai' ? (messages[messages.length - 1]?.content?.length || 0) : 0}
-                            />
-                        )}
+                        {isTyping && <ResearchProgressTimeline activeNodes={activeNodes} />}
                         {isTyping && <SubQueryTasks isTyping={isTyping} input={input} />}
 
                         {/* File Preview */}
@@ -1055,10 +923,10 @@ const ResearchChat = () => {
                             </div>
                         )}
 
-                        <div className="relative flex items-end gap-2 bg-white border border-slate-200 rounded-[28px] shadow-lg shadow-slate-200/40 focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-300 transition-all p-2 pl-3">
+                        <div className="relative flex items-center gap-2 bg-white border border-slate-200 rounded-[28px] shadow-lg shadow-slate-200/40 focus-within:ring-4 focus-within:ring-blue-50 focus-within:border-blue-300 transition-all p-2 pl-3">
 
                             {/* Plus Menu (Dropdown logic) */}
-                            <div className="relative mb-1">
+                            <div className="relative">
                                 <button
                                     onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
                                     className={`flex-none p-2 rounded-full transition-colors ${isPlusMenuOpen ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:bg-slate-100'}`}
@@ -1097,7 +965,7 @@ const ResearchChat = () => {
                             />
 
                             {/* Dynamic Model & Thinking Selector */}
-                            <div className="relative mb-1.5 flex items-center">
+                            <div className="relative flex items-center">
                                 <button
                                     onClick={() => setIsModelSelectorOpen(!isModelSelectorOpen)}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold transition-colors mr-2 whitespace-nowrap"
@@ -1174,7 +1042,7 @@ const ResearchChat = () => {
                         </div>
                         <div className="text-center mt-3">
                             <p className="text-[10px] font-medium text-slate-400 flex items-center justify-center gap-1.5">
-                                <span className="material-symbols-outlined text-[12px]">info</span> AI can make mistakes. Always verify outputs before relying on them.
+                                <span className="material-symbols-outlined text-[12px]">info</span> AI can do mistakes, so Human intervention is required.
                             </p>
                         </div>
                     </div>

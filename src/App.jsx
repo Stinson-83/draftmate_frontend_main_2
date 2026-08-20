@@ -8,7 +8,6 @@ import PDFEditor from './pages/PDFEditor';
 import MyDrafts from './pages/MyDrafts';
 import OnlyOfficeWorkspace from './pages/OnlyOfficeWorkspace';
 import DraftingLanding from './pages/DraftingLanding';
-import ChronologyWorkspace from './pages/ChronologyWorkspace';
 import ResearchChat from './pages/ResearchChat';
 import Tools from './pages/Tools';
 import ChatWithPDF from './pages/ChatWithPDF';
@@ -51,7 +50,10 @@ import AdvocateProfile from './pages/AdvocateProfile';
 import AdvocateDiscovery from './pages/AdvocateDiscovery';
 import AdvocateDashboard from './pages/AdvocateDashboard';
 import AdvocateOnboarding from './pages/AdvocateOnboarding';
+import AdvocateLogin from './pages/AdvocateLogin';
+import AdvocateSignup from './pages/AdvocateSignup';
 import AdminDashboard from './pages/AdminDashboard';
+import AuthResolver from './components/AuthResolver';
 import TranslateDocumentPage from './pages/TranslateDocumentPage';
 import TranslateComparePage from './pages/TranslateComparePage';
 
@@ -158,6 +160,7 @@ function App() {
 
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/auth-resolve" element={<AuthResolver />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/onboarding/student-details" element={<StudentDetails />} />
               <Route path="/onboarding/advocate-details" element={<AdvocateDetails />} />
@@ -180,6 +183,8 @@ function App() {
               <Route path="/terms" element={<TermsOfUse />} />
               <Route path="/blogs" element={<ComingSoon title="Blog" />} />
               <Route path="/advocates" element={<AdvocateDiscovery />} />
+              <Route path="/advocate/login" element={<AdvocateLogin />} />
+              <Route path="/advocate/signup" element={<AdvocateSignup />} />
               <Route path="/advocate/onboarding" element={<AdvocateOnboarding />} />
               <Route path="/advocate/:slug" element={<AdvocateProfile />} />
               <Route path="/admin/verifications" element={<AdminDashboard />} />
@@ -200,7 +205,6 @@ function App() {
                 <Route path="pdf-editor" element={<PDFEditor />} />
                 <Route path="tools" element={<Tools />} />
                 <Route path="drafting" element={<DraftingLanding />} />
-                <Route path="chronology" element={<ChronologyWorkspace />} />
                 <Route path="drafts" element={<MyDrafts />} />
                 <Route path="research" element={<ResearchChat />} />
                 <Route path="chat-pdf" element={<ChatWithPDF />} />
@@ -234,8 +238,7 @@ function App() {
                 <Route path="library/video-links" element={<VideoLinks />} />
                 <Route path="library/clients" element={<Clients />} />
                 <Route path="library/clients/:clientId" element={<ClientDetails />} />
-                <Route path="library/cases" element={<Cases />} />
-                <Route path="library/cases/:caseId" element={<CaseDetails />} />
+
                 <Route path="library/case-tracking" element={<CaseTracking />} />
                 <Route path="library/case-tracking/:trackingId" element={<CaseTrackingDetails />} />
                 <Route path="library/integrations/ecourts" element={<IntegrationSettings />} />
@@ -244,7 +247,11 @@ function App() {
                 <Route path="help" element={<HelpCenter />} />
                 <Route path="billing" element={<Billing />} />
                 <Route path="notifications" element={<Notifications />} />
-                <Route path="advocate-profile" element={<AdvocateDashboard />} />
+                <Route path="profile" element={<AdvocateDashboard />} />
+                <Route path="consultations" element={<AdvocateDashboard />} />
+                <Route path="messages" element={<AdvocateDashboard />} />
+                <Route path="analytics" element={<AdvocateDashboard />} />
+                <Route path="verification" element={<AdvocateDashboard />} />
                 <Route path="chat" element={<Placeholder title="AI Chat" />} />
 
                 {/* Sidebar items — real pages */}

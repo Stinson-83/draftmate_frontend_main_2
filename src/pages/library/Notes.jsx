@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { notesService } from '../../services/library/notesService';
 import { toast } from 'sonner';
 
@@ -38,6 +39,10 @@ const Notes = () => {
   return (
     <div className="p-6 md:p-8 h-full overflow-y-auto flex flex-col bg-background-light dark:bg-background-dark">
       <div className="max-w-5xl mx-auto w-full">
+        <Link to="/dashboard/library" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#2563EB] mb-6 transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Library
+        </Link>
         <div className="flex justify-between items-end mb-8">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Notes</h1>

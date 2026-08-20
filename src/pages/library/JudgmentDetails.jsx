@@ -215,14 +215,12 @@ const JudgmentDetails = () => {
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap gap-2 mb-2">
-              {judgment.court && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">{judgment.court}</span>
-              )}
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Indian Kanoon</span>
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">{judgment.court}</span>
+              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.category}</span>
               <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.citation}</span>
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white leading-tight">{judgment.title}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{judgment.bench || (judgment.judges?.length > 0 ? `Bench: ${judgment.judges.join(', ')}` : 'Court Judgment')} • {judgment.year || judgment.date}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{judgment.bench || (judgment.judges?.length > 0 ? `Bench: ${judgment.judges.join(', ')}` : 'Indian Kanoon Judgment')} • {judgment.year || judgment.date}</p>
           </div>
 
           {/* Actions */}
@@ -236,7 +234,7 @@ const JudgmentDetails = () => {
               <span className="material-symbols-outlined text-[18px]">content_copy</span>
               <span className="hidden md:inline">Copy</span>
             </button>
-            <button onClick={() => downloadDocument(judgment.id, judgment, fullText)} title="Download" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            <button onClick={() => downloadDocument(judgment.id, judgment.pdfUrl)} title="Download" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               <span className="material-symbols-outlined text-[18px]">download</span>
               <span className="hidden md:inline">Download</span>
             </button>
@@ -321,11 +319,11 @@ const JudgmentDetails = () => {
           )}
 
           {/* Tags */}
-          {judgment.tags && judgment.tags.filter(t => !t.toLowerCase().includes('kanoon')).length > 0 && (
+          {judgment.tags && judgment.tags.length > 0 && (
             <div className="p-4 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700">
               <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider mb-3">Tags</p>
               <div className="flex flex-wrap gap-2">
-                {judgment.tags.filter(tag => !tag.toLowerCase().includes('kanoon')).map(tag => (
+                {judgment.tags.map(tag => (
                   <span key={tag} className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 text-xs font-medium">{tag}</span>
                 ))}
               </div>

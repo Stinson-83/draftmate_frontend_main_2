@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, Wand2 } from 'lucide-react';
-import PromptQualityBar from './PromptQualityBar';
 
 const ModifyDraftModal = ({ isOpen, onClose, onConfirm }) => {
     const [context, setContext] = useState('');
@@ -38,7 +37,6 @@ const ModifyDraftModal = ({ isOpen, onClose, onConfirm }) => {
                         onChange={(e) => setContext(e.target.value)}
                         autoFocus
                     />
-                    <PromptQualityBar prompt={context} />
                 </div>
 
                 <div className="modal-footer">

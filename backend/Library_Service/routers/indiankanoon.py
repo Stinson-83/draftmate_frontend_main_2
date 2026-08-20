@@ -8,7 +8,7 @@ import time
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from services import (
@@ -232,54 +232,6 @@ async def get_document_endpoint(doc_id: str):
             str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/document/{doc_id}/pdf")
-async def get_document_pdf_endpoint(doc_id: str, type: str = Query("pdf", description="PDF type: pdf or courtcopy")):
-    """
-    Fetch and stream official PDF court copy directly from Indian Kanoon.
-    """
-    start_time = time.perf_counter()
-    logger.info("Received get document PDF request: /document/%s/pdf (type: %s)", doc_id, type)
-
-    try:
-        pdf_bytes = await ik_service.get_document_pdf(doc_id, pdf_type=type)
-        if not pdf_bytes:
-            end_time = time.perf_counter()
-            logger.warning(
-                "Endpoint: /document/%s/pdf | Status: 404 | Execution time: %.4fs | Error: PDF unavailable",
-                doc_id,
-                end_time - start_time
-            )
-            raise HTTPException(status_code=404, detail="PDF court copy unavailable for this document")
-
-        end_time = time.perf_counter()
-        logger.info(
-            "Endpoint: /document/%s/pdf | Status: 200 | Size: %d bytes | Execution time: %.4fs",
-            doc_id,
-            len(pdf_bytes),
-            end_time - start_time
-        )
-
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="Judgment_{doc_id}.pdf"',
-                "Cache-Control": "public, max-age=86400"
-            }
-        )
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        end_time = time.perf_counter()
-        logger.error(
-            "Endpoint: /document/%s/pdf | Status: 500 | Execution time: %.4fs | Error: %s",
-            doc_id,
-            end_time - start_time,
-            str(e)
-        )
-        raise HTTPException(status_code=500, detail="Failed to stream PDF document")
 
 
 @router.get("/document/{doc_id}/metadata", response_model=SuccessResponse)

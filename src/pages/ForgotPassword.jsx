@@ -29,7 +29,6 @@ const ForgotPassword = () => {
                 throw new Error(data.detail || 'Failed to send OTP code');
             }
 
-            setOtp('');
             setShowOtpInput(true);
             toast.success("Verification code sent if the email is registered.");
 

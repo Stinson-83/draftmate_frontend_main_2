@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS advocate_profiles (
     slug                     VARCHAR(255) UNIQUE NOT NULL,
     title                    VARCHAR(255),
     bar_council_number       VARCHAR(100),
+    phone                    VARCHAR(50),
     years_experience         INTEGER,
     bio                      TEXT,
     consultation_fee         NUMERIC(10,2),
@@ -61,10 +62,16 @@ CREATE TABLE IF NOT EXISTS advocate_profiles (
     id_slug                  VARCHAR(100),
     profile_completion_score INTEGER DEFAULT 0,
     is_verified              BOOLEAN DEFAULT FALSE,
+    verification_status      VARCHAR(50) DEFAULT 'PENDING',
     is_public                BOOLEAN DEFAULT FALSE,
     rating                   NUMERIC(3,2),
     total_consultations      INTEGER DEFAULT 0,
     view_count               INTEGER DEFAULT 0,
+    cases_won                INTEGER DEFAULT 0,
+    total_clients            INTEGER DEFAULT 0,
+    success_rate             NUMERIC(5,2) DEFAULT 0,
+    social_links             JSONB DEFAULT '{}',
+    availability_settings    JSONB DEFAULT '{}',
     created_at               TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at               TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     office_address           TEXT
@@ -77,6 +84,13 @@ ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DE
 ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS total_consultations INTEGER DEFAULT 0;
 ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0;
 ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS office_address TEXT;
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS verification_status VARCHAR(50) DEFAULT 'PENDING';
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS cases_won INTEGER DEFAULT 0;
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS total_clients INTEGER DEFAULT 0;
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS success_rate NUMERIC(5,2) DEFAULT 0;
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}';
+ALTER TABLE advocate_profiles ADD COLUMN IF NOT EXISTS availability_settings JSONB DEFAULT '{}';
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_advocate_profiles_user_id ON advocate_profiles(user_id);

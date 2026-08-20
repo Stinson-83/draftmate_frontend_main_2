@@ -2,33 +2,57 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
 export default function SeoHead({ title, description, ogImage, canonicalUrl, advocateData }) {
-  // Generate Schema.org JSON-LD for an Advocate (LegalService/LocalBusiness)
-  const schemaMarkup = advocateData ? {
-    "@context": "https://schema.org",
-    "@type": "LegalService",
-    "name": advocateData.title,
-    "image": advocateData.profile_image_url || ogImage,
-    "description": advocateData.bio || description,
-    "url": canonicalUrl,
-    "telephone": "+91 0000000000", // Would be dynamic in a real app
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": advocateData.location?.split(',')[0]?.trim() || "New Delhi",
-      "addressRegion": advocateData.location?.split(',')[1]?.trim() || "Delhi",
-      "addressCountry": "IN"
-    },
-    "priceRange": `₹${advocateData.consultation_fee || '0'}`,
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "reviewCount": "24"
+  let schemaMarkup = null;
+  if (advocateData) {
+    schemaMarkup = {
+      "@context": "https://schema.org",
+      "@type": "LegalService",
+      "name": advocateData.title || title,
+      "image": advocateData.profile_image_url || ogImage,
+      "description": advocateData.bio || description,
+      "url": canonicalUrl,
+    };
+
+    if (advocateData.phone) {
+      schemaMarkup.telephone = advocateData.phone;
     }
-  } : null;
+
+    if (advocateData.location) {
+      const parts = advocateData.location.split(',').map(p => p.trim());
+      schemaMarkup.address = {
+        "@type": "PostalAddress",
+        "addressLocality": parts[0] || "",
+        "addressRegion": parts[1] || "",
+        "addressCountry": "IN"
+      };
+    }
+
+    if (advocateData.consultation_fee) {
+      schemaMarkup.priceRange = `₹${advocateData.consultation_fee}`;
+    }
+
+    if (advocateData.social_links) {
+      try {
+        let links = typeof advocateData.social_links === 'string' 
+          ? JSON.parse(advocateData.social_links) 
+          : advocateData.social_links;
+        
+        const validUrls = Object.values(links)
+          .filter(url => url && typeof url === 'string' && url.startsWith('http'));
+          
+        if (validUrls.length > 0) {
+          schemaMarkup.sameAs = validUrls;
+        }
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+  }
 
   return (
     <Helmet>
       {/* Basic HTML Meta Tags */}
-      <title>{title ? `${title} | Draftmate Verified Advocate` : 'Draftmate | AI Legal Assistant'}</title>
+      <title>{title || 'Draftmate | AI Legal Assistant'}</title>
       <meta name="description" content={description || "Discover verified legal professionals on Draftmate."} />
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
 

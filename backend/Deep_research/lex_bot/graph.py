@@ -216,10 +216,6 @@ def define_graph():
     # Fan-out: router routes to selected agents for complex queries
     def route_to_agents(state: AgentState) -> List[str]:
         """Route to selected agents based on router's assignment."""
-        # Document agent takes priority if files are uploaded and not yet processed
-        if state.get("uploaded_file_paths") and not state.get("document_context"):
-            return ["document_agent"]
-
         if state.get("needs_clarification", False):
             return ["__end__"]
 
@@ -239,7 +235,7 @@ def define_graph():
     workflow.add_conditional_edges(
         "router",
         route_to_agents,
-        ["research_agent", "document_agent", "explainer_agent", "law_agent", "case_agent", "citation_agent", "strategy_agent", "__end__"]
+        ["research_agent", "explainer_agent", "law_agent", "case_agent", "citation_agent", "strategy_agent", "__end__"]
     )
     
     # Fan-in: All complex agents → Manager Aggregate

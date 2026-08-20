@@ -936,53 +936,6 @@ const CalculatorHub = ({ onClose, onOpenCourtFee }) => {
 
 
 // ════════ MAIN TOOLS COMPONENT ════════
-// ════════ E-SIGNATURE MODAL ════════
-const ESignatureModal = ({ onClose }) => {
-    return (
-        <AnimatePresence>
-            <motion.div
-                variants={modalOverlayVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="tools-modal-overlay"
-                onClick={(e) => e.target === e.currentTarget && onClose()}
-            >
-                <motion.div
-                    variants={modalContentVariants}
-                    className="tools-modal-content max-w-lg p-6 text-center space-y-6"
-                >
-                    <div className="w-16 h-16 rounded-2xl bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto shadow-sm">
-                        <span className="material-symbols-outlined text-3xl">draw</span>
-                    </div>
-
-                    <div className="space-y-2">
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                            Digital E-Signature & Signing
-                        </h2>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                            Execute agreements, affidavits, and legal contracts with legally binding Aadhaar-based eSign and secure digital signatures (IT Act compliant).
-                        </p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-sky-50/60 dark:bg-sky-900/10 border border-sky-200/60 dark:border-sky-800/40 text-xs text-sky-700 dark:text-sky-300 font-medium">
-                        ✨ Fully compliant under Section 3A & Schedule II of the Indian Information Technology (IT) Act, 2000.
-                    </div>
-
-                    <div className="flex justify-center gap-3 pt-2">
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-sm transition-all shadow-md"
-                        >
-                            Got It
-                        </button>
-                    </div>
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>
-    );
-};
-
 const Tools = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -991,7 +944,6 @@ const Tools = () => {
     const [isCourtFeeModalOpen, setIsCourtFeeModalOpen] = useState(false);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [isDictationModalOpen, setIsDictationModalOpen] = useState(false);
-    const [isESignatureModalOpen, setIsESignatureModalOpen] = useState(false);
     const [isCalculatorHubOpen, setIsCalculatorHubOpen] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadedFileName, setUploadedFileName] = useState('');
@@ -1001,6 +953,33 @@ const Tools = () => {
 
     // List of all tools for uniform dynamic grid representation
     const allTools = [
+        {
+            id: 'create-draft',
+            icon: 'edit_document',
+            title: 'Create New Draft',
+            description: 'Start a new document with AI guidance or an empty workspace.',
+            onClick: () => handleDraftingClick(),
+            accentColor: '#3b82f6',
+            category: 'Drafting'
+        },
+        {
+            id: 'existing-doc',
+            icon: 'upload_file',
+            title: 'Work on Existing Document',
+            description: 'Upload a `.docx` or `.pdf` file and continue in the workspace.',
+            onClick: () => handleUploadClick(),
+            accentColor: '#6366f1',
+            category: 'Drafting'
+        },
+        {
+            id: 'review-draft',
+            icon: 'description',
+            title: 'Review Your Draft',
+            description: 'Review your previously created drafts.',
+            onClick: () => navigate('/dashboard/drafts'),
+            accentColor: '#f59e0b',
+            category: 'Drafting'
+        },
         {
             id: 'pdf-toolkit',
             icon: 'book',
@@ -1019,7 +998,33 @@ const Tools = () => {
                 </div>
             )
         },
-
+        {
+            id: 'translator',
+            icon: 'translate',
+            title: 'Document Translator',
+            description: 'Upload a PDF, DOCX, or HTML document, translate it, and download the rebuilt file.',
+            onClick: () => navigate('/dashboard/translate'),
+            accentColor: '#06b6d4',
+            category: 'PDF Tools'
+        },
+        {
+            id: 'lex-bot',
+            icon: 'balance',
+            title: 'Lex Bot',
+            description: 'Do accurate legal research by talking to our AI.',
+            onClick: () => navigate('/dashboard/research'),
+            accentColor: '#8b5cf6',
+            category: 'Research'
+        },
+        {
+            id: 'case-search',
+            icon: 'gavel',
+            title: 'Case Search',
+            description: 'Search Indian Kanoon database for legal cases and precedence.',
+            onClick: () => navigate('/dashboard/case-search'),
+            accentColor: '#ef4444',
+            category: 'Research'
+        },
         {
             id: 'chat-pdf',
             icon: 'picture_as_pdf',
@@ -1054,15 +1059,6 @@ const Tools = () => {
             description: 'Dictate your legal notes using voice-to-text. Supports Hindi & English.',
             onClick: () => setIsDictationModalOpen(true),
             accentColor: '#f43f5e',
-            category: 'Utilities'
-        },
-        {
-            id: 'esignature',
-            icon: 'draw',
-            title: 'Digital E-Signature & Signing',
-            description: 'Execute agreements, affidavits, and legal contracts with legally binding Aadhaar-based eSign and secure digital signatures (IT Act compliant).',
-            onClick: () => setIsESignatureModalOpen(true),
-            accentColor: '#0284c7',
             category: 'Utilities'
         }
     ];
@@ -1334,6 +1330,7 @@ const Tools = () => {
 
     const categories = [
         { id: 'All features', icon: 'grid_view', label: 'All features' },
+        { id: 'Drafting', icon: 'edit_document', label: 'Drafting' },
         { id: 'PDF Tools', icon: 'picture_as_pdf', label: 'PDF Tools' },
         { id: 'Research', icon: 'search', label: 'Research' },
         { id: 'Utilities', icon: 'construction', label: 'Utilities' },
@@ -1503,7 +1500,6 @@ const Tools = () => {
             {isCourtFeeModalOpen && <CourtFeeModal onClose={() => setIsCourtFeeModalOpen(false)} />}
             {isInvoiceModalOpen && <InvoiceModal onClose={() => setIsInvoiceModalOpen(false)} />}
             {isDictationModalOpen && <DictationModal onClose={() => setIsDictationModalOpen(false)} />}
-            {isESignatureModalOpen && <ESignatureModal onClose={() => setIsESignatureModalOpen(false)} />}
             {isCalculatorHubOpen && (
                 <CalculatorHub
                     onClose={() => setIsCalculatorHubOpen(false)}

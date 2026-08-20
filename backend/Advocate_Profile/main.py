@@ -49,9 +49,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
-limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="Advocate Profile Service", version="3.0.0")
+def get_real_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
 
+limiter = Limiter(key_func=get_real_ip)
+app = FastAPI(title="Advocate Profile Service", version="3.0.0")
 
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
@@ -195,19 +200,22 @@ def _calculate_profile_score(profile: dict, has_experience: bool, has_education:
     Returns 0–100.
     """
     score = 0
-    if profile.get("title"):          score += 10
+    if profile.get("title"):          score += 5
     if profile.get("bar_council_number"): score += 10
-    if profile.get("bio"):             score += 15
+    if profile.get("bio"):             score += 10
     if profile.get("location"):        score += 5
     if profile.get("profile_image_url"): score += 10
     if profile.get("consultation_fee"): score += 5
     if profile.get("languages"):       score += 5
     if profile.get("court_affiliation"): score += 5
     if profile.get("office_address"):  score += 5
+    if profile.get("phone"):           score += 5
+    if profile.get("social_links"):    score += 5
+    if profile.get("availability_settings"): score += 5
     if has_practice_areas:             score += 10
     if has_experience:                 score += 5
     if has_education:                  score += 5
-    if has_certifications:             score += 10
+    if has_certifications:             score += 5
     return min(score, 100)
 
 
@@ -394,18 +402,7 @@ def on_startup():
 
 
 # ── Pydantic Models ───────────────────────────────────────────────────────────
-class ProfileUpdate(BaseModel):
-    title: Optional[str] = None
-    bar_council_number: Optional[str] = None
-    years_experience: Optional[int] = None
-    bio: Optional[str] = None
-    consultation_fee: Optional[float] = None
-    profile_image_url: Optional[str] = None
-    banner_image_url: Optional[str] = None
-    location: Optional[str] = None
-    court_affiliation: Optional[str] = None
-    languages: Optional[List[str]] = None
-    office_address: Optional[str] = None
+
 
 
 class EducationItem(BaseModel):
@@ -428,6 +425,34 @@ class CertificationItem(BaseModel):
     title: str
     type: Optional[str] = None
     date_achieved: Optional[str] = None
+
+class ProfileUpdate(BaseModel):
+    title: Optional[str] = None
+    bar_council_number: Optional[str] = None
+    years_experience: Optional[int] = None
+    bio: Optional[str] = None
+    consultation_fee: Optional[float] = None
+    profile_image_url: Optional[str] = None
+    is_public: Optional[bool] = None
+    banner_image_url: Optional[str] = None
+    location: Optional[str] = None
+    court_affiliation: Optional[str] = None
+    languages: Optional[List[str]] = None
+    office_address: Optional[str] = None
+    phone: Optional[str] = None
+    social_links: Optional[dict] = None
+    availability_settings: Optional[str] = None
+    practice_areas: Optional[List[str]] = None
+    education: Optional[List[EducationItem]] = None
+    experience: Optional[List[ExperienceItem]] = None
+    certifications: Optional[List[CertificationItem]] = None
+
+    @field_validator('years_experience', mode='before')
+    @classmethod
+    def check_non_negative(cls, v):
+        if v is not None and int(v) < 0:
+            raise ValueError("Must be non-negative")
+        return v
 
 
 class OnboardingComplete(BaseModel):
@@ -512,13 +537,13 @@ class StatusUpdate(BaseModel):
 
 
 class AnalyticsViewCreate(BaseModel):
-    advocate_id: str
+    slug: str
     referrer: Optional[str] = None
     source: Optional[str] = "web"
 
 
 class AnalyticsShareCreate(BaseModel):
-    advocate_id: str
+    slug: str
     platform: str
 
 
@@ -543,7 +568,34 @@ class NewAdvocateMessage(BaseModel):
     message: str
 
 
-# ── Public Profile ────────────────────────────────────────────────────────────
+class VisibilityUpdate(BaseModel):
+    is_public: bool
+
+@app.patch("/api/v1/profiles/me/visibility")
+def update_profile_visibility(data: VisibilityUpdate, current_user: dict = Depends(get_current_user)):
+    user_id = current_user["sub"]
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE advocate_profiles SET is_public = %s, updated_at = NOW() WHERE user_id = %s RETURNING id",
+                (data.is_public, user_id)
+            )
+            res = cur.fetchone()
+            if not res:
+                raise HTTPException(status_code=404, detail="Profile not found.")
+            conn.commit()
+        return {"status": "success", "message": "Visibility updated."}
+    except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+# ── Update Profile ────────────────────────────────────────────────────────────
 @app.get("/api/v1/profiles/public/{slug}")
 def get_public_profile(slug: str):
     conn = None
@@ -552,17 +604,19 @@ def get_public_profile(slug: str):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, user_id, slug, title, bar_council_number, years_experience,
-                       bio, consultation_fee, profile_image_url, banner_image_url, location,
-                       court_affiliation, profile_completion_score, is_verified,
-                       rating, total_consultations, view_count, languages, id_slug,
-                       created_at,
-                       COALESCE(id_slug,
-                           'ADV-' || EXTRACT(YEAR FROM COALESCE(created_at, CURRENT_DATE))::text
-                           || '-' || UPPER(SUBSTRING(id::text FROM 1 FOR 5))
+                SELECT ap.id, ap.user_id, ap.slug, ap.title, u.full_name as name, ap.bar_council_number, ap.years_experience,
+                       ap.bio, ap.consultation_fee, ap.profile_image_url, ap.banner_image_url, ap.location,
+                       ap.court_affiliation, ap.profile_completion_score, ap.is_verified, ap.verification_status,
+                       ap.rating, ap.total_consultations, ap.view_count, ap.languages, ap.id_slug,
+                       ap.cases_won, ap.total_clients, ap.success_rate, ap.social_links,
+                       ap.created_at,
+                       COALESCE(ap.id_slug,
+                           'ADV-' || EXTRACT(YEAR FROM COALESCE(ap.created_at, CURRENT_DATE))::text
+                           || '-' || UPPER(SUBSTRING(ap.id::text FROM 1 FOR 5))
                        ) AS advocate_id
-                FROM advocate_profiles
-                WHERE slug = %s AND is_public = TRUE
+                FROM advocate_profiles ap
+                JOIN users u ON ap.user_id = u.id
+                WHERE ap.slug = %s AND ap.is_public = TRUE
                 """,
                 (slug,),
             )
@@ -733,6 +787,17 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
                 langs = [l.strip() for l in langs.split(",") if l.strip()]
         profile["languages"] = langs
 
+        import json as _json
+        for field in ["social_links", "availability_settings"]:
+            val = profile.get(field) or {}
+            if isinstance(val, str):
+                try:
+                    profile[field] = _json.loads(val)
+                except Exception:
+                    profile[field] = {}
+            else:
+                profile[field] = val
+
         return {"status": "success", "data": profile}
     except psycopg2.Error as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -763,9 +828,16 @@ def update_profile(profile_data: ProfileUpdate, current_user: dict = Depends(get
 
             updates = {}
             raw = profile_data.model_dump(exclude_unset=True)
+            
+            # Extract relational data to process separately
+            practice_areas = raw.pop("practice_areas", None)
+            education = raw.pop("education", None)
+            experience = raw.pop("experience", None)
+            certifications = raw.pop("certifications", None)
+            
+            import json as _json
             for key, val in raw.items():
-                if key == "languages" and isinstance(val, list):
-                    import json as _json
+                if key in ["languages", "social_links", "availability_settings"] and val is not None:
                     updates[key] = _json.dumps(val)
                 else:
                     updates[key] = val
@@ -778,6 +850,50 @@ def update_profile(profile_data: ProfileUpdate, current_user: dict = Depends(get
                     values,
                 )
 
+            # Update practice areas if provided
+            if practice_areas is not None:
+                cur.execute("DELETE FROM advocate_practice_areas WHERE advocate_id = %s", (advocate_id,))
+                for pa_name in practice_areas:
+                    pa_name = pa_name.strip()
+                    cur.execute("SELECT id FROM practice_areas WHERE name = %s", (pa_name,))
+                    pa_row = cur.fetchone()
+                    if pa_row:
+                        pa_id = pa_row["id"]
+                    else:
+                        cur.execute("INSERT INTO practice_areas (name) VALUES (%s) RETURNING id", (pa_name,))
+                        pa_id = cur.fetchone()["id"]
+                    cur.execute(
+                        "INSERT INTO advocate_practice_areas (advocate_id, practice_area_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        (advocate_id, pa_id),
+                    )
+            
+            # Update education if provided
+            if education is not None:
+                cur.execute("DELETE FROM advocate_education WHERE advocate_id = %s", (advocate_id,))
+                for edu in education:
+                    cur.execute(
+                        "INSERT INTO advocate_education (advocate_id, institution, degree, start_year, end_year) VALUES (%s, %s, %s, %s, %s)",
+                        (advocate_id, edu["institution"], edu["degree"], edu.get("start_year"), edu.get("end_year")),
+                    )
+            
+            # Update experience if provided
+            if experience is not None:
+                cur.execute("DELETE FROM advocate_experience WHERE advocate_id = %s", (advocate_id,))
+                for exp in experience:
+                    cur.execute(
+                        "INSERT INTO advocate_experience (advocate_id, company, role, start_date, end_date, is_current, description) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                        (advocate_id, exp["company"], exp["role"], exp.get("start_date"), exp.get("end_date"), exp.get("is_current", False), exp.get("description")),
+                    )
+            
+            # Update certifications if provided
+            if certifications is not None:
+                cur.execute("DELETE FROM achievements WHERE advocate_id = %s", (advocate_id,))
+                for cert in certifications:
+                    cur.execute(
+                        "INSERT INTO achievements (advocate_id, title, type, date_achieved) VALUES (%s, %s, %s, %s)",
+                        (advocate_id, cert["title"], cert.get("type"), cert.get("date_achieved")),
+                    )
+
             # Recalculate profile completion
             cur.execute("SELECT * FROM advocate_profiles WHERE id = %s", (advocate_id,))
             p = dict(cur.fetchone())
@@ -789,24 +905,14 @@ def update_profile(profile_data: ProfileUpdate, current_user: dict = Depends(get
                 "SELECT COUNT(*) AS cnt FROM advocate_education WHERE advocate_id = %s", (advocate_id,)
             )
             has_edu = cur.fetchone()["cnt"] > 0
-            try:
-                cur.execute(
-                    "SELECT COUNT(*) AS cnt FROM advocate_practice_areas WHERE advocate_id = %s", (advocate_id,)
-                )
-                has_pa = cur.fetchone()["cnt"] > 0
-            except psycopg2.Error:
-                conn.rollback()
-                has_pa = False
-                
-            # Check for certifications
-            try:
-                cur.execute(
-                    "SELECT COUNT(*) AS cnt FROM achievements WHERE advocate_id = %s", (advocate_id,)
-                )
-                has_cert = cur.fetchone()["cnt"] > 0
-            except psycopg2.Error:
-                conn.rollback()
-                has_cert = False
+            cur.execute(
+                "SELECT COUNT(*) AS cnt FROM advocate_practice_areas WHERE advocate_id = %s", (advocate_id,)
+            )
+            has_pa = cur.fetchone()["cnt"] > 0
+            cur.execute(
+                "SELECT COUNT(*) AS cnt FROM achievements WHERE advocate_id = %s", (advocate_id,)
+            )
+            has_cert = cur.fetchone()["cnt"] > 0
 
             score = _calculate_profile_score(p, has_exp, has_edu, has_pa, has_cert)
             cur.execute(
@@ -1154,12 +1260,13 @@ async def upload_profile_image(
                 raise HTTPException(status_code=404, detail="Profile not found.")
             advocate_id = res["id"]
 
-        ext = (_sanitize_filename(file.filename) or "img").rsplit(".", 1)[-1].lower()
-        safe_key = f"profile-images/{advocate_id}.{ext}"
+        safe_name = _sanitize_filename(file.filename) or "img.png"
+        safe_key = f"profile-images/{advocate_id}_{uuid.uuid4().hex}_{safe_name}"
 
         # Write to temp file then upload
         upload_dir = "/tmp/advocate_uploads"
         os.makedirs(upload_dir, exist_ok=True)
+        ext = safe_name.split('.')[-1] if '.' in safe_name else 'png'
         tmp_path = os.path.join(upload_dir, f"{advocate_id}.{ext}")
         with open(tmp_path, "wb") as f:
             f.write(content)
@@ -1924,11 +2031,12 @@ async def submit_verification(
                 raise HTTPException(status_code=404, detail="Advocate profile not found.")
             advocate_id = profile["id"]
 
-        ext = (_sanitize_filename(file.filename) or "doc").rsplit(".", 1)[-1].lower()
-        s3_key = f"verification-docs/{advocate_id}-{uuid.uuid4().hex[:8]}.{ext}"
+        safe_name = _sanitize_filename(file.filename) or "doc.pdf"
+        s3_key = f"verification-docs/{advocate_id}_{uuid.uuid4().hex}_{safe_name}"
 
         upload_dir = "/tmp/advocate_uploads"
         os.makedirs(upload_dir, exist_ok=True)
+        ext = safe_name.split('.')[-1] if '.' in safe_name else 'pdf'
         tmp_path = os.path.join(upload_dir, f"{advocate_id}_{ext}")
         with open(tmp_path, "wb") as f:
             f.write(content)
@@ -1940,6 +2048,10 @@ async def submit_verification(
                 "INSERT INTO verification_requests (advocate_id, documents_url) VALUES (%s, %s)",
                 (advocate_id, doc_url),
             )
+            cur.execute(
+                "UPDATE advocate_profiles SET verification_status = 'PENDING' WHERE id = %s",
+                (advocate_id,),
+            )
         conn.commit()
 
         try:
@@ -1949,6 +2061,152 @@ async def submit_verification(
 
         return {"status": "success", "message": "Verification submitted.", "url": doc_url}
     except psycopg2.Error as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+
+# ── Analytics ─────────────────────────────────────────────────────────────────
+@app.post("/api/v1/analytics/view")
+async def track_profile_view(payload: AnalyticsViewCreate, request: Request):
+    auth = request.headers.get("Authorization")
+    current_user_id = None
+    if auth and auth.startswith("Bearer "):
+        try:
+            import jwt
+            from auth import SECRET_KEY, ALGORITHM
+            token = auth.split(" ")[1]
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            current_user_id = decoded.get("sub")
+        except Exception:
+            pass
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, user_id, is_public FROM advocate_profiles WHERE slug = %s", (payload.slug,))
+            profile = cur.fetchone()
+            
+            if not profile or not profile["is_public"]:
+                return {"status": "ignored", "reason": "Not a public profile"}
+                
+            if current_user_id and str(profile["user_id"]) == str(current_user_id):
+                return {"status": "ignored", "reason": "Self-view"}
+
+            cur.execute(
+                "INSERT INTO profile_views (advocate_id, referrer, source) VALUES (%s, %s, %s)",
+                (profile["id"], payload.referrer, payload.source)
+            )
+            cur.execute(
+                "UPDATE advocate_profiles SET view_count = view_count + 1 WHERE id = %s",
+                (profile["id"],)
+            )
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.post("/api/v1/analytics/share")
+async def track_profile_share(payload: AnalyticsShareCreate):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, is_public FROM advocate_profiles WHERE slug = %s", (payload.slug,))
+            profile = cur.fetchone()
+            
+            if not profile or not profile["is_public"]:
+                return {"status": "ignored", "reason": "Not a public profile"}
+                
+            cur.execute(
+                "INSERT INTO profile_shares (advocate_id, platform) VALUES (%s, %s)",
+                (profile["id"], payload.platform)
+            )
+        conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.get("/api/v1/analytics/dashboard")
+def get_analytics_dashboard(current_user: dict = Depends(get_current_user)):
+    user_id = current_user["sub"]
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, view_count, total_consultations FROM advocate_profiles WHERE user_id = %s", (user_id,))
+            profile = cur.fetchone()
+            if not profile:
+                raise HTTPException(status_code=404, detail="Profile not found")
+            
+            advocate_id = profile["id"]
+            
+            cur.execute("SELECT COUNT(*) as count FROM profile_views WHERE advocate_id = %s", (advocate_id,))
+            total_views = cur.fetchone()["count"]
+            
+            cur.execute("SELECT COUNT(*) as count FROM profile_shares WHERE advocate_id = %s", (advocate_id,))
+            total_shares = cur.fetchone()["count"]
+            
+            cur.execute("SELECT COUNT(*) as count FROM consultation_requests WHERE advocate_id = %s", (advocate_id,))
+            total_consultations = cur.fetchone()["count"]
+            
+            cur.execute("SELECT COUNT(*) as count FROM consultation_requests WHERE advocate_id = %s AND status = 'ACCEPTED'", (advocate_id,))
+            accepted_consultations = cur.fetchone()["count"]
+            
+            cur.execute("SELECT COUNT(*) as count FROM messages WHERE advocate_id = %s", (advocate_id,))
+            total_messages = cur.fetchone()["count"]
+            
+            conversion_rate = 0.0
+            if total_views > 0:
+                conversion_rate = round((accepted_consultations / total_views) * 100, 2)
+            
+            cur.execute("""
+                SELECT DATE(viewed_at) as day, COUNT(*) as views 
+                FROM profile_views 
+                WHERE advocate_id = %s AND viewed_at >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(viewed_at)
+                ORDER BY day ASC
+            """, (advocate_id,))
+            
+            raw_trend = cur.fetchall()
+            
+            from datetime import timedelta
+            trend_map = {row["day"].isoformat() if hasattr(row["day"], "isoformat") else str(row["day"]): row["views"] for row in raw_trend}
+            
+            views_trend = []
+            today = datetime.now().date()
+            for i in range(6, -1, -1):
+                d = today - timedelta(days=i)
+                d_str = d.isoformat()
+                views_trend.append({"day": d_str, "views": trend_map.get(d_str, 0)})
+            
+            return {
+                "status": "success",
+                "total_views": total_views,
+                "total_shares": total_shares,
+                "total_consultations": total_consultations,
+                "accepted_consultations": accepted_consultations,
+                "total_messages": total_messages,
+                "conversion_rate": conversion_rate,
+                "views_trend": views_trend
+            }
+    except Exception as e:
         if conn:
             conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1997,7 +2255,12 @@ def update_verification_status(
                 raise HTTPException(status_code=404, detail="Verification request not found.")
             if status_data.status == "APPROVED":
                 cur.execute(
-                    "UPDATE advocate_profiles SET is_verified = TRUE WHERE id = %s",
+                    "UPDATE advocate_profiles SET is_verified = TRUE, verification_status = 'APPROVED' WHERE id = %s",
+                    (res["advocate_id"],),
+                )
+            elif status_data.status == "REJECTED":
+                cur.execute(
+                    "UPDATE advocate_profiles SET is_verified = FALSE, verification_status = 'REJECTED' WHERE id = %s",
                     (res["advocate_id"],),
                 )
         conn.commit()

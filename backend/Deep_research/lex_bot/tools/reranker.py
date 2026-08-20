@@ -24,10 +24,7 @@ def get_reranker():
         try:
             print(f"[RERANK] Loading Reranker: {RERANK_MODEL}...")
             # FORCE CPU to avoid OOM on weak GPUs / limited VRAM envs
-            try:
-                _reranker = CrossEncoder(RERANK_MODEL, device='cpu', max_length=512, local_files_only=True)
-            except Exception:
-                _reranker = CrossEncoder(RERANK_MODEL, device='cpu', max_length=512)
+            _reranker = CrossEncoder(RERANK_MODEL, device='cpu', max_length=512)
         except Exception as e:
             print(f"[ERROR] Failed to load Reranker model: {e}")
             return None
@@ -49,13 +46,6 @@ def rerank_documents(query: str, candidates: List[Dict], top_n: int = 10, thresh
     """
     if not candidates:
         return []
-
-    if len(candidates) <= 3:
-        # Fast path: Small candidate set is already pre-ranked (~0ms)
-        for idx, c in enumerate(candidates):
-            if 'rerank_score' not in c:
-                c['rerank_score'] = 1.0 - (idx * 0.1)
-        return candidates[:top_n]
 
     rr = get_reranker()
     

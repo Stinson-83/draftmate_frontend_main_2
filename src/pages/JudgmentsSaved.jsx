@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { judgmentService } from '../services/library/judgmentService';
 import { notesService } from '../services/library/notesService';
@@ -38,13 +39,11 @@ const JudgmentCard = ({ judgment, onRemove, onSaveNote, onShare, onDownload }) =
     <div className="flex flex-col p-5 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 hover:shadow-md transition-all group">
       <div className="flex justify-between items-start gap-3 mb-3">
         <div className="flex flex-wrap gap-2">
-          {judgment.court && (
-            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-              {judgment.court}
-            </span>
-          )}
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+            {judgment.court}
+          </span>
           <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-            Indian Kanoon
+            {judgment.category}
           </span>
         </div>
       </div>
@@ -286,6 +285,10 @@ const JudgmentsSaved = () => {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Top Bar */}
       <div className="px-6 py-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151f2e] flex-shrink-0 z-10">
+        <Link to="/dashboard/library" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#2563EB] mb-4 transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          Back to Library
+        </Link>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 max-w-7xl mx-auto">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Saved Judgments</h1>
