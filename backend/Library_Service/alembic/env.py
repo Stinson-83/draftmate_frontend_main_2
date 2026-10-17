@@ -13,14 +13,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
 
 # Import our models
-from database import Base, POSTGRES_DSN
+from database import Base, POSTGRES_DSN, _postgres_driver_url
+import models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Set the SQLAlchemy URL from environment variables
-config.set_main_option("sqlalchemy.url", POSTGRES_DSN)
+config.set_main_option("sqlalchemy.url", _postgres_driver_url(POSTGRES_DSN))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

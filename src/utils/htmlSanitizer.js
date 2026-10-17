@@ -166,7 +166,7 @@ export const stripHtmlTags = (htmlString) => {
 
       // Target judgment container directly if present
       const judgmentContainer = doc.querySelector('.judgements, #doc_content, .expanded_doc, .doc_content, #content');
-      
+
       // Remove website UI noise elements
       const noiseElements = doc.querySelectorAll(
         'script, style, noscript, nav, header, footer, iframe, svg, button, input, form, ' +
@@ -191,7 +191,56 @@ export const stripHtmlTags = (htmlString) => {
   return cleanNoiseFromText(preCleaned.replace(/<[^>]*>/g, ' '));
 };
 
+export const sanitizeJudgmentHtml = (htmlString) => {
+  if (!htmlString || typeof htmlString !== 'string') return '';
+  if (!htmlString.includes('<')) return htmlString;
+  if (typeof window !== 'undefined' && window.DOMParser) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlString, 'text/html');
+
+      const judgmentContainer = doc.querySelector('.judgements, #doc_content, .expanded_doc, .doc_content, #content');
+
+      const noiseElements = doc.querySelectorAll(
+        'script, style, noscript, nav, header, footer, iframe, svg, button, input, form, ' +
+        '.premium-banner, #case-recast-fab, #google_translate_element, .search-autocomplete-list, ' +
+        '.ui-dialog, .ui-widget, .ui-autocomplete, #translatewarn, #courtcopyform, ' +
+        '#pdfdoc, #printdoc, .mainnavigation, .siteheader, .sitefooter, .navigation, ' +
+        '[id^="google_translate"], .expanded_doc_header, .doc_options, .ad-box, .banner, ' +
+        '.doc_title ~ .doc_title' // duplicate headers
+      );
+      noiseElements.forEach(el => el.remove());
+
+      const targetEl = judgmentContainer || doc.body || doc.documentElement;
+
+      // Keep structural html but remove inline styles/classes for a clean look
+      const allEls = targetEl.querySelectorAll('*');
+      allEls.forEach(el => {
+        el.removeAttribute('style');
+        // Let's keep specific structure classes if needed, or remove class entirely
+        if (el.tagName !== 'A') { // Keep links if they exist (or we could strip a tags)
+           // remove a tags' hrefs if they are relative to IK
+           if (el.tagName === 'A') {
+             el.removeAttribute('href');
+           }
+        }
+      });
+
+      // Inject some professional typography classes on known IK blockquote/pre tags
+      targetEl.querySelectorAll('blockquote').forEach(el => el.className = "pl-4 border-l-4 border-slate-300 dark:border-slate-600 italic text-slate-700 dark:text-slate-300 my-4");
+      targetEl.querySelectorAll('pre').forEach(el => el.className = "p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl overflow-x-auto my-4 text-xs font-mono text-slate-600 dark:text-slate-300");
+      targetEl.querySelectorAll('.doc_title, h1, h2, h3').forEach(el => el.className = "text-xl font-bold text-slate-900 dark:text-white mt-8 mb-4");
+
+      return targetEl.innerHTML;
+    } catch (e) {
+      console.warn('DOMParser failed in HTML sanitize:', e);
+    }
+  }
+  return htmlString;
+};
+
 export default {
   stripHtmlTags,
+  sanitizeJudgmentHtml,
   decodeHtmlEntities
 };

@@ -1,72 +1,119 @@
-import { mockClients } from '../../data/mockClients';
+import { API_CONFIG } from '../endpoints';
 
-const STORAGE_KEY = 'draftmate_clients';
+const BASE_URL = `${API_CONFIG.LIBRARY.BASE_URL}/api/v1/library/clients`;
 
-const initializeStorage = () => {
-  const existing = localStorage.getItem(STORAGE_KEY);
-  if (!existing) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-  } else {
-    try {
-      const parsed = JSON.parse(existing);
-      if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter(c => c.id !== 'client-1' && c.id !== 'client-2' && c.id !== 'client-3' && c.id !== 'client-4' && !c.name?.includes('Ramesh Sharma') && !c.name?.includes('Priya Enterprises') && !c.name?.includes('Sunita Verma'));
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        }
-      }
-    } catch (e) {
-      console.warn('[clientService] Storage init notice:', e);
-    }
+const getHeaders = () => {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('session_id') || localStorage.getItem('token') || localStorage.getItem('access_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
+  return headers;
 };
 
+const mapClientToFrontend = (c) => ({
+  id: String(c.id),
+  name: c.name,
+  phone: c.phone || '',
+  email: c.email || '',
+  address: c.address || '',
+  clientType: c.client_type,
+  notes: c.notes || '',
+  status: c.status || 'Active',
+  createdDate: c.created_date,
+  createdAt: c.created_at,
+  updatedAt: c.updated_at,
+});
+
 export const clientService = {
-  async getClients() {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  async getClients(search = null, status = null, clientType = null) {
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (status) params.append('status', status);
+      if (clientType) params.append('client_type', clientType);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+      const response = await fetch(`${BASE_URL}/${queryStr}`, {
+        headers: getHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data.map(mapClientToFrontend) : [];
+      }
+    } catch (e) {
+      console.error('[clientService] Failed to load clients from API:', e);
+    }
+    return [];
   },
 
   async getClientById(id) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    const clients = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return clients.find(client => client.id === id);
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Client not found: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return mapClientToFrontend(data);
   },
 
   async createClient(clientData) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    const clients = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const newClient = {
-      ...clientData,
-      id: `client-${Date.now()}`
+    const payload = {
+      name: clientData.name,
+      phone: clientData.phone || null,
+      email: clientData.email || null,
+      address: clientData.address || null,
+      client_type: clientData.clientType || clientData.client_type || 'Individual',
+      notes: clientData.notes || null,
+      status: clientData.status || 'Active',
+      created_date: clientData.createdDate || clientData.created_date || new Date().toISOString().split('T')[0],
     };
-    clients.unshift(newClient);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
-    return newClient;
+
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to create client: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return mapClientToFrontend(data);
   },
 
   async updateClient(id, clientData) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    let clients = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const index = clients.findIndex(client => client.id === id);
-    if (index !== -1) {
-      clients[index] = { ...clients[index], ...clientData };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
-      return clients[index];
+    const payload = {};
+    if (clientData.name !== undefined) payload.name = clientData.name;
+    if (clientData.phone !== undefined) payload.phone = clientData.phone;
+    if (clientData.email !== undefined) payload.email = clientData.email;
+    if (clientData.address !== undefined) payload.address = clientData.address;
+    if (clientData.clientType !== undefined || clientData.client_type !== undefined) {
+      payload.client_type = clientData.clientType || clientData.client_type;
     }
-    throw new Error('Client not found');
+    if (clientData.notes !== undefined) payload.notes = clientData.notes;
+    if (clientData.status !== undefined) payload.status = clientData.status;
+
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update client: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return mapClientToFrontend(data);
   },
 
   async deleteClient(id) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    let clients = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    clients = clients.filter(client => client.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Failed to delete client: ${response.statusText}`);
+    }
     return true;
   }
 };

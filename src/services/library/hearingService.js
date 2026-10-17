@@ -1,77 +1,135 @@
-import { mockHearings } from '../../data/mockHearings';
+import { API_CONFIG } from '../endpoints';
 
-const STORAGE_KEY = 'draftmate_hearings';
+const BASE_URL = `${API_CONFIG.LIBRARY.BASE_URL}/api/v1/library/hearings`;
 
-const initializeStorage = () => {
-  const existing = localStorage.getItem(STORAGE_KEY);
-  if (!existing) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-  } else {
-    try {
-      const parsed = JSON.parse(existing);
-      if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter(h => h.id !== 'h1' && h.id !== 'h2' && h.id !== 'h3' && !h.caseTitle?.includes('Ramesh Sharma') && !h.caseTitle?.includes('Priya Enterprises') && !h.caseTitle?.includes('Sunita Verma'));
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        }
-      }
-    } catch (e) {
-      console.warn('[hearingService] Storage init notice:', e);
-    }
+const getHeaders = () => {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('session_id') || localStorage.getItem('token') || localStorage.getItem('access_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
+  return headers;
 };
 
+const mapHearingToFrontend = (h) => ({
+  id: String(h.id),
+  caseId: h.case_id ? String(h.case_id) : null,
+  clientId: h.client_id ? String(h.client_id) : null,
+  caseNumber: h.case_number || '',
+  caseTitle: h.case_title || '',
+  court: h.court || '',
+  judge: h.judge || '',
+  oppositeParty: h.opposite_party || '',
+  hearingDate: h.hearing_date,
+  nextHearingDate: h.next_hearing_date,
+  status: h.status || 'Scheduled',
+  remarks: h.remarks || '',
+  timeline: Array.isArray(h.timeline) ? h.timeline : [],
+  createdAt: h.created_at,
+  updatedAt: h.updated_at,
+});
+
 export const hearingService = {
-  async getHearings() {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  async getHearings(status = null, caseId = null, startDate = null, endDate = null) {
+    try {
+      const params = new URLSearchParams();
+      if (status) params.append('status', status);
+      if (caseId) params.append('case_id', caseId);
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+      const response = await fetch(`${BASE_URL}/${queryStr}`, {
+        headers: getHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data.map(mapHearingToFrontend) : [];
+      }
+    } catch (e) {
+      console.error('[hearingService] Failed to load hearings from API:', e);
+    }
+    return [];
   },
 
   async getHearingById(id) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    const hearings = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return hearings.find(h => h.id === id);
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Hearing not found: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return mapHearingToFrontend(data);
   },
 
   async createHearing(hearingData) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    const hearings = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const newHearing = {
-      ...hearingData,
-      id: `h${Date.now()}`,
-      timeline: [],
+    const payload = {
+      case_id: hearingData.caseId || null,
+      client_id: hearingData.clientId || null,
+      case_number: hearingData.caseNumber || null,
+      case_title: hearingData.caseTitle || null,
+      court: hearingData.court || null,
+      judge: hearingData.judge || null,
+      opposite_party: hearingData.oppositeParty || null,
+      hearing_date: hearingData.hearingDate,
+      next_hearing_date: hearingData.nextHearingDate || null,
+      status: hearingData.status || 'Scheduled',
+      remarks: hearingData.remarks || null,
+      timeline: hearingData.timeline || [],
     };
-    hearings.unshift(newHearing);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(hearings));
+
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to create hearing: ${response.statusText}`);
+    }
+    const data = await response.json();
     window.dispatchEvent(new Event('hearings_updated'));
     window.dispatchEvent(new Event('cases_updated'));
-    return newHearing;
+    return mapHearingToFrontend(data);
   },
 
   async updateHearing(id, hearingData) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    let hearings = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const index = hearings.findIndex(h => h.id === id);
-    if (index !== -1) {
-      hearings[index] = { ...hearings[index], ...hearingData };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(hearings));
-      window.dispatchEvent(new Event('hearings_updated'));
-      window.dispatchEvent(new Event('cases_updated'));
-      return hearings[index];
+    const payload = {};
+    if (hearingData.caseId !== undefined) payload.case_id = hearingData.caseId;
+    if (hearingData.clientId !== undefined) payload.client_id = hearingData.clientId;
+    if (hearingData.caseNumber !== undefined) payload.case_number = hearingData.caseNumber;
+    if (hearingData.caseTitle !== undefined) payload.case_title = hearingData.caseTitle;
+    if (hearingData.court !== undefined) payload.court = hearingData.court;
+    if (hearingData.judge !== undefined) payload.judge = hearingData.judge;
+    if (hearingData.oppositeParty !== undefined) payload.opposite_party = hearingData.oppositeParty;
+    if (hearingData.hearingDate !== undefined) payload.hearing_date = hearingData.hearingDate;
+    if (hearingData.nextHearingDate !== undefined) payload.next_hearing_date = hearingData.nextHearingDate;
+    if (hearingData.status !== undefined) payload.status = hearingData.status;
+    if (hearingData.remarks !== undefined) payload.remarks = hearingData.remarks;
+    if (hearingData.timeline !== undefined) payload.timeline = hearingData.timeline;
+
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update hearing: ${response.statusText}`);
     }
-    throw new Error('Hearing not found');
+    const data = await response.json();
+    window.dispatchEvent(new Event('hearings_updated'));
+    window.dispatchEvent(new Event('cases_updated'));
+    return mapHearingToFrontend(data);
   },
 
   async deleteHearing(id) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    let hearings = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    hearings = hearings.filter(h => h.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(hearings));
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Failed to delete hearing: ${response.statusText}`);
+    }
     window.dispatchEvent(new Event('hearings_updated'));
     window.dispatchEvent(new Event('cases_updated'));
     return true;

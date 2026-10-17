@@ -34,8 +34,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables. A database outage must not crash-loop the process;
+# request handlers return a controlled error instead.
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as db_init_err:
+    logger.error("Library database schema initialization failed: %s", type(db_init_err).__name__)
 
 # Enable pg_trgm extension required for legal dictionary similarity() search
 try:
@@ -75,7 +79,7 @@ try:
         with engine.connect() as _conn:
             _count = _conn.execute(text("SELECT COUNT(*) FROM legal_terms")).scalar()
         if _count == 0:
-            logger.info("legal_terms table is empty — seeding dictionary data...")
+            logger.info("legal_terms table is empty -- seeding dictionary data...")
             _content = _dict_file.read_text(encoding="utf-8")
             _matches = _re.findall(
                 r"TERM:\s*(.*?)\s*EXPLANATION:\s*(.*?)(?=\n\s*TERM:|\Z)",
@@ -102,9 +106,9 @@ try:
                         _inserted += 1
             logger.info(f"Legal dictionary seeded: {_inserted} terms inserted.")
         else:
-            logger.info(f"legal_terms table already has {_count} terms — skipping seed.")
+            logger.info(f"legal_terms table already has {_count} terms -- skipping seed.")
     else:
-        logger.warning(f"Dictionary file not found at {_dict_file} — skipping seed.")
+        logger.warning(f"Dictionary file not found at {_dict_file} -- skipping seed.")
 except Exception as _seed_err:
     logger.warning(f"Legal dictionary auto-seed skipped: {_seed_err}")
 
@@ -229,14 +233,16 @@ app.include_router(bookmarks.router, prefix="/api/v1/library")
 app.include_router(indiankanoon.router)
 # Include Bare Acts router (already has prefix)
 app.include_router(bareacts.router)
-# Include Legal Dictionary router
+# Include Legal Dictionary router (upstream)
 app.include_router(legal_dictionary.router)
 # Include e-Courts router (already has prefix)
 app.include_router(ecourts.router)
 
+# Include local Legal search router
+from routers import legal
+app.include_router(legal.router)
 
 from routers import ecourts_settings
-
 app.include_router(ecourts_settings.router)
 
 

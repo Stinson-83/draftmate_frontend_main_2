@@ -1,170 +1,112 @@
 /**
- * Judgment API Service
- * 
- * This service connects the frontend to the Library Service backend,
- * which in turn communicates with Indian Kanoon.
- * 
- * Features:
- * - Debounced search (300ms)
- * - In-memory caching (5-minute TTL)
- * - Proper error handling
- * - Normalized responses to match existing data structure
+ * Judgment library API.
+ * Search and detail go to DraftMate Library Service, which reads the
+ * Open India Law corpus from PostgreSQL and Qdrant.
+ * Indian Kanoon helpers remain for other surfaces and are not used
+ * by the Judgment Library page.
  */
 import { API_CONFIG } from '../endpoints';
-import { stripHtmlTags } from '../../utils/htmlSanitizer';
+import { stripHtmlTags, sanitizeJudgmentHtml } from '../../utils/htmlSanitizer';
+import {
+  buildJudgmentSearchParams,
+  friendlySearchError,
+  mapSearchResponse,
+} from './judgmentSearch';
 
 const LIBRARY_BASE_URL = API_CONFIG.LIBRARY.BASE_URL;
-const SEARCH_DEBOUNCE_MS = 300;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-// In-memory cache
-const cache = {
-    data: new Map(),
-    timestamps: new Map()
-};
-
-// Debounce function
-const debounce = (func, wait) => {
-    let timeout;
-    return (...args) => {
-        clearTimeout(timeout);
-        return new Promise((resolve) => {
-            timeout = setTimeout(async () => {
-                resolve(await func(...args));
-            }, wait);
-        });
-    };
-};
-
-// Cache helpers
-const getCached = (key) => {
-    if (!cache.timestamps.has(key)) return null;
-    if (Date.now() - cache.timestamps.get(key) > CACHE_TTL_MS) {
-        cache.data.delete(key);
-        cache.timestamps.delete(key);
-        return null;
-    }
-    return cache.data.get(key);
-};
-
-const setCached = (key, value) => {
-    cache.data.set(key, value);
-    cache.timestamps.set(key, Date.now());
-};
-
-// Normalization: convert Indian Kanoon API response to existing mock structure
-const normalizeJudgment = (apiJudgment) => ({
-  id: apiJudgment.id,
-  title: stripHtmlTags(apiJudgment.title),
-  court: stripHtmlTags(apiJudgment.court),
-  citation: stripHtmlTags(apiJudgment.citation),
-  date: apiJudgment.date,
-  year: apiJudgment.date ? new Date(apiJudgment.date).getFullYear() : '',
-  judges: apiJudgment.judges || [],
-  summary: stripHtmlTags(apiJudgment.summary),
-  ratiodecidendi: stripHtmlTags(apiJudgment.summary),
-  pdfUrl: apiJudgment.pdf_url,
-  source: apiJudgment.source || 'Indian Kanoon',
-  // Add mock-compatible fields for existing components to work
-  category: 'Indian Kanoon',
-  tags: ['Indian Kanoon'],
-  parties: { petitioner: '', respondent: '' },
-  isSaved: false
-});
-
-const normalizeJudgmentList = (apiResults) => {
-    if (!apiResults) return [];
-    const results = apiResults?.data?.results || apiResults?.results || (Array.isArray(apiResults) ? apiResults : []);
-    return results.map(normalizeJudgment);
-};
-
-/**
- * Search judgments using Indian Kanoon API via Library Service (100% Real-Time)
- */
-export const searchJudgments = debounce(async (query, page = 1) => {
-    if (!query || !query.trim()) return [];
-    const cleanQuery = query.trim();
-    const cacheKey = `search:${cleanQuery}:${page}`;
-    
-    const cached = getCached(cacheKey);
-    if (cached) return cached;
-
-    try {
-        const params = new URLSearchParams({ query: cleanQuery, page: page.toString() });
-        const response = await fetch(`${LIBRARY_BASE_URL}${API_CONFIG.LIBRARY.ENDPOINTS.INDIAN_KANOON.SEARCH}?${params}`);
-        if (!response.ok) throw new Error(`Search failed: ${response.status}`);
-
-        const data = await response.json();
-        const normalized = normalizeJudgmentList(data);
-        setCached(cacheKey, normalized);
-        return normalized;
-    } catch (error) {
-        console.error('Real-time Kanoon API search failed:', error);
-        return [];
-    }
-}, SEARCH_DEBOUNCE_MS);
-
-/**
- * Get a single judgment's full content
- */
-export const getJudgment = async (docId) => {
-  const cacheKey = `judgment:${docId}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
-
+async function readDetail(response) {
   try {
-    const response = await fetch(`${LIBRARY_BASE_URL}${API_CONFIG.LIBRARY.ENDPOINTS.INDIAN_KANOON.DOCUMENT(docId)}`);
-    if (!response.ok) throw new Error(`Failed to get judgment: ${response.status}`);
-
-    let data = await response.json();
-    // Sanitize the full text content
-    if (data?.data?.text) {
-      data.data.text = stripHtmlTags(data.data.text);
-    }
-    setCached(cacheKey, data);
-    return data;
-  } catch (error) {
-    console.warn('Failed to get judgment:', error);
-    return null;
+    const body = await response.json();
+    return body?.detail;
+  } catch {
+    return '';
   }
-};
+}
 
-/**
- * Get judgment metadata (without full text)
- */
-export const getMetadata = async (docId) => {
-    const cacheKey = `metadata:${docId}`;
-    const cached = getCached(cacheKey);
-    if (cached) return cached;
+export async function searchLegalJudgments(params, { signal } = {}) {
+  const search = buildJudgmentSearchParams(params);
+  const response = await fetch(
+    `${LIBRARY_BASE_URL}/api/v1/legal/judgments/search?${search}`,
+    { signal }
+  );
+  if (!response.ok) {
+    const detail = await readDetail(response);
+    const error = new Error(friendlySearchError(response.status, detail));
+    error.status = response.status;
+    throw error;
+  }
+  return mapSearchResponse(await response.json());
+}
 
-    try {
-        const response = await fetch(`${LIBRARY_BASE_URL}${API_CONFIG.LIBRARY.ENDPOINTS.INDIAN_KANOON.DOCUMENT_METADATA(docId)}`);
-        if (!response.ok) throw new Error(`Failed to get metadata: ${response.status}`);
+export async function getRecentJudgments(page = 1, { signal } = {}) {
+  const response = await fetch(
+    `${LIBRARY_BASE_URL}/api/v1/legal/judgments/recent?page=${page}&page_size=9`,
+    { signal }
+  );
+  if (!response.ok) {
+    const detail = await readDetail(response);
+    const error = new Error(friendlySearchError(response.status, detail));
+    error.status = response.status;
+    throw error;
+  }
+  return mapSearchResponse(await response.json());
+}
 
-        const data = await response.json();
-        const normalized = data?.data ? normalizeJudgment(data.data) : null;
-        if (normalized) setCached(cacheKey, normalized);
-        return normalized;
-    } catch (error) {
-        console.warn('Failed to get metadata:', error);
-        return null;
-    }
-};
+export async function getLegalJudgment(judgmentId, { signal } = {}) {
+  const response = await fetch(
+    `${LIBRARY_BASE_URL}/api/v1/legal/judgments/${encodeURIComponent(judgmentId)}`,
+    { signal }
+  );
+  if (!response.ok) {
+    const detail = await readDetail(response);
+    const error = new Error(friendlySearchError(response.status, detail));
+    error.status = response.status;
+    throw error;
+  }
+  const data = await response.json();
+  return {
+    ...data,
+    excerpt: data.excerpt || '',
+    source: data.source || 'Open India Law',
+  };
+}
 
-/**
- * Download judgment (opens in new tab)
- */
-export const downloadDocument = (docId, pdfUrl) => {
-    if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
-    } else {
-        window.open(`https://indiankanoon.org/doc/${docId}/`, '_blank');
-    }
-};
+export async function getJudgmentFilters({ signal } = {}) {
+  const response = await fetch(`${LIBRARY_BASE_URL}/api/v1/legal/judgments/filters`, { signal });
+  if (!response.ok) {
+    const detail = await readDetail(response);
+    throw new Error(friendlySearchError(response.status, detail));
+  }
+  const data = await response.json();
+  return {
+    courts: Array.isArray(data.courts) ? data.courts : [],
+    years: Array.isArray(data.years) ? data.years : [],
+    sources: Array.isArray(data.sources) ? data.sources : [],
+    corpusCount: data.corpus_count || 0,
+  };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function getJudgment(docId) {
+  if (UUID_RE.test(String(docId || ''))) {
+    const data = await getLegalJudgment(docId);
+    return { data: { text: data.text || '' }, text: data.text || '' };
+  }
+  const response = await fetch(`${LIBRARY_BASE_URL}${API_CONFIG.LIBRARY.ENDPOINTS.INDIAN_KANOON.DOCUMENT(docId)}`);
+  if (!response.ok) throw new Error(`Failed to get judgment: ${response.status}`);
+  const data = await response.json();
+  if (data?.data?.text) data.data.text = sanitizeJudgmentHtml(data.data.text);
+  return data;
+}
+
+export const searchJudgments = searchLegalJudgments;
 
 export default {
-    searchJudgments,
-    getJudgment,
-    getMetadata,
-    downloadDocument
+  searchLegalJudgments,
+  getLegalJudgment,
+  getJudgmentFilters,
+  getJudgment,
+  searchJudgments,
 };

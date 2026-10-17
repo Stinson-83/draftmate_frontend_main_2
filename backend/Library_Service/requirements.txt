@@ -11,3 +11,6 @@ alembic==1.13.1
 sqlalchemy==2.0.25
 httpx==0.27.0
 tenacity==8.2.3
+qdrant-client==1.7.0
+voyageai==0.2.3
+xhtml2pdf==0.2.11

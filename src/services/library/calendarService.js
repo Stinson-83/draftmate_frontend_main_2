@@ -1,93 +1,121 @@
-import { mockCalendarEvents } from '../../data/mockCalendar';
-import { diaryService } from './diaryService';
+import { API_CONFIG } from '../endpoints';
 
-const STORAGE_KEY = 'draftmate_calendar_events';
+const BASE_URL = `${API_CONFIG.LIBRARY.BASE_URL}/api/v1/library/calendar`;
 
-const initializeStorage = () => {
-  const existing = localStorage.getItem(STORAGE_KEY);
-  if (!existing) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-  } else {
-    try {
-      const parsed = JSON.parse(existing);
-      if (Array.isArray(parsed)) {
-        const cleaned = parsed.filter(e => e.id !== 'cal-1' && e.id !== 'cal-2' && e.id !== 'cal-3' && !e.title?.includes('Ramesh Sharma') && !e.title?.includes('Priya Enterprises') && !e.title?.includes('Sunita Verma'));
-        if (cleaned.length !== parsed.length) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        }
-      }
-    } catch (e) {
-      console.warn('[calendarService] Storage init notice:', e);
-    }
+const getHeaders = () => {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('session_id') || localStorage.getItem('token') || localStorage.getItem('access_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
+  return headers;
 };
 
-export const calendarService = {
-  async getEvents() {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    
-    // Get diary entries and convert them to calendar events
-    let diaryEvents = [];
-    try {
-      const diaryEntries = await diaryService.getEntries();
-      diaryEvents = diaryEntries.map(entry => ({
-        id: `diary-${entry.id}`,
-        title: entry.caseTitle,
-        type: 'hearing',
-        date: entry.hearingDate,
-        time: '10:00',
-        notes: entry.remarks,
-        isDiaryEvent: true,
-        diaryEntryId: entry.id,
-      }));
-    } catch (e) {
-      console.error('Error loading diary events:', e);
-    }
+const mapEventToFrontend = (e) => ({
+  id: String(e.id),
+  title: e.title,
+  type: e.type,
+  date: e.date,
+  time: e.time ? e.time.slice(0, 5) : '10:00',
+  notes: e.notes || '',
+  caseId: e.case_id ? String(e.case_id) : null,
+  hearingId: e.hearing_id ? String(e.hearing_id) : null,
+  diaryEntryId: e.diary_entry_id,
+  isDiaryEvent: Boolean(e.is_diary_event),
+  createdAt: e.created_at,
+  updatedAt: e.updated_at,
+});
 
-    const storedEvents = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return [...storedEvents, ...diaryEvents];
+export const calendarService = {
+  async getEvents(type = null, startDate = null, endDate = null) {
+    try {
+      const params = new URLSearchParams();
+      if (type) params.append('type', type);
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+      const response = await fetch(`${BASE_URL}/${queryStr}`, {
+        headers: getHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data.map(mapEventToFrontend) : [];
+      }
+    } catch (e) {
+      console.error('[calendarService] Failed to load events from API:', e);
+    }
+    return [];
   },
 
   async getEventById(id) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    const events = await this.getEvents();
-    return events.find(e => e.id === id);
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Event not found: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return mapEventToFrontend(data);
   },
 
   async createEvent(eventData) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    const events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const newEvent = {
-      ...eventData,
-      id: `cal-${Date.now()}`,
+    const payload = {
+      title: eventData.title,
+      type: eventData.type || 'hearing',
+      date: eventData.date,
+      time: eventData.time || '10:00:00',
+      notes: eventData.notes || null,
+      case_id: eventData.caseId || null,
+      hearing_id: eventData.hearingId || null,
+      diary_entry_id: eventData.diaryEntryId || null,
+      is_diary_event: Boolean(eventData.isDiaryEvent),
     };
-    events.unshift(newEvent);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-    return newEvent;
+
+    const response = await fetch(`${BASE_URL}/`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to create calendar event: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return mapEventToFrontend(data);
   },
 
   async updateEvent(id, eventData) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const index = events.findIndex(e => e.id === id);
-    if (index !== -1) {
-      events[index] = { ...events[index], ...eventData };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-      return events[index];
+    const payload = {};
+    if (eventData.title !== undefined) payload.title = eventData.title;
+    if (eventData.type !== undefined) payload.type = eventData.type;
+    if (eventData.date !== undefined) payload.date = eventData.date;
+    if (eventData.time !== undefined) payload.time = eventData.time;
+    if (eventData.notes !== undefined) payload.notes = eventData.notes;
+    if (eventData.caseId !== undefined) payload.case_id = eventData.caseId;
+    if (eventData.hearingId !== undefined) payload.hearing_id = eventData.hearingId;
+    if (eventData.diaryEntryId !== undefined) payload.diary_entry_id = eventData.diaryEntryId;
+    if (eventData.isDiaryEvent !== undefined) payload.is_diary_event = eventData.isDiaryEvent;
+
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update calendar event: ${response.statusText}`);
     }
-    throw new Error('Event not found');
+    const data = await response.json();
+    return mapEventToFrontend(data);
   },
 
   async deleteEvent(id) {
-    await new Promise(r => setTimeout(r, 100));
-    initializeStorage();
-    let events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    events = events.filter(e => e.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    const response = await fetch(`${BASE_URL}/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Failed to delete calendar event: ${response.statusText}`);
+    }
     return true;
   },
 };

@@ -3,19 +3,16 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { judgmentService } from '../../services/library/judgmentService';
 
-const courtColors = {
-  'Supreme Court': 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
-  'High Court':    'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400',
-  'NCLAT':         'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400',
-  'NCDRC':         'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400',
-};
-
-const JudgmentCard = ({ judgment, onSaveToggle }) => {
+const JudgmentCard = ({ judgment, query = '', onSaveToggle }) => {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    judgmentService.isSaved(judgment.id).then(setSaved);
+    let active = true;
+    judgmentService.isSaved(judgment.id).then((value) => {
+      if (active) setSaved(value);
+    });
+    return () => { active = false; };
   }, [judgment.id]);
 
   const handleSaveToggle = async (e) => {
@@ -39,21 +36,45 @@ const JudgmentCard = ({ judgment, onSaveToggle }) => {
     }
   };
 
+  const dateLabel = judgment.judgment_date || (judgment.year ? String(judgment.year) : '');
+
+  const HighlightedText = ({ text, highlight }) => {
+    if (!highlight || !text) return <>{text}</>;
+    const terms = highlight.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!terms.length) return <>{text}</>;
+    const regex = new RegExp(`(${terms.join('|')})`, 'gi');
+    const parts = text.split(regex);
+    return (
+      <>
+        {parts.map((part, i) =>
+          regex.test(part) ? (
+            <mark key={i} className="bg-amber-100 text-amber-900 font-medium px-0.5 rounded">{part}</mark>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+      </>
+    );
+  };
+
   return (
     <Link
       to={`/dashboard/judgments/${judgment.id}`}
       state={{ judgment }}
       className="flex flex-col p-5 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all group"
     >
-      {/* Top row */}
       <div className="flex justify-between items-start gap-3 mb-3">
         <div className="flex flex-wrap gap-2">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${courtColors[judgment.court] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-            {judgment.court}
-          </span>
-          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-            {judgment.category}
-          </span>
+          {judgment.court ? (
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              {judgment.court}
+            </span>
+          ) : null}
+          {dateLabel ? (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+              {dateLabel}
+            </span>
+          ) : null}
         </div>
         <button
           onClick={handleSaveToggle}
@@ -69,34 +90,24 @@ const JudgmentCard = ({ judgment, onSaveToggle }) => {
         </button>
       </div>
 
-      {/* Title */}
-      <h3 className="font-bold text-slate-900 dark:text-white text-base leading-snug group-hover:text-primary transition-colors line-clamp-2 mb-1">
-        {judgment.title}
+      <h3 className="font-bold text-slate-900 dark:text-white text-base leading-snug group-hover:text-primary transition-colors line-clamp-3 mb-2">
+        <HighlightedText text={judgment.title} highlight={query} />
       </h3>
 
-      {/* Citation + Year */}
-      <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-3">{judgment.citation} • {judgment.year}</p>
+      {judgment.citation ? (
+        <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-3">
+          <HighlightedText text={judgment.citation} highlight={query} />
+        </p>
+      ) : null}
 
-      {/* Summary snippet */}
-      <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 flex-1 leading-relaxed">
-        {judgment.ratiodecidendi}
-      </p>
+      {judgment.excerpt ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-4 flex-1 leading-relaxed">
+          <HighlightedText text={judgment.excerpt} highlight={query} />
+        </p>
+      ) : <div className="flex-1" />}
 
-      {/* Footer */}
-      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-        <div className="flex flex-wrap gap-1">
-          {judgment.tags.slice(0, 2).map(tag => (
-            <span key={tag} className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 font-medium">
-              {tag}
-            </span>
-          ))}
-          {judgment.tags.length > 2 && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 font-medium">
-              +{judgment.tags.length - 2}
-            </span>
-          )}
-        </div>
-        <span className="text-xs text-primary font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end items-center gap-3">
+        <span className="text-xs text-primary font-medium flex items-center gap-1 group-hover:gap-2 transition-all flex-shrink-0">
           Read <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
         </span>
       </div>

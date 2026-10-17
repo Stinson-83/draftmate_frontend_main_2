@@ -1,135 +1,62 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { mockJudgments } from '../../data/mockJudgments';
+import { getLegalJudgment } from '../../services/library/judgmentApi';
 import { judgmentService } from '../../services/library/judgmentService';
 import { notesService } from '../../services/library/notesService';
-import ExplainDrawer from '../../components/library/ExplainDrawer';
-import NoteDrawer from '../../components/library/NoteDrawer';
-import { getMetadata, getJudgment, downloadDocument } from '../../services/library/judgmentApi';
-
-const DetailSection = ({ icon, title, children, accent = 'blue' }) => {
-  const accentMap = {
-    blue:    'border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-900/10',
-    amber:   'border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-900/10',
-    red:     'border-red-200 dark:border-red-900/40 bg-red-50/50 dark:bg-red-900/10',
-    purple:  'border-purple-200 dark:border-purple-900/40 bg-purple-50/50 dark:bg-purple-900/10',
-    emerald: 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-900/10',
-    slate:   'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30',
-  };
-  return (
-    <div className={`rounded-2xl border p-6 ${accentMap[accent]}`}>
-      <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white mb-3">
-        <span className="text-xl">{icon}</span>
-        {title}
-      </h3>
-      <div className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">{children}</div>
-    </div>
-  );
-};
+import { API_CONFIG } from '../../services/endpoints';
 
 const JudgmentDetails = () => {
   const { judgmentId } = useParams();
-  const location = useLocation();
   const [judgment, setJudgment] = useState(null);
-  const [fullText, setFullText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
-  const [isExplainOpen, setIsExplainOpen] = useState(false);
-  const [isNoteOpen, setIsNoteOpen] = useState(false);
   const [apiError, setApiError] = useState(null);
+  const backSearch = sessionStorage.getItem('draftmate_judgment_library_search') || '';
 
-  // Load judgment from API or fall back to mock
   useEffect(() => {
-    const loadJudgment = async () => {
-      setIsLoading(true);
-      setApiError(null);
-      try {
-        let activeJudgment = location.state?.judgment;
-
-        if (!activeJudgment || activeJudgment.id !== judgmentId) {
-          const mock = mockJudgments.find(j => j.id === judgmentId);
-          if (mock) {
-            activeJudgment = mock;
-          } else {
-            const metadata = await getMetadata(judgmentId);
-            if (metadata) {
-              activeJudgment = metadata;
-            }
-          }
-        }
-
-        if (activeJudgment) {
-          setJudgment(activeJudgment);
-
-          // Fetch full text
-          const textData = await getJudgment(judgmentId);
-          const rawText = textData?.data?.text || textData?.text || textData?.doc || (typeof textData === 'string' ? textData : '');
-          if (rawText && rawText.trim().length > 10) {
-            setFullText(rawText);
-          } else if (activeJudgment.fullText || activeJudgment.text || activeJudgment.summary) {
-            setFullText(activeJudgment.fullText || activeJudgment.text || activeJudgment.summary);
-          }
-        } else {
-          setApiError('Judgment not found');
-        }
-      } catch (e) {
-        console.error(e);
-        const mock = mockJudgments.find(j => j.id === judgmentId);
-        if (mock) {
-          setJudgment(mock);
-          setFullText(mock.fullText || mock.text || mock.summary || '');
-        } else {
-          setApiError('Failed to load judgment');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (judgmentId) loadJudgment();
-  }, [judgmentId, location.state]);
+    const controller = new AbortController();
+    setIsLoading(true);
+    setApiError(null);
+    getLegalJudgment(judgmentId, { signal: controller.signal })
+      .then((data) => setJudgment(data))
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setJudgment(null);
+        setApiError(error.message || 'Failed to load judgment');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, [judgmentId]);
 
   useEffect(() => {
     if (judgment) judgmentService.isSaved(judgment.id).then(setIsSaved);
-  }, [judgment?.id]);
+  }, [judgment]);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full overflow-hidden">
-        <div className="px-6 py-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151f2e]">
-          <div className="flex items-center gap-4 max-w-5xl mx-auto">
-            <div className="w-10 h-10 rounded-full bg-slate-100 animate-pulse"></div>
-            <div className="flex-1">
-              <div className="w-32 h-4 bg-slate-100 rounded-full mb-2 animate-pulse"></div>
-              <div className="w-full h-8 bg-slate-100 rounded-lg animate-pulse"></div>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 p-6 md:p-8 flex items-center justify-center">
-          <span className="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
-        </div>
+      <div className="p-8 space-y-4 max-w-5xl mx-auto">
+        <div className="h-8 w-2/3 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+        <div className="h-4 w-1/3 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" />
+        <div className="h-64 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
       </div>
     );
   }
 
-  if (apiError) {
+  if (apiError || !judgment) {
     return (
       <div className="p-8 text-center h-full flex flex-col items-center justify-center">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{apiError}</h2>
-        <Link to="/dashboard/judgments" className="mt-4 text-primary hover:underline">Return to Judgments</Link>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{apiError || 'Judgment not found'}</h2>
+        <Link to={`/dashboard/judgments${backSearch}`} className="mt-4 text-primary hover:underline">Back to Search</Link>
       </div>
     );
   }
 
-  if (!judgment) {
-    return (
-      <div className="p-8 text-center h-full flex flex-col items-center justify-center">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Judgment Not Found</h2>
-        <Link to="/dashboard/judgments" className="mt-4 text-primary hover:underline">Return to Judgments</Link>
-      </div>
-    );
-  }
+  const dateLabel = judgment.judgment_date || (judgment.year ? String(judgment.year) : '');
+  const hasContent = Boolean(judgment.text && judgment.text.trim().length > 0);
 
   const handleSaveToggle = async () => {
     if (isSaved) {
@@ -144,18 +71,9 @@ const JudgmentDetails = () => {
   };
 
   const handleCopy = () => {
-    const text = [
-      judgment.title,
-      judgment.citation,
-      '',
-      `RATIO DECIDENDI\n${judgment.ratiodecidendi}`,
-      '',
-      `SUMMARY\n${judgment.summary}`,
-      '',
-      `KEY PRINCIPLES\n${judgment.keyPrinciples.map((p,i) => `${i+1}. ${p}`).join('\n')}`,
-    ].join('\n');
+    const text = [judgment.title, judgment.citation, judgment.court, dateLabel, '', judgment.text].filter(Boolean).join('\n');
     navigator.clipboard.writeText(text);
-    toast.success('Judgment copied to clipboard');
+    toast.success('Judgment copied');
   };
 
   const handleSaveToNotes = async () => {
@@ -164,21 +82,14 @@ const JudgmentDetails = () => {
       await notesService.createNote({
         title: judgment.title,
         content: [
-          `Citation: ${judgment.citation}`,
-          `Court: ${judgment.court} (${judgment.year})`,
-          `Bench: ${judgment.bench}`,
+          judgment.citation ? `Citation: ${judgment.citation}` : '',
+          judgment.court ? `Court: ${judgment.court}` : '',
+          dateLabel ? `Date: ${dateLabel}` : '',
+          judgment.case_id ? `Case ID: ${judgment.case_id}` : '',
           '',
-          `LEGAL ISSUE\n${judgment.legalIssue}`,
-          '',
-          `RATIO DECIDENDI\n${judgment.ratiodecidendi}`,
-          '',
-          `SUMMARY\n${judgment.summary}`,
-          '',
-          `KEY PRINCIPLES\n${(judgment.keyPrinciples || []).map((p,i) => `${i+1}. ${p}`).join('\n')}`,
-        ].join('\n'),
-        tags: [judgment.category, judgment.court, ...(judgment.tags || []).slice(0, 3)],
-        linkedActId: null,
-        linkedActName: null,
+          judgment.text || '',
+        ].filter((line) => line !== undefined).join('\n'),
+        tags: [judgment.court, judgment.source].filter(Boolean),
       });
       toast.success('Saved to My Notes');
     } catch {
@@ -188,177 +99,96 @@ const JudgmentDetails = () => {
     }
   };
 
-  const handleShare = async () => {
-    const shareData = {
-      title: judgment.title,
-      text: `${judgment.citation} - ${judgment.court}, ${judgment.year}`,
-      url: window.location.href,
-    };
+  const handleDownloadPDF = async () => {
     try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        toast.success('Link copied to clipboard!');
-      }
+      toast.info('Generating PDF...', { id: 'pdf-toast' });
+      const url = `${API_CONFIG.LIBRARY.BASE_URL}/api/v1/legal/judgments/${encodeURIComponent(judgment.id)}/pdf`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('PDF generation failed');
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `Judgment_${judgment.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl);
+        document.body.removeChild(a);
+      }, 100);
+      toast.success('Downloaded PDF', { id: 'pdf-toast' });
     } catch (err) {
-      console.error('Error sharing:', err);
+      console.error("PDF generation failed", err);
+      toast.error('Failed to generate PDF', { id: 'pdf-toast' });
     }
   };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Header ── */}
-      <div className="px-6 py-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151f2e] flex-shrink-0 z-10">
+      <div className="px-6 py-4 md:px-8 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151f2e] flex-shrink-0">
         <div className="flex items-start gap-4 max-w-5xl mx-auto">
-          <Link to="/dashboard/judgments" className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0 mt-1">
+          <Link to={`/dashboard/judgments${backSearch}`} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 flex-shrink-0 mt-1">
             <span className="material-symbols-outlined">arrow_back</span>
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap gap-2 mb-2">
-              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">{judgment.court}</span>
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.category}</span>
-              <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.citation}</span>
+              {judgment.court ? <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">{judgment.court}</span> : null}
+              {judgment.citation ? <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{judgment.citation}</span> : null}
+              {dateLabel ? <span className="px-2.5 py-1 rounded-full text-xs bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">{dateLabel}</span> : null}
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white leading-tight">{judgment.title}</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{judgment.bench || (judgment.judges?.length > 0 ? `Bench: ${judgment.judges.join(', ')}` : 'Indian Kanoon Judgment')} • {judgment.year || judgment.date}</p>
+            <p className="text-sm text-slate-500 mt-1">Case ID: {judgment.case_id}</p>
           </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 flex-shrink-0">
-            <button onClick={handleSaveToggle} title={isSaved ? 'Remove' : 'Save'}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${isSaved ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/40' : 'bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-              <span className={`material-symbols-outlined text-[18px] ${isSaved ? 'icon-fill' : ''}`}>bookmark</span>
-              <span className="hidden md:inline">{isSaved ? 'Saved' : 'Save'}</span>
+          <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+            <button onClick={handleSaveToggle} className="px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">{isSaved ? 'Saved' : 'Save'}</button>
+            <button onClick={handleCopy} className="px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Copy</button>
+            <button onClick={handleDownloadPDF} className="px-3 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF
             </button>
-            <button onClick={handleCopy} title="Copy" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <span className="material-symbols-outlined text-[18px]">content_copy</span>
-              <span className="hidden md:inline">Copy</span>
-            </button>
-            <button onClick={() => downloadDocument(judgment.id, judgment.pdfUrl)} title="Download" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              <span className="hidden md:inline">Download</span>
-            </button>
-            <button onClick={handleShare} title="Share" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white dark:bg-[#1e293b] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-              <span className="material-symbols-outlined text-[18px]">share</span>
-              <span className="hidden md:inline">Share</span>
-            </button>
-            <button onClick={() => setIsExplainOpen(true)} title="AI Summary" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm">
-              <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-              <span className="hidden md:inline">AI Summary</span>
-            </button>
-            <button onClick={handleSaveToNotes} disabled={isSavingNote} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors shadow-sm">
-              <span className="material-symbols-outlined text-[18px]">save</span>
-              <span className="hidden md:inline">{isSavingNote ? 'Saving...' : 'Save to Notes'}</span>
-            </button>
+            <button onClick={handleSaveToNotes} disabled={isSavingNote} className="px-3 py-2 rounded-xl text-sm bg-emerald-600 text-white disabled:opacity-60 hover:bg-emerald-700 transition-colors">{isSavingNote ? 'Saving...' : 'Save to Notes'}</button>
           </div>
         </div>
       </div>
 
-      {/* ── Body ── */}
       <div className="flex-1 overflow-y-auto p-6 md:p-8">
         <div className="max-w-5xl mx-auto space-y-5">
-
-          {/* Parties & Judges */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {judgment.parties && (judgment.parties.petitioner || judgment.parties.respondent) && (
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider mb-2">Parties</p>
-                <p className="text-sm text-slate-800"><span className="font-semibold">Petitioner:</span> {judgment.parties?.petitioner || 'N/A'}</p>
-                <p className="text-sm text-slate-800 mt-1"><span className="font-semibold">Respondent:</span> {judgment.parties?.respondent || 'N/A'}</p>
-              </div>
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-6 md:p-10 bg-white dark:bg-[#0f172a] shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">Judgment Text</h2>
+            {hasContent ? (
+              <div
+                className="judgment-content text-[17px] leading-[1.85] text-slate-800 dark:text-slate-300
+                  [&>p]:mb-6 [&>p]:text-justify
+                  [&>blockquote]:my-6 [&>blockquote]:border-l-4 [&>blockquote]:border-primary/60 [&>blockquote]:pl-5 [&>blockquote]:py-2 [&>blockquote]:italic [&>blockquote]:bg-slate-50 dark:[&>blockquote]:bg-slate-800/30
+                  [&>pre]:my-6 [&>pre]:whitespace-pre-wrap [&>pre]:font-mono [&>pre]:text-sm [&>pre]:bg-slate-100 dark:[&>pre]:bg-slate-800/50 [&>pre]:p-4 [&>pre]:rounded-lg
+                  [&>h1]:text-2xl [&>h1]:font-bold [&>h1]:mt-8 [&>h1]:mb-4 [&>h1]:text-slate-900 dark:[&>h1]:text-white
+                  [&>h2]:text-xl [&>h2]:font-bold [&>h2]:mt-8 [&>h2]:mb-4 [&>h2]:text-slate-900 dark:[&>h2]:text-white
+                  [&>h3]:text-lg [&>h3]:font-bold [&>h3]:mt-6 [&>h3]:mb-3 [&>h3]:text-slate-900 dark:[&>h3]:text-white
+                  [&>a]:text-primary [&>a]:underline [&>a]:underline-offset-4
+                  [&>ul]:list-disc [&>ul]:pl-8 [&>ul]:mb-6
+                  [&>ol]:list-decimal [&>ol]:pl-8 [&>ol]:mb-6"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                dangerouslySetInnerHTML={{ __html: judgment.text }}
+              />
+            ) : (
+              <p className="text-sm text-slate-500">No judgment text is stored for this record.</p>
             )}
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider mb-2">Judges</p>
-              {judgment.judges?.length > 0 ? (
-                <ul className="space-y-0.5">
-                  {judgment.judges.map((j, i) => (
-                    <li key={i} className="text-sm text-slate-800">{j}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-500">No judges listed</p>
-              )}
-            </div>
           </div>
 
-          {/* Summary */}
-          {judgment.summary && (
-            <DetailSection icon="📖" title="Summary" accent="amber">
-              {judgment.summary}
-            </DetailSection>
-          )}
-
-          {/* Ratio Decidendi */}
-          {judgment.ratiodecidendi && (
-            <DetailSection icon="🏛" title="Ratio Decidendi (Binding Principle)" accent="purple">
-              <p className="font-medium italic">{judgment.ratiodecidendi}</p>
-            </DetailSection>
-          )}
-
-          {/* Full Text */}
-          {fullText && fullText.trim().length > 20 ? (
-            <DetailSection icon="📄" title="Full Judgment Text" accent="slate">
-              <div
-                className="text-sm leading-relaxed text-slate-800 dark:text-slate-200 font-serif max-h-[700px] overflow-y-auto pr-3 space-y-4 custom-scrollbar"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif', lineHeight: '1.8' }}
-              >
-                {fullText.split('\n\n').map((para, idx) => (
-                  <p key={idx} className="whitespace-pre-wrap">
-                    {para.trim()}
-                  </p>
-                ))}
-              </div>
-            </DetailSection>
-          ) : (
-            <DetailSection icon="📄" title="Full Judgment Text" accent="slate">
-              <div className="text-center py-6 space-y-3">
-                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                  Full text available directly on Indian Kanoon database
-                </p>
-                <a
-                  href={`https://indiankanoon.org/doc/${judgment.id}/`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
-                >
-                  <span className="material-symbols-outlined text-base">open_in_new</span>
-                  Read Full Judgment on Indian Kanoon
-                </a>
-              </div>
-            </DetailSection>
-          )}
-
-          {/* Key Principles (only if available) */}
-          {judgment.keyPrinciples && judgment.keyPrinciples.length > 0 && (
-            <DetailSection icon="📋" title="Key Principles" accent="emerald">
-              <ul className="space-y-2">
-                {judgment.keyPrinciples.map((p, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
-                    <span className="text-slate-700">{p}</span>
+          {Array.isArray(judgment.excerpts) && judgment.excerpts.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white mb-3">Recorded passages ({judgment.excerpts.length})</h2>
+              <ol className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
+                {judgment.excerpts.map((excerpt) => (
+                  <li key={excerpt.chunk_index} className="flex flex-col gap-1">
+                    <span className="font-mono text-xs text-slate-400">{excerpt.chunk_index}</span>
+                    <p className="line-clamp-2">{excerpt.text}</p>
                   </li>
                 ))}
-              </ul>
-            </DetailSection>
-          )}
-
-          {/* Tags */}
-          {judgment.tags && judgment.tags.length > 0 && (
-            <div className="p-4 rounded-2xl bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700">
-              <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold tracking-wider mb-3">Tags</p>
-              <div className="flex flex-wrap gap-2">
-                {judgment.tags.map(tag => (
-                  <span key={tag} className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 text-xs font-medium">{tag}</span>
-                ))}
-              </div>
+              </ol>
             </div>
           )}
-
         </div>
       </div>
-      <ExplainDrawer isOpen={isExplainOpen} onClose={() => setIsExplainOpen(false)} content={judgment} type="judgment" fullText={fullText} />
-      <NoteDrawer isOpen={isNoteOpen} onClose={() => setIsNoteOpen(false)} />
     </div>
   );
 };

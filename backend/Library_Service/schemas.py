@@ -1,7 +1,7 @@
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
-from datetime import date, time, datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Optional, List, Dict, Any, Union
+from datetime import date, time as dt_time, datetime
+from uuid import UUID
 
 
 class ClientBase(BaseModel):
@@ -30,8 +30,8 @@ class ClientUpdate(BaseModel):
 
 
 class Client(ClientBase):
-    id: str
-    user_id: str
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
     created_at: datetime
     updated_at: datetime
 
@@ -77,9 +77,9 @@ class CaseUpdate(BaseModel):
 
 
 class Case(CaseBase):
-    id: str
-    user_id: str
-    client_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    client_id: Optional[Union[UUID, str]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -121,10 +121,10 @@ class HearingUpdate(BaseModel):
 
 
 class Hearing(HearingBase):
-    id: str
-    user_id: str
-    case_id: Optional[str] = None
-    client_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    case_id: Optional[Union[UUID, str]] = None
+    client_id: Optional[Union[UUID, str]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -135,8 +135,8 @@ class Hearing(HearingBase):
 class CalendarEventBase(BaseModel):
     title: str
     type: str
-    date: date
-    time: Optional[time] = None
+    date: Union[date, str]
+    time: Optional[Union[dt_time, str]] = None
     notes: Optional[str] = None
     is_diary_event: bool = False
 
@@ -150,8 +150,8 @@ class CalendarEventCreate(CalendarEventBase):
 class CalendarEventUpdate(BaseModel):
     title: Optional[str] = None
     type: Optional[str] = None
-    date: Optional[date] = None
-    time: Optional[time] = None
+    date: Optional[Union[date, str]] = None
+    time: Optional[Union[dt_time, str]] = None
     notes: Optional[str] = None
     is_diary_event: Optional[bool] = None
     case_id: Optional[str] = None
@@ -160,10 +160,10 @@ class CalendarEventUpdate(BaseModel):
 
 
 class CalendarEvent(CalendarEventBase):
-    id: str
-    user_id: str
-    case_id: Optional[str] = None
-    hearing_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    case_id: Optional[Union[UUID, str]] = None
+    hearing_id: Optional[Union[UUID, str]] = None
     diary_entry_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -180,8 +180,8 @@ class VideoLinkBase(BaseModel):
     meeting_link: Optional[str] = None
     meeting_id: Optional[str] = None
     passcode: Optional[str] = None
-    hearing_date: Optional[date] = None
-    start_time: Optional[time] = None
+    hearing_date: Optional[Union[date, str]] = None
+    start_time: Optional[Union[dt_time, str]] = None
     notes: Optional[str] = None
 
 
@@ -200,16 +200,16 @@ class VideoLinkUpdate(BaseModel):
     meeting_link: Optional[str] = None
     meeting_id: Optional[str] = None
     passcode: Optional[str] = None
-    hearing_date: Optional[date] = None
-    start_time: Optional[time] = None
+    hearing_date: Optional[Union[date, str]] = None
+    start_time: Optional[Union[dt_time, str]] = None
     notes: Optional[str] = None
 
 
 class VideoLink(VideoLinkBase):
-    id: str
-    user_id: str
-    case_id: Optional[str] = None
-    hearing_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    case_id: Optional[Union[UUID, str]] = None
+    hearing_id: Optional[Union[UUID, str]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -223,9 +223,9 @@ class CaseTrackingBase(BaseModel):
     case_title: Optional[str] = None
     court_establishment: Optional[str] = None
     case_stage: Optional[str] = None
-    last_updated: Optional[date] = None
-    next_hearing_date: Optional[date] = None
-    next_hearing_time: Optional[time] = None
+    last_updated: Optional[Union[date, str]] = None
+    next_hearing_date: Optional[Union[date, str]] = None
+    next_hearing_time: Optional[Union[dt_time, str]] = None
     latest_order: Optional[str] = None
     latest_proceeding: Optional[str] = None
 
@@ -241,17 +241,17 @@ class CaseTrackingUpdate(BaseModel):
     case_title: Optional[str] = None
     court_establishment: Optional[str] = None
     case_stage: Optional[str] = None
-    last_updated: Optional[date] = None
-    next_hearing_date: Optional[date] = None
-    next_hearing_time: Optional[time] = None
+    last_updated: Optional[Union[date, str]] = None
+    next_hearing_date: Optional[Union[date, str]] = None
+    next_hearing_time: Optional[Union[dt_time, str]] = None
     latest_order: Optional[str] = None
     latest_proceeding: Optional[str] = None
 
 
 class CaseTracking(CaseTrackingBase):
-    id: str
-    user_id: str
-    case_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    case_id: Optional[Union[UUID, str]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -283,9 +283,9 @@ class NoteUpdate(BaseModel):
 
 
 class Note(NoteBase):
-    id: str
-    user_id: str
-    case_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    case_id: Optional[Union[UUID, str]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -306,8 +306,8 @@ class BookmarkFolderUpdate(BaseModel):
 
 
 class BookmarkFolder(BookmarkFolderBase):
-    id: str
-    user_id: str
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
     created_at: datetime
 
     class Config:
@@ -336,9 +336,9 @@ class BookmarkUpdate(BaseModel):
 
 
 class Bookmark(BookmarkBase):
-    id: str
-    user_id: str
-    folder_id: Optional[str] = None
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
+    folder_id: Optional[Union[UUID, str]] = None
     created_at: datetime
 
     class Config:
@@ -346,7 +346,7 @@ class Bookmark(BookmarkBase):
 
 
 # =========================
-# Legal Dictionary Schemas
+# Legal Dictionary Schemas (upstream)
 # =========================
 class TermSearchResponse(BaseModel):
     id: int

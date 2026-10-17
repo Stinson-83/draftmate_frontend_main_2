@@ -4,15 +4,17 @@ import { bareActsApi } from '../../services/library/bareActsApi';
 import SectionToolbar from '../../components/library/SectionToolbar';
 import NoteDrawer from '../../components/library/NoteDrawer';
 import ExplainDrawer from '../../components/library/ExplainDrawer';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const ActDetails = () => {
   const { actId } = useParams();
   const [act, setAct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [activeChapter, setActiveChapter] = useState(null);
-  
+
   // Drawer State
   const [isNoteDrawerOpen, setIsNoteDrawerOpen] = useState(false);
   const [activeSectionForNote, setActiveSectionForNote] = useState(null);
@@ -89,18 +91,22 @@ const ActDetails = () => {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white line-clamp-1">{act.name} ({act.shortName})</h1>
             <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 dark:text-slate-400">
-              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-medium">{act.category}</span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-medium">{act.documentType || act.category || "ACT"}</span>
               <span>{act.totalSections} Sections</span>
-              <span className="hidden md:inline">• Updated {new Date(act.lastUpdated).toLocaleDateString()}</span>
+              {act.lastUpdated && !isNaN(new Date(act.lastUpdated)) ? (
+                <span className="hidden md:inline">• Updated {new Date(act.lastUpdated).toLocaleDateString()}</span>
+              ) : (
+                <span className="hidden md:inline text-slate-400">• Date unavailable</span>
+              )}
             </div>
           </div>
         </div>
         <div className="w-full md:w-64">
            <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">search</span>
-            <input 
-              type="text" 
-              placeholder="Search in Act..." 
+            <input
+              type="text"
+              placeholder="Search in Act..."
               className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
             />
           </div>
@@ -160,14 +166,16 @@ const ActDetails = () => {
                           <span className="font-bold text-primary">Section {section.number}</span>
                           <h4 className="font-bold text-slate-900 dark:text-white text-lg">{section.title}</h4>
                         </div>
-                        <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-2">
-                          {section.content}
-                        </p>
-                        
-                        <SectionToolbar 
-                          act={act} 
-                          chapter={currentChapter} 
-                          section={section} 
+                        <div className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-2 prose dark:prose-invert max-w-none prose-sm">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {section.content || ''}
+                          </ReactMarkdown>
+                        </div>
+
+                        <SectionToolbar
+                          act={act}
+                          chapter={currentChapter}
+                          section={section}
                           onAddNote={() => handleOpenNote(section)}
                           onAIExplain={() => handleAIExplain(section)}
                         />
@@ -182,9 +190,9 @@ const ActDetails = () => {
       </div>
 
       {/* Note Drawer */}
-      <NoteDrawer 
-        isOpen={isNoteDrawerOpen} 
-        onClose={() => setIsNoteDrawerOpen(false)} 
+      <NoteDrawer
+        isOpen={isNoteDrawerOpen}
+        onClose={() => setIsNoteDrawerOpen(false)}
         act={act}
         chapter={currentChapter}
         section={activeSectionForNote}

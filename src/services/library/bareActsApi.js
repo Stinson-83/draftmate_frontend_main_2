@@ -1,8 +1,7 @@
 import { API_CONFIG } from '../../services/endpoints';
-import * as localBareActsService from './localBareActsService';
 
 // 5-minute cache
-const CACHE_TTL = 5 * 60 * 1000; 
+const CACHE_TTL = 5 * 60 * 1000;
 const cache = new Map();
 
 const getCacheKey = (key) => `bareacts:${key}`;
@@ -31,32 +30,33 @@ const fetchBareActsEndpoint = async (endpoint) => {
       throw new Error(`HTTP ${response.status}`);
     }
     const json = await response.json();
-    return json.success ? json.data : null;
+    if (!json.success) {
+      throw new Error("Backend API error: " + JSON.stringify(json));
+    }
+    return json.data;
   } catch (err) {
-    console.warn("Backend Bare Acts API unavailable, using local registry fallback:", err);
-    return null;
+    console.error("Backend Bare Acts API unavailable:", err);
+    throw err;
   }
 };
 
 export const bareActsApi = {
-  async getActs() {
-    const cached = getCached('acts');
-    if (cached) return cached;
-    let data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACTS);
-    if (!data || data.length === 0) {
-      data = localBareActsService.getActs();
-    }
-    setCached('acts', data);
+  async getActs(page = 1, pageSize = 20, state = null, category = null, jurisdiction = null, status = null) {
+    const queryParams = new URLSearchParams({ page, pageSize });
+    if (state) queryParams.append('state', state);
+    if (category) queryParams.append('category', category);
+    if (jurisdiction) queryParams.append('jurisdiction', jurisdiction);
+    if (status) queryParams.append('status', status);
+
+    const url = `${API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACTS}?${queryParams.toString()}`;
+    const data = await fetchBareActsEndpoint(url);
     return data;
   },
 
   async getActById(actId) {
     const cached = getCached(`act:${actId}`);
     if (cached) return cached;
-    let data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACT(actId));
-    if (!data) {
-      data = localBareActsService.getActById(actId);
-    }
+    const data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_ACT(actId));
     setCached(`act:${actId}`, data);
     return data;
   },
@@ -68,23 +68,14 @@ export const bareActsApi = {
     if (chapterId) {
       url += `?chapter_id=${chapterId}`;
     }
-    let data = await fetchBareActsEndpoint(url);
-    if (!data || data.length === 0) {
-      data = localBareActsService.getSections(actId, chapterId);
-    }
+    const data = await fetchBareActsEndpoint(url);
     setCached(`sections:${actId}:${chapterId}`, data);
     return data;
   },
 
-  async searchActs(query) {
-    const cached = getCached(`search:acts:${query}`);
-    if (cached) return cached;
-    const url = `${API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.SEARCH_ACTS}?query=${encodeURIComponent(query)}`;
-    let data = await fetchBareActsEndpoint(url);
-    if (!data || data.length === 0) {
-      data = localBareActsService.searchActs(query);
-    }
-    setCached(`search:acts:${query}`, data);
+  async searchActs(query, page = 1, pageSize = 20) {
+    const url = `${API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.SEARCH_ACTS}?query=${encodeURIComponent(query)}&page=${page}&pageSize=${pageSize}`;
+    const data = await fetchBareActsEndpoint(url);
     return data;
   },
 
@@ -92,10 +83,7 @@ export const bareActsApi = {
     const cached = getCached(`search:sections:${query}`);
     if (cached) return cached;
     const url = `${API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.SEARCH_SECTIONS}?query=${encodeURIComponent(query)}`;
-    let data = await fetchBareActsEndpoint(url);
-    if (!data || data.length === 0) {
-      data = localBareActsService.searchSections(query);
-    }
+    const data = await fetchBareActsEndpoint(url);
     setCached(`search:sections:${query}`, data);
     return data;
   },
@@ -103,10 +91,7 @@ export const bareActsApi = {
   async getCategories() {
     const cached = getCached('categories');
     if (cached) return cached;
-    let data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_CATEGORIES);
-    if (!data || data.length === 0) {
-      data = localBareActsService.getCategories();
-    }
+    const data = await fetchBareActsEndpoint(API_CONFIG.LIBRARY.ENDPOINTS.BARE_ACTS.GET_CATEGORIES);
     setCached('categories', data);
     return data;
   },

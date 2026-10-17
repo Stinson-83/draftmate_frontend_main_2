@@ -58,7 +58,7 @@ class NormalizedJudgment:
 class IndianKanoonService:
     """
     Reusable service class for Indian Kanoon API integration.
-    
+
     Handles:
     - Environment variable configuration
     - Async HTTP requests with retries, caching, and timeouts
@@ -66,7 +66,7 @@ class IndianKanoonService:
     - Response normalization
     - Comprehensive error handling and fallback landmarks
     """
-    
+
     def __init__(self):
         """Initialize the service with environment variables."""
         env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), '.env')
@@ -75,14 +75,14 @@ class IndianKanoonService:
 
         self.api_token = (os.getenv("INDIANKANOON_API_TOKEN", "") or os.getenv("IKApi", "")).strip()
         self.base_url = os.getenv("INDIANKANOON_BASE_URL", "https://api.indiankanoon.org").rstrip("/")
-        
+
         if not self.api_token:
             logger.warning("INDIANKANOON_API_TOKEN is not set — fallback web pipeline active")
-        
+
         self.timeout = httpx.Timeout(20.0, connect=10.0)
         self._cache: Dict[str, tuple[float, List[NormalizedJudgment]]] = {}
         self._cache_ttl = 300  # 5 minutes in-memory TTL
-    
+
     def _get_headers(self) -> Dict[str, str]:
         """Get headers required for Indian Kanoon API requests."""
         return {
@@ -103,32 +103,68 @@ class IndianKanoonService:
         """Make request to official Indian Kanoon API endpoint."""
         if not self.api_token:
             raise AuthenticationError("INDIANKANOON_API_TOKEN is not set")
-            
+
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             if method.upper() == "POST":
                 response = await client.post(url, headers=self._get_headers(), data=data)
             else:
                 response = await client.get(url, headers=self._get_headers(), params=data)
-                
+
             if response.status_code in (401, 403):
                 raise AuthenticationError(f"Authentication failed: {response.text}")
             elif response.status_code == 429:
                 raise RateLimitError("Rate limit exceeded")
             elif response.status_code == 404:
                 raise NotFoundError("Resource not found")
-            
+
             response.raise_for_status()
             return response.json()
 
-    async def search_judgments(self, query: str, page: int = 1) -> List[NormalizedJudgment]:
+    async def search_judgments(self, query: str, page: int = 1, filters: dict = None) -> List[NormalizedJudgment]:
         """
         Search for judgments on Indian Kanoon using API with live web search fallback.
         Guarantees real-time judgment results for all user queries and filters.
         """
         query_clean = query.strip()
+
+        parts = []
+        if query_clean:
+            parts.append(query_clean)
+
+        if filters:
+            if filters.get("citation"):
+                parts.append(f'"{filters["citation"].strip()}"')
+            if filters.get("court") and filters["court"].lower() != "all courts" and filters["court"].lower() != "all":
+                court = filters["court"].lower()
+                if "supreme court" in court:
+                    parts.append("doctypes: supremecourt")
+                elif "high court" in court:
+                    parts.append("doctypes: highcourts")
+                else:
+                    parts.append(f'"{filters["court"]}"')
+            if filters.get("act"):
+                parts.append(f'"{filters["act"].strip()}"')
+            if filters.get("section"):
+                parts.append(f"Section {filters['section'].strip()}")
+            if filters.get("year_from"):
+                parts.append(f"fromdate: 1-1-{filters['year_from']}")
+            if filters.get("year_to"):
+                parts.append(f"todate: 31-12-{filters['year_to']}")
+            sort = filters.get("sort")
+            if sort == "newest":
+                parts.append("sortby: mostrecent")
+            elif sort == "oldest":
+                parts.append("sortby: leastrecent")
+
+        has_doctype = any("doctypes:" in p for p in parts)
+        if not has_doctype:
+            parts.append("doctypes: judgments")
+
+        query_clean = " ".join(parts).strip()
+
         if not query_clean:
-            query_clean = "Supreme Court 2024"
+            query_clean = "doctypes: supremecourt sortby: mostrecent"
 
         # Check in-memory cache
         cache_key = f"{query_clean.lower()}_{page}"
@@ -141,7 +177,7 @@ class IndianKanoonService:
 
         logger.info(f"Searching Indian Kanoon for: '{query_clean}' (page {page})")
         pagenum = max(0, page - 1)
-        
+
         # 1. Official Indian Kanoon API Attempt
         if self.api_token:
             try:
@@ -160,22 +196,23 @@ class IndianKanoonService:
                     headline = doc.get("headline", "") or doc.get("snippet", "") or doc.get("headline_text", "")
                     court = doc.get("docsource", "") or doc.get("court", "") or "Indian Court"
                     pubdate = doc.get("publishdate", "") or doc.get("date", "")
-                    
+
                     j = NormalizedJudgment(
                         id=doc_id,
-                        title=self._clean_text(title) or title,
-                        court=self._clean_text(court) or court,
-                        citation=doc.get("citation", "") or "",
+                        title=self._strip_html(title) or title,
+                        court=self._strip_html(court) or court,
+                        citation=self._strip_html(doc.get("citation", "")) or "",
                         date=pubdate,
                         judges=[],
-                        summary=self._clean_text(headline) or headline or f"Landmark Indian Court decision on {title}",
+                        summary=self._strip_html(headline) or headline or "",
                         pdf_url=f"https://indiankanoon.org/doc/{doc_id}/",
                         source="Indian Kanoon"
                     )
                     if self._is_clean_judgment(j):
                         results.append(j)
-                
+
                 if results:
+                    results = self._rank_results(query_clean, results)
                     self._cache[cache_key] = (now, results)
                     return results
             except Exception as api_err:
@@ -184,23 +221,66 @@ class IndianKanoonService:
         # 2. Real-time Kanoon Live Search Pipeline (Guarantees results for all user queries)
         try:
             search_params = {"formInput": query_clean, "pagenum": str(pagenum)}
-            async with httpx.AsyncClient(timeout=15.0, http2=True) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 res = await client.get("https://indiankanoon.org/search/", params=search_params, headers=self._get_browser_headers(), follow_redirects=True)
                 if res.status_code == 200 and "Just a moment" not in res.text:
                     results = self._parse_html_results(res.text)
                     if results:
+                        results = self._rank_results(query_clean, results)
                         self._cache[cache_key] = (now, results)
                         return results
         except Exception as web_err:
             logger.error(f"Kanoon live web search pipeline error for query '{query_clean}': {web_err}")
 
-        # 3. Fallback Curated Real Landmark Judgments (Prevents empty screens on network/Cloudflare limit)
-        fallback_results = self._get_fallback_judgments(query_clean)
-        if fallback_results:
-            self._cache[cache_key] = (now, fallback_results)
-            return fallback_results
-
         return []
+
+    def _rank_results(self, query: str, results: List[NormalizedJudgment]) -> List[NormalizedJudgment]:
+        """Rank search results based on relevance to the query."""
+        q_lower = query.lower()
+        if not q_lower or q_lower == "supreme court 2024":
+            return results
+
+        def _calculate_score(judgment: NormalizedJudgment) -> float:
+            score = 0.0
+            title = (judgment.title or "").lower()
+            summary = (judgment.summary or "").lower()
+
+            # 1. Exact phrase match
+            if q_lower in title:
+                score += 50.0
+            if q_lower in summary:
+                score += 20.0
+
+            # 2. Word matches
+            q_words = q_lower.split()
+            for w in q_words:
+                if len(w) > 2:
+                    if w in title:
+                        score += 5.0
+                    if w in summary:
+                        score += 2.0
+
+            # 3. Domain specific boosting (e.g. Section 138 -> NI Act, Cheque bounce)
+            if "section 138" in q_lower or "138" in q_lower:
+                if "negotiable" in title or "negotiable" in summary:
+                    score += 30.0
+                if "cheque" in title or "cheque" in summary or "dishonour" in title or "dishonour" in summary:
+                    score += 30.0
+
+            if "498a" in q_lower:
+                if "dowry" in title or "dowry" in summary or "cruelty" in title or "cruelty" in summary:
+                    score += 30.0
+
+            if "bail" in q_lower:
+                if "439" in title or "439" in summary or "438" in title or "438" in summary:
+                    score += 20.0
+
+            return score
+
+        # Sort descending by score, maintaining original order for ties
+        scored_results = [(r, _calculate_score(r)) for r in results]
+        scored_results.sort(key=lambda x: x[1], reverse=True)
+        return [r[0] for r in scored_results]
 
     def _parse_html_results(self, html_text: str) -> List[NormalizedJudgment]:
         """Parse Indian Kanoon search result HTML page for judgment cards."""
@@ -231,9 +311,10 @@ class IndianKanoonService:
             if doc_id in seen_ids:
                 continue
 
-            raw_title = link_a.get_text(strip=True)
+            raw_title = link_a.get_text(" ", strip=True)
             if not raw_title or len(raw_title) < 3 or raw_title.lower() in ["get in pdf", "cites 0", "cited by 0", "full document", "doc gen hub"]:
                 continue
+            raw_title = re.sub(r'\s+', ' ', raw_title).strip()
 
             seen_ids.add(doc_id)
 
@@ -241,13 +322,15 @@ class IndianKanoonService:
             date_str = date_match.group(1) if date_match else ""
 
             docsource_el = article.find('span', class_='docsource') or article.find('div', class_='docsource')
-            court_name = docsource_el.get_text(strip=True) if docsource_el else "Supreme Court of India"
+            court_name = docsource_el.get_text(" ", strip=True) if docsource_el else "Supreme Court of India"
+            court_name = re.sub(r'\s+', ' ', court_name).strip()
 
             headline_el = article.find('div', class_='headline') or article.find('span', class_='headline')
             snippet = headline_el.get_text(" ", strip=True) if headline_el else f"Landmark Indian Court Decision regarding {raw_title}."
 
             cites_el = article.find('a', href=re.compile(r'cites:'))
-            cites_text = cites_el.get_text(strip=True) if cites_el else ""
+            cites_text = cites_el.get_text(" ", strip=True) if cites_el else ""
+            cites_text = re.sub(r'\s+', ' ', cites_text).strip()
 
             j = NormalizedJudgment(
                 id=doc_id,
@@ -371,60 +454,42 @@ class IndianKanoonService:
                 source="Indian Kanoon"
             )
         ]
-        
+
         matched = [j for j in all_landmarks if any(w in j.title.lower() or w in j.summary.lower() or w in j.court.lower() for w in q_lower.split())]
         return matched if matched else all_landmarks
 
+    def _strip_html(self, text: str) -> str:
+        """Completely strip all HTML tags from metadata fields (like title, summary)"""
+        if not text: return ""
+        try:
+            return BeautifulSoup(text, "html.parser").get_text(separator=" ", strip=True)
+        except:
+            return re.sub(r"<[^>]+>", " ", text).strip()
+
     def _clean_text(self, text: str) -> str:
-        """Clean HTML markup while preserving paragraph double-newlines and legal structure."""
+        """Clean script/style noise while PRESERVING HTML structure."""
         if not text:
             return ""
 
         soup = BeautifulSoup(text, 'html.parser')
         judg_div = soup.find('div', class_='judgements') or soup.find('div', class_='doc_content') or soup.find('div', class_='expanded_doc')
         if judg_div:
-            text = str(judg_div)
+            # We want to preserve the HTML inside judg_div!
+            for tag in judg_div(['script', 'style', 'header', 'footer', 'nav', 'form']):
+                tag.decompose()
+            return str(judg_div)
+
+        # Fallback if no main div
         for tag in soup(['script', 'style', 'header', 'footer', 'nav', 'form']):
             tag.decompose()
 
-        cleaned = re.sub(r"<\s*/\s*(?:p|div|pre|blockquote|h[1-6]|tr|li)\s*>", "\n\n", text, flags=re.IGNORECASE)
-        cleaned = re.sub(r"<\s*br\s*/?\s*>", "\n", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+        return str(soup)
 
-        cleaned = (
-            cleaned.replace("&nbsp;", " ")
-            .replace("&amp;", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&#39;", "'")
-            .replace("&quot;", '"')
-        )
-
-        noise_patterns = [
-            r"^Skip to main content",
-            r"^Indian Kanoon",
-            r"^Search Indian laws",
-            r"^Document Options",
-            r"^Get in PDF",
-            r"^PRISM AI",
-            r"^Integrated with over",
-            r"^Know your Kanoon",
-        ]
-
-        lines = [re.sub(r"[ \t]+", " ", line).strip() for line in cleaned.splitlines()]
-        clean_lines = []
-        for line in lines:
-            if not line:
-                continue
-            if not any(re.search(pat, line, re.IGNORECASE) for pat in noise_patterns):
-                clean_lines.append(line)
-
-        return "\n\n".join(clean_lines)
 
     async def get_document(self, doc_id: str) -> Optional[str]:
         """Get the full text of a document (judgment)."""
         logger.info(f"Fetching document: {doc_id}")
-        
+
         if self.api_token:
             try:
                 data = await self._make_request(f"/doc/{doc_id}/")
@@ -436,7 +501,7 @@ class IndianKanoonService:
 
         try:
             url_main = f"https://indiankanoon.org/doc/{doc_id}/"
-            async with httpx.AsyncClient(timeout=15.0, http2=True) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 res_m = await client.get(url_main, headers=self._get_browser_headers(), follow_redirects=True)
                 if res_m.status_code == 200:
                     return self._clean_text(res_m.text)
@@ -444,7 +509,7 @@ class IndianKanoonService:
             logger.error(f"Web fetch for doc {doc_id} failed: {web_err}")
 
         return None
-    
+
     async def get_document_metadata(self, doc_id: str) -> Optional[NormalizedJudgment]:
         """Get metadata for a specific document without fetching full text."""
         logger.info(f"Fetching metadata for document: {doc_id}")
@@ -455,7 +520,7 @@ class IndianKanoonService:
                 for result in results:
                     if str(result.id) == str(doc_id):
                         return result
-            
+
             return NormalizedJudgment(
                 id=str(doc_id),
                 title=f"Judgment {doc_id}",
@@ -482,7 +547,7 @@ class IndianKanoonService:
     async def search_by_citation(self, citation: str) -> List[NormalizedJudgment]:
         """Search for judgments by citation."""
         return await self.search_judgments(f'citation:"{citation}"', page=1)
-    
+
     async def search_by_act(self, act_name: str) -> List[NormalizedJudgment]:
         """Search for judgments related to a specific act."""
         return await self.search_judgments(act_name, page=1)

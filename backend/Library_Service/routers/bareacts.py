@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 from services.bareacts_service import bare_acts_service
 
 router = APIRouter(
@@ -17,14 +17,25 @@ class SuccessResponse(BaseModel):
 
 
 @router.get("", response_model=SuccessResponse)
-async def get_bare_acts():
-    acts = bare_acts_service.get_acts()
+async def get_bare_acts(
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
+    state: Optional[str] = None,
+    category: Optional[str] = None,
+    jurisdiction: Optional[str] = None,
+    status: Optional[str] = None
+):
+    acts = bare_acts_service.get_acts(page, pageSize, state, category, jurisdiction, status)
     return SuccessResponse(data=acts)
 
 
 @router.get("/search", response_model=SuccessResponse)
-async def search_bare_acts(query: str = Query(..., min_length=1)):
-    acts = bare_acts_service.search_acts(query)
+async def search_bare_acts(
+    query: str = Query(..., min_length=1),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100)
+):
+    acts = bare_acts_service.search_acts(query, page, pageSize)
     return SuccessResponse(data=acts)
 
 
